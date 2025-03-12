@@ -1,10 +1,12 @@
 "use client";
-import React, { useState, useRef, ChangeEvent } from "react";
+import React, { useState, useRef, useEffect, ChangeEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { CardContent } from "@/components/ui/cardContent";
 import { Button } from "@/components/ui/button";
 import { FiSearch, FiCheckCircle, FiArrowLeft, FiArrowRight, FiCamera, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
+import Quagga from 'quagga';
+
 
 // Define types for our component
 interface DeviceDetails {
@@ -15,6 +17,7 @@ interface DeviceDetails {
   lastSeen: string;
   status: string;
   macAddress: string;
+  addedAt: string; // Added timestamp field
 }
 
 const OnboardDevice: React.FC = () => {
@@ -24,70 +27,183 @@ const OnboardDevice: React.FC = () => {
   const [deviceDetails, setDeviceDetails] = useState<DeviceDetails | null>(null);
   const [isAdded, setIsAdded] = useState<boolean>(false);
   const [showCamera, setShowCamera] = useState<boolean>(false);
+  const [scanning, setScanning] = useState<boolean>(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const scannerRef = useRef<HTMLDivElement>(null);
 
   const handleSerialNumberChange = (e: ChangeEvent<HTMLInputElement>): void => {
     setSerialNumber(e.target.value);
   };
 
-  const startCamera = async (): Promise<void> => {
-    try {
-      const constraints = {
-        video: { facingMode: "environment" } // Use back camera on mobile devices
-      };
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setShowCamera(true);
-        toast.success("Camera activated. Position barcode in view.");
+  // Initialize and start the barcode scanner
+  const initBarcodeScanner = () => {
+    if (!scannerRef.current) return;
+    
+    Quagga.init({
+      inputStream: {
+        name: "Live",
+        type: "LiveStream",
+        target: scannerRef.current,
+        constraints: {
+          facingMode: "environment", // Use back camera on mobile devices
+          width: { min: 450 },
+          height: { min: 300 },
+          aspectRatio: { min: 1, max: 2 }
+        },
+      },
+      locator: {
+        patchSize: "medium",
+        halfSample: true
+      },
+      numOfWorkers: 2,
+      frequency: 10,
+      decoder: {
+        readers: [
+          "code_128_reader",
+          "ean_reader",
+          "ean_8_reader",
+          "code_39_reader",
+          "code_39_vin_reader",
+          "codabar_reader",
+          "upc_reader",
+          "upc_e_reader",
+          "i2of5_reader"
+        ]
+      },
+      locate: true
+    }, (err:Error) => {
+      if (err) {
+        console.error("Error initializing Quagga:", err);
+        toast.error("Failed to initialize barcode scanner");
+        return;
       }
-    } catch (error) {
-      toast.error("Unable to access camera. Please ensure camera permissions are granted.");
-      console.error("Error accessing camera:", error);
+      
+      // Start the scanner when initialized successfully
+      Quagga.start();
+      setScanning(true);
+      
+      // Set up the detection callback
+      Quagga.onDetected(handleBarcodeDetected);
+      
+      // Draw detection box
+      Quagga.onProcessed(handleProcessed);
+    });
+  };
+
+  // Process frames and draw detection box
+  const handleProcessed = (result: any) => {
+    const drawingCtx = Quagga.canvas.ctx.overlay;
+    const drawingCanvas = Quagga.canvas.dom.overlay;
+
+    if (result) {
+      if (result.boxes) {
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        
+        // Draw all boxes
+        result.boxes.filter((box: any) => box !== result.box).forEach((box: any) => {
+          Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, { color: "green", lineWidth: 2 });
+        });
+      }
+
+      if (result.box) {
+        // Draw main box in red
+        Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: "#FF3B58", lineWidth: 2 });
+      }
+
+      if (result.codeResult && result.codeResult.code) {
+        // Highlight the found code
+        Quagga.ImageDebug.drawPath(result.line, { x: 'x', y: 'y' }, drawingCtx, { color: 'yellow', lineWidth: 3 });
+      }
     }
   };
 
+  // Handle successful barcode detection
+  const handleBarcodeDetected = (result: any) => {
+    // We need a confidence threshold to avoid false positives
+    if (result.codeResult && result.codeResult.code && result.codeResult.startInfo.error < 0.25) {
+      const code = result.codeResult.code;
+      
+      // Stop scanning
+      stopBarcodeScanner();
+      
+      // Update the serial number field with the scanned barcode
+      setSerialNumber(code);
+      
+      // Show success message
+      toast.success(`Barcode detected: ${code}`);
+      
+      // Close the camera view
+      setShowCamera(false);
+    }
+  };
+
+  // Stop the barcode scanner
+  const stopBarcodeScanner = () => {
+    if (scanning) {
+      Quagga.stop();
+      setScanning(false);
+    }
+  };
+
+  const startCamera = async (): Promise<void> => {
+    setShowCamera(true);
+    
+    // Initialize the barcode scanner after the component is rendered
+    setTimeout(() => {
+      initBarcodeScanner();
+    }, 500);
+  };
+
   const stopCamera = (): void => {
+    stopBarcodeScanner();
+    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    
     setShowCamera(false);
-  };
-
-  const captureBarcode = (): void => {
-    if (!videoRef.current || !canvasRef.current) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    
-    if (!context) return;
-    
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    // Draw current video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // In a real implementation, you would use a barcode scanning library here
-    // For example: ZXing, QuaggaJS, or a cloud-based solution
-    
-    // For demo purposes, we'll simulate a successful scan
-    toast.success("Barcode detected!");
-    setSerialNumber("CENTO-D3V1C3-2025");
-    stopCamera();
   };
 
   const handleScanBarcode = (): void => {
     startCamera();
+  };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      stopBarcodeScanner();
+      
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // Function to save device to the JSON file via API
+  const saveDeviceToFile = async (device: DeviceDetails): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/onboarded-devices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(device),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save device');
+      }
+      
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error('Error saving device:', error);
+      return false;
+    }
   };
 
   const handleNext = async (): Promise<void> => {
@@ -106,6 +222,7 @@ const OnboardDevice: React.FC = () => {
         
         // Simulating API response
         setTimeout(() => {
+          const timestamp = new Date().toISOString();
           setDeviceDetails({
             id: "DEV-" + Math.floor(Math.random() * 10000),
             serialNumber: serialNumber,
@@ -113,7 +230,8 @@ const OnboardDevice: React.FC = () => {
             firmware: "v1.2.3",
             lastSeen: "Never",
             status: "New",
-            macAddress: "00:1A:2B:3C:4D:5E"
+            macAddress: "00:1A:2B:3C:4D:5E",
+            addedAt: timestamp // Add timestamp
           });
           setIsLoading(false);
           setCurrentStep(1);
@@ -123,23 +241,22 @@ const OnboardDevice: React.FC = () => {
         setIsLoading(false);
       }
     } else if (currentStep === 1) {
-      // Add device to user's account
+      // Add device to user's account and save to JSON file
       setIsLoading(true);
       try {
-        // Simulate API call to add the device
-        // In a real implementation, you would call your backend API
-        // const response = await fetch('/api/devices', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ deviceId: deviceDetails?.id })
-        // });
-        
-        setTimeout(() => {
-          setIsLoading(false);
-          setIsAdded(true);
-          setCurrentStep(2);
-          toast.success("Device added successfully!");
-        }, 1500);
+        if (deviceDetails) {
+          // Save device to JSON file via API
+          const saved = await saveDeviceToFile(deviceDetails);
+          
+          if (saved) {
+            setIsLoading(false);
+            setIsAdded(true);
+            setCurrentStep(2);
+            toast.success("Device added successfully!");
+          } else {
+            throw new Error("Failed to save device data");
+          }
+        }
       } catch (error) {
         toast.error("Error adding device");
         setIsLoading(false);
@@ -212,32 +329,34 @@ const OnboardDevice: React.FC = () => {
               {showCamera ? (
                 <div className="camera-container">
                   <div className="relative">
-                    <video 
-                      ref={videoRef} 
-                      autoPlay 
-                      playsInline 
-                      className="w-full rounded-lg border border-gray-300"
-                      style={{ maxHeight: "350px" }}
-                    ></video>
-                    <canvas ref={canvasRef} className="hidden"></canvas>
-                    <div className="absolute top-2 right-2">
+                    <div 
+                      ref={scannerRef} 
+                      className="w-full rounded-lg border border-gray-300 overflow-hidden"
+                      style={{ 
+                        minHeight: "300px",
+                        maxHeight: "350px",
+                        position: "relative"
+                      }}
+                    >
+                      {/* QuaggaJS will inject the video element here */}
+                      <div className="scanner-overlay absolute inset-0 z-10">
+                        <div className="scanner-laser bg-red-500 h-px w-full absolute top-1/2 transform-translate-y-1/2 opacity-70"></div>
+                      </div>
+                    </div>
+                    
+                    <div className="absolute top-2 right-2 z-20">
                       <Button 
-                        variant="destructive" 
                         onClick={stopCamera}
                         className="rounded-full p-2 bg-gray-800 text-white"
                       >
                         <FiX />
                       </Button>
                     </div>
-                    <div className="scanning-line bg-blue-500 h-1 w-full absolute top-1/2 transform-translate-y-1/2 opacity-70"></div>
                   </div>
-                  <div className="mt-4 flex justify-center">
-                    <Button 
-                      onClick={captureBarcode}
-                      className="bg-blue-500 text-white px-6 py-2 rounded flex items-center"
-                    >
-                      <FiCamera className="mr-2" /> Capture Barcode
-                    </Button>
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-gray-600 font-medium">
+                      Position the barcode within the camera view for scanning
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -291,6 +410,10 @@ const OnboardDevice: React.FC = () => {
                     <p className="text-sm text-gray-500">Status</p>
                     <p className="font-medium">{deviceDetails.status}</p>
                   </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Added At</p>
+                    <p className="font-medium">{new Date(deviceDetails.addedAt).toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -303,7 +426,7 @@ const OnboardDevice: React.FC = () => {
               </div>
               <h3 className="text-xl font-medium">Device Added Successfully!</h3>
               <p className="text-gray-500 mt-2">
-                Your device has been successfully added to your account. You can now manage it from the dashboard.
+                Your device has been successfully added to your account and saved to the database. You can now manage it from the dashboard.
               </p>
             </div>
           )}
