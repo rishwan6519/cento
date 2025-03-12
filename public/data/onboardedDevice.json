@@ -8,5 +8,16 @@
     "status": "New",
     "macAddress": "00:1A:2B:3C:4D:5E",
     "addedAt": "2025-03-12T10:29:18.434Z"
+  },
+  {
+    "id": "DEV-2523",
+    "serialNumber": "123",
+    "model": "Cento Smart Speaker",
+    "firmware": "v1.2.3",
+    "lastSeen": "Never",
+    "status": "New",
+    "macAddress": "00:1A:2B:3C:4D:5E",
+    "addedAt": "2025-03-12T10:49:33.868Z"
   }
-]
+
+]  
