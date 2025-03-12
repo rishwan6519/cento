@@ -11,20 +11,30 @@
   "dependencies": {
     "@radix-ui/react-select": "^2.1.6",
     "framer-motion": "^12.4.10",
+    "fs": "^0.0.1-security",
+    "fs-extra": "^11.3.0",
     "lucide-react": "^0.479.0",
+    "multer": "^1.4.5-lts.1",
     "next": "15.2.1",
+    "path": "^0.12.7",
+    "quagga": "^0.12.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2",
     "react-icons": "^5.5.0",
     "react-pro-sidebar": "^1.1.0",
     "react-spinners": "^0.15.0",
-    "tailwind-scrollbar-hide": "^2.0.0"
+    "tailwind-scrollbar-hide": "^2.0.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/fs-extra": "^11.0.4",
+    "@types/multer": "^1.4.12",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
     "tailwindcss": "^4.0.12",
     "typescript": "^5"
   }

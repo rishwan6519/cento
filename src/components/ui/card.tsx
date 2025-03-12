@@ -1,13 +1,11 @@
-import React, { ReactNode } from "react";
+import React from "react";
 
-interface CardProps {
-  children: ReactNode;
-}
-
-export function Card({ children }: CardProps) {
+export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+    <div className={`bg-white p-4 rounded-lg shadow-md border border-gray-200 ${className || ""}`}>
       {children}
     </div>
   );
 }
+
+export default Card;

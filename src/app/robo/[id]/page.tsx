@@ -8,9 +8,17 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import CreateMedia from "@/components/ui/createMedia";
 import GenerateVoice from "@/components/ui/GenerateVoice";
+import { FaPlusCircle } from "react-icons/fa";
+import toast from "react-hot-toast";
+import OnboardDevice from "@/components/ui/onboardDevice";
 
 export default function AdminDashboard() {
   const [selectedComponent, setSelectedComponent] = useState("dashboard");
+
+  const handleOnboarding = () => {
+    setSelectedComponent("onboarding");
+    toast.success("Device Onboarded Successfully!");
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -81,36 +89,23 @@ export default function AdminDashboard() {
               <Button variant="outline">+ Add Channel</Button>
             </header>
             <div className="grid grid-cols-4 gap-4 mt-4">
-              <Card>
-                <CardContent>
-                  <p className="text-sm text-gray-500">Total Channels</p>
-                  <h2 className="text-xl font-bold">1252</h2>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent>
-                  <p className="text-sm text-gray-500">Total Devices</p>
-                  <h2 className="text-xl font-bold">1039</h2>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent>
-                  <p className="text-sm text-gray-500">Total Images</p>
-                  <h2 className="text-xl font-bold">4813</h2>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent>
-                  <p className="text-sm text-gray-500">Total Playlists</p>
-                  <h2 className="text-xl font-bold">120</h2>
-                </CardContent>
-              </Card>
+              <div className="cursor-pointer" onClick={handleOnboarding}>
+                <Card>
+                  <CardContent>
+                    <p className="text-sm text-gray-500 text-center">Onboard Device</p>
+                    <h2 className="text-xl font-bold flex justify-center mt-2">
+                      <FaPlusCircle />
+                    </h2>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         )}
 
         {selectedComponent === "createMedia" && <CreateMedia />}
         {selectedComponent === "generateVoice" && <GenerateVoice />}
+        {selectedComponent === "onboarding" && <OnboardDevice />}
       </div>
     </div>
   );
