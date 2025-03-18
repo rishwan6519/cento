@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { PlusCircle, Database, XCircle, Trash2, PlusCircleIcon } from "lucide-react";
+import { PlusCircle, Database, XCircle, Trash2, PlusCircleIcon, Edit, ImageIcon, Music, Upload, Video } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FcDataConfiguration } from "react-icons/fc";
+import { CgPlayList } from "react-icons/cg";
+import { MdPlaylistAddCheckCircle, MdPlaylistAddCircle, MdAudiotrack } from "react-icons/md";
 
 interface DeviceType {
   id: string;
@@ -22,6 +24,25 @@ interface Device {
   handMovements?: string[];
 }
 
+// First, add this interface for selected files
+interface SelectedFile {
+  id: string;
+  file: File;
+  name: string;
+}
+
+// First, update the Playlist interface
+interface Playlist {
+  name: string;
+  type: 'image' | 'video' | 'audio';
+  files: SelectedFile[];
+  backgroundAudio?: File;
+  volume: {
+    main: number;
+    background: number;
+  };
+}
+
 export default function RobotAdminDashboard() {
   const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [customDeviceName, setCustomDeviceName] = useState<string>("");
@@ -34,6 +55,8 @@ export default function RobotAdminDashboard() {
   });
   const [activeSection, setActiveSection] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [configuredDevices, setConfiguredDevices] = useState<Device[]>([]);
 
   const [deviceDetails, setDeviceDetails] = useState<Device>({
     id: "",
@@ -46,6 +69,22 @@ export default function RobotAdminDashboard() {
     features: [],
     handMovements: [],
   });
+
+  // Update the playlist state
+  const [playlist, setPlaylist] = useState<Playlist>({
+    name: '',
+    type: 'image',
+    files: [],
+    backgroundAudio: undefined,
+    volume: {
+      main: 100,
+      background: 50
+    }
+  });
+
+  // Add this to your RobotAdminDashboard component state
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(false);
 
   useEffect(() => {
     fetchDeviceTypes();
@@ -64,6 +103,19 @@ export default function RobotAdminDashboard() {
       }
     }
   }, [selectedDevice, devices]);
+
+  useEffect(() => {
+    if (activeSection === "showConfiguredDevices") {
+      getConfiguredDevices();
+    }
+  }, [activeSection]);
+
+  // Add useEffect to fetch playlists when component mounts
+  useEffect(() => {
+    if (activeSection === 'showPlaylists') {
+      fetchPlaylists();
+    }
+  }, [activeSection]);
 
   const fetchDevices = async () => {
     try {
@@ -157,19 +209,37 @@ export default function RobotAdminDashboard() {
     }
   };
 
-  const deleteDevice = async (id: string) => {
+  const deleteDevice = async (id: string, isConfigured: boolean = false) => {
     if (!confirm("Are you sure you want to delete this device?")) {
       return;
     }
     
     try {
-      const response = await fetch("/api/devices", {
+      // If it's a configured device, only delete the configuration
+      if (isConfigured) {
+        const configDeleteResponse = await fetch("/api/configure-device", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+  
+        if (!configDeleteResponse.ok) {
+          throw new Error("Failed to delete device configuration");
+        }
+
+        toast.success("Device configuration deleted successfully!");
+        getConfiguredDevices(); // Refresh only the configured devices list
+        return; // Exit early without deleting the main device
+      }
+  
+      // Only execute this part if deleting a main device (when isConfigured is false)
+      const deviceDeleteResponse = await fetch("/api/devices", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-
-      if (!response.ok) {
+  
+      if (!deviceDeleteResponse.ok) {
         throw new Error("Failed to delete device");
       }
       
@@ -177,7 +247,7 @@ export default function RobotAdminDashboard() {
       fetchDevices();
     } catch (error) {
       console.error("Error deleting device:", error);
-      toast.error("Failed to delete device!");
+      toast.error(isConfigured ? "Failed to delete device configuration!" : "Failed to delete device!");
     }
   };
 
@@ -224,36 +294,46 @@ export default function RobotAdminDashboard() {
         ...deviceDetails,
         id: selectedDevice
       };
-      
+
       const response = await fetch("/api/configure-device", {
-        method: "POST",
+        method: isEditing ? "PUT" : "POST", // Use PUT for updates, POST for new configs
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configData),
       });
       
-      if (!response.ok) throw new Error("Failed to configure device");
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Device configuration error:", errorData);
+        throw new Error("Failed to configure device");
+      }
       
-      toast.success("Device configured successfully!");
-      fetchDevices();
-      setActiveSection("");
-      setDeviceDetails({
-        id: "",
-        name: "",
-        imageUrl: "",
-        typeId: "",
-        serialNumber: "",
-        color: "",
-        description: "",
-        features: [],
-        handMovements: [],
-      });
-      setSelectedDevice("");
+      toast.success(isEditing ? "Device updated successfully!" : "Device configured successfully!");
+      getConfiguredDevices(); // Refresh the configured devices list
+      setActiveSection("showConfiguredDevices"); // Keep showing the configured devices list
+      resetForm();
     } catch (error) {
       console.error("Error configuring device:", error);
-      toast.error("Failed to configure device!");
+      toast.error(isEditing ? "Failed to update device!" : "Failed to configure device!");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Add this helper function to reset the form
+  const resetForm = () => {
+    setDeviceDetails({
+      id: "",
+      name: "",
+      imageUrl: "",
+      typeId: "",
+      serialNumber: "",
+      color: "",
+      description: "",
+      features: [],
+      handMovements: [],
+    });
+    setSelectedDevice("");
+    setIsEditing(false);
   };
 
   const handleConfigInputChange = (field: keyof Device, value: any) => {
@@ -263,6 +343,157 @@ export default function RobotAdminDashboard() {
     }));
   };
 
+  const editDevice = (device: Device) => {
+    setDeviceDetails({
+      ...device,
+      features: device.features || [],
+      handMovements: device.handMovements || [],
+      serialNumber: device.serialNumber || "",
+      color: device.color || "",
+      description: device.description || ""
+    });
+    setSelectedDevice(device.id);
+    setIsEditing(true);
+    setActiveSection("configureDevice");
+  };
+
+  const getConfiguredDevices = async () => {
+    try {
+      const response = await fetch("/api/configure-device");
+      if (!response.ok) throw new Error("Failed to fetch configured devices");
+      const data = await response.json();
+      console.log(data,"data");
+
+      setConfiguredDevices(data.devices);
+    } catch (error) {
+      console.error("Error fetching configured devices:", error);
+      toast.error("Failed to fetch configured devices!");
+    }
+  };
+
+  // Add this helper function to generate unique IDs
+  const generateUniqueId = () => {
+    return Math.random().toString(36).substr(2, 9);
+  };
+
+  // Add this function to handle file selection
+  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFiles = Array.from(e.target.files || []).map(file => ({
+      id: generateUniqueId(),
+      file,
+      name: file.name
+    }));
+    setPlaylist(prev => ({
+      ...prev,
+      files: [...prev.files, ...newFiles]
+    }));
+  };
+
+  // Add this function to handle file deletion
+  const handleFileDelete = (id: string) => {
+    setPlaylist(prev => ({
+      ...prev,
+      files: prev.files.filter(file => file.id !== id)
+    }));
+  };
+
+  // Add this function to your RobotAdminDashboard component
+  const handlePlaylistCreate = async () => {
+    if (!playlist.name || playlist.files.length === 0) {
+      toast.error('Please provide a name and at least one file');
+      return;
+    }
+  
+    try {
+      const formData = new FormData();
+      formData.append('name', playlist.name);
+      formData.append('type', playlist.type);
+      
+      // Add all files
+      playlist.files.forEach(file => {
+        formData.append('files', file.file);
+      });
+  
+      // Add background audio if present
+      if (playlist.backgroundAudio) {
+        formData.append('backgroundAudio', playlist.backgroundAudio);
+      }
+  
+      const response = await fetch('/api/playlist', {
+        method: 'POST',
+        body: formData,
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to create playlist');
+      }
+  
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Playlist created successfully!');
+        setActiveSection('');
+        // Reset form
+        setPlaylist({
+          name: '',
+          type: 'image',
+          files: [],
+          backgroundAudio: undefined,
+          volume: {
+            main: 100,
+            background: 50
+          }
+        });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error creating playlist:', error);
+      toast.error('Failed to create playlist');
+    }
+  };
+
+  // Add this function to fetch playlists
+  const fetchPlaylists = async () => {
+    setIsLoadingPlaylists(true);
+    try {
+      const response = await fetch('/api/playlist');
+      if (!response.ok) throw new Error('Failed to fetch playlists');
+      
+      const data = await response.json();
+      setPlaylists(data.playlists || []);
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+      toast.error('Failed to fetch playlists');
+    } finally {
+      setIsLoadingPlaylists(false);
+    }
+  };
+
+  const handleEditPlaylist = (playlist: any) => {
+    // Set the current playlist for editing
+    setPlaylist({
+      ...playlist,
+      volume: playlist.volume || { main: 100, background: 50 }
+    });
+    setActiveSection("generatePlaylist");
+  };
+
+  const handleDeletePlaylist = async (playlistId: string) => {
+    if (!confirm("Are you sure you want to delete this playlist?")) {
+      return;
+    }
+    
+    try {
+      // Here you would typically make an API call to delete the playlist
+      // For now, just filter it out from the state
+      setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+      toast.success('Playlist deleted successfully');
+    } catch (error) {
+      console.error('Error deleting playlist:', error);
+      toast.error('Failed to delete playlist');
+    }
+  };
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <Toaster />
@@ -270,10 +501,10 @@ export default function RobotAdminDashboard() {
         🤖 Robot Admin Dashboard
       </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
         <div className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
           <Database size={40} className="text-blue-500 mx-auto" />
-          <h2 className="text-lg text-center font-semibold mt-2">Total Devices</h2>
+          <h2 className="text-lg text-center font-semibold mt-2">Total Devices   </h2>
           <p className="text-2xl font-bold text-center text-blue-500">{devices.length}</p>
         </div>
 
@@ -299,6 +530,44 @@ export default function RobotAdminDashboard() {
         >
           <FcDataConfiguration size={40} className="mx-auto" />
           <h2 className="text-lg text-center font-semibold mt-2">Configure Device</h2>
+        </div>
+
+        <div
+          className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+          onClick={() => setActiveSection("showConfiguredDevices")}
+        >
+          <FcDataConfiguration size={40} className="mx-auto" />
+          <h2 className="text-lg text-center font-semibold mt-2">Show Configured Devices</h2>
+        </div>
+
+        {/* // Add this new section for playlist generation */}
+
+        <div
+          className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+          onClick={() => setActiveSection("generatePlaylist")}
+        >
+          <MdPlaylistAddCircle  size={40} className="mx-auto" />
+          <h2 className="text-lg text-center font-semibold mt-2">Playlist Generation</h2>
+        </div>
+
+
+        {/* // Add this new section for playlist generation */}
+
+        <div
+          className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+          onClick={() => setActiveSection("generatePlaylist")}
+        >
+          <CgPlayList size={40} className="mx-auto" />
+          <h2 className="text-lg text-center font-semibold mt-2">Playlist Genration</h2>
+        </div>
+
+        {/* Add this in your grid of buttons */}
+        <div
+          className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+          onClick={() => setActiveSection("showPlaylists")}
+        >
+          <MdPlaylistAddCheckCircle size={40} className="mx-auto" />
+          <h2 className="text-lg text-center font-semibold mt-2">Show Saved Playlists</h2>
         </div>
       </div>
 
@@ -472,7 +741,10 @@ export default function RobotAdminDashboard() {
       {activeSection === "configureDevice" && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
-          onClick={() => setActiveSection("")}
+          onClick={() => {
+            setActiveSection("");
+            setIsEditing(false);
+          }}
         >
           <div
             className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md relative overflow-y-auto max-h-screen"
@@ -480,12 +752,17 @@ export default function RobotAdminDashboard() {
           >
             <button
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              onClick={() => setActiveSection("")}
+              onClick={() => {
+                setActiveSection("");
+                setIsEditing(false);
+              }}
             >
               <XCircle size={24} />
             </button>
 
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">Configure Device</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">
+              {isEditing ? "Edit Device Configuration" : "Configure New Device"}
+            </h2>
             
             <div className="space-y-6">
               <div>
@@ -496,6 +773,7 @@ export default function RobotAdminDashboard() {
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={selectedDevice}
                   onChange={(e) => setSelectedDevice(e.target.value)}
+                  disabled={isEditing}
                 >
                   <option value="">Select a device</option>
                   {devices.map((device) => (
@@ -580,9 +858,446 @@ export default function RobotAdminDashboard() {
                     : "bg-blue-600 hover:bg-blue-700"
                 } text-white font-semibold transition-colors duration-200 ease-in-out transform hover:scale-105`}
               >
-                {isLoading ? "Configuring..." : "Save Configuration"}
+                {isLoading 
+                  ? "Saving..." 
+                  : isEditing 
+                    ? "Update Configuration" 
+                    : "Save Configuration"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show Configured Devices Modal */}
+      {activeSection === "showConfiguredDevices" && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+          onClick={() => setActiveSection("")}
+        >
+          <div
+            className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl relative overflow-y-auto max-h-screen"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              onClick={() => setActiveSection("")}
+            >
+              <XCircle size={24} />
+            </button>
+
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Configured Devices</h2>
+            
+            {configuredDevices.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">No configured devices found</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {configuredDevices.map((device) => (
+                  <div key={device.id} className="border rounded-xl p-4 relative hover:shadow-md transition-shadow bg-gray-50">
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="md:w-1/4">
+                        <div className="h-48 mb-2 overflow-hidden rounded-md bg-gray-100 flex items-center justify-center">
+                          <img
+                            src={device.imageUrl}
+                            alt={device.name}
+                            className="object-contain h-full w-full"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/placeholder-image.jpg";
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="md:w-3/4">
+                        <h3 className="font-semibold text-xl mb-2">{device.name}</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {device.serialNumber && (
+                            <div>
+                              <span className="font-semibold">Serial Number:</span> {device.serialNumber}
+                            </div>
+                          )}
+                          
+                          {device.color && (
+                            <div>
+                              <span className="font-semibold">Color:</span> {device.color}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {device.description && (
+                          <div className="mt-2">
+                            <span className="font-semibold">Description:</span> {device.description}
+                          </div>
+                        )}
+                        
+                        {device.features && device.features.length > 0 && (
+                          <div className="mt-2">
+                            <span className="font-semibold">Features:</span> {device.features.join(", ")}
+                          </div>
+                        )}
+                        
+                        {device.handMovements && device.handMovements.length > 0 && (
+                          <div className="mt-2">
+                            <span className="font-semibold">Hand Movements:</span> {device.handMovements.join(", ")}
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2 mt-4">
+                          <button
+                            onClick={() => editDevice(device)}
+                            className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                          >
+                            <Edit size={16} /> Edit
+                          </button>
+                          
+                          <button
+                            onClick={() => deleteDevice(device.id, true)}
+                            className="flex items-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                          >
+                            <Trash2 size={16} /> Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Playlist Generation Modal */}
+      {activeSection === "generatePlaylist" && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 overflow-y-auto"
+          onClick={() => setActiveSection("")}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full max-w-4xl relative my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 sm:p-6 border-b">
+              <button
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                onClick={() => setActiveSection("")}
+              >
+                <XCircle size={24} />
+              </button>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Create New Playlist</h2>
+            </div>
+
+            {/* Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
+              {/* Left Column - Playlist Details */}
+              <div className="space-y-4 sm:space-y-6">
+                {/* Playlist Name */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Playlist Name
+                  </label>
+                  <input
+                    type="text"
+                    value={playlist.name}
+                    onChange={(e) => setPlaylist({ ...playlist, name: e.target.value })}
+                    placeholder="Enter playlist name"
+                    className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Playlist Type */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Playlist Type
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                    {['image', 'video', 'audio'].map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setPlaylist({
+                          ...playlist,
+                          type: type as 'image' | 'video' | 'audio',
+                          files: [],
+                          backgroundAudio: undefined
+                        })}
+                        className={`p-2 sm:p-4 rounded-lg border-2 transition-all ${
+                          playlist.type === type
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex flex-col items-center gap-1 sm:gap-2">
+                          {type === 'image' && <ImageIcon size={20} className="text-blue-500" />}
+                          {type === 'video' && <Video size={20} className="text-green-500" />}
+                          {type === 'audio' && <Music size={20} className="text-purple-500" />}
+                          <span className="text-xs sm:text-sm capitalize">{type}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* File Upload */}
+                <div className="flex flex-col gap-4">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Upload {playlist.type === 'image' ? 'Images' : 
+                           playlist.type === 'video' ? 'Videos' : 'Audio Files'}
+                  </label>
+                  <div
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-blue-500 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                  >
+                    <Upload className="mx-auto h-8 sm:h-12 w-8 sm:w-12 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-600">
+                      Click to upload or drag and drop
+                    </p>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      multiple
+                      hidden
+                      accept={playlist.type === 'image' ? 'image/*' :
+                              playlist.type === 'video' ? 'video/*' :
+                              'audio/*'}
+                      onChange={handleFileSelection}
+                    />
+                  </div>
+                </div>
+
+                {/* Background Audio Section */}
+                <div className="flex flex-col gap-4">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Background Audio {playlist.type === 'audio' ? '(Mix)' : '(Optional)'}
+                  </label>
+                  <div
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 text-center hover:border-blue-500 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('audio-upload')?.click()}
+                  >
+                    <Music className="mx-auto h-6 sm:h-8 w-6 sm:w-8 text-gray-400" />
+                    <p className="mt-1 text-xs sm:text-sm text-gray-600">
+                      {playlist.type === 'audio' ? 'Add background mix' : 'Add background music'}
+                    </p>
+                    <input
+                      id="audio-upload"
+                      type="file"
+                      hidden
+                      accept="audio/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        setPlaylist({ ...playlist, backgroundAudio: file });
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Selected Files Preview */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-700 mb-4">Selected Files</h3>
+                <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
+                  {playlist.files.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      No files selected yet
+                    </div>
+                  ) : (
+                    playlist.files.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between p-2 sm:p-3 bg-white rounded-lg shadow-sm"
+                      >
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          {/* File Icon */}
+                          <div className="flex-shrink-0">
+                            {playlist.type === 'image' && <ImageIcon size={18} className="text-blue-500" />}
+                            {playlist.type === 'video' && <Video size={18} className="text-green-500" />}
+                            {playlist.type === 'audio' && <Music size={18} className="text-purple-500" />}
+                          </div>
+                          {/* File Details */}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm truncate max-w-[150px] sm:max-w-[200px]">
+                              {file.name}
+                            </span>
+                            {(playlist.type === 'audio' || playlist.type === 'video') && (
+                              <span className="text-xs text-gray-500">
+                                Volume: {playlist.volume.main}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleFileDelete(file.id)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Volume Controls */}
+                {(playlist.files.length > 0 || playlist.backgroundAudio) && (
+                  <div className="mt-4 space-y-4 p-3 bg-white rounded-lg">
+                    {playlist.files.length > 0 && (
+                      <div>
+                        <label className="block text-xs sm:text-sm text-gray-600 mb-1">
+                          Main Volume
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={playlist.volume.main}
+                            onChange={(e) => setPlaylist({
+                              ...playlist,
+                              volume: {
+                                ...playlist.volume,
+                                main: Number(e.target.value)
+                              }
+                            })}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="text-xs sm:text-sm text-gray-600 w-12">
+                            {playlist.volume.main}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {playlist.backgroundAudio && (
+                      <div>
+                        <label className="block text-xs sm:text-sm text-gray-600 mb-1">
+                          Background Volume
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={playlist.volume.background}
+                            onChange={(e) => setPlaylist({
+                              ...playlist,
+                              volume: {
+                                ...playlist.volume,
+                                background: Number(e.target.value)
+                              }
+                            })}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="text-xs sm:text-sm text-gray-600 w-12">
+                            {playlist.volume.background}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t p-4 sm:p-6 flex justify-end gap-3 sm:gap-4">
+              <button
+                onClick={() => setActiveSection("")}
+                className="px-3 sm:px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePlaylistCreate}
+                disabled={!playlist.name || playlist.files.length === 0}
+                className={`px-4 sm:px-6 py-2 rounded-lg text-sm ${
+                  !playlist.name || playlist.files.length === 0
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white font-semibold transition-colors`}
+              >
+                Create Playlist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show Saved Playlists Modal */}
+      {activeSection === "showPlaylists" && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+          onClick={() => setActiveSection("")}
+        >
+          <div
+            className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl relative overflow-y-auto max-h-screen"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              onClick={() => setActiveSection("")}
+            >
+              <XCircle size={24} />
+            </button>
+
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Saved Playlists</h2>
+
+            {isLoadingPlaylists ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : playlists.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">No playlists found</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {playlists.map((playlist) => (
+                  <div key={playlist.id} className="border rounded-xl p-4 relative hover:shadow-md transition-shadow bg-gray-50">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {playlist.type === 'image' && <ImageIcon size={20} className="text-blue-500" />}
+                          {playlist.type === 'video' && <Video size={20} className="text-green-500" />}
+                          {playlist.type === 'audio' && <Music size={20} className="text-purple-500" />}
+                          <h3 className="font-semibold text-xl">{playlist.name}</h3>
+                        </div>
+
+                        <div className="text-sm text-gray-600">
+                          <p>Type: <span className="capitalize">{playlist.type}</span></p>
+                          <p>Files: {playlist.files.length}</p>
+                          {playlist.backgroundAudio && (
+                            <p>Background Audio: Yes</p>
+                          )}
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {playlist.files.map((file: any, index: number) => (
+                            <div
+                              key={index}
+                              className="px-3 py-1 bg-white rounded-full text-sm border shadow-sm"
+                            >
+                              {file.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditPlaylist(playlist)}
+                          className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                          <Edit size={16} /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeletePlaylist(playlist.id)}
+                          className="flex items-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        >
+                          <Trash2 size={16} /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

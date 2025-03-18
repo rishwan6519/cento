@@ -3,21 +3,22 @@ import React, { useState, useRef, useEffect, ChangeEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { CardContent } from "@/components/ui/cardContent";
 import { Button } from "@/components/ui/button";
-import { FiSearch, FiCheckCircle, FiArrowLeft, FiArrowRight, FiCamera, FiX } from "react-icons/fi";
+import { FiSearch, FiCheckCircle, FiArrowLeft, FiArrowRight, FiCamera, FiX, FiAlertCircle } from "react-icons/fi";
 import toast from "react-hot-toast";
 import Quagga from 'quagga';
-
+import Image from "next/image";
 
 // Define types for our component
 interface DeviceDetails {
   id: string;
   serialNumber: string;
-  model: string;
-  firmware: string;
-  lastSeen: string;
-  status: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  type: string;
   macAddress: string;
-  addedAt: string; // Added timestamp field
+  handMovements: Array<string>;
+  addedAt: string;
 }
 
 const OnboardDevice: React.FC = () => {
@@ -25,17 +26,20 @@ const OnboardDevice: React.FC = () => {
   const [serialNumber, setSerialNumber] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [deviceDetails, setDeviceDetails] = useState<DeviceDetails | null>(null);
+  const [deviceNotFound, setDeviceNotFound] = useState<boolean>(false);
   const [isAdded, setIsAdded] = useState<boolean>(false);
   const [showCamera, setShowCamera] = useState<boolean>(false);
   const [scanning, setScanning] = useState<boolean>(false);
   
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const scannerRef = useRef<HTMLDivElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const handleSerialNumberChange = (e: ChangeEvent<HTMLInputElement>): void => {
     setSerialNumber(e.target.value);
+    // Reset device not found status when input changes
+    if (deviceNotFound) {
+      setDeviceNotFound(false);
+    }
   };
 
   // Initialize and start the barcode scanner
@@ -74,7 +78,7 @@ const OnboardDevice: React.FC = () => {
         ]
       },
       locate: true
-    }, (err:Error) => {
+    }, (err: Error) => {
       if (err) {
         console.error("Error initializing Quagga:", err);
         toast.error("Failed to initialize barcode scanner");
@@ -183,6 +187,28 @@ const OnboardDevice: React.FC = () => {
     };
   }, []);
 
+  // Function to check if a device exists
+  const fetchDeviceDetails = async (serialNum: string): Promise<DeviceDetails | null> => {
+    try {
+      const response = await fetch(`/api/serialnumber?serialNum=${serialNum}`);
+
+  
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // Device not found
+        }
+        throw new Error(`Error: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      return data.device;
+    } catch (error) {
+      console.error("Error fetching device:", error);
+      throw error;
+    }
+  };
+  
+
   // Function to save device to the JSON file via API
   const saveDeviceToFile = async (device: DeviceDetails): Promise<boolean> => {
     try {
@@ -213,31 +239,23 @@ const OnboardDevice: React.FC = () => {
         return;
       }
 
-      // Simulate fetching device details from backend
+      // Fetch actual device details from backend
       setIsLoading(true);
       try {
-        // Here you would make an actual API call
-        // const response = await fetch(`/api/devices/${serialNumber}`);
-        // const data = await response.json();
+        const deviceData = await fetchDeviceDetails(serialNumber);
         
-        // Simulating API response
-        setTimeout(() => {
-          const timestamp = new Date().toISOString();
-          setDeviceDetails({
-            id: "DEV-" + Math.floor(Math.random() * 10000),
-            serialNumber: serialNumber,
-            model: "Cento Smart Speaker",
-            firmware: "v1.2.3",
-            lastSeen: "Never",
-            status: "New",
-            macAddress: "00:1A:2B:3C:4D:5E",
-            addedAt: timestamp // Add timestamp
-          });
-          setIsLoading(false);
+        if (deviceData) {
+          setDeviceDetails(deviceData);
+          setDeviceNotFound(false);
           setCurrentStep(1);
-        }, 1500);
+        } else {
+          setDeviceNotFound(true);
+          toast.error("Device not found");
+        }
       } catch (error) {
         toast.error("Error fetching device details");
+        console.error(error);
+      } finally {
         setIsLoading(false);
       }
     } else if (currentStep === 1) {
@@ -259,6 +277,8 @@ const OnboardDevice: React.FC = () => {
         }
       } catch (error) {
         toast.error("Error adding device");
+        console.error(error);
+      } finally {
         setIsLoading(false);
       }
     } else if (currentStep === 2) {
@@ -266,6 +286,7 @@ const OnboardDevice: React.FC = () => {
       setCurrentStep(0);
       setSerialNumber("");
       setDeviceDetails(null);
+      setDeviceNotFound(false);
       setIsAdded(false);
     }
   };
@@ -275,7 +296,7 @@ const OnboardDevice: React.FC = () => {
       setCurrentStep(currentStep - 1);
     }
   };
-
+console.log(deviceDetails,"........................")
   // Steps array for the stepper
   const steps: string[] = ["Enter Device Information", "Review Device Details", "Confirmation"];
 
@@ -360,21 +381,36 @@ const OnboardDevice: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <input
-                    placeholder="Enter serial number"
-                    value={serialNumber}
-                    onChange={handleSerialNumberChange}
-                    className="flex-grow p-2 border border-gray-300 rounded"
-                  />
-                  <Button 
-                    variant="outline"
-                    onClick={handleScanBarcode}
-                    className="border border-gray-300 px-4 py-2 rounded flex items-center"
-                  >
-                    <FiCamera className="mr-2" /> Scan
-                  </Button>
-                </div>
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="Enter serial number"
+                      value={serialNumber}
+                      onChange={handleSerialNumberChange}
+                      className="flex-grow p-2 border border-gray-300 rounded"
+                    />
+                    <Button 
+                      variant="outline"
+                      onClick={handleScanBarcode}
+                      className="border border-gray-300 px-4 py-2 rounded flex items-center"
+                    >
+                      <FiCamera className="mr-2" /> Scan
+                    </Button>
+                  </div>
+                  
+                  {deviceNotFound && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+                      <FiAlertCircle className="text-red-500 mr-2 mt-1" />
+                      <div>
+                        <p className="text-red-700 font-medium">Device Not Found</p>
+                        <p className="text-sm text-red-600">
+                          The serial number you entered does not match any registered device in our database. 
+                          Please check the serial number and try again.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -393,66 +429,118 @@ const OnboardDevice: React.FC = () => {
                   <div>
                     <p className="text-sm text-gray-500">Serial Number</p>
                     <p className="font-medium">{deviceDetails.serialNumber}</p>
+                    
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Model</p>
-                    <p className="font-medium">{deviceDetails.model}</p>
+                    <p className="text-sm text-gray-500">Name</p>
+                    <p className="font-medium">{deviceDetails.name}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Firmware Version</p>
-                    <p className="font-medium">{deviceDetails.firmware}</p>
+                    <p className="text-sm text-gray-500">Description</p>
+                    <p className="font-medium">{deviceDetails.description}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm text-gray-500">Photo</p>
+                    <Image src={deviceDetails.imageUrl} alt={deviceDetails.name} width={100} height={100} />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">MAC Address</p>
-                    <p className="font-medium">{deviceDetails.macAddress}</p>
+                    <p className="text-sm text-gray-500">Type</p>
+                    <p className="font-medium">{deviceDetails.handMovements}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Status</p>
-                    <p className="font-medium">{deviceDetails.status}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Added At</p>
-                    <p className="font-medium">{new Date(deviceDetails.addedAt).toLocaleString()}</p>
-                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start">
+                <FiCheckCircle className="text-blue-500 mr-2 mt-1" />
+                <div>
+                  <p className="text-blue-700 font-medium">Ready to Add</p>
+                  <p className="text-sm text-blue-600">
+                    This device is available and can be added to your account. Click "Next" to complete the process.
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {currentStep === 2 && isAdded && (
-            <div className="text-center py-8">
-              <div className="flex justify-center mb-4">
-                <FiCheckCircle className="text-green-500 text-6xl" />
+          {currentStep === 2 && (
+            <div className="space-y-6 p-4 text-center">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-green-100 p-4">
+                  <FiCheckCircle className="text-green-500 text-3xl" />
+                </div>
               </div>
-              <h3 className="text-xl font-medium">Device Added Successfully!</h3>
-              <p className="text-gray-500 mt-2">
-                Your device has been successfully added to your account and saved to the database. You can now manage it from the dashboard.
-              </p>
+              
+              <div>
+                <h3 className="text-lg font-medium">Device Successfully Added</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  The device has been successfully added to your account and is ready to use
+                </p>
+              </div>
+              
+              {deviceDetails && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="text-left">
+                    <p className="text-sm text-gray-500">Device</p>
+                    <p className="font-medium">{deviceDetails.id} ({deviceDetails.serialNumber})</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start">
+                <FiCheckCircle className="text-green-500 mr-2 mt-1" />
+                <div className="text-left">
+                  <p className="text-green-700 font-medium">Successfully Onboarded</p>
+                  <p className="text-sm text-green-600">
+                    You can now manage this device from your device dashboard.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="flex justify-between p-4 border-t border-gray-200 mt-6">
-            {currentStep > 0 && currentStep < 2 && (
+          <div className="mt-6 flex justify-between">
+            {currentStep > 0 && currentStep < 2 ? (
               <Button 
-                variant="outline" 
-                onClick={handleBack} 
+                onClick={handleBack}
+                className="px-4 py-2 flex items-center bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                 disabled={isLoading}
-                className="flex items-center border border-gray-300 px-4 py-2 rounded"
               >
                 <FiArrowLeft className="mr-2" /> Back
               </Button>
+            ) : (
+              <div></div> // Empty div to maintain flex spacing
             )}
-            {currentStep === 0 && <div></div>}
+            
             <Button 
-              onClick={handleNext} 
+              onClick={handleNext}
+              className={`px-4 py-2 flex items-center ${
+                currentStep === 2 ? "bg-green-500 hover:bg-green-600" : "bg-blue-500 hover:bg-blue-600"
+              } text-white rounded`}
               disabled={isLoading}
-              className={`flex items-center px-4 py-2 rounded ${isLoading ? "bg-gray-400" : "bg-blue-500 text-white"}`}
             >
-              {isLoading ? "Processing..." : 
-                currentStep === 0 ? "Next" : 
-                currentStep === 1 ? "Add Device" : 
-                "Finish"}
-              {currentStep < 2 && <FiArrowRight className="ml-2" />}
+              {isLoading ? (
+                <span>Loading...</span>
+              ) : (
+                <>
+                  {currentStep === 0 && (
+                    <>
+                      <FiSearch className="mr-2" /> Find Device
+                    </>
+                  )}
+                  {currentStep === 1 && (
+                    <>
+                      <FiCheckCircle className="mr-2" /> Add Device
+                    </>
+                  )}
+                  {currentStep === 2 && (
+                    <>
+                      Add Another Device
+                    </>
+                  )}
+                  {currentStep < 2 && <FiArrowRight className="ml-2" />}
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
