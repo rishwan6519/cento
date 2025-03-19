@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { PlusCircle, Database, XCircle, Trash2, PlusCircleIcon, Edit, ImageIcon, Music, Upload, Video } from "lucide-react";
+import { PlusCircle, Database, XCircle, Trash2, PlusCircleIcon, Edit, ImageIcon, Music, Upload, Video, Edit2 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FcDataConfiguration } from "react-icons/fc";
 import { CgPlayList } from "react-icons/cg";
@@ -33,6 +33,7 @@ interface SelectedFile {
 
 // First, update the Playlist interface
 interface Playlist {
+  id?: string; // Make it clear that id is optional
   name: string;
   type: 'image' | 'video' | 'audio';
   files: SelectedFile[];
@@ -41,6 +42,21 @@ interface Playlist {
     main: number;
     background: number;
   };
+}
+
+// Add these interfaces at the top of your file
+interface PlaylistSchedule {
+  deviceTypeId: string;
+  playlists: {
+    playlistId: string;
+    duration: number; // duration in minutes
+  }[];
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  activeDays: string[];
+  exemptDays: string[];
 }
 
 export default function RobotAdminDashboard() {
@@ -82,9 +98,38 @@ export default function RobotAdminDashboard() {
     }
   });
 
-  // Add this to your RobotAdminDashboard component state
-  const [playlists, setPlaylists] = useState<any[]>([]);
+  // And update the playlists state to use the interface
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(false);
+
+  // Add these state variables
+  const [selectedPlaylists, setSelectedPlaylists] = useState<string[]>([]);
+  const [selectedDeviceType, setSelectedDeviceType] = useState<string>("");
+
+  // Update the scheduleSettings state
+  const [scheduleSettings, setScheduleSettings] = useState<PlaylistSchedule>({
+    deviceTypeId: "",
+    playlists: [],
+    startDate: "",
+    endDate: "",
+    startTime: "09:00",
+    endTime: "17:00",
+    activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    exemptDays: []
+  });
+
+  // Add this new state for managing playlist durations
+  const [playlistDurations, setPlaylistDurations] = useState<{[key: string]: number}>({});
+
+  // Add this function to handle day selection
+const toggleDay = (day: string) => {
+  setScheduleSettings(prev => ({
+    ...prev,
+    activeDays: prev.activeDays.includes(day)
+      ? prev.activeDays.filter(d => d !== day)
+      : [...prev.activeDays, day]
+  }));
+};
 
   useEffect(() => {
     fetchDeviceTypes();
@@ -389,6 +434,8 @@ export default function RobotAdminDashboard() {
     }));
   };
 
+  
+
   // Add this function to handle file deletion
   const handleFileDelete = (id: string) => {
     setPlaylist(prev => ({
@@ -400,57 +447,64 @@ export default function RobotAdminDashboard() {
   // Add this function to your RobotAdminDashboard component
   const handlePlaylistCreate = async () => {
     if (!playlist.name || playlist.files.length === 0) {
-      toast.error('Please provide a name and at least one file');
+      toast.error("Please provide a name and at least one file");
       return;
     }
   
     try {
       const formData = new FormData();
-      formData.append('name', playlist.name);
-      formData.append('type', playlist.type);
-      
+      formData.append("name", playlist.name);
+      formData.append("type", playlist.type);
+  
       // Add all files
-      playlist.files.forEach(file => {
-        formData.append('files', file.file);
+      playlist.files.forEach((file) => {
+        formData.append("files", file.file);
       });
   
       // Add background audio if present
       if (playlist.backgroundAudio) {
-        formData.append('backgroundAudio', playlist.backgroundAudio);
+        formData.append("backgroundAudio", playlist.backgroundAudio);
       }
   
-      const response = await fetch('/api/playlist', {
-        method: 'POST',
+      // Determine if this is an update or a new playlist
+      const url = isEditing ? `/api/playlist?id=${playlist.id}` : "/api/playlist";
+      const method = isEditing ? "PUT" : "POST";
+  
+      const response = await fetch(url, {
+        method,
         body: formData,
       });
   
       if (!response.ok) {
-        throw new Error('Failed to create playlist');
+        throw new Error(isEditing ? "Failed to update playlist" : "Failed to create playlist");
       }
   
       const data = await response.json();
       if (data.success) {
-        toast.success('Playlist created successfully!');
-        setActiveSection('');
+        toast.success(isEditing ? "Playlist updated successfully!" : "Playlist created successfully!");
+        setActiveSection("");
+  
         // Reset form
         setPlaylist({
-          name: '',
-          type: 'image',
+          name: "",
+          type: "image",
           files: [],
           backgroundAudio: undefined,
           volume: {
             main: 100,
-            background: 50
-          }
+            background: 50,
+          },
         });
+        setIsEditing(false); // Reset editing state
       } else {
         throw new Error(data.error);
       }
     } catch (error) {
-      console.error('Error creating playlist:', error);
-      toast.error('Failed to create playlist');
+      console.error(isEditing ? "Error updating playlist:" : "Error creating playlist:", error);
+      toast.error(isEditing ? "Failed to update playlist" : "Failed to create playlist");
     }
   };
+  
 
   // Add this function to fetch playlists
   const fetchPlaylists = async () => {
@@ -470,29 +524,105 @@ export default function RobotAdminDashboard() {
   };
 
   const handleEditPlaylist = (playlist: any) => {
-    // Set the current playlist for editing
     setPlaylist({
       ...playlist,
-      volume: playlist.volume || { main: 100, background: 50 }
+      id: playlist.id,
+      volume: playlist.volume || { main: 100, background: 50 },
     });
+    setIsEditing(true); // Enable editing mode
     setActiveSection("generatePlaylist");
   };
+  
 
-  const handleDeletePlaylist = async (playlistId: string) => {
+  const handleDeletePlaylist = async (playlistId: string | undefined) => {
+    if (!playlistId) {
+      toast.error("Invalid playlist ID");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete this playlist?")) {
       return;
     }
     
+   try {
+    const response = await fetch(`/api/playlist?id=${playlistId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete playlist');
+    }
+
+    // Remove the playlist from the state
+    setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+    toast.success('Playlist deleted successfully');
+  } catch (error) {
+    console.error('Error deleting playlist:', error);
+    toast.error('Failed to delete playlist');
+  }
+  };
+
+  // Add these functions
+  const handleDeviceTypeChange = (typeId: string) => {
+    setSelectedDeviceType(typeId);
+  };
+
+  const handlePlaylistSelection = (playlistId: string | undefined) => {
+    if (!playlistId) return; // Guard clause for undefined id
+    setSelectedPlaylists(prev => 
+      prev.includes(playlistId) 
+        ? prev.filter(id => id !== playlistId)
+        : [...prev, playlistId]
+    );
+  };
+
+  const handlePlaylistSetup = async () => {
+    if (!scheduleSettings.deviceTypeId) {
+      toast.error("Please select a device type");
+      return;
+    }
+  
+    if (scheduleSettings.playlists.length === 0) {
+      toast.error("Please select at least one playlist");
+      return;
+    }
+  
+    if (!scheduleSettings.startDate || !scheduleSettings.endDate) {
+      toast.error("Please select both start and end dates");
+      return;
+    }
+  
     try {
-      // Here you would typically make an API call to delete the playlist
-      // For now, just filter it out from the state
-      setPlaylists(prev => prev.filter(p => p.id !== playlistId));
-      toast.success('Playlist deleted successfully');
+    console.log(scheduleSettings);
+    alert(scheduleSettings);
+    
+      const response = await fetch("/api/playlist-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(scheduleSettings)
+      });
+  
+      if (!response.ok) throw new Error("Failed to save playlist schedule");
+  
+      toast.success("Playlist schedule saved successfully!");
+      setActiveSection("");
+      // Reset the schedule settings
+      setScheduleSettings({
+        deviceTypeId: "",
+        playlists: [],
+        startDate: "",
+        endDate: "",
+        startTime: "09:00",
+        endTime: "17:00",
+        activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        exemptDays: []
+      });
     } catch (error) {
-      console.error('Error deleting playlist:', error);
-      toast.error('Failed to delete playlist');
+      console.error("Error saving playlist schedule:", error);
+      toast.error("Failed to save playlist schedule");
     }
   };
+  
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -502,12 +632,11 @@ export default function RobotAdminDashboard() {
       </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-        <div className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
-          <Database size={40} className="text-blue-500 mx-auto" />
-          <h2 className="text-lg text-center font-semibold mt-2">Total Devices   </h2>
+        <div className="col-span-2">
+          <h2 className="text-lg text-center font-semibold mt-2">Total Devices</h2>
           <p className="text-2xl font-bold text-center text-blue-500">{devices.length}</p>
         </div>
-
+        
         <div
           className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
           onClick={() => setActiveSection("addDevice")}
@@ -544,10 +673,10 @@ export default function RobotAdminDashboard() {
 
         <div
           className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-          onClick={() => setActiveSection("generatePlaylist")}
+          onClick={() => setActiveSection("playlistSetup")}
         >
           <MdPlaylistAddCircle  size={40} className="mx-auto" />
-          <h2 className="text-lg text-center font-semibold mt-2">Playlist Generation</h2>
+          <h2 className="text-lg text-center font-semibold mt-2">Playlist Setup</h2>
         </div>
 
 
@@ -1101,9 +1230,9 @@ export default function RobotAdminDashboard() {
                       No files selected yet
                     </div>
                   ) : (
-                    playlist.files.map((file) => (
+                    playlist.files.map((file: SelectedFile) => (
                       <div
-                        key={file.id}
+                        key={file.id} // Using the unique id from SelectedFile interface
                         className="flex items-center justify-between p-2 sm:p-3 bg-white rounded-lg shadow-sm"
                       >
                         <div className="flex items-center space-x-2 sm:space-x-3">
@@ -1248,9 +1377,9 @@ export default function RobotAdminDashboard() {
               <p className="text-gray-500 text-center py-4">No playlists found</p>
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {playlists.map((playlist) => (
-                  <div key={playlist.id} className="border rounded-xl p-4 relative hover:shadow-md transition-shadow bg-gray-50">
-                    <div className="flex items-start justify-between">
+                {playlists.map((playlist: Playlist) => (
+                  <div key={playlist.id ?? playlist.name} className="border rounded-xl p-4 relative hover:shadow-md transition-shadow bg-gray-50">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           {playlist.type === 'image' && <ImageIcon size={20} className="text-blue-500" />}
@@ -1268,9 +1397,9 @@ export default function RobotAdminDashboard() {
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
-                          {playlist.files.map((file: any, index: number) => (
+                          {playlist.files.map((file: SelectedFile) => (
                             <div
-                              key={index}
+                              key={`${playlist.id}-${file.id}`} // Combining playlist and file ids for uniqueness
                               className="px-3 py-1 bg-white rounded-full text-sm border shadow-sm"
                             >
                               {file.name}
@@ -1279,13 +1408,13 @@ export default function RobotAdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditPlaylist(playlist)}
-                          className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      <div className="flex gap-2 flex-shrink-0">
+                       <button onClick={() => handleEditPlaylist(playlist)}  className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                         >
-                          <Edit size={16} /> Edit
+                          <Edit size={16} />
+                          Edit
                         </button>
+
                         <button
                           onClick={() => handleDeletePlaylist(playlist.id)}
                           className="flex items-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
@@ -1301,6 +1430,286 @@ export default function RobotAdminDashboard() {
           </div>
         </div>
       )}
+
+
+         {/* Playlist Setup Modal */}
+{activeSection === "playlistSetup" && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4"
+    onClick={() => setActiveSection("")}
+  >
+    <div
+      className="bg-white rounded-xl shadow-2xl w-full max-w-4xl relative max-h-[90vh] overflow-y-auto"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="p-6 border-b sticky top-0 bg-white z-10">
+        <button
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          onClick={() => setActiveSection("")}
+        >
+          <XCircle size={24} />
+        </button>
+        <h2 className="text-2xl font-bold text-gray-800">Setup Playlist Schedule</h2>
+      </div>
+
+      {/* Content */}
+      <div className="p-6">
+        {/* Device Type Selection */}
+        <div className="mb-6">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            Select Device Type
+          </label>
+          <select 
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            value={scheduleSettings.deviceTypeId}
+            onChange={(e) => setScheduleSettings(prev => ({
+              ...prev,
+              deviceTypeId: e.target.value
+            }))}
+          >
+            <option value="">Select a device type</option>
+            {deviceTypes.map((type) => (
+              <option key={type.id} value={type.id}>{type.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Date Range Selection */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">Schedule Duration</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={scheduleSettings.startDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setScheduleSettings(prev => ({
+                  ...prev,
+                  startDate: e.target.value
+                }))}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={scheduleSettings.endDate}
+                min={scheduleSettings.startDate}
+                onChange={(e) => setScheduleSettings(prev => ({
+                  ...prev,
+                  endDate: e.target.value
+                }))}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Time Range Selection */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">Daily Time Range</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Start Time
+              </label>
+              <input
+                type="time"
+                value={scheduleSettings.startTime}
+                onChange={(e) => setScheduleSettings(prev => ({
+                  ...prev,
+                  startTime: e.target.value
+                }))}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                End Time
+              </label>
+              <input
+                type="time"
+                value={scheduleSettings.endTime}
+                onChange={(e) => setScheduleSettings(prev => ({
+                  ...prev,
+                  endTime: e.target.value
+                }))}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Active Days Selection */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">Active Days</h3>
+          <div className="flex flex-wrap gap-2">
+            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
+              <button
+                key={day}
+                onClick={() => {
+                  setScheduleSettings(prev => ({
+                    ...prev,
+                    activeDays: prev.activeDays.includes(day)
+                      ? prev.activeDays.filter(d => d !== day)
+                      : [...prev.activeDays, day]
+                  }))
+                }}
+                className={`px-4 py-2 rounded-full ${
+                  scheduleSettings.activeDays.includes(day)
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Exempt Days */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">Exemption Days</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <input
+                type="date"
+                min={scheduleSettings.startDate}
+                max={scheduleSettings.endDate}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setScheduleSettings(prev => ({
+                      ...prev,
+                      exemptDays: [...new Set([...prev.exemptDays, e.target.value])]
+                    }))
+                  }
+                }}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          {/* Display selected exempt days */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {scheduleSettings.exemptDays.map((date) => (
+              <div key={date} className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                <span>{new Date(date).toLocaleDateString()}</span>
+                <button
+                  onClick={() => setScheduleSettings(prev => ({
+                    ...prev,
+                    exemptDays: prev.exemptDays.filter(d => d !== date)
+                  }))}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <XCircle size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Playlist Selection with Duration */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">Select Playlists & Duration</h3>
+          <div className="grid grid-cols-1 gap-4">
+            {playlists.map((playlist: Playlist) => (
+              <div 
+                key={playlist.id}
+                className={`p-4 border rounded-lg transition-all ${
+                  scheduleSettings.playlists.some(p => p.playlistId === playlist.id)
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={scheduleSettings.playlists.some(p => p.playlistId === playlist.id)}
+                      onChange={() => {
+                        setScheduleSettings(prev => {
+                          const isSelected = prev.playlists.some(p => p.playlistId === playlist.id);
+                          return {
+                            ...prev,
+                            playlists: isSelected
+                              ? prev.playlists.filter(p => p.playlistId !== playlist.id)
+                              : [...prev.playlists, { playlistId: playlist.id || '', duration: 30 }]
+                          };
+                        });
+                      }}
+                      className="w-5 h-5 rounded border-gray-300"
+                    />
+                    <div>
+                      <h4 className="font-medium">{playlist.name}</h4>
+                      <p className="text-sm text-gray-500 capitalize">{playlist.type}</p>
+                    </div>
+                  </div>
+                  {scheduleSettings.playlists.some(p => p.playlistId === playlist.id) && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-600">Duration (minutes):</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={scheduleSettings.playlists.find(p => p.playlistId === playlist.id)?.duration || 30}
+                        onChange={(e) => {
+                          setScheduleSettings(prev => ({
+                            ...prev,
+                            playlists: prev.playlists.map(p => 
+                              p.playlistId === playlist.id
+                                ? { ...p, duration: parseInt(e.target.value) || 30 }
+                                : p
+                            )
+                          }));
+                        }}
+                        className="w-20 p-1 border rounded"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t p-6 sticky bottom-0 bg-white">
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            {scheduleSettings.playlists.length} playlist(s) selected
+          </div>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveSection("")}
+              className="px-6 py-2 text-gray-700 hover:text-gray-900"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handlePlaylistSetup}
+              disabled={!scheduleSettings.deviceTypeId || scheduleSettings.playlists.length === 0}
+              className={`px-6 py-2 rounded-lg ${
+                !scheduleSettings.deviceTypeId || scheduleSettings.playlists.length === 0
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              } text-white font-semibold`}
+            >
+              Save Schedule
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+      
+       
     </div>
   );
 }

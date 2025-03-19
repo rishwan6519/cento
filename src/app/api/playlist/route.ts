@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
+import { rm } from 'fs/promises';
+
 
 const PLAYLISTS_FILE = path.join(process.cwd(), 'public/data/playlists.json');
 const UPLOADS_DIR = path.join(process.cwd(), 'public/uploads');
@@ -160,3 +162,144 @@ export async function GET() {
 
 
 
+export async function DELETE(request: NextRequest) {
+  try {
+    // Extract playlistId from query parameters
+    const { searchParams } = new URL(request.url);
+    const playlistId = searchParams.get('id');
+
+    if (!playlistId) {
+      return NextResponse.json(
+        { success: false, error: 'Playlist ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Read existing playlists
+    let playlists = [];
+    if (existsSync(PLAYLISTS_FILE)) {
+      const playlistsData = await readFile(PLAYLISTS_FILE, 'utf-8');
+      playlists = JSON.parse(playlistsData);
+    }
+
+    // Find the playlist to delete
+    const playlistIndex = playlists.findIndex((p: any) => p.id === playlistId);
+
+    if (playlistIndex === -1) {
+      return NextResponse.json(
+        { success: false, error: 'Playlist not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get the playlist to delete
+    const playlistToDelete = playlists[playlistIndex];
+
+    // Delete the playlist's folder and files
+    const playlistDir = path.join(
+      UPLOADS_DIR,
+      `${playlistToDelete.type}s`,
+      playlistToDelete.id
+    );
+
+    if (existsSync(playlistDir)) {
+      // Delete the folder and its contents recursively
+      await rm(playlistDir, { recursive: true, force: true });
+    }
+
+    // Remove the playlist from the list
+    playlists.splice(playlistIndex, 1);
+
+    // Save the updated playlists
+    await writeFile(PLAYLISTS_FILE, JSON.stringify(playlists, null, 2));
+
+    return NextResponse.json({
+      success: true,
+      message: 'Playlist deleted successfully',
+    });
+
+  } catch (error) {
+    console.error('Error deleting playlist:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete playlist' },
+      { status: 500 }
+    );
+  }
+}
+
+
+export async function PUT(request: NextRequest) {
+  try {
+    console.log("PUT request");
+    const { searchParams } = new URL(request.url);
+    const playlistId = searchParams.get("id");
+
+    if (!playlistId) {
+      return NextResponse.json({ success: false, error: "Playlist ID is required" }, { status: 400 });
+    }
+
+    const formData = await request.formData();
+    const name = formData.get("name") as string;
+    const type = formData.get("type") as string;
+    const rawFiles = formData.getAll("files");
+    const rawBackgroundAudio = formData.get("backgroundAudio");
+
+    if (!name || !type) {
+      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
+    }
+
+    // Read existing playlists
+    let playlists = [];
+    if (existsSync(PLAYLISTS_FILE)) {
+      const playlistsData = await readFile(PLAYLISTS_FILE, "utf-8");
+      playlists = JSON.parse(playlistsData);
+    }
+
+    // Find the playlist to update
+    const playlistIndex = playlists.findIndex((p: any) => p.id === playlistId);
+
+    if (playlistIndex === -1) {
+      return NextResponse.json({ success: false, error: "Playlist not found" }, { status: 404 });
+    }
+
+    // Process uploaded files
+    const files = await Promise.all(
+      rawFiles.map(async (file: any) => {
+        if (file instanceof File) {
+          const filePath = path.join("uploads", `${Date.now()}-${file.name}`);
+          const buffer = await file.arrayBuffer();
+          await writeFile(filePath, Buffer.from(buffer));
+          return { name: file.name, path: filePath };
+        }
+        return null;
+      })
+    );
+
+    // Process background audio
+    let backgroundAudio = playlists[playlistIndex].backgroundAudio;
+    if (rawBackgroundAudio instanceof File) {
+      const audioPath = path.join("uploads", `${Date.now()}-${rawBackgroundAudio.name}`);
+      const audioBuffer = await rawBackgroundAudio.arrayBuffer();
+      await writeFile(audioPath, Buffer.from(audioBuffer));
+      backgroundAudio = { name: rawBackgroundAudio.name, path: audioPath };
+    }
+
+    // Update playlist details
+    playlists[playlistIndex] = {
+      ...playlists[playlistIndex],
+      name,
+      type,
+      files: files.filter(Boolean).length > 0 ? files.filter(Boolean) : playlists[playlistIndex].files,
+      backgroundAudio,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Save the updated playlists
+    await writeFile(PLAYLISTS_FILE, JSON.stringify(playlists, null, 2));
+
+    return NextResponse.json({ success: true, playlist: playlists[playlistIndex] });
+  } catch (error) {
+    console.error("Error updating playlist:", error);
+    return NextResponse.json({ success: false, error: "Failed to update playlist" }, { status: 500 });
+  }
+}
