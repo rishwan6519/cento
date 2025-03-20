@@ -1,0 +1,27 @@
+[
+  {
+    "deviceTypeId": "e0eeec59-b948-4fdc-9544-1f2a86d6d61a",
+    "playlists": [
+      {
+        "playlistId": "1742379233122",
+        "duration": 30
+      }
+    ],
+    "startDate": "2025-03-20",
+    "endDate": "2025-03-31",
+    "startTime": "09:00",
+    "endTime": "17:00",
+    "activeDays": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Sunday",
+      "Saturday"
+    ],
+    "exemptDays": [],
+    "id": "6b96bbf6-ae9e-43ec-8d05-2cd7b4b52028",
+    "createdAt": "2025-03-20T08:57:26.293Z"
+  }
+]

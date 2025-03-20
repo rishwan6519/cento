@@ -18,6 +18,8 @@ if (!fs.existsSync(jsonFilePath)) {
 // GET: Fetch all device types
 export async function GET() {
   try {
+    console.log();
+    
     if (!fs.existsSync(jsonFilePath)) {
       return NextResponse.json({ types: [] });
     }

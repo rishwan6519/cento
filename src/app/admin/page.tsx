@@ -601,35 +601,38 @@ useEffect(() => {
     }
   
     try {
-    console.log(scheduleSettings);
-    alert(scheduleSettings);
-    
       const response = await fetch("/api/playlist-schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(scheduleSettings)
       });
   
-      if (!response.ok) throw new Error("Failed to save playlist schedule");
+      if (!response.ok) {
+        throw new Error("Failed to save playlist schedule");
+      }
   
-      toast.success("Playlist schedule saved successfully!");
-      setActiveSection("");
-      // Reset the schedule settings
-      setScheduleSettings({
-        deviceTypeId: "",
-        playlists: [],
-        startDate: "",
-        endDate: "",
-        startTime: "09:00",
-        endTime: "17:00",
-        activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-        exemptDays: []
-      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success("Playlist schedule saved successfully!");
+        setActiveSection("");
+        // Reset the schedule settings
+        setScheduleSettings({
+          deviceTypeId: "",
+          playlists: [],
+          startDate: "",
+          endDate: "",
+          startTime: "09:00",
+          endTime: "17:00",
+          activeDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          exemptDays: []
+        });
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
       console.error("Error saving playlist schedule:", error);
       toast.error("Failed to save playlist schedule");
     }
-    
   };
   
 
