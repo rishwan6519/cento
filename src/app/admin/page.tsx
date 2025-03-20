@@ -162,6 +162,13 @@ const toggleDay = (day: string) => {
     }
   }, [activeSection]);
 
+  // Add this useEffect in your component, alongside other useEffect hooks
+useEffect(() => {
+  if (activeSection === "playlistSetup") {
+    fetchPlaylists();
+  }
+}, [activeSection]);
+
   const fetchDevices = async () => {
     try {
       const response = await fetch("/api/devices");
@@ -514,6 +521,7 @@ const toggleDay = (day: string) => {
       if (!response.ok) throw new Error('Failed to fetch playlists');
       
       const data = await response.json();
+      console.log('Fetched playlists:', data.playlists); // Add this for debugging
       setPlaylists(data.playlists || []);
     } catch (error) {
       console.error('Error fetching playlists:', error);
@@ -621,6 +629,7 @@ const toggleDay = (day: string) => {
       console.error("Error saving playlist schedule:", error);
       toast.error("Failed to save playlist schedule");
     }
+    
   };
   
 
@@ -1617,64 +1626,72 @@ const toggleDay = (day: string) => {
         {/* Playlist Selection with Duration */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-4">Select Playlists & Duration</h3>
-          <div className="grid grid-cols-1 gap-4">
-            {playlists.map((playlist: Playlist) => (
-              <div 
-                key={playlist.id}
-                className={`p-4 border rounded-lg transition-all ${
-                  scheduleSettings.playlists.some(p => p.playlistId === playlist.id)
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={scheduleSettings.playlists.some(p => p.playlistId === playlist.id)}
-                      onChange={() => {
-                        setScheduleSettings(prev => {
-                          const isSelected = prev.playlists.some(p => p.playlistId === playlist.id);
-                          return {
-                            ...prev,
-                            playlists: isSelected
-                              ? prev.playlists.filter(p => p.playlistId !== playlist.id)
-                              : [...prev.playlists, { playlistId: playlist.id || '', duration: 30 }]
-                          };
-                        });
-                      }}
-                      className="w-5 h-5 rounded border-gray-300"
-                    />
-                    <div>
-                      <h4 className="font-medium">{playlist.name}</h4>
-                      <p className="text-sm text-gray-500 capitalize">{playlist.type}</p>
-                    </div>
-                  </div>
-                  {scheduleSettings.playlists.some(p => p.playlistId === playlist.id) && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">Duration (minutes):</label>
+          {isLoadingPlaylists ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          ) : playlists.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No playlists found</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {playlists.map((playlist: Playlist) => (
+                <div 
+                  key={playlist.id}
+                  className={`p-4 border rounded-lg transition-all ${
+                    scheduleSettings.playlists.some(p => p.playlistId === playlist.id)
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
                       <input
-                        type="number"
-                        min="1"
-                        value={scheduleSettings.playlists.find(p => p.playlistId === playlist.id)?.duration || 30}
-                        onChange={(e) => {
-                          setScheduleSettings(prev => ({
-                            ...prev,
-                            playlists: prev.playlists.map(p => 
-                              p.playlistId === playlist.id
-                                ? { ...p, duration: parseInt(e.target.value) || 30 }
-                                : p
-                            )
-                          }));
+                        type="checkbox"
+                        checked={scheduleSettings.playlists.some(p => p.playlistId === playlist.id)}
+                        onChange={() => {
+                          setScheduleSettings(prev => {
+                            const isSelected = prev.playlists.some(p => p.playlistId === playlist.id);
+                            return {
+                              ...prev,
+                              playlists: isSelected
+                                ? prev.playlists.filter(p => p.playlistId !== playlist.id)
+                                : [...prev.playlists, { playlistId: playlist.id || '', duration: 30 }]
+                            };
+                          });
                         }}
-                        className="w-20 p-1 border rounded"
+                        className="w-5 h-5 rounded border-gray-300"
                       />
+                      <div>
+                        <h4 className="font-medium">{playlist.name}</h4>
+                        <p className="text-sm text-gray-500 capitalize">{playlist.type}</p>
+                      </div>
                     </div>
-                  )}
+                    {scheduleSettings.playlists.some(p => p.playlistId === playlist.id) && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">Duration (minutes):</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={scheduleSettings.playlists.find(p => p.playlistId === playlist.id)?.duration || 30}
+                          onChange={(e) => {
+                            setScheduleSettings(prev => ({
+                              ...prev,
+                              playlists: prev.playlists.map(p => 
+                                p.playlistId === playlist.id
+                                  ? { ...p, duration: parseInt(e.target.value) || 30 }
+                                  : p
+                              )
+                            }));
+                          }}
+                          className="w-20 p-1 border rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
