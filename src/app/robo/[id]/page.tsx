@@ -86,7 +86,7 @@ export default function AdminDashboard() {
           <div>
             <header className="flex justify-between items-center bg-white p-4 rounded shadow">
               <h1 className="text-2xl font-semibold">Dashboard</h1>
-              <Button variant="outline">+ Add Channel</Button>
+            
             </header>
             <div className="grid grid-cols-4 gap-4 mt-4">
               <div className="cursor-pointer" onClick={handleOnboarding}>

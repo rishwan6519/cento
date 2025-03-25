@@ -4,6 +4,16 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { rm } from 'fs/promises';
 
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+const MEDIA_FILES_JSON = path.join(process.cwd(), 'data', 'mediaFiles.json');
+
+interface MediaFile {
+  id: string;
+  name: string;
+  type: string;
+  path: string;
+  uploadedAt: string;
+}
 
 const PLAYLISTS_FILE = path.join(process.cwd(), 'public/data/playlists.json');
 const UPLOADS_DIR = path.join(process.cwd(), 'public/uploads');
@@ -25,94 +35,104 @@ async function ensureDirectories() {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensureDirectories();
-
     const formData = await request.formData();
     const name = formData.get('name') as string;
     const type = formData.get('type') as string;
     const files = formData.getAll('files');
-    const backgroundAudio = formData.get('backgroundAudio') as File | null;
 
-    if (!name || !type || files.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
+    // Create base upload directory if it doesn't exist
+    if (!existsSync(UPLOAD_DIR)) {
+      await mkdir(UPLOAD_DIR, { recursive: true });
     }
 
-    // Create playlist ID and directory
-    const playlistId = Date.now().toString();
-    const playlistDir = path.join(UPLOADS_DIR, `${type}s`, playlistId);
-    await mkdir(playlistDir, { recursive: true });
+    // Create type-specific directories
+    const imageDir = path.join(UPLOAD_DIR, 'images');
+    const videoDir = path.join(UPLOAD_DIR, 'videos');
+    const audioDir = path.join(UPLOAD_DIR, 'audio');
 
-    // Save files
-    const savedFiles = await Promise.all(
-      files.map(async (file: any) => {
-        const fileName = `${Date.now()}-${file.name}`;
-        const filePath = path.join(playlistDir, fileName);
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await writeFile(filePath, buffer);
-        return {
-          name: file.name,
-          path: `/uploads/${type}s/${playlistId}/${fileName}`
-        };
-      })
-    );
+    await Promise.all([
+      !existsSync(imageDir) && mkdir(imageDir, { recursive: true }),
+      !existsSync(videoDir) && mkdir(videoDir, { recursive: true }),
+      !existsSync(audioDir) && mkdir(audioDir, { recursive: true })
+    ]);
 
-    // Handle background audio
-    let backgroundAudioPath = null;
-    if (backgroundAudio) {
-      const backgroundDir = path.join(playlistDir, 'background');
-      await mkdir(backgroundDir, { recursive: true });
-      const fileName = `${Date.now()}-${backgroundAudio.name}`;
-      const filePath = path.join(backgroundDir, fileName);
-      const buffer = Buffer.from(await backgroundAudio.arrayBuffer());
+    const uploadedFiles: MediaFile[] = [];
+
+    for (const file of files) {
+      const buffer = Buffer.from(await (file as File).arrayBuffer());
+      const fileName = `${Date.now()}-${(file as File).name}`;
+      let filePath: string;
+
+      // Determine directory based on file type
+      if ((file as File).type.startsWith('image/')) {
+        filePath = path.join(imageDir, fileName);
+      } else if ((file as File).type.startsWith('video/')) {
+        filePath = path.join(videoDir, fileName);
+      } else if ((file as File).type.startsWith('audio/')) {
+        filePath = path.join(audioDir, fileName);
+      } else {
+        throw new Error('Unsupported file type');
+      }
+
+      // Save file
       await writeFile(filePath, buffer);
-      backgroundAudioPath = `/uploads/${type}s/${playlistId}/background/${fileName}`;
+
+      // Create relative path for database
+      const relativePath = path.relative(
+        path.join(process.cwd(), 'public'),
+        filePath
+      ).replace(/\\/g, '/');
+
+      // Add file info to array
+      uploadedFiles.push({
+        id: Math.random().toString(36).substr(2, 9),
+        name: (file as File).name,
+        type: (file as File).type,
+        path: '/' + relativePath,
+        uploadedAt: new Date().toISOString(),
+      });
     }
+
+    // Save playlist data
+    const playlistData = {
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      type,
+      files: uploadedFiles,
+      createdAt: new Date().toISOString(),
+    };
 
     // Read existing playlists
     let playlists = [];
     try {
-      if (existsSync(PLAYLISTS_FILE)) {
-        const playlistsData = await readFile(PLAYLISTS_FILE, 'utf-8');
-        playlists = JSON.parse(playlistsData);
+      const playlistsFile = path.join(process.cwd(), 'data', 'playlists.json');
+      if (existsSync(playlistsFile)) {
+        playlists = JSON.parse(await readFile(playlistsFile, 'utf-8'));
       }
     } catch (error) {
       console.error('Error reading playlists:', error);
     }
 
-    // Create new playlist
-    const newPlaylist = {
-      id: playlistId,
-      name,
-      type,
-      files: savedFiles,
-      backgroundAudio: backgroundAudioPath,
-      createdAt: new Date().toISOString()
-    };
+    // Add new playlist and save
+    playlists.push(playlistData);
+    await writeFile(
+      path.join(process.cwd(), 'data', 'playlists.json'),
+      JSON.stringify(playlists, null, 2)
+    );
 
-    playlists.push(newPlaylist);
-
-    // Save updated playlists
-    await writeFile(PLAYLISTS_FILE, JSON.stringify(playlists, null, 2));
-
-    return NextResponse.json({ 
-      success: true, 
-      playlist: newPlaylist 
+    return NextResponse.json({
+      success: true,
+      playlist: playlistData,
     });
 
   } catch (error) {
-    console.error('Error saving playlist:', error);
+    console.error('Upload error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to save playlist' },
+      { success: false, error: 'Failed to create playlist' },
       { status: 500 }
     );
   }
 }
-
-
-
 
 export async function GET() {
   try {

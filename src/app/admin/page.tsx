@@ -13,11 +13,12 @@ import {
   Settings,
   PlayCircle,
   ListMusic,
-  Upload
+  Upload,
+  Menu
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FcDataConfiguration } from "react-icons/fc";
-import { CgPlayList } from "react-icons/cg";
+import { CgPlayList, CgPlayListAdd } from "react-icons/cg";
 import { MdPlaylistAddCheckCircle, MdPlaylistAddCircle, MdAudiotrack } from "react-icons/md";
 
 interface DeviceType {
@@ -30,7 +31,7 @@ interface Device {
   id: string;
   name: string;
   imageUrl: string;
-  typeId: string;
+  type: string;  // Changed from typeId to type to match JSON structure
   serialNumber?: string;
   color?: string;
   description?: string;
@@ -73,6 +74,13 @@ interface PlaylistSchedule {
   exemptDays: string[];
 }
 
+// First add this interface for the model preview
+interface ModelPreview {
+  id: string;
+  file: File;
+  preview: string;
+}
+
 export default function RobotAdminDashboard() {
   const [selectedDevice, setSelectedDevice] = useState<string>("");
   const [customDeviceName, setCustomDeviceName] = useState<string>("");
@@ -92,7 +100,7 @@ export default function RobotAdminDashboard() {
     id: "",
     name: "",
     imageUrl: "",
-    typeId: "",
+    type: "",
     serialNumber: "",
     color: "",
     description: "",
@@ -134,6 +142,17 @@ export default function RobotAdminDashboard() {
 
   // Add this new state for managing playlist durations
   const [playlistDurations, setPlaylistDurations] = useState<{[key: string]: number}>({});
+
+  // Add this state for mobile sidebar
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Add these to your existing component
+  const [files, setFiles] = useState<Array<File & { id: string }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Add these to your existing state declarations
+  const [modelPreviews, setModelPreviews] = useState<ModelPreview[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Add this function to handle day selection
 const toggleDay = (day: string) => {
@@ -391,7 +410,7 @@ useEffect(() => {
       id: "",
       name: "",
       imageUrl: "",
-      typeId: "",
+      type: "",
       serialNumber: "",
       color: "",
       description: "",
@@ -455,8 +474,6 @@ useEffect(() => {
     }));
   };
 
-  
-
   // Add this function to handle file deletion
   const handleFileDelete = (id: string) => {
     setPlaylist(prev => ({
@@ -465,67 +482,62 @@ useEffect(() => {
     }));
   };
 
-  // Add this function to your RobotAdminDashboard component
-  const handlePlaylistCreate = async () => {
-    if (!playlist.name || playlist.files.length === 0) {
-      toast.error("Please provide a name and at least one file");
-      return;
+  // Update the handlePlaylistCreate function
+const handlePlaylistCreate = async () => {
+  if (playlist.files.length === 0) {
+    toast.error("Please select at least one file");
+    alert("Please select at least one file");
+    return;
+  }
+
+  // Show loading toast
+  const loadingToast = toast.loading('Creating playlist...');
+
+  try {
+    const formData = new FormData();
+    
+    // Add all files from playlist
+    playlist.files.forEach((file) => {
+      formData.append('files', file.file);
+      formData.append('fileNames', file.name);
+    });
+
+    // Make the API call
+    const response = await fetch("/api/media/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to upload media files");
     }
-  
-    try {
-      const formData = new FormData();
-      formData.append("name", playlist.name);
-      formData.append("type", playlist.type);
-  
-      // Add all files
-      playlist.files.forEach((file) => {
-        formData.append("files", file.file);
-      });
-  
-      // Add background audio if present
-      if (playlist.backgroundAudio) {
-        formData.append("backgroundAudio", playlist.backgroundAudio);
-      }
-  
-      // Determine if this is an update or a new playlist
-      const url = isEditing ? `/api/playlist?id=${playlist.id}` : "/api/playlist";
-      const method = isEditing ? "PUT" : "POST";
-  
-      const response = await fetch(url, {
-        method,
-        body: formData,
-      });
-  
-      if (!response.ok) {
-        throw new Error(isEditing ? "Failed to update playlist" : "Failed to create playlist");
-      }
-  
-      const data = await response.json();
-      if (data.success) {
-        toast.success(isEditing ? "Playlist updated successfully!" : "Playlist created successfully!");
-        setActiveSection("");
-  
-        // Reset form
-        setPlaylist({
-          name: "",
-          type: "image",
-          files: [],
-          backgroundAudio: undefined,
-          volume: {
-            main: 100,
-            background: 50,
-          },
-        });
-        setIsEditing(false); // Reset editing state
-      } else {
-        throw new Error(data.error);
-      }
-    } catch (error) {
-      console.error(isEditing ? "Error updating playlist:" : "Error creating playlist:", error);
-      toast.error(isEditing ? "Failed to update playlist" : "Failed to create playlist");
-    }
-  };
-  
+
+    const data = await response.json();
+    
+    // Update success toast
+    toast.success('Media uploaded successfully!', {
+      id: loadingToast,
+    });
+
+    // Reset the form
+    setPlaylist(prev => ({
+      ...prev,
+      files: []
+    }));
+    setActiveSection("");
+
+    // Refresh playlists if needed
+    fetchPlaylists();
+
+  } catch (error) {
+    // Update error toast
+    toast.error(error instanceof Error ? error.message : 'Failed to upload media', {
+      id: loadingToast,
+    });
+    console.error("Error uploading media:", error);
+  }
+};
+
 
   // Add this function to fetch playlists
   const fetchPlaylists = async () => {
@@ -649,8 +661,76 @@ useEffect(() => {
     }
   };
   
+  const handleUpload = async () => {
+    if (files.length === 0) return;
+  
+    setIsUploading(true);
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+  
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+  
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+  
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Files uploaded successfully!');
+        setFiles([]);
+        setActiveSection('');
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Add these handler functions
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  };
+  
+  const handleFiles = (files: File[]) => {
+    const newModels = files.map(file => ({
+      id: generateUniqueId(),
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+    
+    setModelPreviews(prev => [...prev, ...newModels]);
+  };
+  
   const sidebarItems = [
-   
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: <LayoutDashboard size={20} />,
+    },
     {
       id: 'addDevice',
       label: 'Add Device',
@@ -683,23 +763,45 @@ useEffect(() => {
     },
     {
       id: 'playlistSetup',
-      label: 'Playlist Schedule',
-      icon: <Music size={20} className="text-purple-500" />,
+      label: 'Playlist Setup',
+      icon: <CgPlayListAdd size={20} className="text-purple-500" />,
     },
   ];
 
+  // Update the return statement with responsive classes
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
+      {/* Mobile Sidebar Toggle */}
+      <div className="md:hidden fixed top-4 left-4 z-30">
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="p-2 rounded-lg bg-white shadow-lg"
+        >
+          {isSidebarOpen ? (
+            <XCircle size={24} className="text-gray-600" />
+          ) : (
+            <Menu size={24} className="text-gray-600" />
+          )}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
+      <div
+        className={`${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0 fixed md:relative z-20 w-64 h-full bg-white shadow-lg transition-transform duration-200 ease-in-out`}
+      >
         <div className="p-6 border-b">
-          <h1 className="text-xl font-bold text-gray-800">🤖 Robot Admin</h1>
+          <h1 className="text-xl font-bold text-gray-800"> Centor Admin.</h1>
         </div>
-        <nav className="p-4">
+        <nav className="p-4 overflow-y-auto h-[calc(100vh-88px)]">
           {sidebarItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveSection(item.id)}
+              onClick={() => {
+                setActiveSection(item.id);
+                setIsSidebarOpen(false); // Close sidebar on mobile after selection
+              }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
                 activeSection === item.id
                   ? 'bg-blue-50 text-blue-600'
@@ -713,9 +815,17 @@ useEffect(() => {
         </nav>
       </div>
 
+      {/* Overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
+      <div className="flex-1 w-full md:w-auto p-4 md:p-8 pt-20 md:pt-8">
+        <div className="max-w-7xl mx-auto">
           {/* Dashboard Overview */}
           {!activeSection && (
   <div className="space-y-6">
@@ -767,72 +877,55 @@ useEffect(() => {
       </div>
     </div>
 
-    {/* Quick Actions */}
+    {/* Devices List */}
     <div className="bg-white rounded-xl shadow-sm p-6">
-      <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button
-          onClick={() => setActiveSection("addDevice")}
-          className="flex flex-col items-center p-4 rounded-lg border-2 border-gray-100 hover:border-blue-500 hover:bg-blue-50 transition-all"
-        >
-          <PlusCircle size={24} className="text-blue-500 mb-2" />
-          <span className="text-sm font-medium">Add Device</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSection("configureDevice")}
-          className="flex flex-col items-center p-4 rounded-lg border-2 border-gray-100 hover:border-green-500 hover:bg-green-50 transition-all"
-        >
-          <Settings size={24} className="text-green-500 mb-2" />
-          <span className="text-sm font-medium">Configure Device</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSection("generatePlaylist")}
-          className="flex flex-col items-center p-4 rounded-lg border-2 border-gray-100 hover:border-purple-500 hover:bg-purple-50 transition-all"
-        >
-          <PlayCircle size={24} className="text-purple-500 mb-2" />
-          <span className="text-sm font-medium">Create Playlist</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSection("playlistSetup")}
-          className="flex flex-col items-center p-4 rounded-lg border-2 border-gray-100 hover:border-orange-500 hover:bg-orange-50 transition-all"
-        >
-          <Music size={24} className="text-orange-500 mb-2" />
-          <span className="text-sm font-medium">Schedule Playlist</span>
-        </button>
+      <h3 className="text-lg font-semibold mb-4">All Devices..</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {devices.map((device) => {
+  // Find the matching device type using the 'type' field instead of 'typeId'
+  const deviceType = deviceTypes.find(type => type.id === device.type);
+  
+  return (
+    <div key={device.id} className="border rounded-lg p-4 hover:shadow-md transition-all">
+      <div className="flex flex-col h-full">
+        <div className="relative h-48 mb-3">
+          <img
+            src={device.imageUrl}
+            alt={device.name}
+            className="h-[90%] object-fill  rounded-lg"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "/placeholder-image.jpg";
+            }}
+          />
+        </div>
+        <div className="flex-grow">
+          <h4 className="font-semibold text-lg mb-2">{device.name}</h4>
+          {deviceType && (
+            <p className="text-sm text-gray-600 mb-2">
+              Type: {deviceType.name}
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 mt-3 pt-3 border-t">
+          <button
+            onClick={() => editDevice(device)}
+            className="flex items-center gap-1 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <Edit size={16} />
+            Edit
+          </button>
+          <button
+            onClick={() => deleteDevice(device.id)}
+            className="flex items-center gap-1 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <Trash2 size={16} />
+            Delete
+          </button>
+        </div>
       </div>
     </div>
-
-    {/* Recent Activity */}
-    <div className="bg-white rounded-xl shadow-sm p-6">
-      <h3 className="text-lg font-semibold mb-4">Recent Devices</h3>
-      <div className="space-y-4">
-        {devices.slice(0, 3).map((device) => (
-          <div key={device.id} className="flex items-center justify-between p-4 rounded-lg bg-gray-50">
-            <div className="flex items-center gap-4">
-              <img
-                src={device.imageUrl}
-                alt={device.name}
-                className="w-12 h-12 rounded-lg object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/placeholder-image.jpg";
-                }}
-              />
-              <div>
-                <h4 className="font-medium">{device.name}</h4>
-                <p className="text-sm text-gray-500">Type: {deviceTypes.find(t => t.id === device.typeId)?.name || 'Unknown'}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => editDevice(device)}
-              className="text-blue-500 hover:text-blue-700"
-            >
-              <Edit size={18} />
-            </button>
-          </div>
-        ))}
+  );
+})}
       </div>
     </div>
   </div>
@@ -1140,213 +1233,112 @@ useEffect(() => {
               </div>
               
               <div className="p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="space-y-4 sm:space-y-6">
-                    {/* Playlist Name */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Playlist Name
-                      </label>
-                      <input
-                        type="text"
-                        value={playlist.name}
-                        onChange={(e) => setPlaylist({ ...playlist, name: e.target.value })}
-                        placeholder="Enter playlist name"
-                        className="w-full p-2 sm:p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    {/* Left Column - Upload Section */}
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Upload Media
+        </h3>
+        <div
+          className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer"
+          onClick={() => document.getElementById('media-upload')?.click()}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <Upload className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-2 text-sm font-medium text-gray-600">
+            Click to upload or drag and drop
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Supports images, videos, and audio files
+          </p>
+          <input
+            id="media-upload"
+            type="file"
+            multiple
+            hidden
+            accept="image/*,video/*,audio/*"
+            onChange={handleFileSelection}
+          />
+        </div>
+      </div>
+    </div>
 
-                    {/* Playlist Type */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Playlist Type
-                      </label>
-                      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                        {['image', 'video', 'audio'].map((type) => (
-                          <button
-                            key={type}
-                            onClick={() => setPlaylist({
-                              ...playlist,
-                              type: type as 'image' | 'video' | 'audio',
-                              files: [],
-                              backgroundAudio: undefined
-                            })}
-                            className={`p-2 sm:p-4 rounded-lg border-2 transition-all ${
-                              playlist.type === type
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <div className="flex flex-col items-center gap-1 sm:gap-2">
-                              {type === 'image' && <ImageIcon size={20} className="text-blue-500" />}
-                              {type === 'video' && <Video size={20} className="text-green-500" />}
-                              {type === 'audio' && <Music size={20} className="text-purple-500" />}
-                              <span className="text-xs sm:text-sm capitalize">{type}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* File Upload */}
-                    <div className="flex flex-col gap-4">
-                      <label className="block text-sm font-semibold text-gray-700">
-                        Upload {playlist.type === 'image' ? 'Images' : 
-                               playlist.type === 'video' ? 'Videos' : 'Audio Files'}
-                      </label>
-                      <div
-                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-blue-500 transition-colors cursor-pointer"
-                        onClick={() => document.getElementById('file-upload')?.click()}
-                      >
-                        <Upload className="mx-auto h-8 sm:h-12 w-8 sm:w-12 text-gray-400" />
-                        <p className="mt-2 text-sm text-gray-600">
-                          Click to upload or drag and drop
-                        </p>
-                        <input
-                          id="file-upload"
-                          type="file"
-                          multiple
-                          hidden
-                          accept={playlist.type === 'image' ? 'image/*' :
-                                  playlist.type === 'video' ? 'video/*' :
-                                  'audio/*'}
-                          onChange={handleFileSelection}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Background Audio Section */}
-                    <div className="flex flex-col gap-4">
-                      <label className="block text-sm font-semibold text-gray-700">
-                        Background Audio {playlist.type === 'audio' ? '(Mix)' : '(Optional)'}
-                      </label>
-                      <div
-                        className="border-2 border-dashed border-gray-300 rounded-lg p-3 sm:p-4 text-center hover:border-blue-500 transition-colors cursor-pointer"
-                        onClick={() => document.getElementById('audio-upload')?.click()}
-                      >
-                        <Music className="mx-auto h-6 sm:h-8 w-6 sm:w-8 text-gray-400" />
-                        <p className="mt-1 text-xs sm:text-sm text-gray-600">
-                          {playlist.type === 'audio' ? 'Add background mix' : 'Add background music'}
-                        </p>
-                        <input
-                          id="audio-upload"
-                          type="file"
-                          hidden
-                          accept="audio/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            setPlaylist({ ...playlist, backgroundAudio: file });
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Selected Files Preview */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-700 mb-4">Selected Files</h3>
-                    <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
-                      {playlist.files.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500 text-sm">
-                          No files selected yet
-                        </div>
-                      ) : (
-                        playlist.files.map((file: SelectedFile) => (
-                          <div
-                            key={file.id} // Using the unique id from SelectedFile interface
-                            className="flex items-center justify-between p-2 sm:p-3 bg-white rounded-lg shadow-sm"
-                          >
-                            <div className="flex items-center space-x-2 sm:space-x-3">
-                              {/* File Icon */}
-                              <div className="flex-shrink-0">
-                                {playlist.type === 'image' && <ImageIcon size={18} className="text-blue-500" />}
-                                {playlist.type === 'video' && <Video size={18} className="text-green-500" />}
-                                {playlist.type === 'audio' && <Music size={18} className="text-purple-500" />}
-                              </div>
-                              {/* File Details */}
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm truncate max-w-[150px] sm:max-w-[200px]">
-                                  {file.name}
-                                </span>
-                                {(playlist.type === 'audio' || playlist.type === 'video') && (
-                                  <span className="text-xs text-gray-500">
-                                    Volume: {playlist.volume.main}%
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleFileDelete(file.id)}
-                              className="text-red-500 hover:text-red-700 p-1"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    {/* Volume Controls */}
-                    {(playlist.files.length > 0 || playlist.backgroundAudio) && (
-                      <div className="mt-4 space-y-4 p-3 bg-white rounded-lg">
-                        {playlist.files.length > 0 && (
-                          <div>
-                            <label className="block text-xs sm:text-sm text-gray-600 mb-1">
-                              Main Volume
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={playlist.volume.main}
-                                onChange={(e) => setPlaylist({
-                                  ...playlist,
-                                  volume: {
-                                    ...playlist.volume,
-                                    main: Number(e.target.value)
-                                  }
-                                })}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                              />
-                              <span className="text-xs sm:text-sm text-gray-600 w-12">
-                                {playlist.volume.main}%
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {playlist.backgroundAudio && (
-                          <div>
-                            <label className="block text-xs sm:text-sm text-gray-600 mb-1">
-                              Background Volume
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={playlist.volume.background}
-                                onChange={(e) => setPlaylist({
-                                  ...playlist,
-                                  volume: {
-                                    ...playlist.volume,
-                                    background: Number(e.target.value)
-                                  }
-                                })}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                              />
-                              <span className="text-xs sm:text-sm text-gray-600 w-12">
-                                {playlist.volume.background}%
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+    {/* Right Column - Preview Section */}
+    <div className="bg-gray-50 rounded-lg p-4">
+      <h3 className="font-semibold text-gray-800 mb-4">Media Preview</h3>
+      <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+        {playlist.files.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No files selected yet
+          </div>
+        ) : (
+          playlist.files.map((file: SelectedFile) => (
+            <div
+              key={file.id}
+              className="bg-white rounded-lg shadow-sm p-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {/* File Icon */}
+                  <div className="flex-shrink-0">
+                    {file.file.type.startsWith('image/') && (
+                      <ImageIcon size={20} className="text-blue-500" />
+                    )}
+                    {file.file.type.startsWith('video/') && (
+                      <Video size={20} className="text-green-500" />
+                    )}
+                    {file.file.type.startsWith('audio/') && (
+                      <Music size={20} className="text-purple-500" />
                     )}
                   </div>
+                  
+                  {/* File Preview */}
+                  <div className="flex-grow min-w-0">
+                    {file.file.type.startsWith('image/') && (
+                      <img
+                        src={URL.createObjectURL(file.file)}
+                        alt={file.name}
+                        className="h-20 w-20 object-cover rounded"
+                      />
+                    )}
+                    {file.file.type.startsWith('video/') && (
+                      <video
+                        src={URL.createObjectURL(file.file)}
+                        className="h-20 w-20 object-cover rounded"
+                        controls
+                      />
+                    )}
+                    {file.file.type.startsWith('audio/') && (
+                      <audio
+                        src={URL.createObjectURL(file.file)}
+                        className="max-w-full"
+                        controls
+                      />
+                    )}
+                    <p className="mt-1 text-sm text-gray-600 truncate">
+                      {file.name}
+                    </p>
+                  </div>
                 </div>
+
+                {/* Delete Button */}
+                <button
+                  onClick={() => handleFileDelete(file.id)}
+                  className="text-red-500 hover:text-red-700 p-2"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  </div>
+</div>
               
               <div className="p-6 border-t bg-gray-50">
                 <div className="flex justify-end gap-4">
@@ -1360,7 +1352,7 @@ useEffect(() => {
                     onClick={handlePlaylistCreate}
                     className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
-                    Create Playlist
+                    Create Media
                   </button>
                 </div>
               </div>

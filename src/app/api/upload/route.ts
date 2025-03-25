@@ -1,41 +1,101 @@
-import { NextRequest, NextResponse } from "next/server";
-import fs from "fs-extra";
-import path from "path";
-import { randomUUID } from "crypto";
+import { writeFile, mkdir } from 'fs/promises';
+import { NextRequest, NextResponse } from 'next/server';
+import path from 'path';
+import { existsSync } from 'fs';
+import { readFile, writeFile as writeFileSync } from 'fs/promises';
 
-export async function POST(req: NextRequest) {
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+const MEDIA_FILES_JSON = path.join(process.cwd(), 'data', 'mediaFiles.json');
+
+interface MediaFile {
+  id: string;
+  name: string;
+  type: string;
+  path: string;
+  uploadedAt: string;
+}
+
+export async function POST(request: NextRequest) {
   try {
-    // Parse the multipart form data
-    const formData = await req.formData();
-    const image = formData.get("image") as File;
-    
-    if (!image) {
-      console.error("No image in request");
-      return NextResponse.json({ error: "No image provided" }, { status: 400 });
+    const formData = await request.formData();
+    const files = formData.getAll('files');
+
+    // Create upload directory if it doesn't exist
+    if (!existsSync(UPLOAD_DIR)) {
+      await mkdir(UPLOAD_DIR, { recursive: true });
     }
-    
-    // Create directories if they don't exist
-    const uploadDir = path.join(process.cwd(), "public/uploads");
-    await fs.ensureDir(uploadDir);
-    
-    // Generate a unique filename with original extension
-    const fileExtension = image.name.split('.').pop() || 'jpg';
-    const fileName = `${randomUUID()}.${fileExtension}`;
-    const filePath = path.join(uploadDir, fileName);
-    
-    // Convert file to buffer and save it
-    const bytes = await image.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    
-    // Write file to disk
-    await fs.writeFile(filePath, buffer);
-    
-    // Return the relative URL to the image
-    const imageUrl = `/uploads/${fileName}`;
-    console.log("Image saved successfully:", imageUrl);
-    return NextResponse.json({ imageUrl });
+
+    // Create data directory if it doesn't exist
+    if (!existsSync(path.dirname(MEDIA_FILES_JSON))) {
+      await mkdir(path.dirname(MEDIA_FILES_JSON), { recursive: true });
+    }
+
+    // Load existing media files data
+    let mediaFiles: MediaFile[] = [];
+    try {
+      const data = await readFile(MEDIA_FILES_JSON, 'utf-8');
+      mediaFiles = JSON.parse(data);
+    } catch (error) {
+      // If file doesn't exist or is invalid, start with empty array
+      mediaFiles = [];
+    }
+
+    const uploadedFiles: MediaFile[] = [];
+
+    for (const file of files) {
+      const buffer = Buffer.from(await (file as File).arrayBuffer());
+      const fileName = `${Date.now()}-${(file as File).name}`;
+      const filePath = path.join(UPLOAD_DIR, fileName);
+
+      // Save file to uploads directory
+      await writeFile(filePath, buffer);
+
+      // Add file info to mediaFiles array
+      const mediaFile: MediaFile = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: (file as File).name,
+        type: (file as File).type,
+        path: `/uploads/${fileName}`,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      mediaFiles.push(mediaFile);
+      uploadedFiles.push(mediaFile);
+    }
+
+    // Save updated media files data
+    await writeFileSync(MEDIA_FILES_JSON, JSON.stringify(mediaFiles, null, 2));
+
+    return NextResponse.json({
+      success: true,
+      files: uploadedFiles,
+    });
+
   } catch (error) {
-    console.error("Error uploading image:", error);
-    return NextResponse.json({ error: "Failed to upload image" }, { status: 500 });
+    console.error('Upload error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to upload files' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    // Read media files data
+    const data = await readFile(MEDIA_FILES_JSON, 'utf-8');
+    const mediaFiles = JSON.parse(data);
+
+    return NextResponse.json({
+      success: true,
+      files: mediaFiles,
+    });
+
+  } catch (error) {
+    console.error('Error reading media files:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch media files' },
+      { status: 500 }
+    );
   }
 }

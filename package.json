@@ -10,9 +10,12 @@
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.1.6",
+    "@types/jsonwebtoken": "^9.0.9",
     "framer-motion": "^12.5.0",
     "fs": "^0.0.1-security",
     "fs-extra": "^11.3.0",
+    "jose": "^6.0.10",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.479.0",
     "multer": "^1.4.5-lts.1",
     "next": "15.2.1",
