@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "id": "1742283031671",
+    "name": "Demo3",
+    "imageUrl": "/uploads/d16e3591-cbb0-42d9-89eb-4ccd5e7ed1ff.png",
+    "type": "e0eeec59-b948-4fdc-9544-1f2a86d6d61a",
+    "features": [
+      "asd",
+      "af",
+      "das",
+      "d"
+    ],
+    "handMovements": [
+      "dsnd",
+      "ddssd",
+      "sds"
+    ],
+    "serialNumber": "12345",
+    "color": "blue",
+    "description": "this is a good robot"
+  }
+]

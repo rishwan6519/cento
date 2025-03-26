@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -23,12 +24,20 @@ interface Playlist {
 const DATA_DIR = path.join(process.cwd(), 'public', 'data');
 const PLAYLISTS_FILE = path.join(DATA_DIR, 'playlists.json');
 
+type RouteContext = {
+  params: {
+    id: string;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
+
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: RouteContext
 ) {
   try {
-    if (!params?.id) {
+    const { id } = context.params;
+    if (!id) {
       return NextResponse.json(
         { success: false, error: 'Playlist ID is required' },
         { status: 400 }
@@ -47,10 +56,10 @@ export async function GET(
       );
     }
 
-    const playlist = playlists.find(p => p.id === params.id);
+    const playlist = playlists.find(p => p.id === id);
     if (!playlist) {
       return NextResponse.json(
-        { success: false, error: `Playlist with ID ${params.id} not found` },
+        { success: false, error: `Playlist with ID ${id} not found` },
         { status: 404 }
       );
     }
