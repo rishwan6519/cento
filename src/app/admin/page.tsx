@@ -858,7 +858,7 @@ const fetchPlaylists = async () => {
         } md:translate-x-0 fixed md:relative z-20 w-64 h-full bg-white shadow-lg transition-transform duration-200 ease-in-out`}
       >
         <div className="p-6 border-b">
-          <h1 className="text-xl font-bold text-gray-800"> Centor Admin.</h1>
+          <h1 className="text-xl font-bold text-gray-800"> Centor Admin...</h1>
         </div>
         <nav className="p-4 overflow-y-auto h-[calc(100vh-88px)]">
           {sidebarItems.map((item) => (
