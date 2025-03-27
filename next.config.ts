@@ -1,14 +1,15 @@
-import type { NextConfig } from 'next'
+/** @type {import('next').NextConfig} */
+const nextConfig = {
 
-const nextConfig: NextConfig = {
-  experimental: {
-    disableSymlinkResolution: true
-  },
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true
-  }
-}
+    server: {
+        host: '0.0.0.0',  // Allow connections from all network interfaces
+        port: 3000
+    },
+    eslint: {
+        // Warning: This allows production builds to successfully complete even if
+        // your project has ESLint errors.
+        ignoreDuringBuilds: true,
+    },
+};
 
-export default nextConfig
+module.exports = nextConfig;

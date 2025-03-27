@@ -222,7 +222,7 @@ useEffect(() => {
 // Add this useEffect
 useEffect(() => {
   if (selectedDeviceType) {
-    getConfiguredDevices();
+    getConfiguredDevices(selectedDeviceType);
   }
 }, [selectedDeviceType]);
 
@@ -469,7 +469,7 @@ useEffect(() => {
   };
 
   const getConfiguredDevices = async () => {
-    try {
+    try { 
       const response = await fetch("/api/configure-device");
       if (!response.ok) throw new Error("Failed to fetch configured devices");
       

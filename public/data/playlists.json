@@ -2,15 +2,43 @@
   {
     "id": "1742379233122",
     "name": "winters",
-    "type": "audio",
+    "type": "mixed",
+    "enableAI": false,
+    "serialNumber": "C20000004",
+    "startTime": "00:00:00",
+    "endTime": "00:10:00",
     "files": [
       {
-        "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1).mp3",
-        "path": "/uploads/audios/1742379233122/1742379233124-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1).mp3"
+        "name": "Hanumankind - Run It Up.mp3",
+        "path": "/uploads/audios/1742379233122/1742379233124-Hanumankind-RunItUp.mp3",
+        "backgroundImage": "/uploads/bg_image_1.png",
+        "type": "audio",
+        "displayOrder": 2,
+        "delay": 3
       },
       {
-        "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me.mp3",
-        "path": "/uploads/audios/1742379233122/1742379233126-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me.mp3"
+        "name": "Hanumankind - Run It Up (Official).mp3",
+        "path": "/uploads/audios/1742379233122/1742379233126-Hanumankind-RunItUp-Official.mp3",
+        "backgroundImage": "/uploads/9995aab9-bc57-4e65-98bd-ab46696f8690.png",
+        "type": "audio",
+        "displayOrder": 1,
+        "delay": 2
+      },
+      {
+        "name": "New Track - Chill Vibes.mp3",
+        "path": "/uploads/audios/1742379233122/1742379233128-NewTrack-ChillVibes.mp3",
+        "backgroundImage": "/uploads/bg_image_2.png",
+        "type": "audio",
+        "displayOrder": 3,
+        "delay": 4
+      },
+      {
+        "name": "Bazooka - Official Trailer.mp4",
+        "path": "/uploads/video/1743057821768-Bazooka-OfficialTrailer.mp4",
+        "backgroundImage": "/uploads/bg_image_3.png",
+        "type": "video",
+        "displayOrder": 0,
+        "delay": 5
       }
     ],
     "backgroundAudio": null,
