@@ -5,17 +5,16 @@
     "imageUrl": "/uploads/d16e3591-cbb0-42d9-89eb-4ccd5e7ed1ff.png",
     "type": "e0eeec59-b948-4fdc-9544-1f2a86d6d61a",
     "features": [
-      "ghisd",
-      "sdd",
-      "dd"
+      "hello",
+      "hi",
+      "hi"
     ],
     "handMovements": [
-      "sdsnd",
-      "dds",
-      "wss"
+      "shaking",
+      "baa"
     ],
-    "serialNumber": "12345",
+    "serialNumber": "1234",
     "color": "blue",
-    "description": "green"
+    "description": "hello this a test for congiguraation device"
   }
 ]

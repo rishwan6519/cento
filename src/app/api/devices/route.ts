@@ -32,7 +32,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const { name, imageUrl,typeId } = await req.json();
-    console.log(typeId)
+    
+    console.log("Received data:", { name, imageUrl, typeId });
     
     if (!name || !imageUrl) {
       return NextResponse.json({ error: "Name and image URL are required" }, { status: 400 });

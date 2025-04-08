@@ -1,48 +1,42 @@
 [
   {
-    "id": "1742379233122",
-    "name": "winters",
+    "name": "testing",
     "type": "mixed",
     "enableAI": false,
-    "serialNumber": "C20000004",
+    "serialNumber": "1234",
     "startTime": "00:00:00",
     "endTime": "00:10:00",
     "files": [
       {
-        "name": "Hanumankind - Run It Up.mp3",
-        "path": "/uploads/audios/1742379233122/1742379233124-Hanumankind-RunItUp.mp3",
-        "backgroundImage": "/uploads/bg_image_1.png",
+        "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1)",
+        "path": "/uploads/audio/1742899618374-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1).mp3",
         "type": "audio",
-        "displayOrder": 2,
-        "delay": 3
+        "displayOrder": 0,
+        "delay": 2,
+        "backgroundImageEnabled": true,
+        "backgroundImage": "/uploads/image/1742901034105-centelon_logo.png"
       },
       {
-        "name": "Hanumankind - Run It Up (Official).mp3",
-        "path": "/uploads/audios/1742379233122/1742379233126-Hanumankind-RunItUp-Official.mp3",
-        "backgroundImage": "/uploads/9995aab9-bc57-4e65-98bd-ab46696f8690.png",
+        "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me",
+        "path": "/uploads/audio/1742899618382-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me.mp3",
         "type": "audio",
         "displayOrder": 1,
-        "delay": 2
+        "delay": 2,
+        "backgroundImageEnabled": false,
+        "backgroundImage": null
       },
       {
-        "name": "New Track - Chill Vibes.mp3",
-        "path": "/uploads/audios/1742379233122/1742379233128-NewTrack-ChillVibes.mp3",
-        "backgroundImage": "/uploads/bg_image_2.png",
-        "type": "audio",
-        "displayOrder": 3,
-        "delay": 4
-      },
-      {
-        "name": "Bazooka - Official Trailer.mp4",
-        "path": "/uploads/video/1743057821768-Bazooka-OfficialTrailer.mp4",
-        "backgroundImage": "/uploads/bg_image_3.png",
+        "name": "yt1z.net - Bazooka - Official Trailer Mammootty Gautham Vasudev Menon Deeno Dennis (720p)",
+        "path": "/uploads/video/1743057821768-yt1z.net - Bazooka - Official Trailer Mammootty Gautham Vasudev Menon Deeno Dennis (720p).mp4",
         "type": "video",
-        "displayOrder": 0,
-        "delay": 5
+        "displayOrder": 2,
+        "delay": 2,
+        "backgroundImageEnabled": false,
+        "backgroundImage": null
       }
     ],
-    "backgroundAudio": null,
-    "createdAt": "2025-03-19T10:13:53.174Z",
-    "updatedAt": "2025-03-19T11:02:19.539Z"
+    "id": "1",
+    "createdAt": "2025-04-07T07:26:27.814Z",
+    "updatedAt": "2025-04-07T07:26:27.814Z"
   }
 ]

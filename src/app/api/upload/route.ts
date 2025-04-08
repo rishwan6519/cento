@@ -18,63 +18,44 @@ interface MediaFile {
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const files = formData.getAll('files');
+    const file = formData.get('file') as File;
 
-    // Create upload directory if it doesn't exist
-    if (!existsSync(UPLOAD_DIR)) {
-      await mkdir(UPLOAD_DIR, { recursive: true });
+    if (!file) {
+      return NextResponse.json(
+        { error: "No file provided" },
+        { status: 400 }
+      );
     }
 
-    // Create data directory if it doesn't exist
-    if (!existsSync(path.dirname(MEDIA_FILES_JSON))) {
-      await mkdir(path.dirname(MEDIA_FILES_JSON), { recursive: true });
-    }
-
-    // Load existing media files data
-    let mediaFiles: MediaFile[] = [];
+    // Create uploads directory if it doesn't exist
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
     try {
-      const data = await readFile(MEDIA_FILES_JSON, 'utf-8');
-      mediaFiles = JSON.parse(data);
-    } catch (error) {
-      // If file doesn't exist or is invalid, start with empty array
-      mediaFiles = [];
+      await mkdir(uploadsDir, { recursive: true });
+    } catch (err) {
+      // Directory might already exist
     }
 
-    const uploadedFiles: MediaFile[] = [];
+    // Create unique filename
+    const uniqueFilename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '-')}`;
+    const filePath = path.join(uploadsDir, uniqueFilename);
 
-    for (const file of files) {
-      const buffer = Buffer.from(await (file as File).arrayBuffer());
-      const fileName = `${Date.now()}-${(file as File).name}`;
-      const filePath = path.join(UPLOAD_DIR, fileName);
+    // Convert file to buffer and save it
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    await writeFile(filePath, buffer);
 
-      // Save file to uploads directory
-      await writeFile(filePath, buffer);
+    // Return the public URL for the file
+    const fileUrl = `/uploads/${uniqueFilename}`;
 
-      // Add file info to mediaFiles array
-      const mediaFile: MediaFile = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: (file as File).name,
-        type: (file as File).type,
-        path: `/uploads/${fileName}`,
-        uploadedAt: new Date().toISOString(),
-      };
-
-      mediaFiles.push(mediaFile);
-      uploadedFiles.push(mediaFile);
-    }
-
-    // Save updated media files data
-    await writeFileSync(MEDIA_FILES_JSON, JSON.stringify(mediaFiles, null, 2));
-
-    return NextResponse.json({
+    return NextResponse.json({ 
       success: true,
-      files: uploadedFiles,
+      url: fileUrl 
     });
 
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to upload files' },
+      { error: "Failed to upload file" },
       { status: 500 }
     );
   }

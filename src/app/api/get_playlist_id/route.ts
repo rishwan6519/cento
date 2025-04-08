@@ -32,15 +32,16 @@ export async function GET(request: Request) {
                 message: 'Playlist data not found'
             }, { status: 404 })
         }
-
-        const matchedPlaylist = playlists.find(playlist => 
+        const matchedPlaylists = playlists.filter(playlist => 
             playlist.serialNumber === serialNumber
         )
 
-        if (matchedPlaylist) {
+        if (matchedPlaylists.length > 0) {
             return NextResponse.json({
                 success: true,
-                playlistId: matchedPlaylist.id
+                playlists: matchedPlaylists.map(playlist => ({
+                    playlistId: playlist.id
+                }))
             })
         } else {
             return NextResponse.json({
