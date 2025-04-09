@@ -234,13 +234,21 @@ export default function RobotAdminDashboard() {
   const [showBgImageInput, setShowBgImageInput] = useState<{ [key: string]: boolean }>({});
   const [bgImages, setBgImages] = useState<{ [key: string]: File }>({});
 
+  // Add this state at the beginning of your component
+  const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [deviceTypeImage, setDeviceTypeImage] = useState<File | null>(null);
+ 
+
+  const [handMovements, setHandMovements] = useState<string>("");
+  const [bodyMovements, setBodyMovements] = useState<string>("");
+  const [screenWidth, setScreenWidth] = useState<string>("");
+  const [screenHeight, setScreenHeight] = useState<string>("");
+
   // Add this function to handle day selection
   const toggleDay = (day: string) => {
     setScheduleSettings((prev) => ({
       ...prev,
-      activeDays: prev.activeDays.includes(day)
-        ? prev.activeDays.filter((d) => d !== day)
-        : [...prev.activeDays, day],
     }));
   };
 
@@ -352,7 +360,7 @@ const getFileType = (fileName: string) => {
   // Add this useEffect in your component, alongside other useEffect hooks
   useEffect(() => {
     if (activeSection === "playlistSetup") {
-      fetchPlaylists();
+      fetchMedia(); // Fetch media files when entering playlist setup
     }
   }, [activeSection]);
 
@@ -368,12 +376,12 @@ const getFileType = (fileName: string) => {
     }
   }, [selectedDeviceType]);
 
-  // Add this useEffect in your page.tsx
-  useEffect(() => {
-    if (activeSection === "showMedia") {
-      fetchPlaylists();
-    }
-  }, [activeSection]);
+  // Update this useEffect
+useEffect(() => {
+  if (activeSection === "showMedia") {
+    fetchMedia(); // Change from fetchPlaylists to fetchMedia
+  }
+}, [activeSection]);
 
   const fetchDevices = async () => {
     try {
@@ -528,33 +536,73 @@ const getFileType = (fileName: string) => {
   };
 
   const addDeviceType = async () => {
-    if (!customDeviceName) {
-      toast.error("Please enter a name!");
-      return;
+    if (!customDeviceName || !deviceTypeImage || 
+      !handMovements || !bodyMovements || 
+      !screenWidth || !screenHeight) {
+    toast.error("Please fill in all required fields!");
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    // First upload the image
+    const formData = new FormData();
+    formData.append("file", deviceTypeImage);
+    
+    const imageUploadResponse = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!imageUploadResponse.ok) {
+      throw new Error("Failed to upload image");
     }
 
-    try {
-      const response = await fetch("/api/device-types", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: customDeviceName,
-        }),
-      });
+    const imageData = await imageUploadResponse.json();
+    const imageUrl = imageData.url;
 
-      if (!response.ok) {
-        throw new Error("Failed to add device type");
-      }
+    // Then create the device type
+    const response = await fetch("/api/device-types", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: customDeviceName,
+        imageUrl: imageUrl,
+        handMovements: handMovements.split(",").map(m => m.trim()),
+        bodyMovements: bodyMovements.split(",").map(m => m.trim()),
+        screenSize: {
+          width: parseInt(screenWidth),
+          height: parseInt(screenHeight)
 
-      const newType = await response.json();
-      toast.success("Device type added successfully!");
-      setDeviceTypes((prev) => [...prev, newType]);
-      setCustomDeviceName("");
-    } catch (error) {
-      console.error("Error adding device type:", error);
-      toast.error("Failed to add device type!");
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to add device type");
     }
-  };
+
+    const newType = await response.json();
+    toast.success("Device type added successfully!");
+    
+    // Reset form
+    setCustomDeviceName("");
+    setDeviceTypeImage(null);
+    setHandMovements("");
+    setBodyMovements("");
+    setScreenWidth("");
+    setScreenHeight("");
+    
+    // Update device types list
+    setDeviceTypes((prev) => [...prev, newType]);
+  } catch (error) {
+    console.error("Error adding device type:", error);
+    toast.error("Failed to add device type!");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const configureDevice = async () => {
     if (!selectedDevice) {
@@ -1071,9 +1119,9 @@ const openBgImageSelector = (audioPath: string) => {
         </button>
       </div>
       
-      ${imageFiles.length > 0 ? `
+      ${mediaFiles.length > 0 ? `
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4" id="bgImageGrid ">
-          ${imageFiles.map(image => `
+          ${mediaFiles.map(image => `
             <div class="aspect-square relative group cursor-pointer hover:opacity-90 bg-white rounded-lg overflow-hidden " 
                  data-image-url="${image.url}"
                  onclick="selectBgImage('${audioPath}', '${image.url}')">
@@ -1174,13 +1222,29 @@ const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => 
   }
 };
 
+// Add this function with your other functions
+const fetchMedia = async () => {
+  setIsLoadingMedia(true);
+  try {
+    const response = await fetch("/api/media");
+    if (!response.ok) throw new Error("Failed to fetch media");
+
+    const data = await response.json();
+    if (data.media) {
+      setMediaFiles(data.media);
+    }
+  } catch (error) {
+    console.error("Error fetching media:", error);
+    toast.error("Failed to fetch media");
+    setMediaFiles([]);
+  } finally {
+    setIsLoadingMedia(false);
+  }
+};
+
   const sidebarItems = [
   
-    {
-      id: "addDevice",
-      label: "Add Device",
-      icon: <PlusCircle size={20} className="text-green-500" />,
-    },
+ 
     {
       id: "addDeviceType",
       label: "Add Device Type",
@@ -1408,15 +1472,7 @@ const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => 
 
               {/* Quick Action Buttons */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button
-                  onClick={() => setActiveSection("addDevice")}
-                  className="p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-3"
-                >
-                  <div className="p-2 bg-green-50 rounded-lg">
-                    <PlusCircle size={20} className="text-green-500" />
-                  </div>
-                  <span className="font-medium text-gray-700">Add New Device</span>
-                </button>
+              
 
                 <button
                   onClick={() => setActiveSection("generatePlaylist")}
@@ -1453,121 +1509,109 @@ const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => 
           )}
 
           {/* Keep all your existing modal content, but remove the fixed positioning */}
-          {activeSection === "addDevice" && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-2xl font-bold mb-6">Add New Device</h2>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Device Name
-                  </label>
-                  <input
-                    value={newDevice.name}
-                    onChange={(e) =>
-                      setNewDevice({ ...newDevice, name: e.target.value })
-                    }
-                    placeholder="Enter device name"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+        
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Device Type
-                  </label>
-                  <select
-                    value={newDevice.typeId}
-                    onChange={(e) =>
-                      setNewDevice({ ...newDevice, typeId: e.target.value })
-                    }
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select device type</option>
-                    {deviceTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+{activeSection === "addDeviceType" && (
+  <div className="bg-white rounded-xl shadow-sm p-6">
+    <h2 className="text-2xl font-bold mb-6 text-black">Add New Device Type</h2>
+    <div className="space-y-6">
+      {/* Device Type Name */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Device Type Name
+        </label>
+        <input
+          value={customDeviceName}
+          onChange={(e) => setCustomDeviceName(e.target.value)}
+          placeholder="Enter device type name"
+          className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Device Image
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      setNewDevice({
-                        ...newDevice,
-                        imageFile: e.target.files?.[0] || null,
-                      })
-                    }
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                  {newDevice.imageFile && (
-                    <p className="mt-1 text-sm text-gray-500">
-                      Selected: {newDevice.imageFile.name}
-                    </p>
-                  )}
-                </div>
+      {/* Hand Movements */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Hand Movements
+        </label>
+        <input
+          value={handMovements}
+          onChange={(e) => setHandMovements(e.target.value)}
+          placeholder="Enter hand movements (comma-separated)"
+          className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+        />
+        <p className="mt-1 text-xs text-gray-500">Example: wave, grab, point</p>
+      </div>
 
-                <button
-                  onClick={addDevice}
-                  disabled={
-                    isLoading ||
-                    !newDevice.name ||
-                    !newDevice.typeId ||
-                    !newDevice.imageFile
-                  }
-                  className={`w-full py-3 rounded-lg ${
-                    isLoading ||
-                    !newDevice.name ||
-                    !newDevice.typeId ||
-                    !newDevice.imageFile
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  } text-white font-semibold transition-colors`}
-                >
-                  {isLoading ? "Adding..." : "Add Device"}
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Body Movements */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Body Movements
+        </label>
+        <input
+          value={bodyMovements}
+          onChange={(e) => setBodyMovements(e.target.value)}
+          placeholder="Enter body movements (comma-separated)"
+          className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+        />
+        <p className="mt-1 text-xs text-gray-500">Example: walk, turn, dance</p>
+      </div>
 
-          {activeSection === "addDeviceType" && (
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-2xl font-bold mb-6">Add New Device Type</h2>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Device Type Name
-                  </label>
-                  <input
-                    value={customDeviceName}
-                    onChange={(e) => setCustomDeviceName(e.target.value)}
-                    placeholder="Enter device type name"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+      {/* Screen Size */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Screen Size
+        </label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <input
+              type="number"
+              value={screenWidth}
+              onChange={(e) => setScreenWidth(e.target.value)}
+              placeholder="Width (px)"
+              className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <input
+              type="number"
+              value={screenHeight}
+              onChange={(e) => setScreenHeight(e.target.value)}
+              placeholder="Height (px)"
+              className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+      </div>
 
-                <button
-                  onClick={addDeviceType}
-                  disabled={isLoading || !customDeviceName}
-                  className={`w-full py-3 rounded-lg ${
-                    isLoading || !customDeviceName
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  } text-white font-semibold transition-colors`}
-                >
-                  {isLoading ? "Adding..." : "Add Device Type"}
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Image Upload */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Device Type Image
+        </label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setDeviceTypeImage(e.target.files?.[0] || null)}
+          className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
 
-          {activeSection === "configureDevice" && (
+      <button
+        onClick={addDeviceType}
+        disabled={isLoading || !customDeviceName || !deviceTypeImage || 
+                 !handMovements || !bodyMovements || !screenWidth || !screenHeight}
+        className={`w-full py-3 rounded-lg ${
+          isLoading || !customDeviceName || !deviceTypeImage || 
+          !handMovements || !bodyMovements || !screenWidth || !screenHeight
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700"
+        } text-white font-semibold transition-colors`}
+      >
+        {isLoading ? "Adding..." : "Add Device Type"}
+      </button>
+    </div>
+  </div>
+)}       {activeSection === "configureDevice" && (
             <div className="bg-white rounded-xl shadow-sm p-6 text-black">
               <h2 className="text-2xl font-bold mb-6">
                 {isEditing ? "Edit Device Configuration" : "Configure Device"}
@@ -2046,744 +2090,454 @@ const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => 
                 </div>
               </div>
 
-              {isLoadingPlaylists ? (
+              {isLoadingMedia ? (
                 <div className="flex justify-center items-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                 </div>
-              ) : playlists.length === 0 ? (
+              ) : mediaFiles.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">
                   No media files found
                 </p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {playlists.map((media: any) => (
-                    <div
-                      key={media.id}
-                      className="border rounded-xl p-4 hover:shadow-md transition-shadow bg-gray-50"
-                    >
-                      <div className="flex flex-col h-full">
-                        <div className="relative h-48 mb-3">
-                          {media.type.includes("image") && (
-                            <div className="relative h-full">
-                              <img
-                                src={media.url}
-                                alt={media.name}
-                                className="h-full w-full object-cover rounded-lg"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "/placeholder-image.jpg";
-                                }}
-                              />
-                            </div>
-                          )}
-                          {media.type.includes("video") && (
-                            <div className="relative h-full group">
-                              <video
-                                id={`video-${media.id}`}
-                                src={
-                                  process.env.NEXT_PUBLIC_API_URL + media.url
-                                }
-                                className="h-full w-full object-cover rounded-lg"
-                                controls
-                                preload="metadata"
-                                controlsList="nodownload"
-                                onPlay={(e) => {
-                                  const video = e.currentTarget;
-                                  if (
-                                    playingMedia &&
-                                    playingMedia !== media.id
-                                  ) {
-                                    const previousVideo = document.getElementById(
-                                      `video-${playingMedia}`
-                                    ) as HTMLVideoElement;
-                                    if (previousVideo) previousVideo.pause();
-                                  }
-                                  setPlayingMedia(media.id);
-                                }}
-                                onPause={() => {
-                                  if (playingMedia === media.id) {
-                                    setPlayingMedia(null);
-                                  }
-                                }}
-                              >
-                                Your browser does not support the video tag.
-                              </video>
-                              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => {
-                                    const video = document.getElementById(
-                                      `video-${media.id}`
-                                    ) as HTMLVideoElement;
-                                    if (video) {
-                                      if (video.paused) {
-                                        video.play();
-                                      } else {
-                                        video.pause();
-                                      }
-                                    }
-                                  }}
-                                  className="bg-white p-3 rounded-full hover:bg-gray-100"
-                                >
-                                  {playingMedia === media.id ? (
-                                    <Pause size={24} className="text-black" />
-                                  ) : (
-                                    <Play size={24} className="text-black" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                          {media.type.includes("audio") && (
-                            <div className="h-full w-full flex flex-col items-center justify-center bg-gray-200 rounded-lg p-4">
-                              {bgImages[media.id] ? (
-                                <div className="relative w-full h-32 mb-4">
-                                  <img
-                                    src={URL.createObjectURL(bgImages[media.id])}
-                                    alt="Background"
-                                    className="w-full h-full object-cover rounded-lg"
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      const newBgImages = { ...bgImages };
-                                      delete newBgImages[media.id];
-                                      setBgImages(newBgImages);
-                                    }}
-                                    className="absolute top-2 right-2 p-1 bg-white rounded-full"
-                                  >
-                                    <XCircle
-                                      size={16}
-                                      className="text-red-500"
-                                    />
-                                  </button>
-                                </div>
-                              ) : (
-                                <Music
-                                  size={48}
-                                  className="text-gray-400 mb-4"
-                                />
-                              )}
+                {mediaFiles.map((media) => (
+  <div
+    key={media.id}
+    className="border rounded-xl p-3 md:p-4 hover:shadow-md transition-shadow bg-gray-50"
+  >
+    <div className="flex flex-col gap-3 md:gap-4">
+      {/* Media Preview */}
+      <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+        {media.type.startsWith('image/') && (
+          <img
+            src={media.url}
+            alt={media.name}
+            className="w-full h-full object-contain"
+            loading="lazy"
+          />
+        )}
+        {media.type.startsWith('video/') && (
+          <div className="h-full">
+            <video
+              src={media.url}
+              controls
+              className="w-full h-full object-contain"
+              onPlay={() => handlePlayPause(media.id, document.querySelector(`video[src="${media.url}"]`)!)}
+            />
+          </div>
+        )}
+        {media.type.startsWith('audio/') && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+            <div className="w-full max-w-md px-4">
+              <div className="flex items-center gap-4 mb-2">
+                <Music size={24} className="text-gray-400" />
+                <span className="text-sm font-medium text-gray-600 truncate">
+                  {media.name}
+                </span>
+              </div>
+              <audio
+                src={media.url}
+                controls
+                className="w-full"
+                onPlay={() => handlePlayPause(media.id, document.querySelector(`audio[src="${media.url}"]`)!)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
-                              <audio
-                                id={`audio-${media.id}`}
-                                src={media.url}
-                                className="w-full mb-2"
-                                controls
-                                onPlay={(e) =>
-                                  handlePlayPause(media.id, e.currentTarget)
-                                }
-                              />
+      {/* Media Info */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-1">
+          <h3 className="font-medium text-gray-800 text-sm md:text-base truncate ">
+            {media.name}
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs md:text-sm text-gray-500 capitalize">
+              {media.type.split('/')[0]}
+            </span>
+            {media.createdAt && (
+              <span className="text-xs text-gray-400">
+                • {new Date(media.createdAt).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+        </div>
 
-                              <div className="flex flex-col w-full gap-2">
-                                {!showBgImageInput[media.id] ? (
-                                  <button
-                                    onClick={() =>
-                                      setShowBgImageInput({
-                                        ...showBgImageInput,
-                                        [media.id]: true,
-                                      })
-                                    }
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
-                                  >
-                                    <ImageIcon size={16} />
-                                    <span>Add Background Image</span>
-                                  </button>
-                                ) : (
-                                  <div className="flex flex-col gap-2 p-2 bg-white rounded-lg">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                          setBgImages({
-                                            ...bgImages,
-                                            [media.id]: file,
-                                          });
-                                          setShowBgImageInput({
-                                            ...showBgImageInput,
-                                            [media.id]: false,
-                                          });
-                                        }
-                                      }}
-                                      className="w-full text-sm"
-                                    />
-                                    <button
-                                      onClick={() =>
-                                        setShowBgImageInput({
-                                          ...showBgImageInput,
-                                          [media.id]: false,
-                                        })
-                                      }
-                                      className="text-sm text-red-500 hover:text-red-600"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                )}
-
-                                <button
-                                  onClick={() => {
-                                    const audio = document.getElementById(
-                                      `audio-${media.id}`
-                                    ) as HTMLAudioElement;
-                                    if (audio)
-                                      handlePlayPause(media.id, audio);
-                                  }}
-                                  className="flex items-center justify-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
-                                >
-                                  {playingMedia === media.id ? (
-                                    <>
-                                      <Pause size={16} />
-                                      <span>Pause</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Play size={16} />
-                                      <span>Play</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex-grow">
-                          <h4 className="font-semibold text-lg mb-2 truncate">
-                            {media.name}
-                          </h4>
-                          <p className="text-sm text-gray-600 capitalize">
-                            Type: {media.type.split("/")[0]}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            Added:{" "}
-                            {new Date(media.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-
-                        <div className="flex justify-end gap-2 mt-3 pt-3 border-t">
-                          <button
-                            onClick={() => handleDeletePlaylist(media.id)}
-                            className="flex items-center gap-1 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 size={16} />
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {(media.type.startsWith('video/') || media.type.startsWith('audio/')) && (
+            <button
+              onClick={() => handlePlayPause(
+                media.id,
+                document.querySelector(`${media.type.startsWith('video/') ? 'video' : 'audio'}[src="${media.url}"]`)!
+              )}
+              className="p-2 text-gray-600 hover:text-blue-600 rounded-lg transition-colors"
+              aria-label={playingMedia === media.id ? "Pause" : "Play"}
+            >
+              {playingMedia === media.id ? (
+                <Pause size={18} />
+              ) : (
+                <Play size={18} />
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => handleDeletePlaylist(media.id)}
+            className="p-2 text-gray-600 hover:text-red-600 rounded-lg transition-colors"
+            aria-label="Delete media"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+))}
                 </div>
               )}
             </div>
           )}
 
           {activeSection === "playlistSetup" && (
-            <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 text-black">
-              <div className="mb-4 md:mb-6 border-b pb-4">
-                <h2 className="text-xl md:text-2xl font-bold">
-                  Setup Playlist Configuration...
-                </h2>
+  <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 text-black">
+    <div className="mb-4 md:mb-6 border-b pb-4">
+      <h2 className="text-xl md:text-2xl font-bold">Create Playlist Configuration</h2>
+    </div>
 
-                {/* Progress Steps - Make mobile friendly */}
-                <div className="flex items-center justify-center md:justify-start mt-4 px-2 md:px-0">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Playlist Name
+            </label>
+            <input
+              type="text"
+              value={playlistConfig.name}
+              onChange={(e) =>
+                setPlaylistConfig({
+                  ...playlistConfig,
+                  name: e.target.value,
+                })
+              }
+              className="w-full p-2 border rounded text-sm"
+              placeholder="Enter playlist name"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Start Time
+              </label>
+              <input
+                type="time"
+                value={playlistConfig.startTime}
+                onChange={(e) =>
+                  setPlaylistConfig({
+                    ...playlistConfig,
+                    startTime: e.target.value,
+                  })
+                }
+                className="w-full p-2 border rounded text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                End Time
+              </label>
+              <input
+                type="time"
+                value={playlistConfig.endTime}
+                onChange={(e) =>
+                  setPlaylistConfig({
+                    ...playlistConfig,
+                    endTime: e.target.value,
+                  })
+                }
+                className="w-full p-2 border rounded text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Select Media Files
+            </label>
+            <div className="max-h-[300px] md:max-h-[400px] overflow-y-auto border rounded p-3">
+              {mediaFiles.map((media: any) => {
+                const isAudio = media.type.startsWith('audio/');
+                const isImage = media.type.startsWith('image/');
+                const fileExtension = media.name.split('.').pop()?.toLowerCase();
+                const fileName = media.name.split('.').slice(0, -1).join('.');
+                
+                if (isImage) {
+                  return null;
+                }
+              
+                return (
                   <div
-                    className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-sm md:text-base ${
-                      setupStep >= 1 ? "bg-blue-500 text-white" : "bg-gray-200"
-                    }`}
+                    key={media.id}
+                    className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded"
                   >
-                    1
-                  </div>
-                  <div
-                    className={`h-1 w-8 md:w-16 ${
-                      setupStep >= 2 ? "bg-blue-500" : "bg-gray-200"
-                    }`}
-                  />
-                  <div
-                    className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-sm md:text-base ${
-                      setupStep >= 2 ? "bg-blue-500 text-white" : "bg-gray-200"
-                    }`}
-                  >
-                    2
-                  </div>
-                  <div
-                    className={`h-1 w-8 md:w-16 ${
-                      setupStep >= 3 ? "bg-blue-500" : "bg-gray-200"
-                    }`}
-                  />
-                  <div
-                    className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-sm md:text-base ${
-                      setupStep >= 3 ? "bg-blue-500 text-white" : "bg-gray-200"
-                    }`}
-                  >
-                    3
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 1 - Device Type Selection */}
-              {setupStep === 1 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold mb-4">
-                    Select Device Type
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                    {deviceTypes.map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => {
-                          setSelectedDeviceType(type.id);
-                          setSetupStep(2);
-                        }}
-                        className={`p-3 md:p-4 border rounded-lg transition-all ${
-                          selectedDeviceType === type.id
-                            ? "border-blue-500 bg-blue-50"
-                            : "hover:border-blue-300"
-                        }`}
-                      >
-                        <h4 className="font-medium text-sm md:text-base">
-                          {type.name}
-                        </h4>
-                        <p className="text-xs md:text-sm text-gray-600">
-                          {type.description}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2 - Device Selection */}
-              {setupStep === 2 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <button
-                      onClick={() => setSetupStep(1)}
-                      className="text-blue-500 p-1 hover:bg-blue-50 rounded-full"
-                    >
-                      <ArrowLeft size={18} />
-                    </button>
-                    <h3 className="text-lg font-semibold">Select Device</h3>
-                  </div>
-
-                  {configuredDevices.filter((device) => device.type === selectedDeviceType).length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="mb-4">
-                        <Settings size={48} className="mx-auto text-gray-400" />
-                      </div>
-                      <h4 className="text-lg font-medium text-gray-800 mb-2">
-                        No Configured Devices Available
-                      </h4>
-                      <p className="text-gray-600 mb-4">
-                        There are no configured devices for this device type.
-                      </p>
-                      <button
-                        onClick={() => setActiveSection("configureDevice")}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                      >
-                        <Settings size={18} />
-                        Configure New Device
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                      {configuredDevices
-                        .filter((device) => device.type === selectedDeviceType)
-                        .map((device) => (
-                          <button
-                            key={device.id}
-                            onClick={() => {
-                              setSelectedDevice(device.id);
-                              setSelectedDeviceConfig(device);
-                              setSetupStep(3);
-                            }}
-                            className={`p-3 md:p-4 border rounded-lg transition-all ${
-                              selectedDevice === device.id
-                                ? "border-blue-500 bg-blue-50"
-                                : "hover:border-blue-300"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 md:gap-3">
-                              <img
-                                src={device.imageUrl || "/placeholder-image.jpg"}
-                                alt={device.name}
-                                className="w-12 h-12 md:w-16 md:h-16 rounded-lg object-cover"
-                              />
-                              <div className="text-left">
-                                <h4 className="font-medium text-sm md:text-base">
-                                  {device.name}
-                                </h4>
-                                <p className="text-xs md:text-sm text-gray-600">
-                                  SN: {device.serialNumber}
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Step 3 - Playlist Configuration */}
-              {setupStep === 3 && (
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <button
-                      onClick={() => setSetupStep(2)}
-                      className="text-blue-500 p-1 hover:bg-blue-50 rounded-full"
-                    >
-                      <ArrowLeft size={18} />
-                    </button>
-                    <h3 className="text-lg font-semibold">
-                      Configure Playlist
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Left Column */}
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">
-                          Playlist Name
-                        </label>
-                        <input
-                          type="text"
-                          value={playlistConfig.name}
-                          onChange={(e) =>
-                            setPlaylistConfig({
-                              ...playlistConfig,
-                              name: e.target.value,
-                            })
-                          }
-                          className="w-full p-2 border rounded text-sm"
-                          placeholder="Enter playlist name"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">
-                            Start Time
-                          </label>
+                    <input
+                      type="checkbox"
+                      checked={playlistConfig.files.some(f => f.path === media.url)}
+                      onChange={() => {
+                        const file = {
+                          name: fileName,
+                          path: media.url,
+                          type: media.type.split("/")[0],
+                          displayOrder: playlistConfig.files.length+1,
+                          delay: 2,
+                          backgroundImageEnabled: false,
+                          backgroundImage: null
+                        } as PlaylistConfigFile;
+                        setPlaylistConfig({
+                          ...playlistConfig,
+                          files: playlistConfig.files.some(f => f.path === media.url)
+                            ? playlistConfig.files.filter(f => f.path !== media.url)
+                            : [...playlistConfig.files, file],
+                        });
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm truncate">
+                      {fileName}
+                      <span className="text-gray-500 text-xs ml-1">
+                        ({fileExtension})
+                      </span>
+                    </span>
+                    {isAudio && playlistConfig.files.some(f => f.path === media.url) && (
+                      <div className="flex items-center gap-2">
+                        <label className="relative inline-flex items-center cursor-pointer">
                           <input
-                            type="time"
-                            value={playlistConfig.startTime}
-                            onChange={(e) =>
-                              setPlaylistConfig({
-                                ...playlistConfig,
-                                startTime: e.target.value,
-                              })
-                            }
-                            className="w-full p-2 border rounded text-sm"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium mb-1">
-                            End Time
-                          </label>
-                          <input
-                            type="time"
-                            value={playlistConfig.endTime}
-                            onChange={(e) =>
-                              setPlaylistConfig({
-                                ...playlistConfig,
-                                endTime: e.target.value,
-                              })
-                            }
-                            className="w-full p-2 border rounded text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Select Media Files
-                        </label>
-                        <div className="max-h-[300px] md:max-h-[400px] overflow-y-auto border rounded p-3">
-                          {playlists.map((media: any) => {
-                            const isAudio = media.type.startsWith('audio/');
-                            const isImage = media.type.startsWith('image/');
-                            console.log(isImage,"image type");
-                            
-                            // Get file extension from the URL or name
-                            const fileExtension = media.name.split('.').pop()?.toLowerCase();
-                            const fileName = media.name.split('.').slice(0, -1).join('.');
-                            
-                            if (isImage) {
-                              return null;
-                            }
-                          
-                            return (
-                              <div
-                                key={media.id}
-                                className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={playlistConfig.files.some(f => f.path === media.url)}
-                                  onChange={() => {
-                                    const file = {
-                                      name: fileName,
-                                      path: media.url,
-                                      type: media.type.split("/")[0],
-                                      displayOrder: playlistConfig.files.length+1,
-                                      delay: 2,
-                                      backgroundImageEnabled: false,
-                                      backgroundImage: null
-                                    } as PlaylistConfigFile;
-                                    setPlaylistConfig({
-                                      ...playlistConfig,
-                                      files: playlistConfig.files.some(f => f.path === media.url)
-                                        ? playlistConfig.files.filter(f => f.path !== media.url)
-                                        : [...playlistConfig.files, file],
-                                    });
-                                  }}
-                                  className="h-4 w-4"
-                                />
-                                <span className="text-sm truncate">
-                                  {fileName}
-                                  <span className="text-gray-500 text-xs ml-1">
-                                    ({fileExtension})
-                                  </span>
-                                </span>
-                                {isAudio && playlistConfig.files.some(f => f.path === media.url) && (
-                                  <div className="flex items-center gap-2">
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        className="sr-only peer"
-                                        checked={playlistConfig.files.find(f => f.path === media.url)?.backgroundImageEnabled}
-                                        onChange={() => {
-                                          const updatedFiles = playlistConfig.files.map(f => {
-                                            if (f.path === media.url) {
-                                              return { 
-                                                ...f, 
-                                                backgroundImageEnabled: !f.backgroundImageEnabled,
-                                                backgroundImage: !f.backgroundImageEnabled ? null : f.backgroundImage 
-                                              } as PlaylistConfigFile;
-                                            }
-                                            return f;
-                                          });
-                                          setPlaylistConfig({
-                                            ...playlistConfig,
-                                            files: updatedFiles,
-                                          });
-                                        }}
-                                      />
-                                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                                      <span className="ml-2 text-xs text-gray-600">BG Image</span>
-                                    </label>
-                                    {playlistConfig.files.find(f => f.path === media.url)?.backgroundImageEnabled && (
-                                      <button
-                                        onClick={() => openBgImageSelector(media.url)}
-                                        className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
-                                      >
-                                        {playlistConfig.files.find(f => f.path === media.url)?.backgroundImage
-                                          ? 'Change BG Image'
-                                          : 'Add BG Image'}
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="border-t lg:border-t-0 lg:border-l pt-4 lg:pt-0 lg:pl-6">
-                      <h4 className="font-medium mb-4 text-sm md:text-base">
-                        Selected Media Order
-                      </h4>
-                      <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                        {playlistConfig.files.map((file, index) => (
-                          <div
-                            key={file.path}
-                            className="flex items-center gap-3 p-2 md:p-3 bg-gray-50 rounded"
-                          >
-                            <span className="text-gray-500 text-sm">
-                              {index + 1}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">
-                                {file.name}
-                              </p>
-                              {file.type === 'audio' && file.backgroundImageEnabled && (
-                                <div className="mt-2">
-                                  {file.backgroundImage ? (
-                                    <div className="relative w-20 h-20">
-                                      <img 
-                                        src={typeof file.backgroundImage === 'string' 
-                                          ? file.backgroundImage 
-                                          : URL.createObjectURL(file.backgroundImage)
-                                        } 
-                                        alt="Background" 
-                                        className="w-full h-full object-cover rounded-lg"
-                                      />
-                                      <button
-                                        onClick={() => {
-                                          const updatedFiles = playlistConfig.files.map(f => {
-                                            if (f.path === file.path) {
-                                              return { ...f, backgroundImage: null };
-                                            }
-                                            return f;
-                                          });
-                                          setPlaylistConfig({
-                                            ...playlistConfig,
-                                            files: updatedFiles,
-                                          });
-                                        }}
-                                        className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow-md"
-                                      >
-                                        <XCircle size={16} className="text-red-500" />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <p className="text-xs text-gray-500">No background image selected</p>
-                                  )}
-                                </div>
-                              )}
-                              <div className="flex items-center gap-2 mt-2">
-                                <label className="text-xs text-gray-600">
-                                  Delay (s)
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={file.delay}
-                                  onChange={(e) => {
-                                    const newFiles = [
-                                      ...playlistConfig.files,
-                                    ];
-                                    newFiles[index].delay = parseInt(
-                                      e.target.value
-                                    );
-                                    setPlaylistConfig({
-                                      ...playlistConfig,
-                                      files: newFiles,
-                                    });
-                                  }}
-                                  className="w-16 p-1 border rounded text-sm"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Background Audio Section */}
-                  <div className="mt-6 border-t pt-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={playlistConfig.backgroundAudio.enabled}
-                          onChange={() => {
-                            setPlaylistConfig({
-                              ...playlistConfig,
-                              backgroundAudio: {
-                                ...playlistConfig.backgroundAudio,
-                                enabled: !playlistConfig.backgroundAudio.enabled,
-                                file: null // Reset file when toggling
-                              }
-                            });
-                          }}
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        <span className="ml-3 text-sm font-medium text-gray-700">Enable Background Audio</span>
-                      </label>
-                    </div>
-
-                    {playlistConfig.backgroundAudio.enabled && (
-                      <div className="space-y-4 pl-4">
-                        <div className="max-h-[200px] overflow-y-auto border rounded p-3">
-                          {playlists
-                            .filter(media => media.type.startsWith('audio/'))
-                            .map((audio: any) => (
-                              <div
-                                key={audio.id}
-                                className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded"
-                              >
-                                <input
-                                  type="radio"
-                                  name="backgroundAudio"
-                                  checked={playlistConfig.backgroundAudio.file === audio.url}
-                                  onChange={() => {
-                                    setPlaylistConfig({
-                                      ...playlistConfig,
-                                      backgroundAudio: {
-                                        ...playlistConfig.backgroundAudio,
-                                        file: audio.url
-                                      }
-                                    });
-                                  }}
-                                  className="h-4 w-4"
-                                />
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{audio.name}</p>
-                                  <audio
-                                    src={audio.url}
-                                    controls
-                                    className="w-full mt-1"
-                                    controlsList="nodownload"
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <label className="text-sm font-medium">Background Volume:</label>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={playlistConfig.backgroundAudio.volume}
-                            onChange={(e) => {
-                              setPlaylistConfig({
-                                ...playlistConfig,
-                                backgroundAudio: {
-                                  ...playlistConfig.backgroundAudio,
-                                  volume: parseInt(e.target.value)
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={playlistConfig.files.find(f => f.path === media.url)?.backgroundImageEnabled}
+                            onChange={() => {
+                              const updatedFiles = playlistConfig.files.map(f => {
+                                if (f.path === media.url) {
+                                  return { 
+                                    ...f, 
+                                    backgroundImageEnabled: !f.backgroundImageEnabled,
+                                    backgroundImage: !f.backgroundImageEnabled ? null : f.backgroundImage 
+                                  } as PlaylistConfigFile;
                                 }
+                                return f;
+                              });
+                              setPlaylistConfig({
+                                ...playlistConfig,
+                                files: updatedFiles,
                               });
                             }}
-                            className="flex-1"
                           />
-                          <span className="text-sm text-gray-600">
-                            {playlistConfig.backgroundAudio.volume}%
-                          </span>
-                        </div>
+                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                          <span className="ml-2 text-xs text-gray-600">BG Image</span>
+                        </label>
+                        {playlistConfig.files.find(f => f.path === media.url)?.backgroundImageEnabled && (
+                          <button
+                            onClick={() => openBgImageSelector(media.url)}
+                            className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                          >
+                            {playlistConfig.files.find(f => f.path === media.url)?.backgroundImage
+                              ? 'Change BG Image'
+                              : 'Add BG Image'}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
-                  <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                    <button
-                      onClick={() => setActiveSection("")}
-                      className="px-4 md:px-6 py-2 text-sm text-gray-600 hover:text-gray-900"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSavePlaylistConfig}
-                      className="px-4 md:px-6 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Save Configuration
-                    </button>
+        {/* Right Column */}
+        <div className="border-t lg:border-t-0 lg:border-l pt-4 lg:pt-0 lg:pl-6">
+          <h4 className="font-medium mb-4">Selected Media Order</h4>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {playlistConfig.files.map((file, index) => (
+              <div
+                key={file.path}
+                className="flex items-center gap-3 p-2 md:p-3 bg-gray-50 rounded"
+              >
+                <span className="text-gray-500 text-sm">{index + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{file.name}</p>
+                  {file.type === 'audio' && file.backgroundImageEnabled && (
+                    <div className="mt-2">
+                      {file.backgroundImage ? (
+                        <div className="relative w-20 h-20">
+                          <img 
+                            src={typeof file.backgroundImage === 'string' 
+                              ? file.backgroundImage 
+                              : URL.createObjectURL(file.backgroundImage)
+                            } 
+                            alt="Background" 
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                          <button
+                            onClick={() => {
+                              const updatedFiles = playlistConfig.files.map(f => {
+                                if (f.path === file.path) {
+                                  return { ...f, backgroundImage: null };
+                                }
+                                return f;
+                              });
+                              setPlaylistConfig({
+                                ...playlistConfig,
+                                files: updatedFiles,
+                              });
+                            }}
+                            className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow-md"
+                          >
+                            <XCircle size={16} className="text-red-500" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500">No background image selected</p>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <label className="text-xs text-gray-600">Delay (s)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={file.delay}
+                      onChange={(e) => {
+                        const newFiles = [...playlistConfig.files];
+                        newFiles[index].delay = parseInt(e.target.value);
+                        setPlaylistConfig({
+                          ...playlistConfig,
+                          files: newFiles,
+                        });
+                      }}
+                      className="w-16 p-1 border rounded text-sm"
+                    />
                   </div>
                 </div>
-              )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Background Audio Section */}
+      <div className="mt-6 border-t pt-4">
+        <div className="flex items-center gap-3 mb-4">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={playlistConfig.backgroundAudio.enabled}
+              onChange={() => {
+                setPlaylistConfig({
+                  ...playlistConfig,
+                  backgroundAudio: {
+                    ...playlistConfig.backgroundAudio,
+                    enabled: !playlistConfig.backgroundAudio.enabled,
+                    file: null
+                  }
+                });
+              }}
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            <span className="ml-3 text-sm font-medium text-gray-700">Enable Background Audio</span>
+          </label>
+        </div>
+
+        {playlistConfig.backgroundAudio.enabled && (
+          <div className="space-y-4 pl-4">
+            <div className="max-h-[200px] overflow-y-auto border rounded p-3">
+              {mediaFiles
+                .filter(media => media.type.startsWith('audio/'))
+                .map((audio: any) => (
+                  <div
+                    key={audio.id}
+                    className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded"
+                  >
+                    <input
+                      type="radio"
+                      name="backgroundAudio"
+                      checked={playlistConfig.backgroundAudio.file === audio.url}
+                      onChange={() => {
+                        setPlaylistConfig({
+                          ...playlistConfig,
+                          backgroundAudio: {
+                            ...playlistConfig.backgroundAudio,
+                            file: audio.url
+                          }
+                        });
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{audio.name}</p>
+                      <audio
+                        src={audio.url}
+                        controls
+                        className="w-full mt-1"
+                        controlsList="nodownload"
+                      />
+                    </div>
+                  </div>
+                ))}
             </div>
-          )}
-// ...existing imports...
+
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium">Background Volume:</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={playlistConfig.backgroundAudio.volume}
+                onChange={(e) => {
+                  setPlaylistConfig({
+                    ...playlistConfig,
+                    backgroundAudio: {
+                      ...playlistConfig.backgroundAudio,
+                      volume: parseInt(e.target.value)
+                    }
+                  });
+                }}
+                className="flex-1"
+              />
+              <span className="text-sm text-gray-600">
+                {playlistConfig.backgroundAudio.volume}%
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <button
+          onClick={() => setActiveSection("")}
+          className="px-4 md:px-6 py-2 text-sm text-gray-600 hover:text-gray-900"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSavePlaylistConfig}
+          disabled={!playlistConfig.name || playlistConfig.files.length === 0}
+          className={`px-4 md:px-6 py-2 text-sm rounded ${
+            !playlistConfig.name || playlistConfig.files.length === 0
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600"
+          } text-white`}
+        >
+          Save Configuration
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 {activeSection === "showPlaylists" && (
   <div className="bg-white rounded-xl shadow-sm p-6">

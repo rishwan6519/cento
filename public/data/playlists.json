@@ -1,8 +1,9 @@
 [
+ 
   {
-    "name": "testing",
+    "id": "2",
+    "name": "",
     "type": "mixed",
-    "enableAI": false,
     "serialNumber": "1234",
     "startTime": "00:00:00",
     "endTime": "00:10:00",
@@ -11,16 +12,16 @@
         "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1)",
         "path": "/uploads/audio/1742899618374-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1).mp3",
         "type": "audio",
-        "displayOrder": 0,
+        "displayOrder": 1,
         "delay": 2,
-        "backgroundImageEnabled": true,
-        "backgroundImage": "/uploads/image/1742901034105-centelon_logo.png"
+        "backgroundImageEnabled": false,
+        "backgroundImage": null
       },
       {
         "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me",
         "path": "/uploads/audio/1742899618382-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me.mp3",
         "type": "audio",
-        "displayOrder": 1,
+        "displayOrder": 2,
         "delay": 2,
         "backgroundImageEnabled": false,
         "backgroundImage": null
@@ -29,14 +30,13 @@
         "name": "yt1z.net - Bazooka - Official Trailer Mammootty Gautham Vasudev Menon Deeno Dennis (720p)",
         "path": "/uploads/video/1743057821768-yt1z.net - Bazooka - Official Trailer Mammootty Gautham Vasudev Menon Deeno Dennis (720p).mp4",
         "type": "video",
-        "displayOrder": 2,
+        "displayOrder": 3,
         "delay": 2,
         "backgroundImageEnabled": false,
         "backgroundImage": null
       }
     ],
-    "id": "1",
-    "createdAt": "2025-04-07T07:26:27.814Z",
-    "updatedAt": "2025-04-07T07:26:27.814Z"
+    "createdAt": "2025-04-08T10:43:56.218Z",
+    "updatedAt": "2025-04-08T10:43:56.218Z"
   }
 ]
