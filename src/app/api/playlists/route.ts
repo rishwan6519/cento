@@ -1,59 +1,110 @@
-import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { statSync } from 'fs'; 
-import { Playlist, PlaylistFile } from '@/types/playlist';
+import { NextRequest, NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/db';
+import  PlaylistConfig from '@/models/PlaylistConfig';
+
+export async function POST(req: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const body = await req.json();
+    const { 
+      name, 
+      type, 
+      startTime, 
+      endTime, 
+      files, 
+      backgroundAudio 
+    } = body;
+
+    // Validate required fields
+    if (!name || !type || !startTime || !endTime || !files) {
+      return NextResponse.json(
+        { error: 'All required fields must be provided' },
+        { status: 400 }
+      );
+    }
+
+    // Validate files array
+    if (!Array.isArray(files) || files.length === 0) {
+      return NextResponse.json(
+        { error: 'At least one file is required' },
+        { status: 400 }
+      );
+    }
+
+    // Create new playlist
+    const playlist = await PlaylistConfig.create({
+      name,
+      type,
+      startTime,
+      endTime,
+      files: files.map((file, index) => ({
+        ...file,
+        displayOrder: index + 1,
+        delay: file.delay || 0
+      })),
+      backgroundAudio: {
+        enabled: backgroundAudio?.enabled || false,
+        file: backgroundAudio?.file || null,
+        volume: backgroundAudio?.volume || 50
+      }
+    });
+
+    return NextResponse.json(playlist, { status: 201 });
+
+  } catch (error) {
+    console.error('Error creating playlist:', error);
+    return NextResponse.json(
+      { error: 'Failed to create playlist' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function GET() {
   try {
-    console.log("hiiiiiiiiiiii")
-    // Define path to playlists data file
-    const playlistsPath = path.join(process.cwd(), 'data', 'playlists.json');
-    const mediaFolderPath = path.join(process.cwd(), 'public', 'media');
-
-    // Create directories if they don't exist
-    await fs.mkdir(path.join(process.cwd(), 'data'), { recursive: true });
-    await fs.mkdir(mediaFolderPath, { recursive: true });
-
-    let playlists: Playlist[] = [];
-    try {
-      // Read existing playlists
-      const fileContent = await fs.readFile(playlistsPath, 'utf-8');
-      playlists = JSON.parse(fileContent);
-    } catch (error) {
-      // If file doesn't exist or is invalid, start with empty array
-      playlists = [];
-    }
-
-    // Get all files in media directory
-    const files = await fs.readdir(mediaFolderPath);
-
-    // Map through playlists and add file details
-    const enhancedPlaylists = await Promise.all(playlists.map(async (playlist: Playlist) => ({
-      ...playlist,
-      files: await Promise.all(playlist.files.map(async (file: PlaylistFile) => {
-        // Get file stats
-        const filePath = path.join(mediaFolderPath, file.name);
-        const fileStats = await fs.stat(filePath);
-
-        return {
-          ...file,
-          size: fileStats.size,
-          createdAt: fileStats.birthtime,
-          url: `/media/${file.name}`
-        };
-      }))
-    })));
-
-    return NextResponse.json({
-      success: true,
-      playlists: enhancedPlaylists
-    });
-
+    await connectToDatabase();
+    
+    const playlists = await PlaylistConfig.find({})
+      .sort({ createdAt: -1 });
+      console.log("playlists",playlists);
+      
+    
+    return NextResponse.json(playlists);
   } catch (error) {
     console.error('Error fetching playlists:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch playlists' },
+      { error: 'Failed to fetch playlists' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const { id } = await req.json();
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Playlist ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const playlist = await PlaylistConfig.findByIdAndDelete(id);
+    if (!playlist) {
+      return NextResponse.json(
+        { error: 'Playlist not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting playlist:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete playlist' },
       { status: 500 }
     );
   }

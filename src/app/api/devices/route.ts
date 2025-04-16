@@ -1,109 +1,110 @@
-import { NextRequest, NextResponse } from "next/server";
-import fs from "fs-extra";
-import path from "path";
+import { NextRequest, NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/db';
+import Device from '@/models/Device';
+import { DeviceType }  from '@/models/DeviceTypes';
+export async function POST(req: NextRequest) {
+  try {
+    // Connect to database
+    await connectToDatabase();
 
-// Define paths for data storage
-const dataDir = path.join(process.cwd(), "public/data");
-const jsonFilePath = path.join(dataDir, "devices.json");
+ 
 
-// Ensure the data directory exists
-fs.ensureDirSync(dataDir);
+    // Parse request body
+    const body = await req.json();
+    const { name, typeId, serialNumber, imageUrl,color } = body;
 
-// Initialize the JSON file if it doesn't exist
-if (!fs.existsSync(jsonFilePath)) {
-  fs.writeJsonSync(jsonFilePath, [], { spaces: 2 });
+    // Validate required fields
+    if (!name || !typeId || !serialNumber) {
+      return NextResponse.json(
+        { error: 'Name, type and serial number are required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if device type exists
+    const deviceType = await DeviceType.findById(typeId);
+    if (!deviceType) {
+      return NextResponse.json(
+        { error: 'Invalid device type' },
+        { status: 400 }
+      );
+    }
+
+    // Check if serial number is unique
+    const existingDevice = await Device.findOne({ serialNumber });
+    if (existingDevice) {
+      return NextResponse.json(
+        { error: 'Device with this serial number already exists' },
+        { status: 400 }
+      );
+    }
+
+    // Create new device
+    const device = await Device.create({
+      name,
+      typeId,
+      serialNumber,
+      imageUrl,
+      color,
+      status: 'active'
+    });
+
+    // Return success response
+    return NextResponse.json(device, { status: 201 });
+
+  } catch (error) {
+    console.error('Error in POST /api/devices:', error);
+    return NextResponse.json(
+      { error: 'Failed to create device' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function GET() {
   try {
-    // Read the JSON file or return an empty array if it doesn't exist
-    if (!fs.existsSync(jsonFilePath)) {
-      return NextResponse.json([]);
-    }
-    
-    const devices = await fs.readJson(jsonFilePath);
+    await connectToDatabase();
+
+    const devices = await Device.find({})
+      .populate('typeId', 'name imageUrl')
+      .sort({ createdAt: -1 });
+
     return NextResponse.json(devices);
   } catch (error) {
-    console.error("Error reading devices:", error);
-    return NextResponse.json([], { status: 200 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const { name, imageUrl,typeId } = await req.json();
-    
-    console.log("Received data:", { name, imageUrl, typeId });
-    
-    if (!name || !imageUrl) {
-      return NextResponse.json({ error: "Name and image URL are required" }, { status: 400 });
-    }
-    
-    // Read existing devices - handle case where file might not exist yet
-    let devices = [];
-    if (fs.existsSync(jsonFilePath)) {
-      devices = await fs.readJson(jsonFilePath, { throws: false }) || [];
-    }
-
-    // Create new device with unique ID
-    const newDevice = { 
-      id: Date.now().toString(), 
-      name, 
-      imageUrl ,
-      type:typeId
-    };
-    
-    // Add to list and save
-    devices.push(newDevice);
-    await fs.writeJson(jsonFilePath, devices, { spaces: 2 });
-
-    return NextResponse.json({ 
-      message: "Device saved successfully!", 
-      device: newDevice 
-    }, { status: 200 });
-  } catch (error) {
-    console.error("Error saving device:", error);
-    return NextResponse.json({ error: "Failed to save device!" }, { status: 500 });
+    console.error('Error in GET /api/devices:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch devices' },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await req.json();
-    
-    if (!id) {
-      return NextResponse.json({ error: "Device ID is required" }, { status: 400 });
-    }
-    
-    // Read existing devices
-    if (!fs.existsSync(jsonFilePath)) {
-      return NextResponse.json({ error: "No devices found" }, { status: 404 });
-    }
-    
-    const devices = await fs.readJson(jsonFilePath);
-    
-    // Find the device to delete
-    const deviceToDelete = devices.find((device: any) => device.id === id);
-    
-    if (!deviceToDelete) {
-      return NextResponse.json({ error: "Device not found" }, { status: 404 });
-    }
-    
-    // Remove image file if it exists in our uploads directory
-    if (deviceToDelete.imageUrl && deviceToDelete.imageUrl.startsWith('/uploads/')) {
-      const imagePath = path.join(process.cwd(), "public", deviceToDelete.imageUrl);
-      if (fs.existsSync(imagePath)) {
-        await fs.remove(imagePath);
-      }
-    }
-    
-    // Filter out the device and save the updated list
-    const updatedDevices = devices.filter((device: any) => device.id !== id);
-    await fs.writeJson(jsonFilePath, updatedDevices, { spaces: 2 });
+    await connectToDatabase();
 
-    return NextResponse.json({ message: "Device deleted successfully!" });
+    const { id } = await req.json();
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Device ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const device = await Device.findByIdAndDelete(id);
+    if (!device) {
+      return NextResponse.json(
+        { error: 'Device not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting device:", error);
-    return NextResponse.json({ error: "Failed to delete device!" }, { status: 500 });
+    console.error('Error in DELETE /api/devices:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete device' },
+      { status: 500 }
+    );
   }
 }
