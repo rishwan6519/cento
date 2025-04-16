@@ -52,6 +52,7 @@ interface Device {
 interface SelectedFile {
   id: string;
   name: string;
+  type: string;
   url?: string;
   file: File; // Add this property
 }
@@ -63,7 +64,11 @@ interface Playlist {
   type: string;
   url?: string;
   files: SelectedFile[];
-  backgroundAudio?: File;
+  backgroundAudio?: {
+    enabled: boolean;
+    file: string | null;
+    volume: number;
+  } | File;
   volume: {
     main: number;
     background: number;
@@ -556,31 +561,34 @@ const [selectedPlaylistsForDevice, setSelectedPlaylistsForDevice] = useState<str
   };
 
   // Update the handleFileSelection function
-  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isEditing && editedPlaylist) {
-      const newFiles = Array.from(e.target.files || []).map((file) => ({
-        id: generateUniqueId(),
-        name: file.name,
-        file: file,
-      }));
+  // Update the handleFileSelection function
+const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (isEditing && editedPlaylist) {
+    const newFiles = Array.from(e.target.files || []).map((file) => ({
+      id: generateUniqueId(),
+      name: file.name,
+      type: file.type || getFileType(file.name),
+      file: file
+    }));
 
-      setEditedPlaylist({
-        ...editedPlaylist,
-        files: [...editedPlaylist.files, ...newFiles],
-      });
-    } else {
-      const newFiles = Array.from(e.target.files || []).map((file) => ({
-        id: generateUniqueId(),
-        name: file.name,
-        file: file,
-      }));
+    setEditedPlaylist({
+      ...editedPlaylist,
+      files: [...editedPlaylist.files, ...newFiles],
+    });
+  } else {
+    const newFiles = Array.from(e.target.files || []).map((file) => ({
+      id: generateUniqueId(),
+      name: file.name,
+      type: file.type || getFileType(file.name),
+      file: file
+    }));
 
-      setPlaylist((prev) => ({
-        ...prev,
-        files: [...prev.files, ...newFiles],
-      }));
-    }
-  };
+    setPlaylist((prev) => ({
+      ...prev,
+      files: [...prev.files, ...newFiles],
+    }));
+  }
+};
 
   // Add this function to handle file deletion
   const handleFileDelete = (id: string) => {
@@ -689,7 +697,7 @@ const [selectedPlaylistsForDevice, setSelectedPlaylistsForDevice] = useState<str
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: playlist.id,
+          id: playlist._id,
           name: playlist.name,
           type: playlist.type,
           files: playlist.files,
@@ -712,6 +720,33 @@ const [selectedPlaylistsForDevice, setSelectedPlaylistsForDevice] = useState<str
   const handleEditClick = (e: React.MouseEvent, playlist: Playlist) => {
     e.stopPropagation();
     setIsEditing(true);
+  
+    // First check if backgroundAudio exists and is a File
+    let backgroundAudioConfig = {
+      enabled: false,
+      file: null as string | null,
+      volume: 50
+    };
+  
+    // If playlist has backgroundAudio, set up the config
+    if (playlist.backgroundAudio) {
+      if (playlist.backgroundAudio instanceof File) {
+        // If it's a File, create URL and set as string
+        backgroundAudioConfig = {
+          enabled: true,
+          file: URL.createObjectURL(playlist.backgroundAudio),
+          volume: 50 // default volume
+        };
+      } else if (typeof playlist.backgroundAudio === 'object') {
+        // If it's already in the correct format, use it
+        backgroundAudioConfig = {
+          enabled: playlist.backgroundAudio.enabled || false,
+          file: playlist.backgroundAudio.file || null,
+          volume: playlist.backgroundAudio.volume || 50
+        };
+      }
+    }
+  
     setEditedPlaylist({
       id: playlist._id,
       name: playlist.name,
@@ -727,14 +762,9 @@ const [selectedPlaylistsForDevice, setSelectedPlaylistsForDevice] = useState<str
         main: playlist.volume?.main || 100,
         background: playlist.volume?.background || 50
       },
-      backgroundAudio: playlist.backgroundAudio || {
-        enabled: false,
-        file: null,
-        volume: 50
-      }
+      backgroundAudio: backgroundAudioConfig
     });
   };
-
   // Update the handleDeletePlaylist function in page.tsx
   const handleDeletePlaylist = async (playlistId: string | undefined) => {
     alert("Deleting media...");
@@ -1248,12 +1278,12 @@ const handleConnectPlaylistToDevice = async () => {
     },
     {
       id: "generatePlaylist",
-      label: "Create Playlist",
+      label: "Create Media",
       icon: <PlayCircle size={20} className="text-green-500" />,
     },
     {
       id: "showMedia", // changed from 'showPlaylists'
-      label: "Show Mediass",
+      label: "Show Medias",
       icon: <CgPlayList size={20} className="text-indigo-500" />,
     },
 
@@ -2610,6 +2640,7 @@ const handleConnectPlaylistToDevice = async () => {
           )}
 
           {/* Replace the existing showPlaylists section with this code */}
+          
           {activeSection === "showPlaylists" && (
             <div className="bg-white rounded-xl shadow-sm p-6 text-black">
               <div className="flex justify-between items-center mb-6">

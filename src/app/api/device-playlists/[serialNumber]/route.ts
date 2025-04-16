@@ -28,11 +28,8 @@ export async function GET(
 
     if (!devicePlaylists || !devicePlaylists.playlistIds.length) {
       return NextResponse.json({
-        deviceId: device._id,
-        serialNumber: device.serialNumber,
         currentPlaylist: null,
-        nextPlaylist: null,
-        allPlaylistIds: []
+      
       });
     }
 
@@ -80,23 +77,14 @@ export async function GET(
     }
 
     return NextResponse.json({
-      deviceId: device._id,
-      serialNumber: device.serialNumber,
-      currentTime,
+     
       currentPlaylist: currentPlaylist ? {
         id: currentPlaylist._id,
-        name: currentPlaylist.name,
-        startTime: currentPlaylist.startTime,
-        endTime: currentPlaylist.endTime
+        updatedAt: currentPlaylist.updatedAt
       } : null,
-      nextPlaylist: nextPlaylist ? {
-        id: nextPlaylist._id,
-        name: nextPlaylist.name,
-        startTime: nextPlaylist.startTime,
-        endTime: nextPlaylist.endTime,
-        startsIn: getTimeUntilStart(currentTime, nextPlaylist.startTime)
-      } : null,
-      allPlaylistIds: playlists.map(p => p._id)
+   
+
+      
     });
 
   } catch (error) {

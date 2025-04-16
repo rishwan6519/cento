@@ -9,7 +9,7 @@ declare global {
   var mongoose: CachedMongoose;
 }
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://rishwank:rishwan@centoplatform.og8fvnv.mongodb.net/?retryWrites=true&w=majority&appName=centoplatform';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://rishwank:rishwan@centoplatform.og8fvnv.mongodb.net/Cento?retryWrites=true&w=majority&appName=centoplatform';
 console.log(MONGODB_URI);
 
 if (!MONGODB_URI) {
