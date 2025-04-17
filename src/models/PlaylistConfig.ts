@@ -10,19 +10,15 @@ const playlistFileSchema = new mongoose.Schema({
   backgroundImage: { type: String, default: null }
 });
 
-const backgroundAudioSchema = new mongoose.Schema({
-  enabled: { type: Boolean, default: false },
-  file: { type: String, default: null },
-  volume: { type: Number, default: 50 }
-});
 
 const playlistConfigSchema = new mongoose.Schema({
   name: { type: String, required: true },
   type: { type: String, required: true },
+  contentType: { type: String,required:true }, // Add this line
   startTime: { type: String, required: true },
   endTime: { type: String, required: true },
   files: [playlistFileSchema],
-  backgroundAudio: backgroundAudioSchema,
+  
   status: { 
     type: String, 
     enum: ['active', 'inactive'], 

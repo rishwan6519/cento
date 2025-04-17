@@ -7,13 +7,26 @@ import Playlist from '@/models/PlaylistConfig';
 export async function GET(
   req: NextRequest,
   { params }: { params: { serialNumber: string } }
+ 
 ) {
   try {
     await connectToDatabase();
-    const { serialNumber } = params;
+
+    
+    const serialNumber = params.serialNumber;
+
+
+    
+    if (!serialNumber) {
+      return NextResponse.json(
+        { error: 'Serial number is required' },
+        { status: 400 }
+      );
+    }
 
     // Step 1: Find device by serial number
     const device = await Device.findOne({ serialNumber });
+    console.log("Device", device)
     if (!device) {
       return NextResponse.json(
         { error: 'Device not found with this serial number' }, 
@@ -25,6 +38,7 @@ export async function GET(
     const devicePlaylists = await DevicePlaylist.findOne({ 
       deviceId: device._id 
     }, 'playlistIds');
+    console.log("devicePlaylists", devicePlaylists)
 
     if (!devicePlaylists || !devicePlaylists.playlistIds.length) {
       return NextResponse.json({
@@ -80,7 +94,12 @@ export async function GET(
      
       currentPlaylist: currentPlaylist ? {
         id: currentPlaylist._id,
-        updatedAt: currentPlaylist.updatedAt
+        name: currentPlaylist.name,
+        updatedAt: currentPlaylist.updatedAt,
+        ...(currentPlaylist.contentType === 'announcement' && {
+          announcementId: currentPlaylist.announcementId || currentPlaylist._id
+        })
+
       } : null,
    
 

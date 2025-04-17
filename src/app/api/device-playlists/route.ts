@@ -35,7 +35,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(
+  request: Request,
+  { params }: { params: { deviceId: string } }
+)  {
   try {
     await connectToDatabase();
     

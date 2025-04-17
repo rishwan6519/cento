@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const configString = formData.get('config');
     
-    console.log('Received config string:', configString);
+    // console.log('Received config string:', configString);
     
     if (!configString) {
       return NextResponse.json(
@@ -21,11 +21,11 @@ export async function POST(req: NextRequest) {
     }
 
     const configData = JSON.parse(configString as string);
+    console.log("conentData", configData.contentType);
     
-    // Only validate essential fields
     if (!configData.name) {
       return NextResponse.json(
-        { error: 'Playlist name is required' },
+        { error: 'Name is required' },
         { status: 400 }
       );
     }
@@ -37,13 +37,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create new playlist configuration with default values
+    // Create new configuration with contentType
     const playlistConfig = await PlaylistConfig.create({
       name: configData.name,
-      type: configData.type || 'mixed',
-      serialNumber: 'default', // Set a default value
-      startTime: configData.startTime || '00:00:00',
-      endTime: configData.endTime || '23:59:59',
+      type: configData.type ,
+      contentType: configData.contentType ||'playlist', // Default to 'playlist' if not provided, 
+      startTime: configData.startTime ,
+      endTime: configData.endTime,
       files: configData.files.map((file: any) => ({
         name: file.name,
         path: file.path,
@@ -53,20 +53,15 @@ export async function POST(req: NextRequest) {
         backgroundImageEnabled: file.backgroundImageEnabled || false,
         backgroundImage: file.backgroundImage || null
       })),
-      backgroundAudio: {
-        enabled: configData.backgroundAudio?.enabled || false,
-        file: configData.backgroundAudio?.file || null,
-        volume: configData.backgroundAudio?.volume || 50
-      },
       status: 'active'
     });
 
     return NextResponse.json(playlistConfig, { status: 201 });
 
   } catch (error) {
-    console.error('Error creating playlist config:', error);
+    console.error('Error creating configuration:', error);
     return NextResponse.json(
-      { error: 'Failed to create playlist configuration' },
+      { error: 'Failed to create configuration' },
       { status: 500 }
     );
   }
@@ -78,16 +73,22 @@ export async function GET(req: NextRequest) {
     
     const { searchParams } = new URL(req.url);
     const serialNumber = searchParams.get('serialNumber');
+    const contentType = searchParams.get('contentType'); // Add this line
 
-    const query = serialNumber ? { serialNumber } : {};
+    // Update query to include contentType if provided
+    const query = {
+      ...(serialNumber && { serialNumber }),
+      ...(contentType && { contentType })
+    };
+
     const configs = await PlaylistConfig.find(query)
       .sort({ createdAt: -1 });
 
     return NextResponse.json(configs);
   } catch (error) {
-    console.error('Error fetching playlist configs:', error);
+    console.error('Error fetching configurations:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch playlist configurations' },
+      { error: 'Failed to fetch configurations' },
       { status: 500 }
     );
   }
@@ -107,7 +108,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Handle background images similar to POST
+    // Handle background images
     for (let i = 0; i < configData.files.length; i++) {
       const file = configData.files[i];
       if (file.backgroundImageEnabled) {
@@ -130,11 +131,11 @@ export async function PUT(req: NextRequest) {
       {
         name: configData.name,
         type: configData.type,
+        contentType: configData.contentType, // Add this line
         serialNumber: configData.serialNumber,
         startTime: configData.startTime,
         endTime: configData.endTime,
         files: configData.files,
-        backgroundAudio: configData.backgroundAudio,
         status: configData.status || 'active'
       },
       { new: true }
@@ -149,9 +150,9 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json(updatedConfig);
   } catch (error) {
-    console.error('Error updating playlist config:', error);
+    console.error('Error updating configuration:', error);
     return NextResponse.json(
-      { error: 'Failed to update playlist configuration' },
+      { error: 'Failed to update configuration' },
       { status: 500 }
     );
   }
@@ -181,9 +182,9 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting playlist config:', error);
+    console.error('Error deleting configuration:', error);
     return NextResponse.json(
-      { error: 'Failed to delete playlist configuration' },
+      { error: 'Failed to delete configuration' },
       { status: 500 }
     );
   }

@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { connectToDatabase } from '@/lib/db';
+import Playlist from '@/models/PlaylistConfig';
 
 interface PlaylistFile {
   name: string;
   path: string;
 }
 
-interface Playlist {
+interface PlaylistData {
   id: string;
   name: string;
   type: string;
@@ -44,7 +46,7 @@ export async function GET(
       );
     }
 
-    let playlists: Playlist[] = [];
+    let playlists: PlaylistData[] = [];
     try {
       const data = await fs.readFile(PLAYLISTS_FILE, 'utf-8');
       playlists = JSON.parse(data);
@@ -91,5 +93,54 @@ export async function GET(
       { success: false, error: 'Failed to fetch playlist' },
       { status: 500 }
     );
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    console.log('Updating playlist with ID:', params.id);
+    await connectToDatabase();
+    const data = await request.json();
+
+    const updatedPlaylist = {
+      name: data.name,
+      type: data.type,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      files: data.files.map((file: any) => ({
+        id: file.id,
+        name: file.name,
+        type: file.type,
+        url: file.url,
+        delay: file.delay || 0,
+        backgroundImageEnabled: file.backgroundImageEnabled || false,
+        backgroundImage: file.backgroundImage || null
+      })),
+      backgroundAudio: data.backgroundAudio,
+      updatedAt: new Date()
+    };
+
+    await Playlist.findByIdAndUpdate(params.id, updatedPlaylist, { new: true });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating playlist:', error);
+    return NextResponse.json({ error: 'Failed to update playlist' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectToDatabase();
+    await Playlist.findByIdAndDelete(params.id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting playlist:', error);
+    return NextResponse.json({ error: 'Failed to delete playlist' }, { status: 500 });
   }
 }
