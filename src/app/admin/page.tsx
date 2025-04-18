@@ -1167,7 +1167,7 @@ export default function RobotAdminDashboard() {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json(); 
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to connect playlists");
@@ -1915,41 +1915,44 @@ export default function RobotAdminDashboard() {
                                 : "hover:border-blue-500"
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium text-gray-900">
-                                  {playlist.name}
-                                </h4>
-                                <p className="text-sm text-gray-500">
-                                  {playlist.files?.length || 0} files
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {isConnected ? (
-                                  <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
-                                    Already Connected
-                                  </span>
-                                ) : (
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedPlaylistsForDevice.includes(
-                                      playlist._id || ""
-                                    )}
-                                    onChange={() => {
-                                      const playlistId = playlist._id || "";
-                                      setSelectedPlaylistsForDevice((prev) =>
-                                        prev.includes(playlistId)
-                                          ? prev.filter(
-                                              (id) => id !== playlistId
-                                            )
-                                          : [...prev, playlistId]
-                                      );
-                                    }}
-                                    className="h-5 w-5 text-blue-600 rounded"
-                                  />
-                                )}
-                              </div>
-                            </div>
+<div className="flex items-center justify-between">
+  <div className="relative">
+    {/* Content type tag in corner */}
+    <span className="absolute -top-2 -left-2 text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+      {playlist?.contentType}
+    </span>
+    
+    <h4 className="font-medium text-gray-900 mt-3">
+      {playlist.name}
+    </h4>
+    <p className="text-sm text-gray-500">
+      {playlist.files?.length || 0} files
+    </p>
+  </div>
+  <div className="flex items-center gap-2">
+    {isConnected ? (
+      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+        Already Connected
+      </span>
+    ) : (
+      <input
+        type="checkbox"
+        checked={selectedPlaylistsForDevice.includes(playlist._id || "")}
+        onChange={() => {
+          const playlistId = playlist._id || "";
+          setSelectedPlaylistsForDevice((prev) =>
+            prev.includes(playlistId)
+              ? prev.filter((id) => id !== playlistId)
+              : [...prev, playlistId]
+          );
+        }}
+        className="h-5 w-5 text-blue-600 rounded"
+      />
+    )}
+  </div>
+</div>
+
+
                           </div>
                         );
                       })}
@@ -1980,6 +1983,8 @@ export default function RobotAdminDashboard() {
                   </div>
                 </div>
               )}
+
+              
             </div>
           )}
 

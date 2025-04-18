@@ -5,7 +5,9 @@ import mongoose from 'mongoose'
 
 export async function GET(req: Request) {
     try {
-        await connectToDatabase();
+        
+        await connectToDatabase();  
+        console.log("enikk  ith valare budhmutt aayirikkum pakse njan ithu oru test aayirikkum $in") 
 
         const { searchParams } = new URL(req.url)
         const playlistId = searchParams.get('id')
