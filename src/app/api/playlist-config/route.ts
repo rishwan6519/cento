@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const configData = JSON.parse(configString as string);
-    console.log("conentData", configData.contentType);
+    console.log("conentData", configData.files,"................................ffffffff");
     
     if (!configData.name) {
       return NextResponse.json(
@@ -41,16 +41,17 @@ export async function POST(req: NextRequest) {
     const playlistConfig = await PlaylistConfig.create({
       name: configData.name,
       type: configData.type ,
-      contentType: configData.contentType ||'playlist', // Default to 'playlist' if not provided, 
+      contentType: configData.contentType , // Default to 'playlist' if not provided, 
       startTime: configData.startTime ,
       endTime: configData.endTime,
       files: configData.files.map((file: any) => ({
         name: file.name,
         path: file.path,
         type: file.type,
-        displayOrder: file.displayOrder,
+        displayOrder: file.displayOrder,  
         delay: file.delay || 0,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
+        // backgoroundImageName: file.backgoroundImageName || null,
         backgroundImage: file.backgroundImage || null
       })),
       status: 'active'

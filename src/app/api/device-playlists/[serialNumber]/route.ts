@@ -77,12 +77,14 @@ export async function GET(
     return NextResponse.json({
       currentPlaylist: currentPlaylist ? {
         playlistId: currentPlaylist._id,
-        versionId: currentAnnouncement.updatedAt.getTime()
+       versionId: currentPlaylist.updatedAt.getTime().toString()
+
       } : null,
 
       currentAnnouncement: currentAnnouncement ? {
         announcementId: currentAnnouncement.announcementId || currentAnnouncement._id,
-        versionId: currentAnnouncement.updatedAt.getTime()
+        versionId: currentAnnouncement.updatedAt.getTime().toString()
+
       } : null
     });
 

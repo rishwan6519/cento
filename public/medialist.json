@@ -1,20 +1,6 @@
 {
   "media": [
     {
-      "id": "c873c44d-653a-4a48-af03-6eeceb3014ab",
-      "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1).mp3",
-      "type": "audio/mpeg",
-      "url": "/uploads/audio/1742899618374-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me (1).mp3",
-      "createdAt": "2025-03-25T10:46:58.406Z"
-    },
-    {
-      "id": "5fcc58f6-01b4-4349-ab6a-41ad515e0555",
-      "name": "Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me.mp3",
-      "type": "audio/mpeg",
-      "url": "/uploads/audio/1742899618382-Hanumankind - Run It Up ( Prod. By Kalmi ) _ (Official Music Video)-yt.savetube.me.mp3",
-      "createdAt": "2025-03-25T10:46:58.406Z"
-    },
-    {
       "id": "85feecf1-2c75-4c29-a1d8-758266622979",
       "name": "centelon_logo.png",
       "type": "image/png",
@@ -22,25 +8,11 @@
       "createdAt": "2025-03-25T10:46:58.405Z"
     },
     {
-      "id": "4ce67759-4c2f-4938-83b7-880540be437c",
-      "name": "smart-plug.jpg",
-      "type": "image/jpeg",
-      "url": "/uploads/image/1742899618384-smart-plug.jpg",
-      "createdAt": "2025-03-25T10:46:58.406Z"
-    },
-    {
-      "id": "505879f4-0367-4602-8aac-9f37ca7b88f6",
-      "name": "centelon_logo.png",
-      "type": "image/png",
-      "url": "/uploads/image/1742901034105-centelon_logo.png",
-      "createdAt": "2025-03-25T11:10:34.115Z"
-    },
-    {
-      "id": "e7db6a5c-784f-4e4c-9ef4-19a64d171483",
-      "name": "yt1z.net - Bazooka - Official Trailer Mammootty Gautham Vasudev Menon Deeno Dennis (720p).mp4",
-      "type": "video/mp4",
-      "url": "/uploads/video/1743057821768-yt1z.net - Bazooka - Official Trailer Mammootty Gautham Vasudev Menon Deeno Dennis (720p).mp4",
-      "createdAt": "2025-03-27T06:43:41.816Z"
+      "id": "c2f2adb1-e89b-42fa-8d6d-9cb9b28cbd26",
+      "name": "seherezada_ringtone.mp3",
+      "type": "audio/mpeg",
+      "url": "/uploads/audio/1745238248195-seherezada_ringtone.mp3",
+      "createdAt": "2025-04-21T12:24:08.202Z"
     }
   ]
 }

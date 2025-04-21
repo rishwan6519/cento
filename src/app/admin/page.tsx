@@ -109,6 +109,7 @@ interface PlaylistConfigFile {
   delay: number;
   backgroundImageEnabled?: boolean;
   backgroundImage?: string | File | null; // Update this to allow both string and File types
+  backgroundImageName?: string | null; // Add this line
 }
 
 interface PlaylistConfiguration {
@@ -974,6 +975,7 @@ export default function RobotAdminDashboard() {
       const formData = new FormData();
       formData.append("config", JSON.stringify(configToSend));
   
+      console.log(formData,"formData")
       const response = await fetch("/api/playlist-config", {
         method: "POST",
         body: formData,
@@ -984,6 +986,7 @@ export default function RobotAdminDashboard() {
         throw new Error(data.error || "Failed to save playlist");
       }
   
+   
       toast.success(`${playlistConfig.contentType === 'announcement' ? 'Announcement' : 'Playlist'} saved successfully`);
       setActiveSection("showPlaylists");
       fetchPlaylists();
@@ -1042,6 +1045,7 @@ export default function RobotAdminDashboard() {
               (image) => `
             <div class="aspect-square relative group cursor-pointer hover:opacity-90 bg-white rounded-lg overflow-hidden " 
                  data-image-url="${image.url}"
+                  data-image-name="${image.name}"
                  onclick="selectBgImage('${audioPath}', '${image.url}')">
               <img src="${image.url}" 
                    alt="${image.name}"
@@ -1079,13 +1083,14 @@ export default function RobotAdminDashboard() {
     document.body.appendChild(input);
 
     // Add the selection handler to window
-    (window as any).selectBgImage = (audioPath: string, imageUrl: string) => {
+    (window as any).selectBgImage = (audioPath: string, imageUrl: string, imageName: string) => {
       const updatedFiles = playlistConfig.files.map((f) => {
         if (f.path === audioPath) {
           return {
             ...f,
             backgroundImageEnabled: true,
             backgroundImage: imageUrl,
+            backgroundImageName: imageName,
           } as PlaylistConfigFile;
         }
         return f;
