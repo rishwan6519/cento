@@ -1,0 +1,825 @@
+"use client";
+import React, { useState, useEffect } from "react";
+import { Trash2, Edit, XCircle, ImageIcon, Music, Video } from "lucide-react";
+import toast from "react-hot-toast";
+
+interface PlaylistFile {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  file?: File;
+  delay?: number;
+  backgroundImageEnabled?: boolean;
+  backgroundImage?: string | null;
+}
+
+interface Playlist {
+  _id?: string;
+  name: string;
+  type: string;
+  contentType: string;
+  files: PlaylistFile[];
+  startTime?: string;
+  endTime?: string;
+  createdAt?: string;
+}
+
+interface EditablePlaylist {
+  id?: string;
+  name: string;
+  type: string;
+  startTime: string;
+  endTime: string;
+  files: PlaylistFile[];
+  backgroundAudio?: {
+    enabled: boolean;
+    file: string | null;
+    volume: number;
+  };
+}
+
+interface PlaylistManagerProps {
+  activeSection: string;
+  mediaFiles: any[];
+  generateUniqueId: () => string;
+}
+
+const PlaylistManager: React.FC<PlaylistManagerProps> = ({
+  activeSection,
+  mediaFiles = [], // Provide default empty array
+  generateUniqueId
+}) => {
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = useState<boolean>(true);
+  const [isLoadingMedia, setIsLoadingMedia] = useState<boolean>(false);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editedPlaylist, setEditedPlaylist] = useState<EditablePlaylist | null>(null);
+  const [availableMediaFiles, setAvailableMediaFiles] = useState<any[]>([]);
+  const [localMediaFiles, setLocalMediaFiles] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeSection === "showPlaylist") {
+      fetchPlaylists();
+      if (mediaFiles.length === 0) {
+        fetchMedia(); // Fetch media files if not provided
+      }
+    }
+  }, [activeSection]); // Remove mediaFiles.length from dependencies
+
+  // Update local media files when prop changes
+  useEffect(() => {
+    console.log("Media files from props:", mediaFiles?.length);
+    if (mediaFiles && mediaFiles.length > 0) {
+      setLocalMediaFiles(mediaFiles);
+    }
+  }, [mediaFiles]);
+
+  // Update available media files when editing
+  useEffect(() => {
+    if (isEditing && editedPlaylist) {
+      if (localMediaFiles.length === 0) {
+        fetchMedia().then(updateAvailableMediaFiles);
+      } else {
+        updateAvailableMediaFiles();
+      }
+    }
+  }, [isEditing, editedPlaylist, localMediaFiles]);
+
+  const updateAvailableMediaFiles = () => {
+    if (!editedPlaylist) return;
+    
+    // Filter out files that are already in the playlist
+    const playlistUrls = editedPlaylist.files.map(file => file.url);
+    const available = localMediaFiles.filter(media => !playlistUrls.includes(media.url));
+    
+    console.log("Available media files:", available.length);
+    setAvailableMediaFiles(available);
+  };
+
+  const fetchMedia = async () => {
+    setIsLoadingMedia(true);
+    try {
+      const response = await fetch("/api/media");
+      if (!response.ok) throw new Error("Failed to fetch media files");
+      const data = await response.json();
+      console.log("Media API response:", data);
+      setLocalMediaFiles(data.media || []);
+      console.log("Media files fetched:", data.media?.length || 0);
+      return data.media || [];
+    } catch (error) {
+      console.error("Error fetching media:", error);
+      toast.error("Failed to fetch media files");
+      setLocalMediaFiles([]);
+      return [];
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  };
+
+  const fetchPlaylists = async () => {
+    setIsLoadingPlaylists(true);
+    try {
+      const response = await fetch("/api/playlists");
+      if (!response.ok) throw new Error("Failed to fetch playlists");
+      const data = await response.json();
+      if (!data) {
+        throw new Error("Failed to fetch playlists");
+      }
+      setPlaylists(data || []);
+      console.log("Playlists fetched:", data?.length || 0);
+    } catch (error) {
+      console.error("Error fetching playlists:", error);
+      toast.error("Failed to fetch playlists");
+      setPlaylists([]);
+    } finally {
+      setIsLoadingPlaylists(false);
+    }
+  };
+
+  const handleSearch = (term: string) => {
+    // Filter playlists based on search term
+    if (!term.trim()) {
+      fetchPlaylists(); // Reload all if search is cleared
+      return;
+    }
+    const filtered = playlists.filter(
+      (playlist) =>
+        playlist.name.toLowerCase().includes(term.toLowerCase()) ||
+        playlist.type.toLowerCase().includes(term.toLowerCase())
+    );
+    setPlaylists(filtered);
+  };
+
+  const handleEditClick = (e: React.MouseEvent, playlist: Playlist) => {
+    e.stopPropagation();
+    
+    // If we don't have media files, fetch them first
+    if (localMediaFiles.length === 0) {
+      toast.loading("Loading media files...");
+      fetchMedia().then((mediaData) => {
+        toast.dismiss();
+        setIsEditing(true);
+        initializeEditedPlaylist(playlist);
+      }).catch(error => {
+        toast.error("Failed to load media files");
+        console.error("Error loading media files:", error);
+      });
+    } else {
+      setIsEditing(true);
+      initializeEditedPlaylist(playlist);
+    }
+  };
+
+  const initializeEditedPlaylist = (playlist: Playlist) => {
+    setEditedPlaylist({
+      id: playlist._id,
+      name: playlist.name,
+      type: playlist.type,
+      startTime: playlist.startTime || "00:00",
+      endTime: playlist.endTime || "23:59",
+      files: playlist.files.map((file) => ({
+        id: file.id || generateUniqueId(),
+        name: file.name,
+        type: file.type,
+        url: file.url,
+        delay: file.delay || 0,
+        backgroundImageEnabled: file.backgroundImageEnabled || false,
+        backgroundImage: file.backgroundImage || null,
+      })),
+    });
+  };
+
+  const handleAddFileToPlaylist = (mediaFile: any) => {
+    if (!editedPlaylist) return;
+    
+    // Create a new file entry
+    const newFile = {
+      id: generateUniqueId(),
+      name: mediaFile.name,
+      type: mediaFile.type,
+      url: mediaFile.url,
+      delay: 0,
+      backgroundImageEnabled: false,
+      backgroundImage: null,
+    };
+    
+    // Add the file to the playlist
+    setEditedPlaylist({
+      ...editedPlaylist,
+      files: [...editedPlaylist.files, newFile]
+    });
+    
+    // Remove from available files
+    setAvailableMediaFiles(availableMediaFiles.filter(m => m.url !== mediaFile.url));
+  };
+
+  const handleRemoveFileFromPlaylist = (fileId: string) => {
+    if (!editedPlaylist) return;
+    
+    // Find the file that's being removed
+    const fileToRemove = editedPlaylist.files.find(f => f.id === fileId);
+    
+    // Update the playlist files
+    setEditedPlaylist({
+      ...editedPlaylist,
+      files: editedPlaylist.files.filter(f => f.id !== fileId)
+    });
+    
+    // Add the file back to available media files if it exists
+    if (fileToRemove) {
+      const mediaFileToAdd = localMediaFiles.find(m => m.url === fileToRemove.url);
+      if (mediaFileToAdd) {
+        setAvailableMediaFiles([...availableMediaFiles, mediaFileToAdd]);
+      }
+    }
+  };
+
+  const handleEditPlaylist = async (playlist: EditablePlaylist | null) => {
+    if (!playlist) return;
+    try {
+      const response = await fetch(`/api/playlists/${playlist.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: playlist.name,
+          type: playlist.type,
+          startTime: playlist.startTime,
+          endTime: playlist.endTime,
+          files: playlist.files.map((file) => ({
+            id: file.id,
+            name: file.name,
+            type: file.type,
+            url: file.url,
+            delay: file.delay || 0,
+            backgroundImageEnabled: file.backgroundImageEnabled || false,
+            backgroundImage: file.backgroundImage || null,
+          })),
+          backgroundAudio: playlist.backgroundAudio,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update playlist");
+      }
+      toast.success("Playlist updated successfully");
+      fetchPlaylists(); // Refresh the list
+    } catch (error) {
+      console.error("Error updating playlist:", error);
+      toast.error("Failed to update playlist");
+    }
+  };
+
+  const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => {
+    if (!playlistId) {
+      toast.error("Invalid playlist ID");
+      return;
+    }
+    if (!confirm("Are you sure you want to delete this playlist and its files?")) {
+      return;
+    }
+    try {
+      const params = new URLSearchParams({ id: playlistId });
+      const response = await fetch(`/api/playlist?${params.toString()}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete playlist");
+      }
+      if (data.success) {
+        toast.success("Playlist deleted successfully");
+        fetchPlaylists();
+      } else {
+        throw new Error(data.error || "Failed to delete playlist");
+      }
+    } catch (error) {
+      console.error("Error deleting playlist:", error);
+      toast.error("Failed to delete playlist");
+    }
+  };
+
+  if (activeSection !== "showPlaylist") {
+    return null;
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 text-black">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">
+          {isEditing ? "Edit Playlist" : "Playlists"}
+        </h2>
+        {!isEditing && (
+          <div className="flex gap-4">
+            <input
+              type="text"
+              placeholder="Search playlists..."
+              className="px-3 py-2 border rounded-lg"
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+      
+      {isLoadingPlaylists ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      ) : isEditing && editedPlaylist ? (
+        <div className="space-y-6">
+          {/* Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Playlist Name
+              </label>
+              <input
+                type="text"
+                value={editedPlaylist.name}
+                onChange={(e) =>
+                  setEditedPlaylist({
+                    ...editedPlaylist,
+                    name: e.target.value,
+                  })
+                }
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+            {/* Time Settings */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  value={editedPlaylist.startTime}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      startTime: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  value={editedPlaylist.endTime}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      endTime: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Available Media Files Section */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Available Media Files ({availableMediaFiles.length})
+            </label>
+            {isLoadingMedia ? (
+              <div className="flex justify-center items-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <span className="ml-2 text-sm text-gray-600">Loading media files...</span>
+              </div>
+            ) : availableMediaFiles.length === 0 ? (
+              <p className="text-sm text-gray-500 py-2">No more media files available to add</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {availableMediaFiles
+                  .filter(
+                    (media) =>
+                      media.type.includes("audio") ||
+                      media.type.includes("video") 
+                  )
+                  .map((media) => (
+                    <div
+                      key={media.id || `media-${generateUniqueId()}`} // Add fallback unique ID
+                      className="border rounded-lg p-3 transition-all hover:border-blue-500 hover:bg-blue-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        {media.type.includes("video") && (
+                          <Video size={20} className="text-blue-500" />
+                        )}
+                        {media.type.includes("audio") && (
+                          <Music size={20} className="text-purple-500" />
+                        )}
+                        {media.type.includes("image") && (
+                          <ImageIcon size={20} className="text-green-500" />
+                        )}
+                        <div className="flex-1">
+                          <span className="text-sm font-medium">
+                            {media.name}
+                          </span>
+                          {media.type.includes("audio") && (
+                            <audio
+                              src={media.url}
+                              controls
+                              className="w-full mt-2"
+                            />
+                          )}
+                          {media.type.includes("video") && (
+                            <video
+                              src={media.url}
+                              controls
+                              className="w-full mt-2"
+                            />
+                          )}
+                          {media.type.includes("image") && (
+                            <img 
+                              src={media.url}
+                              alt={media.name}
+                              className="w-full h-24 object-cover mt-2 rounded"
+                            />
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleAddFileToPlaylist(media)}
+                          className="ml-auto px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Selected Files Order */}
+          {editedPlaylist.files.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Selected Files Order ({editedPlaylist.files.length} items)
+              </label>
+              <div className="space-y-2">
+                {editedPlaylist.files.map((file, index) => (
+                  <div
+                    key={file.id || `file-${index}`} // Use index as fallback
+                    className="flex flex-col p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">
+                        {index + 1}
+                      </span>
+                      <div className="flex items-center gap-2 flex-1">
+                        {file.type.includes("image") && (
+                          <ImageIcon
+                            size={16}
+                            className="text-green-500"
+                          />
+                        )}
+                        {file.type.includes("video") && (
+                          <Video size={16} className="text-blue-500" />
+                        )}
+                        {file.type.includes("audio") && (
+                          <Music
+                            size={16}
+                            className="text-purple-500"
+                          />
+                        )}
+                        <span className="text-sm">{file.name}</span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveFileFromPlaylist(file.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    
+                    {/* Preview the media */}
+                    <div className="mt-2">
+                      {file.type.includes("image") && (
+                        <img
+                          src={file.url}
+                          alt={file.name}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                      )}
+                      {file.type.includes("video") && (
+                        <video
+                          src={file.url}
+                          controls
+                          className="w-full rounded-lg"
+                        />
+                      )}
+                      {file.type.includes("audio") && (
+                        <audio
+                          src={file.url}
+                          controls
+                          className="w-full"
+                        />
+                      )}
+                    </div>
+                    
+                    {/* Audio-specific settings */}
+                    {file.type.includes("audio") && (
+                      <div className="mt-3 pl-8 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={file.backgroundImageEnabled}
+                            onChange={(e) => {
+                              const updatedFiles = [
+                                ...editedPlaylist.files,
+                              ];
+                              updatedFiles[index] = {
+                                ...file,
+                                backgroundImageEnabled:
+                                  e.target.checked,
+                                backgroundImage: e.target.checked
+                                  ? file.backgroundImage
+                                  : null,
+                              };
+                              setEditedPlaylist({
+                                ...editedPlaylist,
+                                files: updatedFiles,
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <span className="text-sm">
+                            Enable Background Image
+                          </span>
+                        </div>
+                        {file.backgroundImageEnabled && (
+                          <div className="space-y-2">
+                            {file.backgroundImage ? (
+                              <div className="relative inline-block">
+                                <img
+                                  src={file.backgroundImage}
+                                  alt="Background"
+                                  className="w-32 h-32 object-cover rounded-lg"
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (!editedPlaylist) return;
+                                    const updatedFiles = [
+                                      ...editedPlaylist.files,
+                                    ];
+                                    updatedFiles[index] = {
+                                      ...file,
+                                      backgroundImage: null,
+                                    };
+                                    setEditedPlaylist({
+                                      ...editedPlaylist,
+                                      files: updatedFiles,
+                                    });
+                                  }}
+                                  className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow-md"
+                                >
+                                  <XCircle
+                                    size={16}
+                                    className="text-red-500"
+                                  />
+                                </button>
+                              </div>
+                            ) : (
+                              <div>
+                                <select
+                                  onChange={(e) => {
+                                    if (!editedPlaylist) return;
+                                    const selectedImage =
+                                      localMediaFiles.find(
+                                        (m) => m.url === e.target.value
+                                      );
+                                    if (selectedImage) {
+                                      const updatedFiles = [
+                                        ...editedPlaylist.files,
+                                      ];
+                                      updatedFiles[index] = {
+                                        ...file,
+                                        backgroundImage:
+                                          selectedImage.url,
+                                      };
+                                      setEditedPlaylist({
+                                        ...editedPlaylist,
+                                        files: updatedFiles,
+                                      });
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                                >
+                                  <option value="">
+                                    Select background image
+                                  </option>
+                                  {localMediaFiles
+                                    .filter((m) =>
+                                      m.type.includes("image")
+                                    )
+                                    .map((image) => (
+                                      <option
+                                        key={image.id || `option-${image.url}`} // Add fallback key
+                                        value={image.url}
+                                      >
+                                        {image.name}
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* Delay setting */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm">
+                            Delay (seconds):
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={file.delay || 0}
+                            onChange={(e) => {
+                              const updatedFiles = [
+                                ...editedPlaylist.files,
+                              ];
+                              updatedFiles[index] = {
+                                ...file,
+                                delay: parseInt(e.target.value),
+                              };
+                              setEditedPlaylist({
+                                ...editedPlaylist,
+                                files: updatedFiles,
+                              });
+                            }}
+                            className="w-20 px-2 py-1 border rounded text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-4 pt-6 border-t">
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setEditedPlaylist(null);
+              }}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                await handleEditPlaylist(editedPlaylist);
+                setIsEditing(false);
+                setEditedPlaylist(null);
+              }}
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      ) : playlists && playlists.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4">
+          {playlists.map((playlist) => (
+            <div
+              key={playlist._id || `playlist-${generateUniqueId()}`} // Add fallback unique ID
+              className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
+                selectedPlaylist?._id === playlist._id
+                  ? "ring-2 ring-blue-500"
+                  : ""
+              }`}
+              onClick={() =>
+                setSelectedPlaylist(
+                  selectedPlaylist?._id === playlist._id
+                    ? null
+                    : playlist
+                )
+              }
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {playlist.name}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Type: {playlist.contentType}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Files: {playlist.files?.length || 0} items
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Created:{" "}
+                    {new Date(
+                      playlist.createdAt || ""
+                    ).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => handleEditClick(e, playlist)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePlaylistWithFiles(playlist._id);
+                    }}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Expanded View */}
+              {selectedPlaylist?._id === playlist._id && (
+                <div className="mt-4 border-t pt-4">
+                  <h4 className="font-medium mb-3">Playlist Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {playlist.files?.map((file: any, index: number) => (
+                      <div
+                        key={file.id || `playlist-file-${index}`} // Use file.id or index as fallback
+                        className="bg-gray-50 rounded-lg p-4"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          {file.type.includes("image") && (
+                            <ImageIcon
+                              size={16}
+                              className="text-green-500"
+                            />
+                          )}
+                          {file.type.includes("video") && (
+                            <Video
+                              size={16}
+                              className="text-blue-500"
+                            />
+                          )}
+                          {file.type.includes("audio") && (
+                            <Music
+                              size={16}
+                              className="text-purple-500"
+                            />
+                          )}
+                          <span className="font-medium text-sm">
+                            {file.name}
+                          </span>
+                        </div>
+                        {file.url && (
+                          <div className="mt-2">
+                            {file.type.includes("image") && (
+                              <img
+                                src={file.url}
+                                alt={file.name}
+                                className="w-full h-32 object-cover rounded-lg"
+                              />
+                            )}
+                            {file.type.includes("video") && (
+                              <video
+                                src={file.url}
+                                controls
+                                className="w-full rounded-lg"
+                              />
+                            )}
+                            {file.type.includes("audio") && (
+                              <audio
+                                src={file.url}
+                                controls
+                                className="w-full"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-gray-500 text-center py-4">
+          No playlists found
+        </p>
+      )}
+    </div>
+  );
+};
+
+export default PlaylistManager;
