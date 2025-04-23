@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 
     const playlist = await Playlist.findById(playlistId);
 
-    console.log("playlist", playlist.files);
+   
 
     if (!playlist) {
       return NextResponse.json(

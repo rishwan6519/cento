@@ -4,14 +4,11 @@ import Device from '@/models/Device';
 import DevicePlaylist from '@/models/ConectPlaylist';
 import Playlist from '@/models/PlaylistConfig';
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { serialNumber: string } }
-) {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
 
-    const serialNumber = params.serialNumber;
+    const serialNumber = req.nextUrl.searchParams.get('serialNumber');
 
     if (!serialNumber) {
       return NextResponse.json(
@@ -22,7 +19,7 @@ export async function GET(
 
     // Step 1: Find device by serial number
     const device = await Device.findOne({ serialNumber });
-    console.log("Device", device);
+    console.log('Device', device);
     if (!device) {
       return NextResponse.json(
         { error: 'Device not found with this serial number' },
@@ -34,7 +31,7 @@ export async function GET(
     const devicePlaylists = await DevicePlaylist.findOne({
       deviceId: device._id
     }, 'playlistIds');
-    console.log("devicePlaylists", devicePlaylists);
+    console.log('devicePlaylists', devicePlaylists);
 
     if (!devicePlaylists || !devicePlaylists.playlistIds.length) {
       return NextResponse.json({
@@ -77,14 +74,12 @@ export async function GET(
     return NextResponse.json({
       currentPlaylist: currentPlaylist ? {
         playlistId: currentPlaylist._id,
-       versionId: currentPlaylist.updatedAt.getTime().toString()
-
+        versionId: currentPlaylist.updatedAt.getTime().toString()
       } : null,
 
       currentAnnouncement: currentAnnouncement ? {
         announcementId: currentAnnouncement.announcementId || currentAnnouncement._id,
         versionId: currentAnnouncement.updatedAt.getTime().toString()
-
       } : null
     });
 

@@ -47,7 +47,7 @@ interface Device {
   _id: string;
   name: string;
   imageUrl?: string; // Add this property
-  type: string;
+  typeId: string;
   serialNumber?: string;
   color?: string;
   description?: string;
@@ -273,6 +273,7 @@ const [isUploading, setIsUploading] = useState(false);
       const data = await response.json();
 
       setDevices(data);
+      console.log(data, "devices data");
     } catch (error) {
       console.error("Error fetching devices:", error);
       toast.error("Error fetching devices!");
@@ -285,6 +286,7 @@ const [isUploading, setIsUploading] = useState(false);
       if (!response.ok) throw new Error(`Failed to fetch device types`);
       const data = await response.json();
       setDeviceTypes(data);
+      console.log(data, "device types data");
     } catch (error) {
       console.error("Error fetching device types:", error);
       toast.error("Error fetching device types!");
@@ -674,8 +676,8 @@ const [isUploading, setIsUploading] = useState(false);
                             {device.name}
                           </h4>
                           <p className="text-sm text-gray-500">
-                            {deviceTypes.find((type) => type.id === device.type)
-                              ?.name || "Unknown Type"}
+                            {deviceTypes.find((type) => type.id === device.typeId)
+                              ?.name || null}
                           </p>
                         </div>
                         <button className="p-2 text-gray-400 hover:text-blue-500">
