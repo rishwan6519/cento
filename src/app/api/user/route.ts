@@ -7,9 +7,10 @@ export async function POST(req: NextRequest) {
   await connectToDatabase();
 
   const body = await req.json();
-  const { name, email, password, role } = body;
+  const {  username, password, role } = body;
 
-  if (!name || !email || !password) {
+  console.log("Received data:", body);
+  if (  !username || !password) {
     return NextResponse.json({ success: false, message: 'Missing required fields' }, { status: 400 });
   }
 
@@ -18,15 +19,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ username });
     if (existingUser) {
       return NextResponse.json({ success: false, message: 'Email already exists' }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({
-      name,
-      email,
+      
+      username,
       password: hashedPassword,
       role: role || UserRole.User,
     });

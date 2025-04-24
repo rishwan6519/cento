@@ -21,11 +21,7 @@ import {
 import toast, { Toaster } from "react-hot-toast";
 import { FcDataConfiguration } from "react-icons/fc";
 import { CgPlayList, CgPlayListAdd } from "react-icons/cg";
-import {
-  MdPlaylistAddCheckCircle,
-  MdPlaylistAddCircle,
-  MdAudiotrack,
-} from "react-icons/md";
+
 import GptAiComponent from "@/components/GptAiComponent/GptAiComponent";
 import PlaylistManager from "@/components/ShowPlaylist/showPlaylist";
 import PlaylistSetup from "@/components/PlaylistSetup/PlaylistSetup";

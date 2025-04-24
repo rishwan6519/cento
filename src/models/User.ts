@@ -7,15 +7,13 @@ export enum UserRole {
 }
 
 export interface UserDocument extends Document {
-  name: string;
-  email: string;
+  username: string;
   password: string;
   role: UserRole;
 }
 
 const UserSchema: Schema = new Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
+  username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: Object.values(UserRole), default: UserRole.User, required: true },
 }, { timestamps: true });

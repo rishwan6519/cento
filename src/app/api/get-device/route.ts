@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
-import {DeviceType} from '@/models/DeviceTypes'; // Ensure model is registered for populate
+
 
 export async function GET(req: NextRequest) {
   try {
