@@ -823,11 +823,7 @@ const [isUploading, setIsUploading] = useState(false);
           {/* Replace the existing showPlaylists section with this code */}
 
           {activeSection === "showPlaylists" && (
-            <PlaylistManager
-              activeSection="showPlaylist"
-              mediaFiles={mediaFiles}
-              generateUniqueId={generateUniqueId}
-            />
+            <PlaylistManager/>
           )}
         </div>
       </div>

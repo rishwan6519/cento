@@ -37,8 +37,13 @@ export default function LoginPage() {
       // Save JWT token (you might want to use httpOnly cookies in production)
       if (data.token) {
         localStorage.setItem("token", data.token);
+        localStorage.setItem("userId", data.user.id); // Save user ID for later use
+        localStorage.setItem("userRole", data.user.role); // Save user role for later use
         toast.success("Login successful!");
-        router.push("/dashboard");
+        if (data.user.role === "admin") {
+          router.push("/admin"); // Redirect to admin page
+        }
+        router.push("/platform"); // Redirect to the platform page
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Login failed";

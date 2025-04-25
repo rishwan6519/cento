@@ -127,6 +127,7 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+
     const updatedConfig = await PlaylistConfig.findByIdAndUpdate(
       configData.id,
       {

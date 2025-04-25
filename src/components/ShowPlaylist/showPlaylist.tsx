@@ -3,13 +3,18 @@ import React, { useState, useEffect } from "react";
 import { Trash2, Edit, XCircle, ImageIcon, Music, Video } from "lucide-react";
 import toast from "react-hot-toast";
 
+// Mock functions and data for standalone functionality
+const generateUniqueId = () => Math.random().toString(36).substring(2, 15);
+const defaultActiveSection = "showPlaylist";
+
+// Interfaces for types
 interface PlaylistFile {
   id: string;
   name: string;
   type: string;
-  url: string;
+  path: string;
   file?: File;
-  dispalayOrder?: number;
+  displayOrder?: number;
   delay?: number;
   backgroundImageEnabled?: boolean;
   backgroundImage?: string | null;
@@ -40,48 +45,31 @@ interface EditablePlaylist {
   };
 }
 
-interface PlaylistManagerProps {
-  activeSection: string;
-  mediaFiles: any[];
-  generateUniqueId: () => string;
-}
-
-const PlaylistManager: React.FC<PlaylistManagerProps> = ({
-  activeSection,
-  mediaFiles = [], // Provide default empty array
-  generateUniqueId,
-}) => {
+const PlaylistManager: React.FC = () => {
   const [isLoadingPlaylists, setIsLoadingPlaylists] = useState<boolean>(true);
   const [isLoadingMedia, setIsLoadingMedia] = useState<boolean>(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(
-    null
-  );
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [editedPlaylist, setEditedPlaylist] = useState<EditablePlaylist | null>(
-    null
-  );
+  const [editedPlaylist, setEditedPlaylist] = useState<EditablePlaylist | null>(null);
   const [availableMediaFiles, setAvailableMediaFiles] = useState<any[]>([]);
   const [localMediaFiles, setLocalMediaFiles] = useState<any[]>([]);
 
   useEffect(() => {
-    if (activeSection === "showPlaylist") {
+    if (defaultActiveSection === "showPlaylist") {
       fetchPlaylists();
-      if (mediaFiles.length === 0) {
-        fetchMedia(); // Fetch media files if not provided
+      if (localMediaFiles.length === 0) {
+        fetchMedia(); // Fetch media files if not loaded
       }
     }
-  }, [activeSection]); // Remove mediaFiles.length from dependencies
+  }, [defaultActiveSection]);
 
-  // Update local media files when prop changes
   useEffect(() => {
-    console.log("Media files from props:", mediaFiles?.length);
-    if (mediaFiles && mediaFiles.length > 0) {
-      setLocalMediaFiles(mediaFiles);
+    if (localMediaFiles && localMediaFiles.length > 0) {
+      setLocalMediaFiles(localMediaFiles);
     }
-  }, [mediaFiles]);
+  }, [localMediaFiles]);
 
-  // Update available media files when editing
   useEffect(() => {
     if (isEditing && editedPlaylist) {
       if (localMediaFiles.length === 0) {
@@ -95,13 +83,11 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
   const updateAvailableMediaFiles = () => {
     if (!editedPlaylist) return;
 
-    // Filter out files that are already in the playlist
-    const playlistUrls = editedPlaylist.files.map((file) => file.url);
+    const playlistUrls = editedPlaylist.files.map((file) => file.path);
     const available = localMediaFiles.filter(
       (media) => !playlistUrls.includes(media.url)
     );
 
-    console.log("Available media files:", available.length);
     setAvailableMediaFiles(available);
   };
 
@@ -111,9 +97,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
       const response = await fetch("/api/media");
       if (!response.ok) throw new Error("Failed to fetch media files");
       const data = await response.json();
-      console.log("Media API response:", data);
       setLocalMediaFiles(data.media || []);
-      console.log("Media files fetched:", data.media?.length || 0);
       return data.media || [];
     } catch (error) {
       console.error("Error fetching media:", error);
@@ -131,11 +115,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
       const response = await fetch("/api/playlists");
       if (!response.ok) throw new Error("Failed to fetch playlists");
       const data = await response.json();
-      if (!data) {
-        throw new Error("Failed to fetch playlists");
-      }
       setPlaylists(data || []);
-      console.log("Playlists fetched:", data?.length || 0);
     } catch (error) {
       console.error("Error fetching playlists:", error);
       toast.error("Failed to fetch playlists");
@@ -145,8 +125,25 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
     }
   };
 
+  const handleEditClick = (e: React.MouseEvent, playlist: Playlist) => {
+    e.stopPropagation();
+    if (localMediaFiles.length === 0) {
+      toast.loading("Loading media files...");
+      fetchMedia().then(() => {
+        toast.dismiss();
+        setIsEditing(true);
+        initializeEditedPlaylist(playlist);
+      }).catch((error) => {
+        toast.error("Failed to load media files");
+        console.error("Error loading media files:", error);
+      });
+    } else {
+      setIsEditing(true);
+      initializeEditedPlaylist(playlist);
+    }
+  };
   const handleSearch = (term: string) => {
-    // Filter playlists based on search term
+    // Filter playlists based on the search term
     if (!term.trim()) {
       fetchPlaylists(); // Reload all if search is cleared
       return;
@@ -157,28 +154,6 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
         playlist.type.toLowerCase().includes(term.toLowerCase())
     );
     setPlaylists(filtered);
-  };
-
-  const handleEditClick = (e: React.MouseEvent, playlist: Playlist) => {
-    e.stopPropagation();
-
-    // If we don't have media files, fetch them first
-    if (localMediaFiles.length === 0) {
-      toast.loading("Loading media files...");
-      fetchMedia()
-        .then((mediaData) => {
-          toast.dismiss();
-          setIsEditing(true);
-          initializeEditedPlaylist(playlist);
-        })
-        .catch((error) => {
-          toast.error("Failed to load media files");
-          console.error("Error loading media files:", error);
-        });
-    } else {
-      setIsEditing(true);
-      initializeEditedPlaylist(playlist);
-    }
   };
 
   const initializeEditedPlaylist = (playlist: Playlist) => {
@@ -192,8 +167,8 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
         id: file.id || generateUniqueId(),
         name: file.name,
         type: file.type,
-        dispalayOrder: index + 1,
-        url: file.url,
+        displayOrder: index + 1,
+        path: file.path,
         delay: file.delay || 0,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
         backgroundImage: file.backgroundImage || null,
@@ -203,25 +178,19 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
 
   const handleAddFileToPlaylist = (mediaFile: any) => {
     if (!editedPlaylist) return;
-
-    // Create a new file entry
     const newFile = {
       id: generateUniqueId(),
       name: mediaFile.name,
       type: mediaFile.type,
-      url: mediaFile.url,
+      path: mediaFile.url,
       delay: 0,
       backgroundImageEnabled: false,
       backgroundImage: null,
     };
-
-    // Add the file to the playlist
     setEditedPlaylist({
       ...editedPlaylist,
       files: [...editedPlaylist.files, newFile],
     });
-
-    // Remove from available files
     setAvailableMediaFiles(
       availableMediaFiles.filter((m) => m.url !== mediaFile.url)
     );
@@ -229,34 +198,26 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
 
   const handleRemoveFileFromPlaylist = (fileId: string) => {
     if (!editedPlaylist) return;
-
-    // Find the file that's being removed
     const fileToRemove = editedPlaylist.files.find((f) => f.id === fileId);
-
-    // Update the playlist files
     setEditedPlaylist({
       ...editedPlaylist,
       files: editedPlaylist.files.filter((f) => f.id !== fileId),
     });
-
-    // Add the file back to available media files if it exists
     if (fileToRemove) {
       const mediaFileToAdd = localMediaFiles.find(
-        (m) => m.url === fileToRemove.url
+        (m) => m.url === fileToRemove.path
       );
       if (mediaFileToAdd) {
         setAvailableMediaFiles([...availableMediaFiles, mediaFileToAdd]);
       }
     }
   };
+
   const handleEditPlaylist = async (playlist: EditablePlaylist | null) => {
     if (!playlist) return;
     try {
-      // Process files to ensure correct media types
       const processedFiles = playlist.files.map((file, index) => {
         let fileType = file.type;
-
-        // Ensure audio files have audio type
         if (
           file.name.toLowerCase().endsWith(".mp3") ||
           file.name.toLowerCase().endsWith(".wav") ||
@@ -265,8 +226,6 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
         ) {
           fileType = "audio";
         }
-
-        // Ensure video files have video type
         if (
           file.name.toLowerCase().endsWith(".mp4") ||
           file.name.toLowerCase().endsWith(".webm") ||
@@ -275,19 +234,17 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
         ) {
           fileType = "video";
         }
-
         return {
           id: file.id,
           name: file.name,
           type: fileType,
-          url: file.url,
+          url: file.path,
           displayOrder: index + 1,
           delay: file.delay || 0,
           backgroundImageEnabled: file.backgroundImageEnabled || false,
           backgroundImage: file.backgroundImage || null,
         };
       });
-
       const response = await fetch(`api/playlists/id?id=${playlist.id}`, {
         method: "PUT",
         headers: {
@@ -299,30 +256,25 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
           startTime: playlist.startTime,
           endTime: playlist.endTime,
           files: processedFiles,
-          backgroundAudio: playlist.backgroundAudio,
         }),
       });
       if (!response.ok) {
         throw new Error("Failed to update playlist");
       }
       toast.success("Playlist updated successfully");
-      fetchPlaylists(); // Refresh the list
+      fetchPlaylists();
     } catch (error) {
       console.error("Error updating playlist:", error);
       toast.error("Failed to update playlist");
     }
   };
 
-  const handleDeletePlaylistWithFiles = async (
-    playlistId: string | undefined
-  ) => {
+  const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => {
     if (!playlistId) {
       toast.error("Invalid playlist ID");
       return;
     }
-    if (
-      !confirm("Are you sure you want to delete this playlist and its files?")
-    ) {
+    if (!confirm("Are you sure you want to delete this playlist and its files?")) {
       return;
     }
     try {
@@ -334,9 +286,6 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
         },
       });
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to delete playlist");
-      }
       if (data.success) {
         toast.success("Playlist deleted successfully");
         fetchPlaylists();
@@ -349,7 +298,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
     }
   };
 
-  if (activeSection !== "showPlaylist") {
+  if (defaultActiveSection !== "showPlaylist") {
     return null;
   }
 
@@ -370,14 +319,12 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
           </div>
         )}
       </div>
-
       {isLoadingPlaylists ? (
         <div className="flex justify-center items-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
         </div>
       ) : isEditing && editedPlaylist ? (
         <div className="space-y-6">
-          {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium mb-2">
@@ -395,7 +342,6 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                 className="w-full px-3 py-2 border rounded-lg"
               />
             </div>
-            {/* Time Settings */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -431,11 +377,9 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
               </div>
             </div>
           </div>
-
-          {/* Available Media Files Section */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Available Media Files ({availableMediaFiles.length})
+              Available Media Files ({availableMediaFiles.length || 0})
             </label>
             {isLoadingMedia ? (
               <div className="flex justify-center items-center py-4">
@@ -451,50 +395,28 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {availableMediaFiles
-                  .filter(
-                    (media) =>
-                      media.type.includes("audio") ||
-                      media.type.includes("video")
-                  )
+                  .filter((media) => media.type.includes("audio") || media.type.includes("video"))
                   .map((media) => (
                     <div
-                      key={media.id || `media-${generateUniqueId()}`} // Add fallback unique ID
+                      key={media.id || `media-${generateUniqueId()}`}
                       className="border rounded-lg p-3 transition-all hover:border-blue-500 hover:bg-blue-50"
                     >
                       <div className="flex items-center gap-3">
-                        {media.type.includes("video") && (
-                          <Video size={20} className="text-blue-500" />
-                        )}
-                        {media.type.includes("audio") && (
-                          <Music size={20} className="text-purple-500" />
-                        )}
-                        {media.type.includes("image") && (
-                          <ImageIcon size={20} className="text-green-500" />
-                        )}
+                        {media.type.includes("video") && <Video size={20} className="text-blue-500" />}
+                        {media.type.includes("audio") && <Music size={20} className="text-purple-500" />}
+                        {media.type.includes("image") && <ImageIcon size={20} className="text-green-500" />}
                         <div className="flex-1">
                           <span className="text-sm font-medium">
                             {media.name}
                           </span>
                           {media.type.includes("audio") && (
-                            <audio
-                              src={media.url}
-                              controls
-                              className="w-full mt-2"
-                            />
+                            <audio src={media?.url} controls className="w-full mt-2" />
                           )}
                           {media.type.includes("video") && (
-                            <video
-                              src={media.url}
-                              controls
-                              className="w-full mt-2"
-                            />
+                            <video src={media?.url} controls className="w-full mt-2" />
                           )}
                           {media.type.includes("image") && (
-                            <img
-                              src={media.url}
-                              alt={media.name}
-                              className="w-full h-24 object-cover mt-2 rounded"
-                            />
+                            <img src={media.url} alt={media.name} className="w-full h-24 object-cover mt-2 rounded" />
                           )}
                         </div>
                         <button
@@ -509,8 +431,6 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
               </div>
             )}
           </div>
-
-          {/* Selected Files Order */}
           {editedPlaylist.files.length > 0 && (
             <div>
               <label className="block text-sm font-medium mb-2">
@@ -519,21 +439,15 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
               <div className="space-y-2">
                 {editedPlaylist.files.map((file, index) => (
                   <div
-                    key={file.id || `file-${index}`} // Use index as fallback
+                    key={file.id || `file-${index}`}
                     className="flex flex-col p-3 bg-gray-50 rounded-lg"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-500">{index + 1}</span>
                       <div className="flex items-center gap-2 flex-1">
-                        {file.type.includes("image") && (
-                          <ImageIcon size={16} className="text-green-500" />
-                        )}
-                        {file.type.includes("video") && (
-                          <Video size={16} className="text-blue-500" />
-                        )}
-                        {file.type.includes("audio") && (
-                          <Music size={16} className="text-purple-500" />
-                        )}
+                        {file.type.includes("image") && <ImageIcon size={16} className="text-green-500" />}
+                        {file.type.includes("video") && <Video size={16} className="text-blue-500" />}
+                        {file.type.includes("audio") && <Music size={16} className="text-purple-500" />}
                         <span className="text-sm">{file.name}</span>
                       </div>
                       <button
@@ -543,29 +457,17 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                         <Trash2 size={16} />
                       </button>
                     </div>
-
-                    {/* Preview the media */}
                     <div className="mt-2">
                       {file.type.includes("image") && (
-                        <img
-                          src={file.url}
-                          alt={file.name}
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
+                        <img src={file.path} alt={file.name} className="w-full h-32 object-cover rounded-lg" />
                       )}
                       {file.type.includes("video") && (
-                        <video
-                          src={file.url}
-                          controls
-                          className="w-full rounded-lg"
-                        />
+                        <video src={file.path} controls className="w-full rounded-lg" />
                       )}
                       {file.type.includes("audio") && (
-                        <audio src={file.url} controls className="w-full" />
+                        <audio src={file.path} controls className="w-full" />
                       )}
                     </div>
-
-                    {/* Audio-specific settings */}
                     {file.type.includes("audio") && (
                       <div className="mt-3 pl-8 space-y-3">
                         <div className="flex items-center gap-2">
@@ -577,9 +479,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                               updatedFiles[index] = {
                                 ...file,
                                 backgroundImageEnabled: e.target.checked,
-                                backgroundImage: e.target.checked
-                                  ? file.backgroundImage
-                                  : null,
+                                backgroundImage: e.target.checked ? file.backgroundImage : null,
                               };
                               setEditedPlaylist({
                                 ...editedPlaylist,
@@ -596,21 +496,12 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                           <div className="space-y-2">
                             {file.backgroundImage ? (
                               <div className="relative inline-block">
-                                <img
-                                  src={file.backgroundImage}
-                                  alt="Background"
-                                  className="w-32 h-32 object-cover rounded-lg"
-                                />
+                                <img src={file.backgroundImage} alt="Background" className="w-32 h-32 object-cover rounded-lg" />
                                 <button
                                   onClick={() => {
                                     if (!editedPlaylist) return;
-                                    const updatedFiles = [
-                                      ...editedPlaylist.files,
-                                    ];
-                                    updatedFiles[index] = {
-                                      ...file,
-                                      backgroundImage: null,
-                                    };
+                                    const updatedFiles = [...editedPlaylist.files];
+                                    updatedFiles[index] = { ...file, backgroundImage: null };
                                     setEditedPlaylist({
                                       ...editedPlaylist,
                                       files: updatedFiles,
@@ -626,17 +517,10 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                                 <select
                                   onChange={(e) => {
                                     if (!editedPlaylist) return;
-                                    const selectedImage = localMediaFiles.find(
-                                      (m) => m.url === e.target.value
-                                    );
+                                    const selectedImage = localMediaFiles.find(m => m.url === e.target.value);
                                     if (selectedImage) {
-                                      const updatedFiles = [
-                                        ...editedPlaylist.files,
-                                      ];
-                                      updatedFiles[index] = {
-                                        ...file,
-                                        backgroundImage: selectedImage.url,
-                                      };
+                                      const updatedFiles = [...editedPlaylist.files];
+                                      updatedFiles[index] = { ...file, backgroundImage: selectedImage.url };
                                       setEditedPlaylist({
                                         ...editedPlaylist,
                                         files: updatedFiles,
@@ -645,25 +529,19 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                                   }}
                                   className="w-full px-3 py-2 border rounded-lg text-sm"
                                 >
-                                  <option value="">
-                                    Select background image
-                                  </option>
-                                  {localMediaFiles
-                                    .filter((m) => m.type.includes("image"))
-                                    .map((image) => (
-                                      <option
-                                        key={image.id || `option-${image.url}`} // Add fallback key
-                                        value={image.url}
-                                      >
-                                        {image.name}
-                                      </option>
-                                    ))}
+                                  <option value="">Select background image</option>
+                                  {localMediaFiles.filter(m => m.type.includes("image")).map((image) => (
+                                    <option key={image.id || `option-${image.url}`} // Add fallback key
+                                      value={image.url}
+                                    >
+                                      {image.name}
+                                    </option>
+                                  ))}
                                 </select>
                               </div>
                             )}
                           </div>
                         )}
-                        {/* Delay setting */}
                         <div className="flex items-center gap-2">
                           <label className="text-sm">Delay (seconds):</label>
                           <input
@@ -691,8 +569,6 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
               </div>
             </div>
           )}
-
-          {/* Action Buttons */}
           <div className="flex justify-end gap-4 pt-6 border-t">
             <button
               onClick={() => {
@@ -719,7 +595,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
         <div className="grid grid-cols-1 gap-4">
           {playlists.map((playlist) => (
             <div
-              key={playlist._id || `playlist-${generateUniqueId()}`} // Add fallback unique ID
+              key={playlist._id || `playlist-${generateUniqueId()}`}
               className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
                 selectedPlaylist?._id === playlist._id
                   ? "ring-2 ring-blue-500"
@@ -763,15 +639,13 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                   </button>
                 </div>
               </div>
-
-              {/* Expanded View */}
               {selectedPlaylist?._id === playlist._id && (
                 <div className="mt-4 border-t pt-4">
                   <h4 className="font-medium mb-3">Playlist Details</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {playlist.files?.map((file: any, index: number) => (
                       <div
-                        key={file.id || `playlist-file-${index}`} // Use file.id or index as fallback
+                        key={file.id || `playlist-file-${index}`}
                         className="bg-gray-50 rounded-lg p-4"
                       >
                         <div className="flex items-center gap-2 mb-2">
@@ -784,9 +658,7 @@ const PlaylistManager: React.FC<PlaylistManagerProps> = ({
                           {file.type.includes("audio") && (
                             <Music size={16} className="text-purple-500" />
                           )}
-                          <span className="font-medium text-sm">
-                            {file.name}
-                          </span>
+                          <span className="font-medium text-sm">{file.name}</span>
                         </div>
                         {file.url && (
                           <div className="mt-2">
