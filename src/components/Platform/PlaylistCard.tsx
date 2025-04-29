@@ -41,15 +41,15 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
                 <p className="text-xs font-medium text-gray-500 px-3 py-1.5">
                   Connect to device
                 </p>
-                {devices.filter((d) => !playlist.deviceIds.includes(d.id))
+                {devices.filter((d) => !playlist.deviceIds.includes(d._id))
                   .length > 0 ? (
                   devices
-                    .filter((d) => !playlist.deviceIds.includes(d.id))
+                    .filter((d) => !playlist.deviceIds.includes(d._id))
                     .map((device) => (
                       <button
-                        key={device.id}
+                        key={device._id}
                         onClick={() => {
-                          onConnect(playlist.id, device.id);
+                          onConnect(playlist.id, device._id);
                           setShowDeviceDropdown(false);
                         }}
                         className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded flex items-center"
@@ -83,7 +83,7 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
         <div className="flex flex-wrap gap-1 mt-1">
           {playlist.deviceIds.length > 0 ? (
             playlist.deviceIds.map((id) => {
-              const connectedDevice = devices.find((d) => d.id === id);
+              const connectedDevice = devices.find((d) => d._id === id);
               return (
                 <span
                   key={id}

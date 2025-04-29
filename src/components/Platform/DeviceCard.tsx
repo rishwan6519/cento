@@ -24,7 +24,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       <div className="flex items-start space-x-4">
         <div className="relative w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
           <Image
-            src={device.image}
+            src={device.imageUrl}
             alt={device.name}
             width={64}
             height={64}
@@ -40,7 +40,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
             <div>
               <p className="text-gray-500">Type</p>
-              <p className="text-gray-800 font-medium">{device.type}</p>
+              <p className="text-gray-800 font-medium">{device?.typeId?.name}</p>
             </div>
             <div>
               <p className="text-gray-500">Color</p>

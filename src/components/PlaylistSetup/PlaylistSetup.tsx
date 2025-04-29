@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { XCircle } from "lucide-react";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import PlaylistManager from "../ShowPlaylist/showPlaylist";
 
 interface PlaylistConfigFile {
   path: string;
@@ -26,20 +28,63 @@ interface PlaylistConfiguration {
   files: PlaylistConfigFile[];
 }
 
-interface PlaylistSetupProps {
-  activeSection: string;
-  mediaFiles: any[];
-  onSaveSuccess: () => void;
-  onCancel: () => void;
-}
+// Create a ShowPlaylist component
+const ShowPlaylist: React.FC<{
+  playlistName: string;
+  contentType: string;
+  onCreateNew: () => void;
+}> = ({ playlistName, contentType, onCreateNew }) => {
+  const router = useRouter();
+  const [showPlaylistManager, setShowPlaylistManager] = useState(false);
 
-const PlaylistSetup: React.FC<PlaylistSetupProps> = ({
-  activeSection,
-  mediaFiles,
-  onSaveSuccess,
-  onCancel,
-}) => {
+  const handleViewList = () => {
+    setShowPlaylistManager(true);
+  };
+  
+  if (showPlaylistManager) {
+    return <PlaylistManager />;
+  }
+  
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 text-black text-center">
+      <div className="mb-6">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800">Success!</h2>
+        <p className="text-gray-600 mt-2">
+          {contentType === "announcement" ? "Announcement" : "Playlist"} "{playlistName}" has been saved successfully.
+        </p>
+      </div>
+      <div className="flex justify-center gap-4">
+        <button
+          onClick={handleViewList}
+          className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-medium"
+        >
+          View All {contentType === "announcement" ? "Announcements" : "Playlists"}
+        </button>
+        <button
+          onClick={onCreateNew}
+          className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+        >
+          Create Another {contentType === "announcement" ? "Announcement" : "Playlist"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const PlaylistSetup: React.FC = () => {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [mediaFiles, setMediaFiles] = useState<any[]>([]);
+  const [isSaved, setIsSaved] = useState(false);
+  const [savedPlaylistName, setSavedPlaylistName] = useState("");
+  const [savedContentType, setSavedContentType] = useState<"playlist" | "announcement">("playlist");
+  const [isVisible, setIsVisible] = useState(true);
+  const [showPlaylist, setShowPlaylist] = useState(false);
   const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
     id: "",
     name: "",
@@ -51,9 +96,47 @@ const PlaylistSetup: React.FC<PlaylistSetupProps> = ({
     files: [] as PlaylistConfigFile[],
   });
 
-  // Skip rendering if activeSection is not "playlistSetup"
-  if (activeSection !== "playlistSetup") {
+  // Fetch media files on component mount
+  useEffect(() => {
+    const fetchMediaFiles = async () => {
+      try {
+        const response = await fetch("/api/media");
+        if (!response.ok) {
+          throw new Error("Failed to fetch media files");
+        }
+        const data = await response.json();
+        setMediaFiles(data.media || []);
+      } catch (error) {
+        console.error("Error fetching media files:", error);
+        toast.error("Failed to load media files");
+        setMediaFiles([]);
+      }
+    };
+
+    fetchMediaFiles();
+  }, []);
+
+  // Skip rendering if component is not visible
+  if (!isVisible) {
     return null;
+  }
+
+  // Show the playlist manager if showPlaylist is true
+  if (showPlaylist) {
+    return <PlaylistManager />;
+  }
+
+  if (isSaved) {
+    return (
+      <ShowPlaylist 
+        playlistName={savedPlaylistName}
+        contentType={savedContentType}
+        onCreateNew={() => {
+          setIsSaved(false);
+          setSavedPlaylistName("");
+        }}
+      />
+    );
   }
 
   const handleSavePlaylistConfig = async () => {
@@ -102,7 +185,12 @@ const PlaylistSetup: React.FC<PlaylistSetupProps> = ({
         } saved successfully`
       );
 
-      onSaveSuccess();
+      // Store the saved playlist info for the success screen
+      setSavedPlaylistName(playlistConfig.name);
+      setSavedContentType(playlistConfig.contentType);
+      
+      // Show the success component
+      setIsSaved(true);
     } catch (error) {
       console.error("Error saving playlist:", error);
       toast.error(
@@ -111,6 +199,23 @@ const PlaylistSetup: React.FC<PlaylistSetupProps> = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    // Reset form
+    setPlaylistConfig({
+      id: "",
+      name: "",
+      type: "mixed",
+      contentType: "playlist",
+      serialNumber: "",
+      startTime: "00:00:00",
+      endTime: "00:10:00",
+      files: [],
+    });
+    
+    // Hide the component
+    setIsVisible(false);
   };
 
   const openBgImageSelector = (audioPath: string) => {
@@ -524,7 +629,7 @@ const PlaylistSetup: React.FC<PlaylistSetupProps> = ({
         {/* Action buttons */}
         <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
           <button
-            onClick={onCancel}
+            onClick={handleCancel}
             className="px-4 md:px-6 py-2 text-sm text-gray-600 hover:text-gray-900"
           >
             Cancel

@@ -3,14 +3,17 @@ import { ReactElement } from "react";
 
 export type DeviceStatus = "Connected" | "Disconnected" | "Offline";
 export type ButtonVariant = "primary" | "secondary" | "success" | "danger";
-export type MenuKey = "dashboard" | "createMedia" | "setupPlaylist" | "connectPlaylist" | "onboardDevice" | "connectedPlaylists";
+export type MenuKey = "dashboard" | "createMedia" | "setupPlaylist" | "connectPlaylist" | "onboardDevice" | "connectedPlaylists"|"show Playlist";
 
 export interface Device {
-  id: number;
+  _id: number;
   name: string;
-  type: string;
+  typeId: {
+    name: string;
+    
+  };
   color: string;
-  image: string;
+  imageUrl: string;
   status: DeviceStatus;
   lastActive: string;
   batteryLevel: string;

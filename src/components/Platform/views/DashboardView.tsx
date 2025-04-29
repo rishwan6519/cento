@@ -79,7 +79,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         {devices.length > 0 ? (
           devices.map((device) => (
             <DeviceCard
-              key={device.id}
+              key={device._id}
               device={device}
               onEdit={onEditDevice}
               onManagePlaylists={onManagePlaylists}

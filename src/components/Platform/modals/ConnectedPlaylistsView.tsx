@@ -28,7 +28,7 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
 }) => {
   // Filter playlists for the selected device if one is selected
   const filteredPlaylists = selectedDevice
-    ? playlists.filter((p) => p.deviceIds.includes(selectedDevice.id))
+    ? playlists.filter((p) => p.deviceIds.includes(selectedDevice._id))
     : playlists;
     
   return (
@@ -84,7 +84,7 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
               <Image
-                src={selectedDevice.image}
+                src={selectedDevice.imageUrl}
                 alt={selectedDevice.name}
                 width={48}
                 height={48}
@@ -99,7 +99,7 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
                 <StatusBadge status={selectedDevice.status} />
               </div>
               <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                <span>{selectedDevice.type}</span>
+                <span>{selectedDevice.typeId.name}</span>
                 <span>•</span>
                 <span>{selectedDevice.batteryLevel} battery</span>
                 <span>•</span>

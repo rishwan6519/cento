@@ -809,13 +809,7 @@ const [isUploading, setIsUploading] = useState(false);
 
           {activeSection === "playlistSetup" && (
             <PlaylistSetup
-              activeSection={activeSection}
-              mediaFiles={mediaFiles}
-              onSaveSuccess={() => {
-                setActiveSection("showPlaylists");
-                fetchPlaylists();
-              }}
-              onCancel={() => setActiveSection("")}
+             
             />
           )}
 

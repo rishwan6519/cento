@@ -16,6 +16,7 @@ const playlistConfigSchema = new mongoose.Schema({
   type: { type: String, required: true },
   contentType: { type: String,required:true }, // Add this line
   startTime: { type: String, required: true },
+  // userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   endTime: { type: String, required: true },
   files: [playlistFileSchema],
   

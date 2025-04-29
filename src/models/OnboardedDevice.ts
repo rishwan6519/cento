@@ -1,32 +1,19 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
-// Define the interface for a Device document
-export interface DeviceDocument extends Document {
-  name: string;
-  serialNumber: string;
-  status: string;
-  type?: {
-    name?: string;
-  };
-  imageUrl?: string;
-  color?: string;
-  userId: mongoose.Types.ObjectId; // Assume userId is a MongoDB ObjectId
+export interface OnboardedDeviceDocument extends Document {
+  deviceId: mongoose.Schema.Types.ObjectId;
+  typeId: mongoose.Schema.Types.ObjectId;
+  userId: mongoose.Schema.Types.ObjectId;
 }
 
-// Define the schema
-const DeviceSchema: Schema = new Schema({
-  name: { type: String, required: true },
-  serialNumber: { type: String, required: true, unique: true },
-  status: { type: String, required: true },
-  type: {
-    name: { type: String },
-  },
-  imageUrl: { type: String },
-  color: { type: String },
-  userId: { type: mongoose.Types.ObjectId, ref: 'User', required: true },
+const OnboardedDeviceSchema: Schema = new Schema({
+  deviceId: { type: mongoose.Schema.Types.ObjectId, ref: "Device", required: true },
+  typeId: { type: mongoose.Schema.Types.ObjectId, ref: "DeviceType", required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 }, { timestamps: true });
 
-// Create the model
-const Device = mongoose.model<DeviceDocument>('OnboardedDevice', DeviceSchema);
+const OnboardedDevice =
+  mongoose.models.OnboardedDevice ||
+  mongoose.model<OnboardedDeviceDocument>("OnboardedDevice", OnboardedDeviceSchema);
 
-export default Device;
+export default OnboardedDevice;

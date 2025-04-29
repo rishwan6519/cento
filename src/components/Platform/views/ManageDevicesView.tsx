@@ -74,12 +74,12 @@ const ManageDevicesView: React.FC<ManageDevicesViewProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {devices.map((device) => (
-                <tr key={device.id} className="hover:bg-gray-50 transition">
+                <tr key={device._id} className="hover:bg-gray-50 transition">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <Image
-                          src={device.image}
+                          src={device.imageUrl}
                           alt={device.name}
                           width={40}
                           height={40}
@@ -97,7 +97,7 @@ const ManageDevicesView: React.FC<ManageDevicesViewProps> = ({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    {device.type}
+                    {device.typeId.name}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={device.status} />
