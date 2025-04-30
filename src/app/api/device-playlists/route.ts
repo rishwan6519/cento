@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {connectToDatabase} from '@/lib/db';
 import DevicePlaylist from '@/models/ConectPlaylist';
+import "@/models/PlaylistConfig"
+import "@/models/Device";
+import "@/models/User"
+
+
+
+
 
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
 
     const body = await req.json();
-    const { deviceId, playlistIds } = body;
+    const { deviceId, playlistIds,userId } = body;
 
     if (!deviceId || !playlistIds || playlistIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -31,6 +38,7 @@ export async function POST(req: NextRequest) {
       const newDevicePlaylist = await DevicePlaylist.create({
         deviceId,
         playlistIds,
+        userId,
         updatedAt: new Date()
       });
 
@@ -42,33 +50,34 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// export async function GET(
-//   request: Request,
-//   { params }: { params: { deviceId: string } }
-// )  {
-//   try {
-//     await connectToDatabase();
+export async function GET(
+  req: NextRequest,
+  
+)  {
+  try {
+    await connectToDatabase();
     
-//     const url = new URL(req.url);
-//     const deviceId = url.searchParams.get('deviceId');
+    const url = new URL(req.url);
+    const userId = url.searchParams.get('userId');
+    console.log(userId, "userId..............................................")
 
-//     if (!deviceId) {
-//       return NextResponse.json({ error: 'Device ID is required' }, { status: 400 });
-//     }
+    if (!userId) {
+      return NextResponse.json({ error: 'Device ID is required' }, { status: 400 });
+    }
 
-//     const devicePlaylist = await DevicePlaylist.findOne({ deviceId })
-//       .populate('playlistIds');
+    const devicePlaylist = await DevicePlaylist.findOne({ userId: userId }).populate("playlistIds").populate("userId").select("-__v -createdAt -updatedAt");
+      console.log(devicePlaylist, "devicePlaylist..............................................")
 
-//     if (!devicePlaylist) {
-//       return NextResponse.json({ playlists: [] });
-//     }
+    if (!devicePlaylist) {
+      return NextResponse.json({ playlists: [] });
+    }
 
-//     return NextResponse.json(devicePlaylist);
-//   } catch (error) {
-//     console.error('Error fetching device playlists:', error);
-//     return NextResponse.json({ error: 'Failed to fetch device playlists' }, { status: 500 });
-//   }
-// }
+    return NextResponse.json(devicePlaylist);
+  } catch (error) {
+    console.error('Error fetching device playlists:', error);
+    return NextResponse.json({ error: 'Failed to fetch device playlists' }, { status: 500 });
+  }
+}
 
 export async function DELETE(req: NextRequest) {
   try {

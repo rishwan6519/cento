@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import OnboardedDevice  from "@/models/OnboardedDevice";
 import Device from "@/models/Device"; // Import the Device model
-import { DeviceType } from "@/models/DeviceTypes"; // Import DeviceType model
-import User from "@/models/User"; // Import the User model
+import "@/models/DeviceTypes";
+import "@/models/User";
+
 
 
 import { connectToDatabase } from "@/lib/db";
@@ -68,16 +69,19 @@ export async function GET(req: NextRequest) {
     const url = req.nextUrl;
     const userId = url.searchParams.get("userId");
     const serialNumber = url.searchParams.get("serialNumber");
-console.log(userId,"userId.............")
-    // If serialNumber is provided
+
+    // If searching by serialNumber
     if (serialNumber) {
       const device = await OnboardedDevice.findOne({})
         .populate({
           path: "deviceId",
-          match: { serialNumber: serialNumber },
+          match: { serialNumber }, // Filters devices by serialNumber
+          select: "serialNumber name status imageUrl",
         })
-        .populate("typeId");
+        .populate("typeId", "name")
+        .populate("userId", "username "); // Optional fields to populate from User
 
+      // `deviceId` could be null if the match failed
       if (!device || !device.deviceId) {
         return NextResponse.json(
           { success: false, message: "Device not found" },
@@ -88,19 +92,23 @@ console.log(userId,"userId.............")
       return NextResponse.json({ success: true, data: device }, { status: 200 });
     }
 
-    // If userId is provided
+    // If searching by userId
     if (userId) {
-      const devices = await OnboardedDevice.find({ userId: userId })
-      .populate("deviceId")  // Populating deviceId // Populating typeId and only returning the 'name' field // If you want to populate userId, you can specify the fields (e.g., "name")
-      .exec();
-    
+      const devices = await OnboardedDevice.find({
+        userId: new mongoose.Types.ObjectId(userId),
+      })
+        .populate("deviceId", "serialNumber name status imageUrl")
+        .populate("typeId", "name")
+        .populate("userId", "name email");
+
       return NextResponse.json({ success: true, data: devices }, { status: 200 });
     }
 
-    // Return all devices (populated)
+    // Otherwise, return all onboarded devices
     const allDevices = await OnboardedDevice.find({})
-      .populate("deviceId", "name serialNumber status imageUrl")
-      .populate("typeId", "name");
+      .populate("deviceId", "serialNumber name status imageUrl")
+      .populate("typeId", "name")
+      .populate("userId", "name email");
 
     return NextResponse.json({ success: true, data: allDevices }, { status: 200 });
 
@@ -112,3 +120,4 @@ console.log(userId,"userId.............")
     );
   }
 }
+

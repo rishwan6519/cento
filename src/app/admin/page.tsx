@@ -784,7 +784,6 @@ const [isUploading, setIsUploading] = useState(false);
 
           {activeSection === "connectPlaylist" && (
             <ConnectPlaylist
-              activeSection={activeSection}
               onCancel={() => setActiveSection("")}
               onSuccess={() => setActiveSection("")}
             />
@@ -792,7 +791,7 @@ const [isUploading, setIsUploading] = useState(false);
 
           {activeSection === "generatePlaylist" && (
             <CreateMedia
-              activeSection={activeSection}
+
               onCancel={() => setActiveSection("")}
               onSuccess={() => {
                 setActiveSection("");
@@ -802,7 +801,6 @@ const [isUploading, setIsUploading] = useState(false);
           )}
           {activeSection === "showMedia" && (
             <ShowMedia
-              activeSection={activeSection}
               onCancel={() => setActiveSection("")}
             />
           )}

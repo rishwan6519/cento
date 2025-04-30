@@ -4,13 +4,24 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { connectToDatabase } from '@/lib/db';
 import MediaItemModel from '@/models/MediaItems';
+import mongoose from 'mongoose';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    console.log("Fetching media list from MongoDB...");
-    await connectToDatabase(); // Ensure DB connection
+    const userId = req.nextUrl.searchParams.get('userId');
 
-    const media = await MediaItemModel.find().sort({ createdAt: -1 });
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json(
+        { error: 'Invalid or missing userId' },
+        { status: 400 }
+      );
+    }
+
+    await connectToDatabase();
+
+    const media = await MediaItemModel.find({ userId: new mongoose.Types.ObjectId(userId) })
+      .sort({ createdAt: -1 });
+      console.log( "Media items fetched successfully:", media);
 
     return NextResponse.json({ media });
   } catch (error) {

@@ -1,17 +1,34 @@
 import React from "react";
-import  Button from "./Button";
-import  Card from "./Card";
-import  {StatusBadge} from "../Platform/StatusBadge";
-
-import { Device } from "../Platform/types";
+import Button from "./Button";
+import Card from "./Card";
+import { StatusBadge } from "../Platform/StatusBadge";
 import Image from "next/image";
 import { BsMusicNoteList } from "react-icons/bs";
 import { IoMdSettings } from "react-icons/io";
 
 interface DeviceCardProps {
-  device: Device;
-  onEdit: (device: Device) => void;
-  onManagePlaylists?: (device: Device) => void;
+  device: {
+    _id: string;
+    deviceId: {
+      _id: string;
+      name: string;
+      serialNumber: string;
+      imageUrl: string;
+      status: string;
+    };
+    typeId: {
+      _id: string;
+      name: string;
+    };
+    userId: {
+      _id: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+    __v: number;
+  };
+  onEdit: (device: any) => void;
+  onManagePlaylists?: (device: any) => void;
 }
 
 const DeviceCard: React.FC<DeviceCardProps> = ({
@@ -19,13 +36,15 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   onEdit,
   onManagePlaylists,
 }) => {
+  const { deviceId, typeId } = device;
+
   return (
     <Card className="flex flex-col h-full">
       <div className="flex items-start space-x-4">
         <div className="relative w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
           <Image
-            src={device.imageUrl}
-            alt={device.name}
+            src={deviceId.imageUrl}
+            alt={deviceId.name}
             width={64}
             height={64}
             className="object-cover"
@@ -34,29 +53,17 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         </div>
         <div className="flex-grow">
           <div className="flex justify-between items-start">
-            <h4 className="font-semibold text-gray-900">{device.name}</h4>
-            <StatusBadge status={device.status} />
+            <h4 className="font-semibold text-gray-900">{deviceId.name}</h4>
+           
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
             <div>
               <p className="text-gray-500">Type</p>
-              <p className="text-gray-800 font-medium">{device?.typeId?.name}</p>
+              <p className="text-gray-800 font-medium">{typeId.name}</p>
             </div>
             <div>
-              <p className="text-gray-500">Color</p>
-              <p className="text-gray-800 font-medium capitalize">
-                {device.color}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-500">Battery</p>
-              <p className="text-gray-800 font-medium">{device.batteryLevel}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Playlists</p>
-              <p className="text-gray-800 font-medium">
-                {device.connectedPlaylists?.length || 0}
-              </p>
+              <p className="text-gray-500">Serial</p>
+              <p className="text-gray-800 font-medium">{deviceId.serialNumber}</p>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const playlistFileSchema = new mongoose.Schema({
   name: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   path: { type: String, required: true },
   type: { type: String, required: true },
   displayOrder: { type: Number, required: true },
@@ -13,6 +14,7 @@ const playlistFileSchema = new mongoose.Schema({
 
 const playlistConfigSchema = new mongoose.Schema({
   name: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   type: { type: String, required: true },
   contentType: { type: String,required:true }, // Add this line
   startTime: { type: String, required: true },

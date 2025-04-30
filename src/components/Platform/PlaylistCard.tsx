@@ -79,17 +79,18 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
         </div>
       </div>
       <div className="mt-auto">
-        <p className="text-xs text-gray-500">Connected to:</p>
+        <p className="text-xs text-gray-500">Connected to:{playlist.deviceIds}</p>
         <div className="flex flex-wrap gap-1 mt-1">
           {playlist.deviceIds.length > 0 ? (
             playlist.deviceIds.map((id) => {
               const connectedDevice = devices.find((d) => d._id === id);
+              console.log("Connected Device:", devices);
               return (
                 <span
                   key={id}
                   className="inline-flex items-center px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs"
                 >
-                  {connectedDevice?.name || `Device ${id}`}
+                  {connectedDevice?.color || `Device ${id}`}
                 </span>
               );
             })

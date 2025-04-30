@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-
 import Button from "@/components/Platform/Button";
 import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
@@ -9,14 +8,10 @@ import ConnectedPlaylistsView from "@/components/Platform/modals/ConnectedPlayli
 import OnboardDeviceModal from "@/components/Platform/modals/OnboardDeviceModal";
 import AddPlaylistModal from "@/components/Platform/modals/AddPlaylistModal";
 import { HiOutlineChevronDown, HiOutlineChevronRight } from "react-icons/hi";
-import { dummyDevices, dummyPlaylists } from "@/components/Platform/DummyData";
-
-
+import { dummyPlaylists } from "@/components/Platform/DummyData";
 import { AnimatePresence, motion } from "framer-motion";
-
 import {
   FaRobot,
-  FaPlus,
   FaRegFileAudio,
   FaListAlt,
   FaPlug,
@@ -36,6 +31,8 @@ import {
 import PlaylistSetup from "@/components/PlaylistSetup/PlaylistSetup";
 import { MdOutlinePlaylistPlay } from "react-icons/md";
 import CreateMedia from "@/components/CreateMedia/createMedia";
+import ShowMedia from "@/components/ShowMedia/showMedia";
+import ConnectPlaylist from "@/components/ConnectPlaylist/connectPlaylist";
 
 export default function RoboticPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
@@ -67,23 +64,24 @@ export default function RoboticPlatform(): React.ReactElement {
 
         const data = await response.json();
         if (data.success) {
-          const devicesArray = Array.isArray(data.data) ? data.data : [data.data];
-          console.log(devicesArray, "devicesArray");
-          setDevices(devicesArray.map(device => ({
-            ...device,
-            batteryLevel: "100%",
-            location: "Not specified",
-            lastActive: new Date(device.updatedAt).toLocaleString(),
-            status: device.status === "active" ? "Connected" : "Disconnected"
-
-          })));
-          
+          const devicesArray = Array.isArray(data.data)
+            ? data.data
+            : [data.data];
+          setDevices(
+            devicesArray.map((device) => ({
+              ...device,
+              batteryLevel: "100%",
+              location: "Not specified",
+              lastActive: new Date(device.updatedAt).toLocaleString(),
+              status: device.status === "active" ? "Connected" : "Disconnected",
+            }))
+          );
         } else {
           throw new Error(data.message || "Failed to fetch devices");
         }
       } catch (err) {
         console.error("Error fetching devices:", err);
-        setError(err.message || "Failed to load devices");
+        setError(err instanceof Error ? err.message : "Failed to load devices");
       } finally {
         setIsLoading(false);
       }
@@ -102,9 +100,10 @@ export default function RoboticPlatform(): React.ReactElement {
   const menuItems = [
     { key: "dashboard", label: "Dashboard", icon: <RiDashboardLine /> },
     { key: "createMedia", label: "Create Media", icon: <FaRegFileAudio /> },
+    { key: "showMedia", label: "Show Media", icon: <FaRegFileAudio /> },
     { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
     {
-      key: "show Playlist",
+      key: "showPlaylist",
       label: "Show Playlist",
       icon: <MdOutlinePlaylistPlay />,
     },
@@ -176,7 +175,7 @@ export default function RoboticPlatform(): React.ReactElement {
       }
     } catch (err) {
       console.error("Error adding device:", err);
-      setError(err.message || "Failed to add device");
+      setError(err instanceof Error ? err.message : "Failed to add device");
     }
   };
 
@@ -205,7 +204,8 @@ export default function RoboticPlatform(): React.ReactElement {
 
   const handleEditDevice = async (device: Device): Promise<void> => {
     try {
-      const newStatus = device.status === "Connected" ? "Disconnected" : "Connected";
+      const newStatus =
+        device.status === "Connected" ? "Disconnected" : "Connected";
       const apiStatus = newStatus === "Connected" ? "active" : "inactive";
 
       const response = await fetch(`/api/onboarded-devices/${device._id}`, {
@@ -238,7 +238,7 @@ export default function RoboticPlatform(): React.ReactElement {
       }
     } catch (err) {
       console.error("Error updating device:", err);
-      setError(err.message || "Failed to update device");
+      setError(err instanceof Error ? err.message : "Failed to update device");
     }
   };
 
@@ -276,10 +276,7 @@ export default function RoboticPlatform(): React.ReactElement {
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Error</h3>
           <p className="text-gray-500 max-w-md mb-6">{error}</p>
-          <Button
-            variant="secondary"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="secondary" onClick={() => window.location.reload()}>
             Try Again
           </Button>
         </Card>
@@ -319,16 +316,29 @@ export default function RoboticPlatform(): React.ReactElement {
             }}
           />
         );
+
       case "setupPlaylist":
         return <PlaylistSetup />;
-      
-      case "show Playlist":
+      case "showPlaylist":
         return <PlaylistManager />;
-
       case "createMedia":
-        return <CreateMedia />;
+        return (
+          <CreateMedia
+            onCancel={() => setSelectedMenu("dashboard")}
+            onSuccess={() => setSelectedMenu("showMedia")}
+          />
+        );
 
+      case "showMedia":
+        return <ShowMedia onCancel={() => setSelectedMenu("onboardDevice")} />;
       case "connectPlaylist":
+        return (
+          <ConnectPlaylist
+            onCancel={() => setSelectedMenu("dashboard")}
+            onSuccess={() => setSelectedMenu("showPlaylist")}
+          />
+        );
+
         return (
           <Card className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
@@ -401,6 +411,7 @@ export default function RoboticPlatform(): React.ReactElement {
           )}
         </button>
       </div>
+
       {/* Sidebar */}
       <aside
         className={`w-full lg:w-64 bg-white shadow-md border-r border-gray-200 lg:block transition-all duration-300 z-20 ${
@@ -652,6 +663,7 @@ export default function RoboticPlatform(): React.ReactElement {
           </div>
         </nav>
       </aside>
+
       {/* Content */}
       <main className="flex-1 p-4 md:p-6 overflow-auto">
         <AnimatePresence mode="wait">
@@ -666,6 +678,7 @@ export default function RoboticPlatform(): React.ReactElement {
           </motion.div>
         </AnimatePresence>
       </main>
+
       {/* Modals */}
       <AnimatePresence>
         {showOnboardModal && (
@@ -680,7 +693,7 @@ export default function RoboticPlatform(): React.ReactElement {
           <AddPlaylistModal
             onClose={() => setShowPlaylistModal(false)}
             onSave={addNewPlaylist}
-          />  
+          />
         )}
       </AnimatePresence>
     </div>

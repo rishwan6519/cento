@@ -3,7 +3,7 @@ import { ReactElement } from "react";
 
 export type DeviceStatus = "Connected" | "Disconnected" | "Offline";
 export type ButtonVariant = "primary" | "secondary" | "success" | "danger";
-export type MenuKey = "dashboard" | "createMedia" | "setupPlaylist" | "connectPlaylist" | "onboardDevice" | "connectedPlaylists"|"show Playlist";
+export type MenuKey = "dashboard" | "createMedia" | "setupPlaylist" | "connectPlaylist" | "onboardDevice" | "connectedPlaylists"|"showPlaylist" |"showMedia";
 
 export interface Device {
   _id: number;
@@ -124,6 +124,8 @@ export interface SidebarProps {
   setIsMobileMenuOpen: (open: boolean) => void;
   toggleMenuExpansion: (menuSection: string) => void;
 }
+
+
 
 export const colors = {
   primary: {

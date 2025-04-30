@@ -4,30 +4,48 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { connectToDatabase } from '@/lib/db';
 import MediaItemModel from '@/models/MediaItems';
+import sanitize from 'sanitize-filename';
+import { v4 as uuidv4 } from 'uuid';
+import mongoose from 'mongoose';
+
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const files = formData.getAll('files') as File[];
     const fileNames = formData.getAll('fileNames') as string[];
+    const userId = formData.get('userId') as string;
+
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'User ID is required' }, { status: 400 });
+    }
+
+    if (!files.length || !fileNames.length || files.length !== fileNames.length) {
+      return NextResponse.json({ success: false, message: 'Invalid or mismatched file data' }, { status: 400 });
+    }
 
     const baseUploadPath = join(process.cwd(), 'public', 'uploads');
     const directories = ['video', 'audio', 'image'];
 
     for (const dir of directories) {
-      const path = join(baseUploadPath, dir);
-      if (!existsSync(path)) {
-        await mkdir(path, { recursive: true });
+      const dirPath = join(baseUploadPath, dir);
+      if (!existsSync(dirPath)) {
+        await mkdir(dirPath, { recursive: true });
       }
     }
 
-    await connectToDatabase(); // Connect to MongoDB
+    await connectToDatabase();
 
     const uploadedFiles = await Promise.all(
       files.map(async (file: File, index) => {
-        const fileName = fileNames[index];
-        const fileType = file.type.split('/')[0];
-        const uniqueFileName = `${Date.now()}-${fileName}`;
+        const originalFileName = sanitize(fileNames[index]);
+        const fileType = file.type?.split('/')?.[0] || 'unknown';
+
+        if (!['audio', 'video', 'image'].includes(fileType)) {
+          throw new Error(`Unsupported file type: ${file.type}`);
+        }
+
+        const uniqueFileName = `${uuidv4()}-${originalFileName}`;
         const filePath = join(baseUploadPath, fileType, uniqueFileName);
 
         const bytes = await file.arrayBuffer();
@@ -35,14 +53,15 @@ export async function POST(req: NextRequest) {
         await writeFile(filePath, buffer);
 
         const mediaItem = new MediaItemModel({
-          name: fileName,
+          userId:new mongoose.Types.ObjectId(userId),
+          name: originalFileName,
           type: file.type,
           url: `/uploads/${fileType}/${uniqueFileName}`,
           createdAt: new Date()
         });
+        console.log("Saving media item to database:", mediaItem);
 
-        await mediaItem.save(); // Save to MongoDB
-
+        await mediaItem.save();
         return mediaItem;
       })
     );

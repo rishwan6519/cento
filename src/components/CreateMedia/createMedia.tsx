@@ -12,13 +12,11 @@ interface SelectedFile {
 }
 
 interface CreateMediaProps {
-  activeSection: string;
   onCancel: () => void;
   onSuccess: () => void;
 }
 
 const CreateMedia: React.FC<CreateMediaProps> = ({
-  activeSection,
   onCancel,
   onSuccess
 }) => {
@@ -26,10 +24,7 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Skip rendering if not the active section
-  if (activeSection !== "generatePlaylist") {
-    return null;
-  }
+ 
 
   const generateUniqueId = () => {
     return Math.random().toString(36).substr(2, 9);
@@ -92,6 +87,12 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
     const loadingToast = toast.loading("Uploading media files...");
     
     try {
+
+      const userId = localStorage.getItem("userId");
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
       const formData = new FormData();
       
       // Add all files to form data
@@ -100,6 +101,7 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
         formData.append("fileNames", file.name);
       });
       
+      formData.append("userId", userId);
       // Make the API call
       const response = await fetch("/api/media/upload", {
         method: "POST",

@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const devicePlaylistSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   deviceId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Device',
@@ -8,7 +13,7 @@ const devicePlaylistSchema = new mongoose.Schema({
   },
   playlistIds: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Playlist'
+    ref: 'PlaylistConfig'
   }],
   createdAt: {
     type: Date,
