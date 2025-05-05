@@ -2,7 +2,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { FaKeyboard, FaArrowRight, FaExclamationTriangle, FaCamera } from "react-icons/fa";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  FaKeyboard, 
+  FaArrowRight, 
+  FaExclamationTriangle, 
+  FaCamera, 
+  FaChevronLeft,
+  FaQrcode 
+} from "react-icons/fa";
 import { RingLoader } from "react-spinners";
 import jsQR from "jsqr";
 
@@ -12,7 +20,9 @@ interface DeviceInfo {
   status: string;
   type?: {
     name?: string;
+    id?: string;
   };
+  id?: string;
   imageUrl?: string;
   color?: string;
 }
@@ -45,7 +55,6 @@ const OnboardingPage: React.FC = () => {
         } catch (err) {
           console.error("Error accessing camera:", err);
 
-          // Check if err is an instance of Error
           const errorMessage =
             err instanceof Error && err.name === "NotAllowedError"
               ? "Camera access was denied or blocked. Please check your permissions."
@@ -124,31 +133,26 @@ const OnboardingPage: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      console.log(`Fetching device data with serial number: ${serialNum}`); // Debug log
       const response = await fetch(`/api/get-device/serialNumber?serialNumber=${serialNum}`);
-      console.log("Response received:", response); // Debug log
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Response error data:", errorData); // Debug log
         throw new Error(errorData.message || "Failed to validate device");
       }
       const data = await response.json();
-      console.log("Device data:", data); // Debug log
+      console.log(data, "Device data from server");
       if (data.success && data.deviceData) {
+        setLoading(false);
         setDeviceInfo(data.deviceData);
         setStep(4);
       } else {
         throw new Error("Invalid device data returned from server");
       }
     } catch (err) {
-      console.error("Error validating device:", err);
       setError(
         err instanceof Error
           ? err.message
           : "Device validation failed. Please check the serial number and try again."
       );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -160,8 +164,47 @@ const OnboardingPage: React.FC = () => {
     validateAndFetchDevice(serialNumber);
   };
 
-  const handleComplete = () => {
-    router.push("/dashboard");
+  const handleComplete = async () => {
+    try {
+      if (!deviceInfo) {
+        setError("Device information is missing");
+        return;
+      }
+
+      // Get userId from localStorage
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        setError("User session not found");
+        return;
+      }
+
+      setLoading(true);
+      const response = await fetch('/api/onboarded-devices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deviceId: deviceInfo.id,
+          typeId: deviceInfo.type?.id,
+          userId: userId
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to save device');
+      }
+
+      // If successful, redirect to dashboard
+      router.push("/dashboard");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to save device');
+      console.error('Error saving device:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const restartScan = () => {

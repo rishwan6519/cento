@@ -1,54 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Device, Playlist } from "../types";
-// If you need to add these interfaces to your types.ts file:
-/*
-interface Device {
-  _id: string | number;
-  name: string;
-  status: string;
-  typeId: { name: string };
-  batteryLevel: string;
-  lastActive: string;
-  imageUrl: string;
-}
-
-interface Playlist {
-  id: number;
-  name: string;
-  type: string;
-  contentType: string;
-  startTime: string;
-  endTime: string;
-  files: Array<{
-    id: string;
-    name: string;
-    path: string;
-    type: string;
-    displayOrder: number;
-    delay: number;
-    backgroundImageEnabled: boolean;
-    backgroundImage: string | null;
-  }>;
-  status: string;
-  createdAt: Date;
-  deviceIds: number[];
-}
-*/
+import { Device, Playlist, DeviceReference } from "../types";
 import Card from "../Card";
 import Button from "../Button";
-import EmptyState from "../EmpthyState"; // Fixed typo in the import name
+import EmptyState from "../EmpthyState"; // Fixed typo
 import PlaylistCard from "../PlaylistCard";
 import Image from "next/image";
 import { BsMusicNoteList } from "react-icons/bs";
-import { StatusBadge } from "../StatusBadge";
 import { MdPlaylistAdd } from "react-icons/md";
 
 interface ConnectedPlaylistsViewProps {
   devices: Device[];
-  playlists?: Playlist[]; // Make playlists optional since we'll fetch them
+  playlists?: Playlist[];
   selectedDevice: Device | null;
   onAddNewPlaylist: () => void;
-  onConnectPlaylist: (playlistId: number, deviceId: number) => void;
+  onConnectPlaylist: (playlistId: string, deviceId: string) => void; // Changed to string IDs
   onBackToDevices: () => void;
 }
 
@@ -61,77 +26,56 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
   onBackToDevices,
 }) => {
   const [playlists, setPlaylists] = useState<Playlist[]>(initialPlaylists || []);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(!initialPlaylists);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch playlist data from API
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        // Get userId from localStorage
         const userId = localStorage.getItem('userId');
-        
-        if (!userId) {
-          throw new Error("User ID not found in local storage");
-        }
+        if (!userId) throw new Error("User ID not found");
         
         const response = await fetch(`/api/device-playlists?userId=${userId}`);
-        
-        if (!response.ok) {
-          throw new Error(`Error fetching playlists: ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Error: ${response.statusText}`);
         
         const data = await response.json();
         
-        // For debugging
-        console.log("API Response:", data);
-        
-        // Check if data has the expected structure
-        if (!data || !data.playlistIds || !Array.isArray(data.playlistIds)) {
-          throw new Error("Invalid response format from API");
-        }
-
-        // Transform API data to match our Playlist type
+        // Transform API data to match Playlist interface
         const formattedPlaylists = data.playlistIds.map((playlist: any) => ({
-          id: parseInt(playlist._id.toString().substring(0, 8), 16) || Math.floor(Math.random() * 1000000), // Convert ObjectId to number or use random ID
+          id: playlist._id,
           name: playlist.name,
-          type: playlist.type,
+          type: playlist.type || 'default',
           contentType: playlist.contentType,
           startTime: playlist.startTime,
           endTime: playlist.endTime,
-          files: Array.isArray(playlist.files) ? playlist.files.map((file: any) => ({
-            id: file._id ? 
-              (typeof file._id === 'string' ? file._id : file._id.toString()) : 
-              file.id,
+          files: playlist.files?.map((file: any) => ({
             name: file.name,
             path: file.path,
             type: file.type,
-            displayOrder: typeof file.displayOrder === 'object' ? 
-              parseInt(file.displayOrder.$numberInt) : 
-              typeof file.displayOrder === 'string' ? 
-                parseInt(file.displayOrder) : file.displayOrder || 0,
-            delay: typeof file.delay === 'object' ? 
-              parseInt(file.delay.$numberInt) : 
-              typeof file.delay === 'string' ? 
-                parseInt(file.delay) : file.delay || 0,
-            backgroundImageEnabled: file.backgroundImageEnabled,
-            backgroundImage: file.backgroundImage || null
-          })) : [],
-          status: playlist.status,
-          createdAt: playlist.createdAt instanceof Date ? 
-            playlist.createdAt : 
-            new Date(playlist.createdAt.$date ? 
-              playlist.createdAt.$date.$numberLong : playlist.createdAt),
-          deviceIds: data.deviceId ? 
-            [typeof data.deviceId === 'string' ? 
-              parseInt(data.deviceId) : 
-              parseInt(data.deviceId.toString().substring(0, 8), 16)] : 
-            [], // Convert deviceId to number
+            displayOrder: Number(file.displayOrder) || 0,
+            delay: Number(file.delay) || 0,
+            backgroundImageEnabled: Boolean(file.backgroundImageEnabled),
+            backgroundImage: file.backgroundImage || null,
+          })) || [],
+          status: playlist.status || 'active',
+          createdAt: new Date(playlist.createdAt),
+          deviceIds: (playlist.deviceIds || []).map((deviceId: string) => {
+            const device = devices.find(d => d._id === deviceId);
+            return {
+              _id: deviceId, // Changed from id to _id
+              name: device?.deviceId?.name || 'Unknown Device',
+              status: device?.status || 'Disconnected',
+              typeId: device?.typeId?.name || '',
+              batteryLevel: device?.batteryLevel || '',
+              lastActive: device?.lastActive || '',
+              imageUrl: device?.deviceId?.imageUrl || ''
+            };
+          })
         }));
-        
+
         setPlaylists(formattedPlaylists);
       } catch (err) {
         console.error("Failed to fetch playlists:", err);
@@ -142,19 +86,15 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
     };
 
     fetchPlaylists();
-  }, []);
+  }, [devices]);
 
-  // Filter playlists for the selected device if one is selected
+  // Update filtering logic to show unconnected playlists for selected device
   const filteredPlaylists = selectedDevice
-    ? playlists.filter((p) => {
-        // Handle both string and number ID types
-        const deviceId = typeof selectedDevice._id === 'string' 
-          ? parseInt(selectedDevice._id) 
-          : selectedDevice._id;
-        return p.deviceIds.includes(deviceId);
-      })
+    ? playlists.filter(playlist => 
+        !playlist.deviceIds.some(device => device.id === selectedDevice._id)
+      )
     : playlists;
-    
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
@@ -206,21 +146,13 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
       {selectedDevice && (
         <Card className="p-4" hoverEffect={false}>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-              <Image
-                src={selectedDevice.imageUrl}
-                alt={selectedDevice.name}
-                width={48}
-                height={48}
-                className="object-cover"
-              />
-            </div>
+           
             <div className="flex-grow">
               <div className="flex items-center gap-2">
                 <h4 className="font-semibold text-gray-900">
                   {selectedDevice.name}
                 </h4>
-                <StatusBadge status={selectedDevice.status} />
+                
               </div>
               <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                 <span>{selectedDevice.typeId.name}</span>
@@ -257,7 +189,7 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
       {/* Playlist grid */}
       {!isLoading && !error && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPlaylists.length > 0 ? (
+          {filteredPlaylists && filteredPlaylists.length > 0 ? (
             filteredPlaylists.map((playlist) => (
               <PlaylistCard
                 key={playlist.id}
@@ -271,8 +203,8 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
               onAddNew={onAddNewPlaylist}
               message={
                 selectedDevice
-                ? `No playlists are connected to ${selectedDevice.typeId.name} yet. Create a new playlist to get started.`
-                : "You haven't created any playlists yet. Create a new playlist to get started."
+                  ? `No playlists available to connect to ${selectedDevice.deviceId.name}`
+                  : "No playlists available. Create a new playlist to get started."
               }
               icon={<BsMusicNoteList className="text-blue-500 text-3xl" />}
               buttonText="Create New Playlist"

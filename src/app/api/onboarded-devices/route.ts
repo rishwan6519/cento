@@ -25,10 +25,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
+console.log(deviceId,"deviceId")
     // Optional: Check if serialNumber already exists
-    const existingDevice = await Device.findOne({
-      _id: mongoose.Types.ObjectId.createFromHexString(deviceId),
+    const existingDevice = await OnboardedDevice.findOne({
+      deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId),
     });
     if (existingDevice) {
       return NextResponse.json(
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create new Device document
-    const newDevice = await Device.create({
+    const newDevice = await OnboardedDevice.create({
       deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId),
       typeId: typeId
         ? mongoose.Types.ObjectId.createFromHexString(typeId)

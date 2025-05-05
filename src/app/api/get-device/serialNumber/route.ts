@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
       );
     }
     
+    console.log( "Device found: ", device.typeId._id);
 
     return NextResponse.json({
       success: true,
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
         color: device.color,
         status: device.status,
         type: {
+          id: device.typeId._id,
           name: device.typeId.name,
           handMovements: device.typeId.handMovements,
           bodyMovements: device.typeId.bodyMovements,

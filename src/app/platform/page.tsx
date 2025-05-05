@@ -5,7 +5,6 @@ import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
 import ManageDevicesView from "@/components/Platform/views/ManageDevicesView";
 import ConnectedPlaylistsView from "@/components/Platform/modals/ConnectedPlaylistsView";
-import OnboardDeviceModal from "@/components/Platform/modals/OnboardDeviceModal";
 import AddPlaylistModal from "@/components/Platform/modals/AddPlaylistModal";
 import { HiOutlineChevronDown, HiOutlineChevronRight } from "react-icons/hi";
 import { dummyPlaylists } from "@/components/Platform/DummyData";
@@ -27,17 +26,19 @@ import {
   Playlist,
   MenuKey,
   DeviceFormData,
+  DeviceReference,
 } from "@/components/Platform/types";
 import PlaylistSetup from "@/components/PlaylistSetup/PlaylistSetup";
 import { MdOutlinePlaylistPlay } from "react-icons/md";
 import CreateMedia from "@/components/CreateMedia/createMedia";
 import ShowMedia from "@/components/ShowMedia/showMedia";
 import ConnectPlaylist from "@/components/ConnectPlaylist/connectPlaylist";
+import OnboardingPage from "@/components/onboardDevice/onboardDevice";
 
 export default function RoboticPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
   const [devices, setDevices] = useState<Device[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>(dummyPlaylists);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [showOnboardModal, setShowOnboardModal] = useState<boolean>(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState<boolean>(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -64,9 +65,7 @@ export default function RoboticPlatform(): React.ReactElement {
 
         const data = await response.json();
         if (data.success) {
-          const devicesArray = Array.isArray(data.data)
-            ? data.data
-            : [data.data];
+          const devicesArray = Array.isArray(data.data) ? data.data : data.data ? [data.data] : [];
           setDevices(
             devicesArray.map((device) => ({
               ...device,
@@ -98,28 +97,29 @@ export default function RoboticPlatform(): React.ReactElement {
   }));
 
   const menuItems = [
-    { key: "dashboard", label: "Dashboard", icon: <RiDashboardLine /> },
-    { key: "createMedia", label: "Create Media", icon: <FaRegFileAudio /> },
-    { key: "showMedia", label: "Show Media", icon: <FaRegFileAudio /> },
-    { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
+    { key: "dashboard" as MenuKey, label: "Dashboard", icon: <RiDashboardLine /> },
+    { key: "onboardDevice" as MenuKey, label: "Onboard Devices", icon: <FaMobileAlt /> },
+    { key: "createMedia" as MenuKey, label: "Create Media", icon: <FaRegFileAudio /> },
+    { key: "showMedia" as MenuKey, label: "Show Media", icon: <FaRegFileAudio /> },
+    { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
     {
-      key: "showPlaylist",
+      key: "showPlaylist" as MenuKey,
       label: "Show Playlist",
       icon: <MdOutlinePlaylistPlay />,
     },
-    { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
+    { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
     {
-      key: "onboardDevice",
+      key: "ManageDevice" as MenuKey,
       label: "Manage Devices",
       icon: <FaMobileAlt />,
       subItems: [
         {
-          key: "onboardDevice",
+          key: "ManageDevice" as MenuKey,
           label: "All Devices",
           icon: <FaTachometerAlt />,
         },
         {
-          key: "connectedPlaylists",
+          key: "connectedPlaylists" as MenuKey,
           label: "Connected Playlists",
           icon: <BsMusicNoteList />,
         },
@@ -181,22 +181,37 @@ export default function RoboticPlatform(): React.ReactElement {
 
   const addNewPlaylist = (name: string): void => {
     const newPlaylist: Playlist = {
-      id: playlists.length + 1,
+      id: String(Date.now()), // Generate string ID
       name,
-      tracks: 0,
-      duration: "0 min",
-      lastPlayed: "Never",
+      type: "default",
+      contentType: "audio",
+      startTime: "",
+      endTime: "",
+      files: [],
       deviceIds: [],
+      status: "active",
+      createdAt: new Date(),
     };
     setPlaylists([...playlists, newPlaylist]);
     setShowPlaylistModal(false);
   };
 
-  const connectPlaylist = (playlistId: number, deviceId: string): void => {
-    setPlaylists(
-      playlists.map((playlist) =>
+  const connectPlaylist = (playlistId: string, deviceId: string): void => {
+    const deviceToConnect = devices.find(d => d._id === deviceId);
+    if (!deviceToConnect) return;
+
+    const deviceReference: DeviceReference = {
+      id: deviceId,
+      name: deviceToConnect.name
+    };
+
+    setPlaylists(prevPlaylists => 
+      prevPlaylists.map(playlist =>
         playlist.id === playlistId
-          ? { ...playlist, deviceIds: [...playlist.deviceIds, deviceId] }
+          ? {
+              ...playlist,
+              deviceIds: [...playlist.deviceIds, deviceReference]
+            }
           : playlist
       )
     );
@@ -295,12 +310,11 @@ export default function RoboticPlatform(): React.ReactElement {
         );
       case "onboardDevice":
         return (
-          <ManageDevicesView
-            devices={devicesWithPlaylistInfo}
-            onAddNew={() => setShowOnboardModal(true)}
-            onEditDevice={handleEditDevice}
-            onManagePlaylists={handleManagePlaylists}
-          />
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col items-center justify-center py-8">
+              <OnboardingPage />
+            </div>
+          </div>
         );
       case "connectedPlaylists":
         return (
