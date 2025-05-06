@@ -133,26 +133,40 @@ const OnboardingPage: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/get-device/serialNumber?serialNumber=${serialNum}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to validate device");
-      }
-      const data = await response.json();
-      console.log(data, "Device data from server");
-      if (data.success && data.deviceData) {
-        setLoading(false);
-        setDeviceInfo(data.deviceData);
-        setStep(4);
-      } else {
-        throw new Error("Invalid device data returned from server");
-      }
+        // First check if device is already onboarded
+        const checkResponse = await fetch(`/api/onboarded-devices/check?serialNumber=${serialNum}`);
+        const checkData = await checkResponse.json();
+
+        if (!checkResponse.ok) {
+            throw new Error(checkData.message || "Failed to validate device");
+        }
+
+        if (!checkData.success) {
+            throw new Error(checkData.message);
+        }
+
+        // If device is not onboarded, proceed with fetching device details
+        const response = await fetch(`/api/get-device/serialNumber?serialNumber=${serialNum}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to fetch device details");
+        }
+
+        if (data.success && data.deviceData) {
+            setDeviceInfo(data.deviceData);
+            setStep(4);
+        } else {
+            throw new Error("Invalid device data returned from server");
+        }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Device validation failed. Please check the serial number and try again."
-      );
+        setError(
+            err instanceof Error
+                ? err.message
+                : "Device validation failed. Please check the serial number and try again."
+        );
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -171,7 +185,6 @@ const OnboardingPage: React.FC = () => {
         return;
       }
 
-      // Get userId from localStorage
       const userId = localStorage.getItem('userId');
       if (!userId) {
         setError("User session not found");
@@ -187,7 +200,8 @@ const OnboardingPage: React.FC = () => {
         body: JSON.stringify({
           deviceId: deviceInfo.id,
           typeId: deviceInfo.type?.id,
-          userId: userId
+          userId: userId,
+          status: 'active'
         }),
       });
 
@@ -197,8 +211,11 @@ const OnboardingPage: React.FC = () => {
         throw new Error(data.message || 'Failed to save device');
       }
 
-      // If successful, redirect to dashboard
-      router.push("/dashboard");
+      // Store the newly added device ID in localStorage
+      localStorage.setItem('lastAddedDeviceId', data.data._id);
+      window.location.reload();
+        router.push('/platform'); // Redirect to the platform page
+      
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to save device');
       console.error('Error saving device:', error);
@@ -303,7 +320,7 @@ const OnboardingPage: React.FC = () => {
           <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="p-8">
               <h2 className="text-2xl font-semibold mb-6 text-center">
-                Enter Device Serial Number
+                Enter Device Serial Number.
               </h2>
               <div className="mb-6">
                 <input
@@ -315,9 +332,17 @@ const OnboardingPage: React.FC = () => {
                 />
               </div>
               {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 flex items-start">
-                  <FaExclamationTriangle className="text-red-500 mt-1 mr-2 flex-shrink-0" />
-                  <p>{error}</p>
+                <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <FaExclamationTriangle className="h-5 w-5 text-red-400" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-red-700">
+                                {error}
+                            </p>
+                        </div>
+                    </div>
                 </div>
               )}
               <div className="flex justify-between mt-8">

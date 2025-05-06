@@ -6,7 +6,10 @@ export type ButtonVariant = "primary" | "secondary" | "success" | "danger";
 export type MenuKey = 
   | "dashboard"
   | "createMedia"
+  |"createUser"
   | "showMedia"
+  |"assignDevice"
+  |"showUser"
   | "setupPlaylist"
   | "showPlaylist"
   | "connectPlaylist"

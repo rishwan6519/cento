@@ -16,6 +16,8 @@ import {
   FaPlug,
   FaMobileAlt,
   FaTachometerAlt,
+  FaUser,
+  FaMobile,
 } from "react-icons/fa";
 import { RiDashboardLine } from "react-icons/ri";
 import { BsMusicNoteList } from "react-icons/bs";
@@ -34,6 +36,10 @@ import CreateMedia from "@/components/CreateMedia/createMedia";
 import ShowMedia from "@/components/ShowMedia/showMedia";
 import ConnectPlaylist from "@/components/ConnectPlaylist/connectPlaylist";
 import OnboardingPage from "@/components/onboardDevice/onboardDevice";
+import CreateUser from "@/components/CreateUser/CreateUser";
+import LoadingState from "@/components/Platform/LoadingState";
+import ShowUsers from "@/components/ShowUsers/ShowUsers";
+import AssignDevice from "@/components/AssignDevice/AssignDevice";
 
 export default function RoboticPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
@@ -53,41 +59,51 @@ export default function RoboticPlatform(): React.ReactElement {
     const fetchDevices = async () => {
       try {
         setIsLoading(true);
+        setError(null); // Reset error state
+        
         const userId = localStorage.getItem("userId");
         if (!userId) {
-          throw new Error("User ID not found in localStorage");
+          setError("Please log in to view devices");
+          return;
         }
 
-        const response = await fetch(`/api/onboarded-devices?userId=${userId}`);
+        const response = await fetch(`/api/onboarded-devices?userId=${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
         if (!response.ok) {
-          throw new Error("Failed to fetch devices");
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch devices');
         }
 
         const data = await response.json();
-        if (data.success) {
-          const devicesArray = Array.isArray(data.data) ? data.data : data.data ? [data.data] : [];
-          setDevices(
-            devicesArray.map((device) => ({
-              ...device,
-              batteryLevel: "100%",
-              location: "Not specified",
-              lastActive: new Date(device.updatedAt).toLocaleString(),
-              status: device.status === "active" ? "Connected" : "Disconnected",
-            }))
-          );
+        console.log("Fetched devices:", data);
+        
+        if (data.success && Array.isArray(data.data)) {
+          setDevices(data.data.map((device: any) => ({
+            ...device,
+            batteryLevel: "100%",
+            location: "Not specified",
+            lastActive: new Date(device.updatedAt).toLocaleString(),
+            status: device.status === "active" ? "Connected" : "Disconnected",
+          })));
         } else {
-          throw new Error(data.message || "Failed to fetch devices");
+          throw new Error('Invalid data format received from server');
         }
       } catch (err) {
         console.error("Error fetching devices:", err);
         setError(err instanceof Error ? err.message : "Failed to load devices");
+        setDevices([]); // Reset devices on error
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDevices();
-  }, []);
+  }, []); // Empty dependency array
 
   const devicesWithPlaylistInfo = devices.map((device) => ({
     ...device,
@@ -102,6 +118,9 @@ export default function RoboticPlatform(): React.ReactElement {
     { key: "createMedia" as MenuKey, label: "Create Media", icon: <FaRegFileAudio /> },
     { key: "showMedia" as MenuKey, label: "Show Media", icon: <FaRegFileAudio /> },
     { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
+    { key: "createUser" as MenuKey, label: "Create User ", icon: <FaUser /> },
+    {key:"showUser" as MenuKey, label: "Show User", icon: <FaUser />},
+    {key:"assignDevice" as MenuKey, label: "Assign Device", icon: <FaRobot />},
     {
       key: "showPlaylist" as MenuKey,
       label: "Show Playlist",
@@ -113,11 +132,7 @@ export default function RoboticPlatform(): React.ReactElement {
       label: "Manage Devices",
       icon: <FaMobileAlt />,
       subItems: [
-        {
-          key: "ManageDevice" as MenuKey,
-          label: "All Devices",
-          icon: <FaTachometerAlt />,
-        },
+       
         {
           key: "connectedPlaylists" as MenuKey,
           label: "Connected Playlists",
@@ -264,11 +279,7 @@ export default function RoboticPlatform(): React.ReactElement {
 
   const renderContent = (): React.ReactElement => {
     if (isLoading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-gray-500">Loading devices...</p>
-        </div>
-      );
+      return <LoadingState />;
     }
 
     if (error) {
@@ -289,9 +300,12 @@ export default function RoboticPlatform(): React.ReactElement {
               />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Error</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Devices</h3>
           <p className="text-gray-500 max-w-md mb-6">{error}</p>
-          <Button variant="secondary" onClick={() => window.location.reload()}>
+          <Button 
+            variant="primary"
+            onClick={() => window.location.reload()}
+          >
             Try Again
           </Button>
         </Card>
@@ -302,7 +316,9 @@ export default function RoboticPlatform(): React.ReactElement {
       case "dashboard":
         return (
           <DashboardView
-            devices={devicesWithPlaylistInfo}
+            devices={devices}
+            setDevices={setDevices}
+
             onAddNew={() => setShowOnboardModal(true)}
             onEditDevice={handleEditDevice}
             onManagePlaylists={handleManagePlaylists}
@@ -333,6 +349,12 @@ export default function RoboticPlatform(): React.ReactElement {
 
       case "setupPlaylist":
         return <PlaylistSetup />;
+        // In your renderContent function
+case "assignDevice":
+  return <AssignDevice />;
+
+        case "showUser":
+          return <ShowUsers />;
       case "showPlaylist":
         return <PlaylistManager />;
       case "createMedia":
@@ -352,6 +374,8 @@ export default function RoboticPlatform(): React.ReactElement {
             onSuccess={() => setSelectedMenu("showPlaylist")}
           />
         );
+      case "createUser":
+        return <CreateUser />;
 
         return (
           <Card className="flex flex-col items-center justify-center py-16 text-center">

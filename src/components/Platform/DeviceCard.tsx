@@ -4,8 +4,50 @@ import Button from "./Button";
 import Card from "./Card";
 import Image from "next/image";
 import { BsMusicNoteList } from "react-icons/bs";
-import { IoMdSettings } from "react-icons/io";
+import { IoMdSettings, IoMdTrash } from "react-icons/io";
 import { MdAddCircleOutline } from "react-icons/md";
+
+// Add this component above the DeviceCard component
+const RemoveDeviceModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  deviceName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+  deviceName: string;
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Remove Device</h3>
+        <p className="text-gray-600 mb-4">
+          Are you sure you want to remove "{deviceName}"? This action cannot be undone.
+        </p>
+        <div className="flex justify-end space-x-2">
+          <Button
+            variant="secondary"
+            onClick={onClose}
+            className="text-sm"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onConfirm}
+            className="text-sm bg-red-600 hover:bg-red-700"
+          >
+            Remove Device
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface DeviceCardProps {
   device: {
@@ -35,6 +77,7 @@ interface DeviceCardProps {
   };
   onEdit: (device: any) => void;
   onManagePlaylists?: (device: any) => void;
+  onRemoveDevice?: (deviceId: string) => void;  // Add this new prop
 }
 
 const NoDeviceCard = ({ onboardDevice }: { onboardDevice: () => void }) => {
@@ -63,6 +106,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   device,
   onEdit,
   onManagePlaylists,
+  onRemoveDevice,
 }) => {
   // If no device is provided, show the NoDeviceCard
   if (!device) {
@@ -70,11 +114,20 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   }
 
   const [showPlaylists, setShowPlaylists] = useState(false);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
   const { deviceId, typeId, connectedPlaylists } = device;
 
   // Helper function to validate image URL
   const isValidImageUrl = (url?: string) => {
     return url && url.trim() !== '' && !url.includes('undefined');
+  };
+
+  // Handler for removing device
+  const handleRemoveDevice = () => {
+    if (onRemoveDevice) {
+      onRemoveDevice(device._id);
+      setShowRemoveModal(false);
+    }
   };
 
   return (
@@ -157,16 +210,26 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
               </span>
             )}
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => onEdit(device)}
-            className="text-sm"
-            icon={<IoMdSettings />}
-          >
-            Manage
-          </Button>
+          <div className="flex space-x-2">
+        
+            <Button
+              variant="secondary"
+              onClick={() => setShowRemoveModal(true)}
+              className="text-sm text-red-600 hover:text-red-700"
+              icon={<IoMdTrash />}
+            >
+              Remove
+            </Button>
+          </div>
         </div>
       </div>
+
+      <RemoveDeviceModal
+        isOpen={showRemoveModal}
+        onClose={() => setShowRemoveModal(false)}
+        onConfirm={handleRemoveDevice}
+        deviceName={deviceId.name}
+      />
     </Card>
   );
 };

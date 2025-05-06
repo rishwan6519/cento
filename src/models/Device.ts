@@ -34,8 +34,6 @@ const deviceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Keep only typeId index
-deviceSchema.index({ typeId: 1 });
 
 const Device = mongoose.models.Device || mongoose.model('Device', deviceSchema);
 

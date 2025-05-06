@@ -1,5 +1,16 @@
 import mongoose from 'mongoose';
 
+
+export interface DeviceTypeDocument extends Document {
+  name: string;
+  imageUrl: string;
+  handMovements?: string[];
+  bodyMovements?: string[];
+  screenSize: {
+    width: number;
+    
+  };
+}
 const deviceTypeSchema = new mongoose.Schema({
   name: { 
     type: String, 
@@ -26,4 +37,4 @@ const deviceTypeSchema = new mongoose.Schema({
 });
 
 export const DeviceType = mongoose.models.DeviceType || 
-  mongoose.model('DeviceType', deviceTypeSchema);
+  mongoose.model<DeviceTypeDocument>('DeviceType', deviceTypeSchema);

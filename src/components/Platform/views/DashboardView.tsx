@@ -5,12 +5,15 @@ import  Button from "../Button";
 import  DeviceCard from "../DeviceCard";
 import  EmptyState from "../EmpthyState";
 import { FaPlus, FaRobot } from "react-icons/fa";
+import toast from "react-hot-toast";
 
 interface DashboardViewProps {
   devices: Device[];
   onAddNew: () => void;
   onEditDevice: (device: Device) => void;
   onManagePlaylists: (device: Device) => void;
+  setDevices: React.Dispatch<React.SetStateAction<Device[]>>; // Add this line
+
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({
@@ -18,6 +21,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   onAddNew,
   onEditDevice,
   onManagePlaylists,
+  setDevices,
 }) => {
   const connectedCount = devices.filter((d) => d.status === "Connected").length;
   const totalCount = devices.length;
@@ -29,9 +33,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
           <h3 className="text-2xl font-bold text-gray-900">Device Dashboard</h3>
           <p className="text-gray-500">Monitor and manage your robotic devices</p>
         </div>
-        <Button onClick={onAddNew} icon={<FaPlus />}>
-          Onboard New Device
-        </Button>
+       
       </div>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -83,6 +85,24 @@ const DashboardView: React.FC<DashboardViewProps> = ({
               device={device}
               onEdit={onEditDevice}
               onManagePlaylists={onManagePlaylists}
+              onRemoveDevice={async (deviceId) => {
+                try {
+                  const res = await fetch(`api/onboarded-devices?deviceId=${deviceId}`, {
+                    method: "DELETE",
+                  });
+              
+                  if (res.ok) {
+                    setDevices(devices.filter(d => d._id !== deviceId));
+                    toast.success(`Device ${deviceId} removed successfully`);
+                  } else {
+                    toast.error(`Failed to remove device ${deviceId}`);
+                  }
+                } catch (error) {
+                  console.error("Error removing device:", error);
+                  toast.error("An error occurred while removing the device");
+                }
+              }}
+              
             />
           ))
         ) : (

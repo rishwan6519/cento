@@ -10,7 +10,16 @@ interface Device {
   deviceId: {
     serialNumber: string;
     imageUrl: string;
+    name: string;
+    
   };
+  typeId:{
+    _id: string;
+    name: string;
+    handMovements: string[];
+    bodyMovements: string[];
+    screenSize: string;
+  }
   imageUrl?: string;
   serialNumber?: string;
   type?: string;
@@ -217,7 +226,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                   )}
                   <div>
                     <h3 className="font-medium text-gray-900">
-                      {device.name}
+                      {device.deviceId.name||"N/A"}
                     </h3>
                     <p className="text-sm text-gray-500">
                       ID: {device.deviceId.serialNumber || "N/A"}
@@ -264,7 +273,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
             </h3>
             <p className="text-sm text-blue-700 mt-1">
               {selectedDeviceForPlaylist?.name} (
-              {selectedDeviceForPlaylist?.serialNumber})
+              {`${selectedDeviceForPlaylist?.deviceId.name} serial Number :-${selectedDeviceForPlaylist?.deviceId.serialNumber}`})
             </p>
           </div>
           
