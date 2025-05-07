@@ -8,6 +8,7 @@ import {
   Trash2,
   Edit,
   Menu,
+  Users,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { FcDataConfiguration } from "react-icons/fc";
@@ -15,6 +16,8 @@ import { FcDataConfiguration } from "react-icons/fc";
 import GptAiComponent from "@/components/GptAiComponent/GptAiComponent";
 import AddDeviceType from "@/components/AddDeviceTypes/addDeviceTypes";
 import AddDevice from "@/components/AddDevice/addDevice";
+import UserManagement from "@/components/UseManagement/UserManagement";
+import ShowDevices from "@/components/ShowDevices/ShowDevices";
 
 interface DeviceType {
   id: string;
@@ -90,6 +93,17 @@ export default function RobotAdminDashboard() {
           label: "Device Types",
           icon: <Database size={20} className="text-indigo-500" />,
           description: "Manage device categories and types",
+        }, // Add this to your sidebarItems array
+        {
+          id: "users",
+          label: "User Management",
+          icon: <Users size={20} className="text-violet-500" />,
+        },
+        {
+          id: "showDevices",
+          label: "View Devices",
+          icon: <Database size={20} className="text-purple-500" />,
+          description: "View all registered devices",
         },
       ],
     },
@@ -208,12 +222,13 @@ export default function RobotAdminDashboard() {
                     Total Registered Devices
                   </p>
                   <div className="mt-4 pt-4 border-t border-gray-100">
-                    <a
-                      href="#"
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    <button
+                      onClick={() => setActiveSection("showDevices")}
+                      className="text-sm text-blue-600 hover:text-blue-700"
                     >
+                      {" "}
                       View all devices →
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -224,7 +239,10 @@ export default function RobotAdminDashboard() {
                   <h3 className="text-lg font-semibold text-gray-800">
                     Recent Activity
                   </h3>
-                  <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                  <button
+                    onClick={() => setActiveSection("showDevices")}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
                     View All
                   </button>
                 </div>
@@ -291,24 +309,18 @@ export default function RobotAdminDashboard() {
             />
           )}
 
+          {activeSection === "showDevices" && (
+            <ShowDevices onBack={() => setActiveSection("")} />
+          )}
+
+          {activeSection === "users" && <UserManagement />}
+
           {activeSection === "gptAi" && <GptAiComponent />}
         </div>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 // "use client";
 // import { useState, useEffect } from "react";
@@ -465,7 +477,6 @@ export default function RobotAdminDashboard() {
 
 //   // Update the scheduleSettings state
 
-
 //   // Add this new state for managing playlist durations
 //   const [playlistDurations, setPlaylistDurations] = useState<{
 //     [key: string]: number;
@@ -485,7 +496,6 @@ export default function RobotAdminDashboard() {
 //   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
 
 //   // Add this function to handle day selection
- 
 
 //   //fetch media function
 //   // Add this function to fetch media files
@@ -552,9 +562,8 @@ export default function RobotAdminDashboard() {
 //   }, [activeSection]);
 //    useEffect(() => {
 //       if (activeSection === "showPlaylist") {
-          
+
 //         fetchPlaylists();
-       
 
 //       }
 //     }, [activeSection]);
@@ -813,14 +822,13 @@ export default function RobotAdminDashboard() {
 //       label: "Add Device Type",
 //       icon: <Database size={20} className="text-blue-500" />,
 //     },
-   
+
 //     {
 //       id: "gptAi",
 //       label: "GPT AI",
 //       icon: <FcDataConfiguration size={20} className="text-purple-500" />,
 //     },
 
-   
 //   ];
 
 //   // Update the return statement with responsive classes
@@ -901,8 +909,6 @@ export default function RobotAdminDashboard() {
 //                   <p className="text-sm text-gray-500">Registered Devices</p>
 //                 </div>
 
-               
-
 //                 <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
 //                   <div className="flex items-center justify-between mb-4">
 //                     <div className="p-3 bg-orange-50 rounded-lg">
@@ -960,12 +966,8 @@ export default function RobotAdminDashboard() {
 //                   </div>
 //                 </div>
 
-               
-      
 //               </div>
 
-             
-            
 //             </div>
 //           )}
 
@@ -992,10 +994,6 @@ export default function RobotAdminDashboard() {
 //               }}
 //             />
 //           )}
-
-        
-
-        
 
 //           {activeSection === "gptAi" && <GptAiComponent />}
 //           {/* Replace the existing showPlaylists section with this code */}

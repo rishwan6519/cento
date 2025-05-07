@@ -107,7 +107,7 @@ export default function RoboticPlatform(): React.ReactElement {
   const devicesWithPlaylistInfo = devices.map((device) => ({
     ...device,
     connectedPlaylists: playlists.filter((p) =>
-      p.deviceIds.includes(device._id)
+      p.deviceIds.some(deviceRef => deviceRef.id === device._id)
     ),
   }));
 
@@ -672,14 +672,7 @@ case "assignDevice":
       </main>
 
       {/* Modals */}
-      <AnimatePresence>
-        {showOnboardModal && (
-          <OnboardDeviceModal
-            onClose={() => setShowOnboardModal(false)}
-            onSave={addNewDevice}
-          />
-        )}
-      </AnimatePresence>
+      
       <AnimatePresence>
         {showPlaylistModal && (
           <AddPlaylistModal
