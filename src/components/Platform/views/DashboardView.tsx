@@ -23,7 +23,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   onManagePlaylists,
   setDevices,
 }) => {
-  const connectedCount = devices.filter((d) => d.status === "Connected").length;
+  const connectedCount = devices.filter((d) => d.status==="Connected").length;
+  const offlineCount = devices.filter((d) => d.status === "Disconnected").length;
+
+
   const totalCount = devices.length;
 
   return (
@@ -66,7 +69,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <p className="text-sm text-gray-500">Offline</p>
               <h4 className="text-2xl font-bold text-gray-900 mt-1">
-                {totalCount - connectedCount}
+                {offlineCount}
               </h4>
             </div>
             <div className="p-3 bg-red-50 rounded-lg">
