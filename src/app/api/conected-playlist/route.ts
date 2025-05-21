@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     // Extract deviceId from query
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get('deviceId');
+    console.log("Received deviceId:", deviceId);
 
     if (!deviceId) {
       return NextResponse.json(

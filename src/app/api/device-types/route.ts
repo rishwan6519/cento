@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { DeviceType } from '@/models/DeviceTypes';
+import { blob } from 'stream/consumers';
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +16,8 @@ export async function POST(request: Request) {
       screenSize: {
         width: data.screenSize.width,
         height: data.screenSize.height
-      }
+      },
+      blockCodingEnabled: data.blockCodingEnabled,
     });
     console.log(deviceType)
 
@@ -47,7 +49,8 @@ export async function PUT(request: Request) {
         screenSize: {
           width: data.screenSize.width,
           height: data.screenSize.height
-        }
+        },
+        blockCodingEnabled: data.blockCodingEnabled,
       },
       { new: true }
     );
@@ -115,7 +118,8 @@ export async function GET() {
       bodyMovements: type.bodyMovements,
       screenSize: type.screenSize,
       createdAt: type.createdAt,
-      updatedAt: type.updatedAt
+      updatedAt: type.updatedAt,
+      blockCodingEnabled: type?.blockCodingEnabled,
     }));
     console.log(transformedDeviceTypes,"................")
 

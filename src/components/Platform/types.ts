@@ -1,30 +1,94 @@
 // src/components/platform/types.ts
 import { ReactElement } from "react";
 
-export type DeviceStatus = "Connected" | "Disconnected" | "Offline";
+export type DeviceStatus = "Connected" | "Disconnected" | "Offline" | "active" | "inactive" | "pending";
 export type ButtonVariant = "primary" | "secondary" | "success" | "danger";
-export type MenuKey = "dashboard" | "createMedia" | "setupPlaylist" | "connectPlaylist" | "onboardDevice" | "connectedPlaylists";
+export type MenuKey = 
+  | "dashboard"
+  | "createMedia"
+  |"createUser"
+  | "showMedia"
+  |"assignDevice"
+  |"showUser"
+  | "setupPlaylist"
+  | "showPlaylist"
+  | "connectPlaylist"
+  | "onboardDevice"
+  | "connectedPlaylists";
 
 export interface Device {
-  id: number;
-  name: string;
-  type: string;
-  color: string;
-  image: string;
+  _id: string;
+  deviceId: {
+    _id: string;
+    name: string;
+    serialNumber: string;
+    imageUrl: string;
+    status: DeviceStatus;
+    color: string;
+  };
+  typeId: {
+    _id: string;
+    name: string;
+  };
+  userId: {
+    _id: string;
+  };
   status: DeviceStatus;
-  lastActive: string;
+  name: string;
   batteryLevel: string;
-  location?: string;
-  connectedPlaylists?: Playlist[];
+  lastActive: string;
+  connectedPlaylists?: Array<{
+    id: string;
+    name: string;
+    status: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+export interface ConnectedPlaylist {
+  id: string;
+  name: string;
+  status: DeviceStatus;  // Update this to use DeviceStatus type
+}
+
+export interface DeviceReference {
+  id: string;
+  name: string;
+  status?: string;
+  typeId?: string;
+  batteryLevel?: string;
+  lastActive?: string;
+  imageUrl?: string;
+}
+
+export interface PlaylistFile {
+  name: string;
+  path: string;
+  type: string;
+  displayOrder: number;
+  delay: number;
+  backgroundImageEnabled: boolean;
+  backgroundImage: string | null;
 }
 
 export interface Playlist {
-  id: number;
+  id: string;
   name: string;
-  tracks: number;
-  duration: string;
-  lastPlayed: string;
-  deviceIds: number[];
+  type: string;
+  contentType: string;
+  startTime: string;
+  endTime: string;
+  files: PlaylistFile[];
+  deviceIds: DeviceReference[];
+  status: string;
+  createdAt: Date;
+}
+
+export interface CardProps {
+  children: React.ReactNode;
+  deviceIds: DeviceReference[];  // Make deviceIds required
 }
 
 export interface CardProps {
@@ -45,15 +109,35 @@ export interface ButtonProps {
 }
 
 export interface DeviceCardProps {
-  device: Device;
-  onEdit: (device: Device) => void;
-  onManagePlaylists?: (device: Device) => void;
+  device: {
+    _id: string;
+    deviceId: {
+      _id: string;
+      name: string;
+      serialNumber: string;
+      imageUrl: string;
+      status: DeviceStatus;
+    };
+    typeId: {
+      _id: string;
+      name: string;
+    };
+    userId: {
+      _id: string;
+    };
+    connectedPlaylists?: ConnectedPlaylist[];
+    createdAt: string;
+    updatedAt: string;
+    __v: number;
+  };
+  onEdit: (device: any) => void;
+  onManagePlaylists?: (device: any) => void;
 }
 
 export interface PlaylistCardProps {
   playlist: Playlist;
   devices: Device[];
-  onConnect: (playlistId: number, deviceId: number) => void;
+  onConnect: (playlistId: string, deviceId: string) => void; // Changed to string IDs
 }
 
 export interface EmptyStateProps {
@@ -93,10 +177,10 @@ export interface ManageDevicesViewProps {
 
 export interface ConnectedPlaylistsViewProps {
   devices: Device[];
-  playlists: Playlist[];
+  playlists?: Playlist[];
   selectedDevice: Device | null;
   onAddNewPlaylist: () => void;
-  onConnectPlaylist: (playlistId: number, deviceId: number) => void;
+  onConnectPlaylist: (playlistId: string, deviceId: string) => void; // Changed to string IDs
   onBackToDevices: () => void;
 }
 

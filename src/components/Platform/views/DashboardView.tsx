@@ -1,16 +1,19 @@
 import React from "react";
 import { Device } from "../types";
-import  Card from "../Card";
-import  Button from "../Button";
-import  DeviceCard from "../DeviceCard";
-import  EmptyState from "../EmpthyState";
+import Card from "../Card";
+import Button from "../Button";
+import DeviceCard from "../DeviceCard";
+import EmptyState from "../EmpthyState";
 import { FaPlus, FaRobot } from "react-icons/fa";
+import toast from "react-hot-toast";
 
 interface DashboardViewProps {
   devices: Device[];
   onAddNew: () => void;
   onEditDevice: (device: Device) => void;
   onManagePlaylists: (device: Device) => void;
+  setDevices: React.Dispatch<React.SetStateAction<Device[]>>;
+  userRole?: string;
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({
@@ -18,8 +21,12 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   onAddNew,
   onEditDevice,
   onManagePlaylists,
+  setDevices,
+  userRole,
 }) => {
+  const isSuperUser = userRole === "superUser";
   const connectedCount = devices.filter((d) => d.status === "Connected").length;
+  const offlineCount = devices.filter((d) => d.status === "Disconnected").length;
   const totalCount = devices.length;
 
   return (
@@ -29,10 +36,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({
           <h3 className="text-2xl font-bold text-gray-900">Device Dashboard</h3>
           <p className="text-gray-500">Monitor and manage your robotic devices</p>
         </div>
-        <Button onClick={onAddNew} icon={<FaPlus />}>
-          Onboard New Device
-        </Button>
       </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -63,9 +68,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Offline</p>
-              <h4 className="text-2xl font-bold text-gray-900 mt-1">
-                {totalCount - connectedCount}
-              </h4>
+              <h4 className="text-2xl font-bold text-gray-900 mt-1">{offlineCount}</h4>
             </div>
             <div className="p-3 bg-red-50 rounded-lg">
               <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,22 +78,46 @@ const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </Card>
       </div>
+
+      {/* Device Cards or Empty State */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {devices.length > 0 ? (
           devices.map((device) => (
             <DeviceCard
-              key={device.id}
+              key={device._id}
               device={device}
               onEdit={onEditDevice}
               onManagePlaylists={onManagePlaylists}
+              onRemoveDevice={async (deviceId) => {
+                try {
+                  const res = await fetch(`api/onboarded-devices?deviceId=${deviceId}`, {
+                    method: "DELETE",
+                  });
+
+                  if (res.ok) {
+                    setDevices(devices.filter((d) => d._id !== deviceId));
+                    toast.success(`Device ${deviceId} removed successfully`);
+                  } else {
+                    toast.error(`Failed to remove device ${deviceId}`);
+                  }
+                } catch (error) {
+                  console.error("Error removing device:", error);
+                  toast.error("An error occurred while removing the device");
+                }
+              }}
             />
           ))
         ) : (
           <EmptyState
-            onAddNew={onAddNew}
-            message="You haven't onboarded any robotic devices yet. Get started by adding your first device."
+            onAddNew={isSuperUser ? onAddNew : undefined}
+            message={
+              isSuperUser
+                ? "You haven't onboarded any robotic devices yet. Get started by adding your first device."
+                : "You have no assigned device available here. Kindly contact your admin."
+            }
             icon={<FaRobot className="text-blue-500 text-3xl" />}
-            buttonText="Onboard New Device"
+            buttonText={isSuperUser ? "Onboard New Device" : undefined}
+            role={userRole}
           />
         )}
       </div>

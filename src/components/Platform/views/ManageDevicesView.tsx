@@ -7,7 +7,7 @@ import Image from "next/image";
 import { Device } from "../types";
 import { FaPlus, FaEdit, FaRobot } from "react-icons/fa";
 import { BsMusicNoteList } from "react-icons/bs";
-import { StatusBadge } from "../StatusBadge";
+
 
 interface ManageDevicesViewProps {
   devices: Device[];
@@ -74,12 +74,12 @@ const ManageDevicesView: React.FC<ManageDevicesViewProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {devices.map((device) => (
-                <tr key={device.id} className="hover:bg-gray-50 transition">
+                <tr key={device._id} className="hover:bg-gray-50 transition">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <Image
-                          src={device.image}
+                          src={device.deviceId.imageUrl}
                           alt={device.name}
                           width={40}
                           height={40}
@@ -91,16 +91,16 @@ const ManageDevicesView: React.FC<ManageDevicesViewProps> = ({
                           {device.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {device.color}
+                          {device.deviceId.color}
                         </p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    {device.type}
+                    {device.typeId.name}
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={device.status} />
+                  
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
                     {device.lastActive}

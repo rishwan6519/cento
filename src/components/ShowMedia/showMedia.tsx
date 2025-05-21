@@ -14,11 +14,10 @@ interface MediaFile {
 }
 
 interface ShowMediaProps {
-  activeSection: string;
   onCancel: () => void;
 }
 
-const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
+const ShowMedia: React.FC<ShowMediaProps> = ({ onCancel }) => {
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [filteredFiles, setFilteredFiles] = useState<MediaFile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -28,15 +27,19 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
   const [sortBy, setSortBy] = useState<string>("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [previewMedia, setPreviewMedia] = useState<MediaFile | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeSection === "showMedia") {
-      fetchMedia();
+    const storedUserId = localStorage.getItem("userId");
+    if (storedUserId) {
+      setUserId(storedUserId);
+    } else {
+      console.error("User ID not found in local storage");
+      toast.error("Authentication required");
     }
-  }, [activeSection]);
+  }, []);
 
   useEffect(() => {
-    // Apply filters whenever search term changes
     if (searchTerm.trim() === "") {
       setFilteredFiles(mediaFiles);
     } else {
@@ -49,7 +52,6 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
     }
   }, [searchTerm, mediaFiles]);
 
-  // Add event listener to close modal on ESC key press
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && previewMedia) {
@@ -61,22 +63,39 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
     return () => window.removeEventListener('keydown', handleEscKey);
   }, [previewMedia]);
 
+  useEffect(() => {
+    if (userId) {
+      fetchMedia();
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    return () => {
+      // Clean up any playing media when component unmounts
+      document.querySelectorAll<HTMLMediaElement>('audio, video').forEach(el => {
+        el.pause();
+      });
+    };
+  }, []);
+
   const fetchMedia = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/media");
-      if (!response.ok) throw new Error("Failed to fetch media files");
+      if (!userId) {
+        throw new Error("User ID not available");
+      }
+      const response = await fetch(`/api/media?userId=${userId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch media files");
+      }
       const data = await response.json();
       const mediaData = data.media || [];
-      
-      // Log media data for debugging
-      console.log("Fetched media data:", mediaData);
-      
       setMediaFiles(mediaData);
       setFilteredFiles(mediaData);
     } catch (error) {
       console.error("Error fetching media:", error);
-      toast.error("Failed to fetch media files");
+      toast.error(error instanceof Error ? error.message : "Failed to fetch media files");
       setMediaFiles([]);
       setFilteredFiles([]);
     } finally {
@@ -84,29 +103,31 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
     }
   };
 
-  const handlePlayPause = (mediaId: string, mediaElement: HTMLMediaElement) => {
+  const handlePlayPause = (mediaId: string, mediaElement: HTMLMediaElement): void => {
     if (playingMedia === mediaId) {
       mediaElement.pause();
       setPlayingMedia(null);
     } else {
       // Pause any currently playing media
-      const currentlyPlaying =
-        document.querySelector<HTMLMediaElement>(".media-playing");
-      if (currentlyPlaying) {
-        currentlyPlaying.pause();
-        currentlyPlaying.classList.remove("media-playing");
-      }
-      mediaElement.play();
+      document.querySelectorAll<HTMLMediaElement>('audio, video').forEach(el => {
+        if (el !== mediaElement) {
+          el.pause();
+          el.classList.remove("media-playing");
+        }
+      });
+      mediaElement.play().catch(error => {
+        console.error("Playback failed:", error);
+        toast.error("Failed to play media");
+      });
       mediaElement.classList.add("media-playing");
       setPlayingMedia(mediaId);
     }
   };
 
-  const handleDeleteMedia = async (mediaId: string) => {
+  const handleDeleteMedia = async (mediaId: string): Promise<void> => {
     if (!confirm("Are you sure you want to delete this media file? This will permanently remove the file from the server.")) {
       return;
     }
-    console.log("Deleting media with ID:", mediaId); 
     setIsLoading(true);
     try {
       const response = await fetch("/api/media", {
@@ -122,13 +143,10 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
         throw new Error(errorData.message || "Failed to delete media");
       }
       
-      toast.success("Media file deleted successfully from database and storage");
-      
-      // Update the UI by removing the deleted file
+      toast.success("Media file deleted successfully");
       setMediaFiles(prev => prev.filter(file => file._id !== mediaId));
       setFilteredFiles(prev => prev.filter(file => file._id !== mediaId));
       
-      // If the deleted media is currently being previewed, close the preview
       if (previewMedia?._id === mediaId) {
         setPreviewMedia(null);
       }
@@ -141,7 +159,6 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
   };
 
   const handleSort = (criteria: string) => {
-    // If clicking the same column, toggle sort order
     if (sortBy === criteria) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -173,12 +190,16 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
   };
 
   const handlePreviewClick = (media: MediaFile, e?: React.MouseEvent) => {
-    // Prevent any parent event handlers from firing
-    if (e) {
-      e.stopPropagation();
+    if (e) e.stopPropagation();
+    // Check if media is actually playable
+    if (media.type.startsWith('audio/') || media.type.startsWith('video/')) {
+      const test = new Audio(media.url);
+      test.onerror = () => {
+        toast.error("This media file cannot be played");
+        return;
+      };
+      test.src = media.url;
     }
-    
-    console.log("Opening preview for:", media);
     setPreviewMedia(media);
   };
 
@@ -213,18 +234,16 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return `${Math.round(bytes / Math.pow(1024, i))} ${sizes[i]}`;
   };
-  
-  // Skip rendering if not active section
-  if (activeSection !== "showMedia") {
-    return null;
-  }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 text-black">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h2 className="text-2xl font-bold">Media Files</h2>
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-grow md:max-w-xs">
+    <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 text-black">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold">Media Files</h2>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full">
+          {/* Search Bar */}
+          <div className="relative flex-grow">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -234,11 +253,14 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex border rounded-lg">
+          
+          {/* View Toggle */}
+          <div className="flex border rounded-lg self-end sm:self-auto">
             <button 
               onClick={() => setViewMode("table")}
               className={`p-2 ${viewMode === 'table' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}
               title="Table view"
+              aria-label="Table view"
             >
               <List size={18} />
             </button>
@@ -246,6 +268,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
               onClick={() => setViewMode("grid")}
               className={`p-2 ${viewMode === 'grid' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}
               title="Grid view"
+              aria-label="Grid view"
             >
               <Grid size={18} />
             </button>
@@ -253,6 +276,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
         </div>
       </div>
 
+      {/* Loading State */}
       {isLoading ? (
         <div className="flex justify-center items-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -276,7 +300,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
             <thead className="bg-gray-50">
               <tr>
                 <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("name")}
                 >
                   <div className="flex items-center">
@@ -287,7 +311,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                   </div>
                 </th>
                 <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("type")}
                 >
                   <div className="flex items-center">
@@ -298,20 +322,20 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                   </div>
                 </th>
                 <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                   onClick={() => handleSort("date")}
                 >
                   <div className="flex items-center">
-                    Date Added
+                    Date
                     {sortBy === "date" && (
                       <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>
                     )}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Preview
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -319,35 +343,34 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredFiles.map((media) => (
                 <tr key={media._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       {getFileTypeIcon(media.type)}
-                      <span className="ml-2 text-sm font-medium text-gray-900 truncate max-w-xs">
+                      <span className="ml-2 text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-xs">
                         {media.name}
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-500 capitalize">
-                      {media.type.split("/")[0]}
-                    </span>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {media.type.split("/")[0]}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                     {media.createdAt ? new Date(media.createdAt).toLocaleDateString() : 'Unknown'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     {media.type.startsWith("image/") && (
                       <div 
                         className="relative cursor-pointer group"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePreviewClick(media, e);
-                        }}
+                        onClick={(e) => handlePreviewClick(media, e)}
                       >
                         <img 
                           src={media.url} 
                           alt={media.name} 
                           className="h-10 w-16 object-cover rounded"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = '/placeholder-image.png';
+                          }}
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded">
                           <Maximize2 size={14} className="text-white opacity-0 group-hover:opacity-100" />
@@ -357,13 +380,10 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                     {media.type.startsWith("video/") && (
                       <video 
                         src={media.url} 
-                        className="h-10 w-20 object-cover rounded cursor-pointer"
+                        className="h-10 w-16 object-cover rounded cursor-pointer"
                         controls={false}
                         muted
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePreviewClick(media, e);
-                        }}
+                        onClick={(e) => handlePreviewClick(media, e)}
                         onMouseOver={(e) => e.currentTarget.play()}
                         onMouseOut={(e) => e.currentTarget.pause()}
                       />
@@ -377,7 +397,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                       />
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       {(media.type.startsWith("video/") || media.type.startsWith("audio/")) && (
                         <button
@@ -388,6 +408,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                             if (element) handlePlayPause(media._id, element);
                           }}
                           className="p-1 rounded text-gray-500 hover:bg-gray-100"
+                          aria-label={playingMedia === media._id ? "Pause" : "Play"}
                         >
                           {playingMedia === media._id ? (
                             <Pause size={16} className="text-gray-600" />
@@ -399,6 +420,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                       <button
                         onClick={() => downloadMedia(media.url, media.name)}
                         className="p-1 rounded text-gray-500 hover:bg-blue-50 hover:text-blue-500"
+                        aria-label="Download"
                       >
                         <Download size={16} />
                       </button>
@@ -408,6 +430,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                           handleDeleteMedia(media._id);
                         }}
                         className="p-1 rounded text-gray-500 hover:bg-red-50 hover:text-red-500"
+                        aria-label="Delete"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -420,13 +443,13 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
         </div>
       ) : (
         // Grid View
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredFiles.map((media) => (
             <div
               key={media._id}
-              className="border rounded-xl p-4 hover:shadow-md transition-shadow bg-gray-50"
+              className="border rounded-xl p-3 hover:shadow-md transition-shadow bg-gray-50"
             >
-              <div className="flex flex-col gap-3 ">
+              <div className="flex flex-col gap-3">
                 {/* Media Preview */}
                 {media.type.startsWith("image/") && (
                   <div 
@@ -439,9 +462,13 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                         alt={media.name}
                         className="w-full h-full object-contain"
                         loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = '/placeholder-image.png';
+                        }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center group-hover:bg-opacity-30 transition-all">
-                        <Maximize2 size={24} className="text-white opacity-0 group-hover:opacity-100" />
+                        <Maximize2 size={20} className="text-white opacity-0 group-hover:opacity-100" />
                       </div>
                     </div>
                   </div>
@@ -459,7 +486,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                         className="w-full h-full object-contain"
                         onPlay={(e) => handlePlayPause(media._id, e.currentTarget)}
                       />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all pointer-events-none">
+                      <div className="absolute inset-0 flex items-center justify-center bg-opacity-0 group-hover:bg-opacity-20 transition-all pointer-events-none">
                         <Maximize2 size={24} className="text-white opacity-0 group-hover:opacity-100" />
                       </div>
                     </div>
@@ -490,8 +517,8 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                 
                 {/* Media Info */}
                 <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-medium text-gray-800 text-sm truncate max-w-[180px]">
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-gray-800 text-sm truncate">
                       {media.name}
                     </h3>
                     <div className="flex items-center gap-2">
@@ -513,8 +540,8 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                         e.stopPropagation();
                         downloadMedia(media.url, media.name);
                       }}
-                      className="p-2 text-gray-600 hover:text-blue-600 rounded-lg transition-colors"
-                      aria-label="Download media"
+                      className="p-1 sm:p-2 text-gray-600 hover:text-blue-600 rounded-lg transition-colors"
+                      aria-label="Download"
                     >
                       <Download size={16} />
                     </button>
@@ -523,8 +550,8 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                         e.stopPropagation();
                         handleDeleteMedia(media._id);
                       }}
-                      className="p-2 text-gray-600 hover:text-red-600 rounded-lg transition-colors"
-                      aria-label="Delete media"
+                      className="p-1 sm:p-2 text-gray-600 hover:text-red-600 rounded-lg transition-colors"
+                      aria-label="Delete"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -536,13 +563,14 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
         </div>
       )}
       
-      <div className="flex justify-between mt-6 pt-4 border-t">
-        <p className="text-sm text-gray-500">
+      {/* Footer */}
+      <div className="flex flex-col sm:flex-row justify-between items-center mt-6 pt-4 border-t gap-3">
+        <p className="text-sm text-gray-500 order-2 sm:order-1">
           {filteredFiles.length} {filteredFiles.length === 1 ? 'item' : 'items'}
         </p>
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm"
+          className="px-4 py-2 text-gray-600 hover:text-gray-900 text-sm order-1 sm:order-2"
         >
           Back to Dashboard
         </button>
@@ -551,38 +579,46 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
       {/* Media Preview Modal */}
       {previewMedia && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4 md:p-8"
+          className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-2 sm:p-4 md:p-8"
           onClick={closePreview}
         >
           <div 
-            className="relative max-w-5xl w-full bg-white rounded-lg overflow-hidden"
+            className="relative max-w-full w-full max-h-full bg-white rounded-lg overflow-hidden mx-2"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="font-medium truncate max-w-[80%]">{previewMedia.name}</h3>
-              <div className="flex items-center gap-3">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-3 sm:p-4 border-b">
+              <h3 className="font-medium truncate text-sm sm:text-base max-w-[70%]">{previewMedia.name}</h3>
+              <div className="flex items-center gap-2">
                 <button 
                   onClick={() => downloadMedia(previewMedia.url, previewMedia.name)}
-                  className="p-2 text-gray-600 hover:text-blue-600 rounded-full hover:bg-gray-100"
+                  className="p-1 sm:p-2 text-gray-600 hover:text-blue-600 rounded-full hover:bg-gray-100"
+                  aria-label="Download"
                 >
-                  <Download size={20} />
+                  <Download size={18} />
                 </button>
                 <button 
                   onClick={closePreview}
-                  className="p-2 text-gray-600 hover:text-red-600 rounded-full hover:bg-gray-100"
+                  className="p-1 sm:p-2 text-gray-600 hover:text-red-600 rounded-full hover:bg-gray-100"
+                  aria-label="Close"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
             
-            <div className="bg-gray-900 flex items-center justify-center" style={{ height: 'calc(80vh - 130px)' }}>
+            {/* Modal Content */}
+            <div className="bg-gray-900 flex items-center justify-center" style={{ height: '70vh' }}>
               {previewMedia.type.startsWith("image/") && (
-                <div className="w-full h-full flex items-center justify-center">
+                <div className="w-full h-full flex items-center justify-center p-2">
                   <img 
                     src={previewMedia.url} 
                     alt={previewMedia.name} 
                     className="max-w-full max-h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = '/placeholder-image.png';
+                    }}
                   />
                 </div>
               )}
@@ -594,18 +630,32 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ activeSection, onCancel }) => {
                   className="max-w-full max-h-full"
                 />
               )}
+              {previewMedia.type.startsWith("audio/") && (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                  <audio 
+                    src={previewMedia.url} 
+                    controls
+                    autoPlay
+                    className="w-full max-w-md"
+                  />
+                </div>
+              )}
             </div>
             
-            <div className="p-4 border-t flex justify-between items-center bg-white">
-              <span className="text-sm text-gray-500">
+            {/* Modal Footer */}
+            <div className="p-3 sm:p-4 border-t flex flex-col sm:flex-row justify-between items-center bg-white gap-2">
+              <span className="text-xs sm:text-sm text-gray-500">
                 {previewMedia.type}
                 {previewMedia.createdAt && 
                   ` • Added ${new Date(previewMedia.createdAt).toLocaleDateString()}`
                 }
+                {previewMedia.size && 
+                  ` • ${formatSize(previewMedia.size)}`
+                }
               </span>
               <button
                 onClick={closePreview}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors text-sm"
+                className="px-3 py-1 sm:px-4 sm:py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors text-sm w-full sm:w-auto text-center"
               >
                 Close
               </button>

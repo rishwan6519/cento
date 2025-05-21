@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import  PlaylistConfig from '@/models/PlaylistConfig';
+import mongoose from 'mongoose';
 
 export async function POST(req: NextRequest) {
   try {
@@ -61,11 +62,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+
+     const userId = req.nextUrl.searchParams.get('userId');
+    
+        if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+          return NextResponse.json(
+            { error: 'Invalid or missing userId' },
+            { status: 400 }
+          );
+        }
+    
     await connectToDatabase();
     
-    const playlists = await PlaylistConfig.find({})
+    const playlists = await PlaylistConfig.find({userId: new mongoose.Types.ObjectId(userId)})
       .sort({ createdAt: -1 });
       console.log("playlists",playlists);
       

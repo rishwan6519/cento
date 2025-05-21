@@ -7,6 +7,19 @@ import toast from "react-hot-toast";
 interface Device {
   _id: string;
   name: string;
+  deviceId: {
+    serialNumber: string;
+    imageUrl: string;
+    name: string;
+    
+  };
+  typeId:{
+    _id: string;
+    name: string;
+    handMovements: string[];
+    bodyMovements: string[];
+    screenSize: string;
+  }
   imageUrl?: string;
   serialNumber?: string;
   type?: string;
@@ -20,13 +33,11 @@ interface Playlist {
 }
 
 interface ConnectPlaylistProps {
-  activeSection: string;
   onCancel: () => void;
   onSuccess: () => void;
 }
 
 const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
-  activeSection,
   onCancel,
   onSuccess
 }) => {
@@ -37,13 +48,21 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
   const [selectedPlaylistsForDevice, setSelectedPlaylistsForDevice] = useState<string[]>([]);
   const [connectedPlaylists, setConnectedPlaylists] = useState<{[deviceId: string]: string[]}>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("userId");
+    if (storedUserId) {
+      setUserId(storedUserId);
+    }
+  }, []);
 
   useEffect(() => {
-    if (activeSection === "connectPlaylist") {
+    if (userId) {
       fetchAvailableDevices();
       fetchPlaylists();
     }
-  }, [activeSection]);
+  }, [userId]);
 
   useEffect(() => {
     if (selectedDeviceForPlaylist?._id) {
@@ -54,10 +73,11 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
   const fetchAvailableDevices = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/devices");
+      const response = await fetch(`/api/onboarded-devices?userId=${userId}`);
       if (!response.ok) throw new Error("Failed to fetch devices");
       const data = await response.json();
-      setAvailableDevices(data);
+      console.log(data.data, "Available devices data");
+      setAvailableDevices(data.data || []);
     } catch (error) {
       console.error("Error fetching devices:", error);
       toast.error("Failed to fetch devices");
@@ -69,7 +89,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
   const fetchPlaylists = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/playlists");
+      const response = await fetch(`/api/playlists?userId=${userId}`);
       if (!response.ok) throw new Error("Failed to fetch playlists");
       const data = await response.json();
       setPlaylists(data || []);
@@ -83,7 +103,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
 
   const fetchConnectedPlaylists = async (deviceId: string) => {
     try {
-      const response = await fetch(`/api/conected-playlist?deviceId=${deviceId}`);
+      const response = await fetch(`/api/connected-playlist?deviceId=${deviceId}`);
       if (!response.ok) throw new Error("Failed to fetch connected playlists");
       const data = await response.json();
       setConnectedPlaylists((prev) => ({
@@ -127,6 +147,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
         body: JSON.stringify({
           deviceId: selectedDeviceForPlaylist._id,
           playlistIds: validPlaylistIds,
+          userId: userId,
         }),
       });
       
@@ -154,11 +175,6 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
     setSelectedDeviceForPlaylist(null);
     setSelectedPlaylistsForDevice([]);
   };
-
-  // Skip rendering if not the active section
-  if (activeSection !== "connectPlaylist") {
-    return null;
-  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
@@ -197,9 +213,9 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  {device.imageUrl ? (
+                  {device.deviceId.imageUrl ? (
                     <img
-                      src={device.imageUrl}
+                      src={device.deviceId.imageUrl}
                       alt={device.name}
                       className="w-12 h-12 rounded-lg object-cover"
                     />
@@ -210,10 +226,10 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                   )}
                   <div>
                     <h3 className="font-medium text-gray-900">
-                      {device.name}
+                      {device.deviceId.name||"N/A"}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      ID: {device.serialNumber}
+                      ID: {device.deviceId.serialNumber || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -257,7 +273,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
             </h3>
             <p className="text-sm text-blue-700 mt-1">
               {selectedDeviceForPlaylist?.name} (
-              {selectedDeviceForPlaylist?.serialNumber})
+              {`${selectedDeviceForPlaylist?.deviceId.name} serial Number :-${selectedDeviceForPlaylist?.deviceId.serialNumber}`})
             </p>
           </div>
           

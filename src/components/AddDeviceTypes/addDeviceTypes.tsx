@@ -21,6 +21,8 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
   const [bodyMovements, setBodyMovements] = useState<string>("");
   const [screenWidth, setScreenWidth] = useState<string>("");
   const [screenHeight, setScreenHeight] = useState<string>("");
+  const [blockCodingEnabled, setBlockCodingEnabled] = useState<boolean>(false);
+
 
   // Skip rendering if not the active section
   if (activeSection !== "addDeviceType") {
@@ -72,6 +74,8 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
             width: parseInt(screenWidth),
             height: parseInt(screenHeight),
           },
+          blockCodingEnabled: blockCodingEnabled, 
+
         }),
       });
       
@@ -196,6 +200,22 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
             className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
+        {/* Enable Block Coding */}
+<div>
+  <label className="inline-flex items-center space-x-3">
+    <input
+      type="checkbox"
+      checked={blockCodingEnabled}
+      onChange={(e) => setBlockCodingEnabled(e.target.checked)}
+      className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+    />
+    <span className="text-sm font-semibold text-gray-700">
+      Enable Block Coding
+    </span>
+  </label>
+</div>
+
         
         <div className="flex justify-end gap-3 pt-4">
           <button

@@ -42,8 +42,14 @@ export default function LoginPage() {
         toast.success("Login successful!");
         if (data.user.role === "admin") {
           router.push("/admin"); // Redirect to admin page
+        }else if (data.user.role === "superUser") {
+          router.push("/platform"); // Redirect to superuser page
+        }else if (data.user.role === "user") {
+
+          router.push("/user-platform"); // Redirect to the platform page
+        }else if (data.user.role === "developer") {
+          router.push("/block-code"); // Redirect to the platform page
         }
-        router.push("/platform"); // Redirect to the platform page
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Login failed";

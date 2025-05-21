@@ -3,9 +3,20 @@ import { connectToDatabase } from '@/lib/db';
 import PlaylistConfig from '@/models/PlaylistConfig';
 import { writeFile } from 'fs/promises';
 import path from 'path';
+import Mongoose from 'mongoose';
 
 export async function POST(req: NextRequest) {
   try {
+
+     const userId = req.nextUrl.searchParams.get('userId');
+    
+        if (!userId || !Mongoose.Types.ObjectId.isValid(userId)) {
+          return NextResponse.json(
+            { error: 'Invalid or missing userId' },
+            { status: 400 }
+          );
+        }
+    
     await connectToDatabase();
     
     const formData = await req.formData();
@@ -21,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const configData = JSON.parse(configString as string);
-    console.log("conentData", configData.files,"................................ffffffff");
+    console.log("conentData", configData,"................................ffffffff");
     
     if (!configData.name) {
       return NextResponse.json(
@@ -40,6 +51,7 @@ export async function POST(req: NextRequest) {
     // Create new configuration with contentType
     const playlistConfig = await PlaylistConfig.create({
       name: configData.name,
+      userId: new Mongoose.Types.ObjectId(userId),
       type: configData.type ,
       contentType: configData.contentType , // Default to 'playlist' if not provided, 
       startTime: configData.startTime ,
