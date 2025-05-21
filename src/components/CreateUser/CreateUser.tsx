@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { FaUser, FaLock, FaUserPlus } from "react-icons/fa";
 import Card from "@/components/Platform/Card";
 import Button from "@/components/Platform/Button";
@@ -11,12 +10,13 @@ const CreateUser = () => {
     username: "",
     password: "",
     confirmPassword: "",
+    role: "user", // default role
   });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -28,13 +28,13 @@ const CreateUser = () => {
     }
 
     try {
-        const id=localStorage.getItem("userId");
-        const role=localStorage.getItem("userRole");
-        if (role !== "superUser") {
-            toast.error("You do not have permission to create a user");
-            return;
-        }
-       
+      const id = localStorage.getItem("userId");
+      const currentRole = localStorage.getItem("userRole");
+      if (currentRole !== "superUser") {
+        toast.error("You do not have permission to create a user");
+        return;
+      }
+
       setLoading(true);
       const response = await fetch("/api/user", {
         method: "POST",
@@ -44,8 +44,8 @@ const CreateUser = () => {
         body: JSON.stringify({
           username: formData.username.trim(),
           password: formData.password,
-            controllerId: id,
-          role: "user"
+          controllerId: id,
+          role: formData.role, // send selected role here
         }),
       });
 
@@ -56,7 +56,7 @@ const CreateUser = () => {
       }
 
       toast.success("User created successfully!");
-      setFormData({ username: "", password: "", confirmPassword: "" });
+      setFormData({ username: "", password: "", confirmPassword: "", role: "user" });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create user");
     } finally {
@@ -129,6 +129,34 @@ const CreateUser = () => {
             </div>
           </div>
 
+          {/* Role selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <div className="flex gap-6">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="role"
+                  value="user"
+                  checked={formData.role === "user"}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="form-radio"
+                />
+                <span className="ml-2">User</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="role"
+                  value="developer"
+                  checked={formData.role === "developer"}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="form-radio"
+                />
+                <span className="ml-2">Developer</span>
+              </label>
+            </div>
+          </div>
 
           <div className="mt-6">
             <Button
@@ -140,9 +168,25 @@ const CreateUser = () => {
             >
               {loading ? (
                 <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                   Creating...
                 </span>

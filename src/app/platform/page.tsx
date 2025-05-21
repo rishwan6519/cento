@@ -40,6 +40,7 @@ import CreateUser from "@/components/CreateUser/CreateUser";
 import LoadingState from "@/components/Platform/LoadingState";
 import ShowUsers from "@/components/ShowUsers/ShowUsers";
 import AssignDevice from "@/components/AssignDevice/AssignDevice";
+import toast from "react-hot-toast";
 
 export default function RoboticPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
@@ -56,6 +57,14 @@ export default function RoboticPlatform(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const userRole = localStorage.getItem("userRole");
+    if (userRole === "superUser") {
+      toast.success("Welcome Super User!");
+    } else {
+      toast.error("You are not authorized to access this page.");
+      window.location.href = "/login"; // Redirect to login page
+    }
+    
     const fetchDevices = async () => {
       try {
         setIsLoading(true);

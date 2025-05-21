@@ -10,6 +10,7 @@ export interface DeviceTypeDocument extends Document {
     width: number;
     
   };
+  blockCodingEnabled?: boolean;
 }
 const deviceTypeSchema = new mongoose.Schema({
   name: { 
@@ -30,7 +31,15 @@ const deviceTypeSchema = new mongoose.Schema({
     width: { 
       type: Number, 
       required: true 
+    },
+    height: { 
+      type: Number, 
+      required: true 
     }
+  },
+  blockCodingEnabled: { 
+    type: Boolean, 
+    default: false 
   }
 }, {
   timestamps: true

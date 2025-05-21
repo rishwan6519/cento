@@ -4,6 +4,7 @@ export enum UserRole {
   User = 'user',
   SuperUser = 'superUser',
   Admin = 'admin',
+  Developer = 'developer',
 }
 
 export interface UserDocument extends Document {

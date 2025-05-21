@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     // Find admin user in database
     const user = await User.findOne({ 
       username,
-      role: "admin" // Only allow admin users to login through this endpoint
+     // Only allow admin users to login through this endpoint
     });
     
     if (!user) {
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     // Return token
     return NextResponse.json(
       {
-        message: "Admin login successful",
+        message: " login successful",
         token,
         user: {
           id: user._id,
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Admin login error:", error);
+    console.error(" login error:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

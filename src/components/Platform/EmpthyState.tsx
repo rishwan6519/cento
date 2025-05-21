@@ -4,10 +4,11 @@ import  Button  from "./Button";
 import { FaPlus } from "react-icons/fa";
 
 interface EmptyStateProps {
-  onAddNew: () => void;
   message: string;
-  icon: ReactElement;
-  buttonText: string;
+  icon: React.ReactNode;
+  buttonText?: string; // Make optional
+  onAddNew?: () => void; // Make optional
+  role?: string; // Make optional
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({
@@ -15,6 +16,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   message,
   icon,
   buttonText,
+  role,
 }) => (
   <Card
     className="col-span-full flex flex-col items-center justify-center py-12 text-center"
@@ -24,12 +26,17 @@ const EmptyState: React.FC<EmptyStateProps> = ({
       {icon}
     </div>
     <h4 className="text-xl font-semibold text-gray-900 mb-1">
-      No Items Found
+      No Device  Found
     </h4>
     <p className="text-gray-500 mb-6 max-w-md">{message}</p>
-    <Button onClick={onAddNew} icon={<FaPlus />}>
-      {buttonText}
-    </Button>
+    {role === "superUser" && onAddNew && buttonText && (
+      <Button
+        onClick={onAddNew}
+        icon={role === "superUser" ? <FaPlus className="text-center" /> : undefined}
+      >
+        {buttonText}
+      </Button>
+    )}
   </Card>
 );
 

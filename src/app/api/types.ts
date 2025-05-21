@@ -8,5 +8,6 @@ export interface Device {
     _id: string;
     deviceId: string;
     type: string;
+    
   }
   
