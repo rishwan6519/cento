@@ -23,6 +23,7 @@ const BlockCode: React.FC = () => {
   const [connecting, setConnecting] = useState<boolean>(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const isRunningRef = useRef<boolean>(isRunning);
+  
 
   useEffect(() => {
     isRunningRef.current = isRunning;
@@ -235,13 +236,13 @@ const BlockCode: React.FC = () => {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 font-geinst ">
         <div className="container mx-auto p-4 sm:p-6">
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-              <div className="flex items-center flex-wrap gap-2">
-                <img src="/logo.png" alt="Cento Logo" className="h-12 w-12 sm:h-16 sm:w-16" />
-                <h1 className="text-xl sm:text-3xl font-bold text-indigo-700">CENTO ROBOT CONTROLLER</h1>
+              <div className="flex items-center flex-wrap gap-2 ">
+                <img src="/logo.png" alt="Cento Logo" className="h-12 w-12 sm:h-16 sm:w-16 " />
+                <h1 className="text-lg sm:text-xl font-bold text-indigo-700">CENTO ROBOT CONTROLLER</h1>
               </div>
 
               <div className="w-full sm:w-auto">

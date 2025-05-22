@@ -25,20 +25,25 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Add these styles to your global CSS */
-.step-circle {
-  @apply w-8 h-8 rounded-full flex items-center justify-center font-semibold transition-all;
-  @apply bg-gray-200 text-gray-600;
+
+
+:root {
+  --font-geist-sans: 'Geist', sans-serif;
+  --font-geist-mono: 'Geist Mono', monospace;
 }
 
-.step-circle.active {
-  @apply bg-blue-600 text-white;
+.font-geist {
+  font-family: var(--font-geist-sans);
 }
 
-.step-line {
-  @apply w-16 h-0.5 bg-gray-200 mx-2;
+.font-geist-mono {
+  font-family: var(--font-geist-mono);
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     
 }
 
-.step-line.active {
-  @apply bg-blue-600;
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }

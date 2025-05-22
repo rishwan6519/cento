@@ -143,20 +143,20 @@ const BlockPalette: React.FC = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-md p-4 max-h-[calc(100vh-180px)] overflow-y-auto hide-scrollbar">
-      <h2 className="text-lg sm:text-xl font-bold mb-4 text-gray-800 flex items-center">
+      <h2 className="text-lg sm:text-lg font-bold mb-4 text-gray-800 flex items-center">
         <span className="mr-2"><GiStoneBlock /></span> Block Palette
       </h2>
 
       {!selectedCategory ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 ">
           {Object.entries(categories).map(([key, category]) => (
             <button
               key={key}
-              className={`w-full p-3 sm:p-4 text-left rounded-xl text-white shadow-md transition-all hover:shadow-lg flex items-center ${category.color}`}
+              className={`w-full p-3 sm:p-4   text-left rounded-xl text-white shadow-md transition-all hover:shadow-lg flex items-center ${category.color}`}
               onClick={() => setSelectedCategory(key)}
             >
-              <span className="text-xl sm:text-2xl mr-2 sm:mr-3">{category.icon}</span>
-              <span className="font-medium text-base sm:text-lg">{category.name}</span>
+              <span className="text-xl sm:text-lg mr-2 sm:mr-3">{category.icon}</span>
+              <span className="font-medium text-base sm:text-sm">{category.name}</span>
             </button>
           ))}
         </div>
