@@ -17,12 +17,12 @@ const formatDuration = (startTime: string, endTime: string): string => {
 // Helper function to get file icon
 const getFileIcon = (type: string) => {
   switch (type) {
-    case 'audio':
-      return '🎵';
-    case 'video':
-      return '🎬';
+    case "audio":
+      return "🎵";
+    case "video":
+      return "🎬";
     default:
-      return '📄';
+      return "📄";
   }
 };
 
@@ -42,20 +42,20 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
 
   // Add a helper function to check if a device is connected
   const isDeviceConnected = (deviceId: string) => {
-    return playlist.deviceIds.some(d => d.id === deviceId);
+    return playlist.deviceIds.some((d) => d.id === deviceId);
   };
 
   // Add error handling for device connection
   const handleConnect = (deviceId: string) => {
     try {
       if (!playlist.id || !deviceId) {
-        console.error('Invalid playlist or device ID');
+        console.error("Invalid playlist or device ID");
         return;
       }
       onConnect(playlist.id, deviceId);
       setShowDeviceDropdown(false);
     } catch (err) {
-      console.error('Error connecting device:', err);
+      console.error("Error connecting device:", err);
     }
   };
 
@@ -66,56 +66,18 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
           <BsCollectionPlay className="mr-2 text-primary-500" />
           {playlist.name}
         </h4>
-        <div className="relative">
-          <button
-            onClick={() => setShowDeviceDropdown(!showDeviceDropdown)}
-            className="p-1.5 rounded-full hover:bg-gray-100"
-          >
-            <FaEllipsisV className="text-gray-500" />
-          </button>
-          {showDeviceDropdown && (
-            <motion.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-10"
-            >
-              <div className="p-2">
-                <p className="text-xs font-medium text-gray-500 px-3 py-1.5">
-                  Connect to device
-                </p>
-                {devices.length > 0 ? (
-                  devices
-                    .filter(d => !isDeviceConnected(d._id))
-                    .map(device => (
-                      <button
-                        key={device.name}
-                        onClick={() => handleConnect(device._id)}
-                        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded flex items-center"
-                      >
-                        <span className={`w-2 h-2 rounded-full mr-2 ${device.status === 'Connected' ? 'bg-green-400' : 'bg-gray-400'}`}></span>
-                        {device.deviceId?.name || device.name}
-                      </button>
-                    ))
-                ) : (
-                  <p className="text-xs text-gray-500 px-3 py-1.5">
-                    No devices available
-                  </p>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </div>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-4">
         <div>
           <p className="text-gray-500">Tracks</p>
-          <button 
+          <button
             onClick={() => setShowTracks(!showTracks)}
             className="text-gray-800 font-medium hover:text-primary-500 flex items-center"
           >
-            {playlist.files?.length || 0} {playlist.files?.length === 1 ? 'track' : 'tracks'}
+            {playlist.files?.length || 0}{" "}
+            {playlist.files?.length === 1 ? "track" : "tracks"}
             <span className="ml-1 text-xs">
-              {showTracks ? '(hide)' : '(show)'}
+              {showTracks ? "(hide)" : "(show)"}
             </span>
           </button>
         </div>
@@ -131,7 +93,7 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
         <div className="mb-4 border-t border-gray-100 pt-3">
           <ul className="space-y-2">
             {playlist.files.map((file, index) => (
-              <li 
+              <li
                 key={`${file.name}-${index}`}
                 className="flex items-center justify-between text-sm px-2 py-1.5 hover:bg-gray-50 rounded"
               >
@@ -152,23 +114,38 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
       )}
 
       <div className="mt-auto">
-        <p className="text-xs text-gray-500 mb-1">Connected Devices ({playlist.deviceIds.length})</p>
+        <p className="text-xs text-gray-500 mb-1">
+          Connected Devices ({playlist.deviceIds.length})
+        </p>
         <div className="flex flex-wrap gap-1 mt-1">
           {playlist.deviceIds.length > 0 ? (
-            playlist.deviceIds.map((deviceId,ind) => {
-              const connectedDevice = devices.find((d) => d._id.toString() === deviceId.id);
-              console.log("Connected Devices:", playlist);
+            playlist.deviceIds.map((deviceId, ind) => {
+              const connectedDevice = devices.find(
+                (d) => d._id.toString() === deviceId.id
+              );
+              console.log("Connected Devices:", connectedDevice);
               const deviceStatus = connectedDevice?.status || deviceId.status;
-              const statusColor = deviceStatus === "Connected" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700";
-              
+              const statusColor =
+                deviceStatus === "Connected"
+                  ? "bg-green-50 text-green-700"
+                  : "bg-blue-50 text-blue-700";
+
               return (
                 <span
-                  key={`device-${deviceId.id}`}
+                  key={`device-${deviceId.id || Math.random()}`}
                   className={`inline-flex items-center px-2 py-1 rounded-md ${statusColor} text-xs group relative`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${deviceStatus === "Connected" ? "bg-green-500" : "bg-blue-500"}`}></span>
-                  {deviceId.name || connectedDevice?.deviceId?.name || `Device ${deviceId.id}`}
-                  
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                      deviceStatus === "Connected"
+                        ? "bg-green-500"
+                        : "bg-blue-500"
+                    }`}
+                  ></span>
+                  {deviceId.name ||
+                    connectedDevice?.deviceId?.name ||
+                    `Device ${deviceId.id}`}
+
                   {/* Status tooltip on hover */}
                   <div className="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap">
                     {deviceStatus}
@@ -182,7 +159,7 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
             </span>
           )}
         </div>
-        
+
         {/* Show total count if more than 2 devices */}
         {playlist.deviceIds.length > 2 && (
           <p className="text-xs text-gray-500 mt-1">

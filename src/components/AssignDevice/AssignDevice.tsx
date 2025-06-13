@@ -34,9 +34,10 @@ export default function AssignDevice() {
         const superUserId = localStorage.getItem('userId');
         const response = await fetch(`/api/user?controllerId=${superUserId}`);
         const data = await response.json();
-        console.log(data.data, 'data');
+        // console.log(data.data, 'data');
         if (data.success) {
           setUsers(data.data);
+          // console.log(data.data, 'users');
         }
       } catch (err) {
         setError('Failed to fetch users');
@@ -53,7 +54,7 @@ export default function AssignDevice() {
         const id =localStorage.getItem('userId');
         const response = await fetch(`/api/available-devices?id=${id}`);
         const data = await response.json();
-        console.log(data.data, 'data');
+        // console.log(data.data, 'data');
         if (data.success) {
           setDevices(data.data);
         }
@@ -109,7 +110,8 @@ export default function AssignDevice() {
             <h3 className="text-xl font-semibold text-gray-800">Step 1: Select User</h3>
           
             <div className="flex flex-wrap gap-4">
-              {users.map((user) => (
+              {users.filter(user => user.role === 'user').map((user) => (
+
                 <div
                   key={user._id}
                   className={`flex items-center gap-4 w-64 p-4 border rounded-2xl cursor-pointer shadow-sm transition-all duration-200 ${

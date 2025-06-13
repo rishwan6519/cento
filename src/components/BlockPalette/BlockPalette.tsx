@@ -22,6 +22,21 @@ type BlockProps = {
   color: string;
 };
 
+
+const getInputConstraints = (key: string) => {
+switch (key) {
+case 'speed':
+return { min: 0.1, max: 0.3, step: 0.01 };
+case 'angle':
+return { min: 1, max: 360, step: 1 };
+case 'times': // For repeat blocks
+return { min: 1, max: 10, step: 1 };
+case 'seconds': // For delay blocks
+return { min: 1, max: 10, step: 1 };
+default:
+return { min: undefined, max: undefined, step: 1 };
+}
+};
 const Block: React.FC<BlockProps> = ({ block, color }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'BLOCK',
@@ -65,11 +80,7 @@ const Block: React.FC<BlockProps> = ({ block, color }) => {
         <span className="mr-2">{getCategoryIcon(block.category)}</span>
         <span className="font-medium">{block.type}</span>
         {block.params && Object.entries(block.params).map(([key, value]) => {
-          const inputProps = {
-            min: key === 'angle' ? 0 : key === 'speed' ? 0.1 : undefined,
-            max: key === 'angle' ? 360 : key === 'speed' ? 0.3 : undefined,
-            step: key === 'speed' ? 0.01 : 1,
-          };
+          const inputProps = getInputConstraints(key);
 
           return (
             <div key={key} className="flex items-center bg-white/20 px-2 py-1 rounded-lg">
@@ -77,6 +88,8 @@ const Block: React.FC<BlockProps> = ({ block, color }) => {
               <input
                 type="number"
                 defaultValue={value}
+                
+                
                 className="bg-white/10 px-2 py-0.5 rounded text-sm w-16 focus:outline-none focus:ring-2 focus:ring-white/50"
                 {...inputProps}
                 onBlur={(e) => handleParamChange(key, e.target.value)}

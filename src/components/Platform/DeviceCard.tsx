@@ -8,15 +8,15 @@ import { IoMdSettings, IoMdTrash } from "react-icons/io";
 import { MdAddCircleOutline } from "react-icons/md";
 
 // Add this component above the DeviceCard component
-const RemoveDeviceModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  deviceName 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  onConfirm: () => void; 
+const RemoveDeviceModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  deviceName,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
   deviceName: string;
 }) => {
   if (!isOpen) return null;
@@ -24,16 +24,15 @@ const RemoveDeviceModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Remove Device</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Remove Device
+        </h3>
         <p className="text-gray-600 mb-4">
-          Are you sure you want to remove "{deviceName}"? This action cannot be undone.
+          Are you sure you want to remove "{deviceName}"? This action cannot be
+          undone.
         </p>
         <div className="flex justify-end space-x-2">
-          <Button
-            variant="secondary"
-            onClick={onClose}
-            className="text-sm"
-          >
+          <Button variant="secondary" onClick={onClose} className="text-sm">
             Cancel
           </Button>
           <Button
@@ -77,7 +76,7 @@ interface DeviceCardProps {
   };
   onEdit: (device: any) => void;
   onManagePlaylists?: (device: any) => void;
-  onRemoveDevice?: (deviceId: string) => void;  // Add this new prop
+  onRemoveDevice?: (deviceId: string) => void; // Add this new prop
 }
 
 const NoDeviceCard = ({ onboardDevice }: { onboardDevice: () => void }) => {
@@ -119,7 +118,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
 
   // Helper function to validate image URL
   const isValidImageUrl = (url?: string) => {
-    return url && url.trim() !== '' && !url.includes('undefined');
+    return url && url.trim() !== "" && !url.includes("undefined");
   };
 
   // Handler for removing device
@@ -140,6 +139,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
               alt={`Device ${deviceId.name}`}
               width={64}
               height={64}
+              style={{ width: 64, height: "auto" }}
               className="object-cover"
               priority={true}
             />
@@ -161,7 +161,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             </div>
             <div>
               <p className="text-gray-500">Serial</p>
-              <p className="text-gray-800 font-medium">{deviceId.serialNumber}</p>
+              <p className="text-gray-800 font-medium">
+                {deviceId.serialNumber}
+              </p>
             </div>
           </div>
         </div>
@@ -173,17 +175,18 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             <div className="space-y-1">
               {connectedPlaylists && connectedPlaylists.length > 0 ? (
                 connectedPlaylists.map((playlist) => (
-                  <div 
+                  <div
                     key={playlist.id}
                     className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded"
                   >
                     <span className="text-gray-700">{playlist.name}</span>
-                    
                   </div>
                 ))
               ) : (
                 <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded">
-                  <span className="text-gray-400 text-sm">No playlists connected</span>
+                  <span className="text-gray-400 text-sm">
+                    No playlists connected
+                  </span>
                   <p className="text-xs text-gray-500 mt-1">
                     Connect playlists to manage content
                   </p>
@@ -192,7 +195,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             </div>
           </div>
         )}
-        
+
         <div className="flex justify-between">
           <Button
             variant="secondary"
@@ -203,7 +206,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             className="text-sm"
             icon={<BsMusicNoteList />}
           >
-            {showPlaylists ? 'Hide Playlists' : 'Playlists'}
+            {showPlaylists ? "Hide Playlists" : "Playlists"}
             {connectedPlaylists && connectedPlaylists.length > 0 && (
               <span className="ml-1 text-xs text-gray-500">
                 ({connectedPlaylists.length})
@@ -211,7 +214,6 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             )}
           </Button>
           <div className="flex space-x-2">
-        
             <Button
               variant="secondary"
               onClick={() => setShowRemoveModal(true)}

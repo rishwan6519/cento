@@ -50,29 +50,58 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(
-  req: NextRequest,
-  
-)  {
+
+interface Playlist {
+  _id: string;
+  name?: string;
+  startTime?: string;
+  endTime?: string;
+}
+interface DevicePlaylist {
+  deviceId: string;
+  playlistIds: Playlist[];
+}
+
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    
+
     const url = new URL(req.url);
     const userId = url.searchParams.get('userId');
-    console.log(userId, "userId..............................................")
 
     if (!userId) {
-      return NextResponse.json({ error: 'Device ID is required' }, { status: 400 });
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
-    const devicePlaylist = await DevicePlaylist.findOne({ userId: userId }).populate("playlistIds").populate("userId").select("-__v -createdAt -updatedAt");
-      console.log(devicePlaylist, "devicePlaylist..............................................")
+    const devicePlaylists: DevicePlaylist[] = await DevicePlaylist.find({ userId })
+      .populate("playlistIds")
+      .select("-__v -createdAt -updatedAt");
 
-    if (!devicePlaylist) {
-      return NextResponse.json({ playlists: [] });
-    }
+    const playlistMap = new Map();
 
-    return NextResponse.json(devicePlaylist);
+    devicePlaylists.forEach(dp => {
+      const deviceId = dp.deviceId;
+
+      dp.playlistIds.forEach((playlist: Playlist) => {
+        const playlistId = playlist._id.toString();
+
+        if (!playlistMap.has(playlistId)) {
+          playlistMap.set(playlistId, {
+            playlistData: playlist,
+            deviceIds: []
+          });
+        }
+
+        const entry = playlistMap.get(playlistId);
+        if (!entry.deviceIds.includes(deviceId)) {
+          entry.deviceIds.push(deviceId);
+        }
+      });
+    });
+
+    const result = Array.from(playlistMap.values());
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching device playlists:', error);
     return NextResponse.json({ error: 'Failed to fetch device playlists' }, { status: 500 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import OnboardedDevice from "@/models/OnboardedDevice";
 import Device from "@/models/Device";
+import {DeviceType} from "@/models/DeviceTypes";
 
 export async function GET(req: NextRequest) {
     try {

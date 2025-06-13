@@ -490,7 +490,7 @@ case "assignDevice":
             </button>
           </div>
           <div className="px-4 pb-2">
-            <div className="relative">
+            <div className="relative"> 
               <input
                 type="text"
                 placeholder="Search..."

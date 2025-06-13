@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
+import { DeviceType } from '@/models/DeviceTypes';
+import "@/models/DeviceTypes"
+
 
 
 
@@ -20,6 +23,7 @@ export async function GET(req: NextRequest) {
 
     // Populate `type` field details
     const device = await Device.findOne({ serialNumber: serialNumber }).populate('typeId');
+    
 
     if (!device) {
       return NextResponse.json(
