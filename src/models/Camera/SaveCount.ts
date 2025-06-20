@@ -39,13 +39,16 @@ const zoneSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  date: {
+    type: String,
+    required: true
+  },
   counts: [countEntrySchema]
 });
 
+
 // Add compound index for efficient queries
-zoneSchema.index({ camera_id: 1, zone_id: 1 });
-zoneSchema.index({ timestamp: 1 }, { 
-  expireAfterSeconds: 7 * 24 * 60 * 60 // Keep data for 7 days
-});
+zoneSchema.index({ camera_id: 1, zone_id: 1, date: 1 }, { unique: true });
+
 
 export const ZoneCount = mongoose.models.ZoneCount || mongoose.model('ZoneCount', zoneSchema);

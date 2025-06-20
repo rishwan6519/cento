@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { toast } from "react-toastify";
 
 // Add this type definition at the top of the file
 interface ZoneCounts {
@@ -104,6 +105,62 @@ const [isCountsPolling, setIsCountsPolling] = useState(false);
   const [startTime, setStartTime] = useState("00:00");
   const [endTime, setEndTime] = useState("23:59");
 
+// Add these new state variables at the top of your component
+const [availableCameras, setAvailableCameras] = useState<string[]>([]);
+const [selectedHeatmapCamera, setSelectedHeatmapCamera] = useState<string>('');
+const [availableZones, setAvailableZones] = useState<number[]>([]);
+const [drawnZones, setDrawnZones] = useState<Array<{
+  id: number;
+  coordinates: { x1: number; y1: number; x2: number; y2: number };
+  count: number | null;
+}>>([]);
+const [selectedZoneForDrawing, setSelectedZoneForDrawing] = useState<number | null>(null);
+
+// Add these new state variables at the top of your component
+const [isFullScreen, setIsFullScreen] = useState(false);
+
+// Add this function to handle full-screen toggle
+const toggleFullScreen = () => {
+  setIsFullScreen(!isFullScreen);
+};
+
+const fetchAvailableCameras = async () => {
+  try {
+    const response = await fetch(`api/cameras?startDate=${startDate}&startTime=${startTime}&endDate=${endDate}&endTime=${endTime}`);
+    if (!response.ok) throw new Error('Failed to fetch cameras');
+    const data = await response.json();
+    console.log("Available cameras data:", data); // Debugging line
+    if (data.cameras) {
+      setAvailableCameras(data.cameras.map(String));
+    }
+  } catch (error) {
+    console.error('Error fetching cameras:', error);
+    setAvailableCameras([]);
+  }
+};
+
+const fetchAvailableZones = async (cameraId: string) => {
+  try {
+    console.log(`Fetching zones for camera ${cameraId} with date range ${startDate} ${startTime} to ${endDate} ${endTime}`);
+    const response = await fetch(`/api/zones?cameraId=${cameraId}&startDate=${startDate}&startTime=${startTime}&endDate=${endDate}&endTime=${endTime}`);
+    if (!response.ok) throw new Error('Failed to fetch zones');
+    const data = await response.json();
+    console.log("Available zones data:", data); // Debugging line
+    setAvailableZones(data.zones || []);
+    console.log(`Available zones for camera ${availableZones}`);
+  } catch (error) {
+    console.error('Error fetching zones:', error);
+    setAvailableZones([]);
+  }
+};
+const [selectedStartDate, setSelectedStartDate] = useState('2025-06-17');
+const [selectedStartTime, setSelectedStartTime] = useState('09:00');
+const [selectedEndDate, setSelectedEndDate] = useState('2025-06-18');
+const [selectedEndTime, setSelectedEndTime] = useState('17:30');
+const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
+const [totalCount, setTotalCount] = useState<number | null>(null);
+
   const zoneColors = [
     'rgba(255, 99, 132, 0.3)',
     'rgba(54, 162, 235, 0.3)',
@@ -127,10 +184,11 @@ const debugAPI = async () => {
   if (!selectedCamera) return;
   
   try {
-    console.log(`Testing API endpoint: http://10.71.172.124:5000/get_counts?camera_id=${selectedCamera}`);
+    
+    console.log(`Testing API endpoint: http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}`);
     
     
-    const response = await fetch(`http://10.71.172.124:5000/get_counts?camera_id=${selectedCamera}`);
+    const response = await fetch(`http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}`);
     const data = await response.json();
     
     console.log("API Response Status:", response.status);
@@ -178,18 +236,20 @@ const debugAPI = async () => {
     setMessage("Connecting to camera streams...");
 
     try {
-      const response = await fetch("http://10.71.172.124:5000/start_pipeline", {
+      const response = await fetch("http://10.71.172.138:5000/start_pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sources: urls }),
       });
 
+
+      console.log("Pipeline started successfully:", response);
       if (!response.ok) {
         throw new Error("Pipeline start failed");
       }
 
       const result = await response.json();
-      const cameraRes = await fetch("http://10.71.172.124:5000/get_cameras");
+      const cameraRes = await fetch("http://10.71.172.138:5000/get_cameras");
       
       if (!cameraRes.ok) {
         throw new Error("Failed to get camera list");
@@ -215,7 +275,7 @@ const debugAPI = async () => {
     if (!selectedCamera) return;
     try {
       setMessage("Capturing snapshot...");
-      const res = await fetch(`http://10.71.172.124:5000/get_snapshot?camera_id=${selectedCamera}`);
+      const res = await fetch(`http://10.71.172.138:5000/get_snapshot?camera_id=${selectedCamera}`);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -282,7 +342,7 @@ const debugAPI = async () => {
 
         console.log(`Submitting zone ${zone.id} with coordinates:`, scaledPayload);
 
-        const res = await fetch(`http://10.71.172.124:5000/api/camera/${selectedCamera}/zones`, {
+        const res = await fetch(`http://10.71.172.138:5000/api/camera/${selectedCamera}/zones`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(scaledPayload)
@@ -428,7 +488,7 @@ const debugAPI = async () => {
   if (!selectedCamera) return;
   
   try {
-    const response = await fetch(`http://10.71.172.124:5000/get_counts?camera_id=${selectedCamera}`, {
+    const response = await fetch(`http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}`, {
       method: 'GET',
       cache: 'no-store',
       headers: {
@@ -506,7 +566,7 @@ const fetchHistoricalCounts = async () => {
     const endDateTime = `${endDate}T${endTime}:00`;
     
     const response = await fetch(
-      `http://10.71.172.124:5000/get_counts?camera_id=${selectedCamera}&start_time=${startDateTime}&end_time=${endDateTime}`,
+      `http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}&start_time=${startDateTime}&end_time=${endDateTime}`,
       {
         method: 'GET',
         headers: {
@@ -617,9 +677,190 @@ const [activeCamera, setActiveCamera] = useState<string | null>(null);
 
 // Add this function to handle camera switching
 const handleCameraSwitch = (cameraId: string) => {
+    setSelectedHeatmapCamera(cameraId);
+
   setActiveCamera(cameraId);
+
+  setDrawnZones([])
+  
 };
 
+// Add these state variables at the beginning of your component
+const [uploadedHeatmapUrl, setUploadedHeatmapUrl] = useState<string | null>(null);
+const [heatmapImageLoaded, setHeatmapImageLoaded] = useState(false);
+const [heatmapAnnotationZones, setHeatmapAnnotationZones] = useState<Array<{id: number; x1: number; y1: number; x2: number; y2: number}>>([]);
+const [activeHeatmapAnnotationZoneId, setActiveHeatmapAnnotationZoneId] = useState<number | null>(null);
+
+// Add this handler function for file upload
+const handleHeatmapUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (file) {
+    const imageUrl = URL.createObjectURL(file);
+    setUploadedHeatmapUrl(imageUrl);
+    setHeatmapImageLoaded(false);
+    
+    // Fetch available cameras after upload
+    await fetchAvailableCameras();
+  }
+};
+
+// Add this handler for heatmap image load
+const handleHeatmapImageLoad = () => {
+  setHeatmapImageLoaded(true);
+};
+
+// Add these handlers in the heatmap modal section
+const handleHeatmapMouseDown = (e: React.MouseEvent) => {
+  if (!selectedZoneForDrawing || !heatmapImageLoaded) return;
+  
+  setIsDrawing(true);
+  const coords = getRelativeCoords(e);
+  setStartPoint(coords);
+  setCurrentDrawing({ x1: coords.x, y1: coords.y, x2: coords.x, y2: coords.y });
+};
+
+const handleHeatmapMouseMove = (e: React.MouseEvent) => {
+  if (!isDrawing || !startPoint || !heatmapImageLoaded) return;
+  
+  const coords = getRelativeCoords(e);
+  setCurrentDrawing({
+    x1: Math.min(startPoint.x, coords.x),
+    y1: Math.min(startPoint.y, coords.y),
+    x2: Math.max(startPoint.x, coords.x),
+    y2: Math.max(startPoint.y, coords.y),
+  });
+};
+
+const handleHeatmapMouseUp = async (e: React.MouseEvent) => {
+  if (!isDrawing || !startPoint || !currentDrawing || !heatmapImageLoaded || !selectedZoneForDrawing) return;
+  
+  const coords = getRelativeCoords(e);
+  const newZoneCoordinates = {
+    x1: Math.min(startPoint.x, coords.x),
+    y1: Math.min(startPoint.y, coords.y),
+    x2: Math.max(startPoint.x, coords.x),
+    y2: Math.max(startPoint.y, coords.y),
+  };
+
+  const minSize = 20;
+  if (Math.abs(newZoneCoordinates.x2 - newZoneCoordinates.x1) < minSize || 
+      Math.abs(newZoneCoordinates.y2 - newZoneCoordinates.y1) < minSize) {
+    setMessage("Zone too small! Please draw a larger area (minimum 20x20 pixels).");
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentDrawing(null);
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/counts?cameraId=${selectedHeatmapCamera}&zoneId=${selectedZoneForDrawing}&startDate=${selectedStartDate}&startTime=${selectedStartTime}&endDate=${selectedEndDate}&endTime=${selectedEndTime}`
+    );
+    
+    if (!response.ok) throw new Error('Failed to fetch count');
+    
+    const data = await response.json();
+    console.log("Fetched zone count data:", data); // Debugging line  
+    
+    // Add the new zone with count
+    setDrawnZones(prev => [...prev, {
+      id: selectedZoneForDrawing,
+      coordinates: newZoneCoordinates,
+      count: data.total_entered_count
+    }]);
+
+    // Reset drawing state
+    setSelectedZoneForDrawing(null);
+    setMessage(`Zone ${selectedZoneForDrawing} count fetched: ${data.total_entered_count}`);
+    
+  } catch (error) {
+    console.error('Error fetching zone count:', error);
+    setMessage('Failed to fetch zone count');
+  }
+
+  setIsDrawing(false);
+  setStartPoint(null);
+  setCurrentDrawing(null);
+};
+
+// Add this function to fetch zone counts
+const fetchZoneCount = async (zoneId: number, coordinates: { x1: number; y1: number; x2: number; y2: number }) => {
+  try {
+    const response = await fetch(
+      `/api/counts?cameraId=${selectedHeatmapCamera}&zoneId=${zoneId}&startDate=${selectedStartDate}&startTime=${selectedStartTime}&endDate=${selectedEndDate}&endTime=${selectedEndTime}`
+    );
+    
+    if (!response.ok) throw new Error('Failed to fetch count');
+    
+    const data = await response.json();
+    
+    // Update the drawn zones with the count
+    setDrawnZones(prev => prev.map(zone => 
+      zone.id === zoneId 
+        ? { ...zone, count: data.total_entered_count }
+        : zone
+    ));
+    
+  } catch (error) {
+    console.error('Error fetching zone count:', error);
+    toast.error('Failed to fetch zone count');
+  }
+};
+
+// Update your ZoneWithCount component to be more responsive
+const ZoneWithCount = ({ zone, isFullScreen }: { 
+  zone: { 
+    id: number; 
+    coordinates: { x1: number; y1: number; x2: number; y2: number }; 
+    count: number | null 
+  },
+  isFullScreen: boolean
+}) => {
+  const getHeatColor = (count: number) => {
+    if (count > 150) return 'rgba(255, 0, 0, 0.7)';
+    if (count > 100) return 'rgba(255, 165, 0, 0.7)';
+    if (count > 50) return 'rgba(255, 255, 0, 0.7)';
+    return 'rgba(0, 255, 255, 0.7)';
+  };
+
+  return (
+    <>
+      {/* Heat Zone */}
+      <div
+        className={`absolute rounded-full blur-xl pointer-events-none transition-all duration-300 ${
+          isFullScreen ? 'scale-100' : 'scale-90'
+        }`}
+        style={{
+          left: zone.coordinates.x1,
+          top: zone.coordinates.y1,
+          width: zone.coordinates.x2 - zone.coordinates.x1,
+          height: zone.coordinates.y2 - zone.coordinates.y1,
+          backgroundColor: zone.count ? getHeatColor(zone.count) : 'rgba(0, 255, 255, 0.3)'
+        }}
+      />
+      
+      {/* Count Label */}
+      <div
+        className={`absolute px-3 py-1 rounded-lg shadow-md font-bold z-10 transition-all duration-300 ${
+          isFullScreen ? 'text-base' : 'text-sm'
+        }`}
+        style={{
+          left: (zone.coordinates.x1 + zone.coordinates.x2) / 2,
+          top: (zone.coordinates.y1 + zone.coordinates.y2) / 2,
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          border: '2px solid ' + (zone.count ? getHeatColor(zone.count) : 'rgba(0, 255, 255, 0.9)')
+        }}
+      >
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs text-gray-600">In-count: {zone.count || 0}</span>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// Update the heatmap container section
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
      
@@ -735,18 +976,7 @@ const handleCameraSwitch = (cameraId: string) => {
                     📸 Take Snapshot & Set Zones
                   </button>
 
-                  {/* Heatmap Button */}
-                  {submittedZones.length > 0 && (
-                    <button 
-                      onClick={() => {
-                        // Show heatmap time selection UI
-                        document.getElementById('heatmap-controls')?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-orange-600 hover:to-red-700 transform hover:scale-105 transition-all shadow-lg"
-                    >
-                      🔥 View Heatmap
-                    </button>
-                  )}
+               
                 </div>
 
                 {/* Heatmap Controls */}
@@ -902,19 +1132,7 @@ const handleCameraSwitch = (cameraId: string) => {
             )}
           </div>
 
-          {/* Generated URLs Display (if needed for debugging) */}
-          {generatedUrls.length > 0 && (
-            <div className="mt-8 bg-white shadow-xl rounded-2xl p-6">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">🔗 Generated RTSP URLs</h3>
-              <div className="space-y-2">
-                {generatedUrls.map((url, idx) => (
-                  <div key={idx} className="bg-gray-50 p-3 rounded-lg">
-                    <span className="text-sm text-gray-600 font-mono">{url}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+       
         </div>
       </div>
 
@@ -1086,109 +1304,205 @@ const handleCameraSwitch = (cameraId: string) => {
           <div className="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-3xl">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-2xl font-semibold text-gray-800">🔥 People Count Heatmap</h3>
+                <h3 className="text-2xl font-semibold text-gray-800">🔥 Heatmap Analysis</h3>
                 <button 
-                  onClick={() => setShowHeatmapModal(false)}
+                  onClick={() => {
+                    setShowHeatmapModal(false);
+                    setUploadedHeatmapUrl(null);
+                    setHeatmapAnnotationZones([]);
+                  }}
                   className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
                 >
                   ×
                 </button>
               </div>
-              <div className="text-sm text-gray-600">
-                Showing data from {startDate} {startTime} to {endDate} {endTime}
-              </div>
-            </div>
-
-            <div className="p-6">
-              {heatmapData.length > 0 ? (
-                <div className="space-y-6">
-                  {/* Heatmap Visualization */}
-                  <div className="relative border-2 border-gray-300 rounded-2xl overflow-hidden bg-gray-50">
-                    {snapshotUrl && (
-                      <img
-                        src={snapshotUrl}
-                        alt="Camera snapshot for heatmap"
-                        className="max-w-full h-auto block opacity-70"
-                      />
-                    )}
-                    
-                    {/* Heatmap Overlay */}
-                    {(() => {
-                      const aggregatedData = getAggregatedHeatmapData();
-                      const maxCount = Math.max(...Object.values(aggregatedData));
-                      
-                      return submittedZones.map((zone) => {
-                        const inCount = aggregatedData[zone.id] || 0;
-                        const intensity = getHeatmapIntensity(inCount, maxCount);
-                        
-                        return (
-                          <div
-                            key={zone.id}
-                            className="absolute border-2 pointer-events-none"
-                            style={{
-                              left: zone.x1,
-                              top: zone.y1,
-                              width: zone.x2 - zone.x1,
-                              height: zone.y2 - zone.y1,
-                              backgroundColor: `rgba(255, ${255 - Math.floor(intensity * 255)}, ${255 - Math.floor(intensity * 255)}, 0.6)`,
-                              borderColor: intensity > 0.5 ? '#dc2626' : '#f97316',
-                            }}
-                          >
-                            <div 
-                              className="absolute -top-8 left-0 px-2 py-1 text-white text-sm font-bold rounded"
-                              style={{ 
-                                backgroundColor: intensity > 0.5 ? '#dc2626' : '#f97316'
-                              }}
-                            >
-                              Zone {zone.id}: In Count: {inCount}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
+              
+              {!uploadedHeatmapUrl && (
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl">
+                  <div className="text-center mb-4">
+                    <div className="text-4xl mb-2">📤</div>
+                    <h4 className="text-lg font-medium text-gray-800">Upload Heatmap Image</h4>
+                    <p className="text-sm text-gray-600">Upload your heatmap image to start annotation</p>
                   </div>
-
-                  {/* Statistics Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {(() => {
-                      const aggregatedData = getAggregatedHeatmapData();
-                      return submittedZones.map((zone) => {
-                        const inCount = aggregatedData[zone.id] || 0;
-                        const zoneData = heatmapData.filter(item => item.zone_id === zone.id);
-                        
-                        return (
-                          <div key={zone.id} className="bg-white border border-gray-200 rounded-xl p-4">
-                            <h5 className="font-semibold text-gray-800 mb-2">Zone {zone.id}</h5>
-                            <div className="space-y-1 text-sm">
-                              <div className="flex justify-between">
-                                <span>Total In Count:</span>
-                                <span className="font-medium text-green-600">{inCount}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Data Points:</span>
-                                <span className="font-medium">{zoneData.length}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Avg In Count per Point:</span>
-                                <span className="font-medium">
-                                  {zoneData.length > 0 ? (inCount / zoneData.length).toFixed(1) : '0'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">📊</div>
-                  <h4 className="text-xl font-semibold text-gray-800 mb-2">No Heatmap Data</h4>
-                  <p className="text-gray-600">No data found for the selected time range.</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleHeatmapUpload}
+                    className="hidden"
+                    id="heatmap-upload"
+                  />
+                  <label
+                    htmlFor="heatmap-upload"
+                    className="px-6 py-3 bg-blue-500 text-white rounded-xl cursor-pointer hover:bg-blue-600 transition-colors"
+                  >
+                    Choose File
+                  </label>
                 </div>
               )}
             </div>
+
+            {uploadedHeatmapUrl && (
+              <div className="p-6">
+                {/* Camera Selection */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-medium text-gray-800 mb-3">Select Camera</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    {availableCameras.map((cameraId) => (
+                      <button
+                        key={cameraId}
+                        onClick={() => {
+                          setSelectedHeatmapCamera(cameraId);
+                          fetchAvailableZones(cameraId);
+                          
+                        }}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          selectedHeatmapCamera === cameraId
+                            ? "bg-blue-500 text-white shadow-md"
+                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                         {cameraId}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Zone Selection - Only show if camera is selected */}
+                {selectedHeatmapCamera && availableZones.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-lg font-medium text-gray-800 mb-3">Select Zone to Draw {availableZones}</h4>
+                    <div className="grid grid-cols-4 gap-3">
+                      {availableZones.map((zoneId) => (
+                        <button
+                          key={zoneId}
+                          onClick={() => setSelectedZoneForDrawing(zoneId)}
+                          disabled={drawnZones.some(zone => zone.id === zoneId)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                            selectedZoneForDrawing === zoneId
+                              ? "bg-green-500 text-white shadow-md"
+                              : drawnZones.some(zone => zone.id === zoneId)
+                              ? "bg-gray-300 cursor-not-allowed"
+                              : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                          }`}
+                        >
+                          Zone {zoneId}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Time Range Display */}
+                <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                  <h4 className="text-sm font-medium text-gray-600 mb-2">Selected Time Range</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-500">Start: {selectedStartDate} {selectedStartTime}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">End: {selectedEndDate} {selectedEndTime}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Heatmap image container */}
+                <div 
+                  className={`fixed transition-all duration-300 ${
+                    isFullScreen 
+                      ? 'inset-0 z-50 bg-black flex items-center justify-center p-4' 
+                      : 'relative'
+                  }`}
+                >
+                  <div 
+                    ref={containerRef} 
+                    className={`relative border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-gray-50 transition-all duration-300 ${
+                      isFullScreen ? 'w-full h-full max-h-screen' : ''
+                    }`}
+                    onMouseDown={handleHeatmapMouseDown}
+                    onMouseMove={handleHeatmapMouseMove}
+                    onMouseUp={handleHeatmapMouseUp}
+                    onMouseLeave={() => {
+                      setIsDrawing(false);
+                      setStartPoint(null);
+                      setCurrentDrawing(null);
+                    }}
+                    style={{ cursor: selectedZoneForDrawing ? 'crosshair' : 'default' }}
+                  >
+                    {/* Full-screen toggle button */}
+                    <button
+                      onClick={toggleFullScreen}
+                      className="absolute top-4 right-4 z-20 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-all"
+                    >
+                      {isFullScreen ? (
+                        <span className="text-xl">⤓</span> // Minimize icon
+                      ) : (
+                        <span className="text-xl">⤢</span> // Expand icon
+                      )}
+                    </button>
+
+                    <img
+                      ref={imageRef}
+                      src={uploadedHeatmapUrl}
+                      alt="Heatmap"
+                      className={`transition-all duration-300 ${
+                        isFullScreen 
+                          ? 'max-h-full w-auto mx-auto object-contain' 
+                          : 'max-w-full h-auto'
+                      }`}
+                      onLoad={handleHeatmapImageLoad}
+                      draggable={false}
+                    />
+                    
+                    {/* Render drawn zones with heat effect */}
+                    {drawnZones.map(zone => (
+                      <ZoneWithCount 
+                        key={zone.id} 
+                        zone={zone} 
+                        isFullScreen={isFullScreen}
+                      />
+                    ))}
+                    
+                    {/* Current drawing overlay */}
+                    {isDrawing && currentDrawing && (
+                      <div
+                        className="absolute border-2 border-dashed pointer-events-none"
+                        style={{
+                          left: currentDrawing.x1,
+                          top: currentDrawing.y1,
+                          width: currentDrawing.x2 - currentDrawing.x1,
+                          height: currentDrawing.y2 - currentDrawing.y1,
+                          backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                          borderColor: 'rgb(59, 130, 246)',
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {uploadedHeatmapUrl && heatmapImageLoaded && (
+              <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 rounded-b-3xl">
+                <div className="flex justify-end gap-4">
+                  <button 
+                    onClick={() => setHeatmapAnnotationZones([])}
+                    className="px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-all"
+                  >
+                    Clear Annotations
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // Handle annotation submission here
+                      console.log('Heatmap annotations:', heatmapAnnotationZones);
+                      setShowHeatmapModal(false);
+                    }}
+                    className="px-8 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-teal-700 transition-all"
+                  >
+                    Submit Annotations
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

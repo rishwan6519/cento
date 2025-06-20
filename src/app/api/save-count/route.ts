@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { ZoneCount } from '@/models/Camera/SaveCount';
 import { connectToDatabase } from '@/lib/db';
 
-// Add interfaces for type safety
 interface HistoryEntry {
-  action: 'Entered' | 'Exited';
+  action: 'Entered' | 'Exited' | 'Entered (Qualified)';
   id: number;
   time: string;
 }
@@ -32,45 +31,53 @@ export async function POST(request: Request) {
     const body = await request.json() as RequestBody;
     const { camera_id, timestamp, counts } = body;
 
-    // Process each zone's counts
-    for (const [zoneId, zoneData] of Object.entries(counts)) {
-      const countEntry = {
-        timestamp: new Date(timestamp),
-        in_count: zoneData.in_count || zoneData.in || 0,
-        out_count: zoneData.out_count || zoneData.out || 0,
-        history: zoneData.history || []
-      };
+    const dateStr = new Date(timestamp).toISOString().split('T')[0];
 
-      // Find and update zone document, or create if doesn't exist
-      await ZoneCount.findOneAndUpdate(
-        { 
-          camera_id, 
-          zone_id: parseInt(zoneId)
-        },
-        { 
-          $push: { 
-            counts: {
-              $each: [countEntry],
-              $sort: { timestamp: -1 }  // Keep counts sorted by timestamp
-            }
-          }
-        },
-        { 
-          upsert: true,
-          new: true
-        }
+    for (const [zoneId, zoneData] of Object.entries(counts)) {
+      const filteredHistory = (zoneData.history || []).filter(
+        entry => entry.action === 'Entered (Qualified)'
       );
+
+      // Only proceed if there's at least one qualified entry
+      if (filteredHistory.length > 0) {
+        const countEntry = {
+          timestamp: new Date(timestamp),
+          in_count: zoneData.in_count || zoneData.in || 0,
+          out_count: zoneData.out_count || zoneData.out || 0,
+          history: filteredHistory
+        };
+
+        await ZoneCount.findOneAndUpdate(
+          {
+            camera_id,
+            zone_id: parseInt(zoneId),
+            date: dateStr
+          },
+          {
+            $push: {
+              counts: {
+                $each: [countEntry],
+                $sort: { timestamp: -1 }
+              }
+            }
+          },
+          {
+            upsert: true,
+            new: true
+          }
+        );
+      }
     }
 
     return NextResponse.json({
-      message: 'Count data saved successfully'
+      message: 'Qualified count data saved successfully'
     }, { status: 200 });
 
   } catch (error) {
     console.error('Error saving count data:', error);
-    
-    const errorMessage = error instanceof Error 
-      ? error.message 
+
+    const errorMessage = error instanceof Error
+      ? error.message
       : 'An unknown error occurred';
 
     return NextResponse.json({
