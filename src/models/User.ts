@@ -12,6 +12,8 @@ export interface UserDocument extends Document {
   username: string;
   password: string;
   role: UserRole;
+  blockCoding?: boolean;
+  peopleDetection?: boolean;
 }
 
 const UserSchema: Schema = new Schema({
@@ -28,6 +30,14 @@ const UserSchema: Schema = new Schema({
   password: { 
     type: String, 
     required: [true, 'Password is required']
+  },
+  blockCoding: { 
+    type: Boolean, 
+    default: false 
+  },
+  peopleDetection: { 
+    type: Boolean, 
+    default: false 
   },
   role: { 
     type: String, 

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { ZoneCount } from '@/models/Camera/SaveCount';
 import { connectToDatabase } from '@/lib/db';
+import "@/models/Camera/SaveCount"
+
 
 interface HistoryEntry {
   action: 'Entered' | 'Exited' | 'Entered (Qualified)';

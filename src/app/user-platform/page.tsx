@@ -13,6 +13,8 @@ import ShowMedia from "@/components/ShowMedia/showMedia";
 import ConnectPlaylist from "@/components/ConnectPlaylist/connectPlaylist";
 import LoadingState from "@/components/Platform/LoadingState";
 import PlaylistManager from "@/components/ShowPlaylist/showPlaylist";
+import FloorMapUploader from "@/components/FloorMapUploader/FloorMapUploader";
+
 import toast from "react-hot-toast";
 
 export default function UserPlatform(): React.ReactElement {
@@ -173,6 +175,8 @@ export default function UserPlatform(): React.ReactElement {
     { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
     { key: "showPlaylist" as MenuKey, label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
     { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
+    { key: "uploadFloorMap" as MenuKey, label: "Upload Floor Map", icon: <FaPlug /> },
+
   ];
 
   const renderContent = (): React.ReactElement => {
@@ -217,6 +221,8 @@ export default function UserPlatform(): React.ReactElement {
         return <PlaylistManager />;
       case "connectPlaylist":
         return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
+        case "uploadFloorMap":
+  return <FloorMapUploader />;
       default:
         return (
           <div className="flex items-center justify-center h-64">

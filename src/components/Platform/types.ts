@@ -14,6 +14,7 @@ export type MenuKey =
   | "showPlaylist"
   | "connectPlaylist"
   | "onboardDevice"
+  |"uploadFloorMap"
   | "connectedPlaylists";
 
 export interface Device {
