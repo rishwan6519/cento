@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import Button from "@/components/Platform/Button";
 import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
-import { FaRobot, FaRegFileAudio, FaListAlt, FaPlug } from "react-icons/fa";
+import { FaRobot, FaRegFileAudio, FaListAlt, FaPlug, FaCode, FaEye } from "react-icons/fa";
 import { RiDashboardLine } from "react-icons/ri";
 import { MdOutlinePlaylistPlay } from "react-icons/md";
 import { Device, Playlist, MenuKey, DeviceFormData } from "@/components/Platform/types";
@@ -17,23 +17,57 @@ import FloorMapUploader from "@/components/FloorMapUploader/FloorMapUploader";
 
 import toast from "react-hot-toast";
 
+// Add new interfaces for user data
+interface UserData {
+  _id: string;
+  username: string;
+  role: string;
+  blockCoding?: boolean;
+  peopleDetection?: boolean;
+}
+
 export default function UserPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-
+  const [userData, setUserData] = useState<UserData | null>(null);
 
   useEffect(() => {
     const userRole = localStorage.getItem("userRole");
     if (userRole === "user") {
-      toast.success("Welcome  User!");
+      toast.success("Welcome User!");
     } else {
       toast.error("You are not authorized to access this page.");
       window.location.href = "/login"; // Redirect to login page
     }
     
+    // Fetch user data to check for blockCoding and peopleDetection
+    const fetchUserData = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) return;
+
+        const response = await fetch(`/api/user/users?userId=${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+           setUserData(data);
+
+          console.log("User data fetched successfully:", data);
+          
+        }
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+      }
+    };
+
     const fetchAssignedDevices = async () => {
       try {
         setIsLoading(true);
@@ -100,7 +134,7 @@ export default function UserPlatform(): React.ReactElement {
                   ? new Date(assignment.updatedAt).toLocaleString()
                   : new Date().toLocaleString()
               };
-            }).filter(Boolean); // Filter out any null values // Filter out any null values
+            }).filter(Boolean); // Filter out any null values
 
           // Log mapped devices before setting state
           console.log('Mapped devices array:', mappedDevices);
@@ -123,6 +157,7 @@ export default function UserPlatform(): React.ReactElement {
       }
     };
 
+    fetchUserData();
     fetchAssignedDevices();
   }, []);
 
@@ -168,16 +203,55 @@ export default function UserPlatform(): React.ReactElement {
     }
   };
 
-  const menuItems = [
+  // Base menu items
+  const baseMenuItems = [
     { key: "dashboard" as MenuKey, label: "Dashboard", icon: <RiDashboardLine /> },
     { key: "createMedia" as MenuKey, label: "Create Media", icon: <FaRegFileAudio /> },
     { key: "showMedia" as MenuKey, label: "Show Media", icon: <FaRegFileAudio /> },
     { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
     { key: "showPlaylist" as MenuKey, label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
     { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
-    { key: "uploadFloorMap" as MenuKey, label: "Upload Floor Map", icon: <FaPlug /> },
-
   ];
+   const handleBlockCodingClick = () => {
+    // Navigate to Block Coding page
+    window.location.href = "/block-code";
+  };
+
+  // Function to handle People Detection navigation
+  const handlePeopleDetectionClick = () => {
+    // Navigate to People Detection page
+    window.location.href = "/people-detection";
+  };
+
+  // Conditional menu items based on user permissions
+  const conditionalMenuItems = [];
+  
+  if (userData?.blockCoding) {
+    conditionalMenuItems.push({
+      key: "blockCoding" as MenuKey,
+      label: "Block Coding",
+      icon: <FaCode />
+    });
+  }
+
+if (userData?.peopleDetection) {
+  conditionalMenuItems.push(
+    {
+      key: "peopleDetection" as MenuKey,
+      label: "People Detection",
+      icon: <FaEye />,
+    },
+    {
+      key: "uploadFloorMap" as MenuKey,
+      label: "Upload Floor Map",
+      icon: <FaPlug />,
+    }
+  );
+}
+
+
+  // Combine all menu items
+  const menuItems = [...baseMenuItems, ...conditionalMenuItems];
 
   const renderContent = (): React.ReactElement => {
     if (isLoading) {
@@ -221,8 +295,55 @@ export default function UserPlatform(): React.ReactElement {
         return <PlaylistManager />;
       case "connectPlaylist":
         return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
-        case "uploadFloorMap":
-  return <FloorMapUploader />;
+      case "uploadFloorMap":
+        return <FloorMapUploader />;
+      case "blockCoding":
+        return (
+          <Card className="p-6">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+              <FaCode className="text-blue-500" />
+              Block Coding
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Visual programming interface for creating custom logic and automation.
+            </p>
+            <div className="bg-blue-50 p-6 rounded-lg text-center mb-4">
+              <p className="text-blue-700 mb-4">Click below to access the Block Coding interface</p>
+              <Button 
+                variant="primary" 
+                onClick={handleBlockCodingClick}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <FaCode className="mr-2" />
+                Go to Block Coding
+              </Button>
+            </div>
+          </Card>
+        );
+           case "peopleDetection":
+        return (
+          <Card className="p-6">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+              <FaEye className="text-green-500" />
+              People Detection
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Monitor and analyze people movement and detection data.
+            </p>
+            <div className="bg-green-50 p-6 rounded-lg text-center mb-4">
+              <p className="text-green-700 mb-4">Click below to access the People Detection interface</p>
+              <Button 
+                variant="primary" 
+                onClick={handlePeopleDetectionClick}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <FaEye className="mr-2" />
+                Go to People Detection
+              </Button>
+            </div>
+          </Card>
+        );
+
       default:
         return (
           <div className="flex items-center justify-center h-64">
@@ -265,6 +386,11 @@ export default function UserPlatform(): React.ReactElement {
             <FaRobot className="text-primary-500" />
             User Dashboard
           </h2>
+          {userData && (
+            <p className="text-sm text-gray-500 mt-1">
+              Welcome, {userData.username}
+            </p>
+          )}
         </div>
         
         <nav className="mt-6 px-4">
@@ -288,6 +414,19 @@ export default function UserPlatform(): React.ReactElement {
             </div>
           ))}
         </nav>
+
+        {/* Show conditional features info */}
+        {(userData?.blockCoding || userData?.peopleDetection) && (
+          <div className="mt-6 px-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm font-medium text-green-800 mb-1">Special Features</p>
+              <div className="text-xs text-green-600">
+                {userData?.blockCoding && <div>• Block Coding Enabled</div>}
+                {userData?.peopleDetection && <div>• People Detection Enabled</div>}
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* Main Content */}

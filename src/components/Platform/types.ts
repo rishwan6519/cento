@@ -15,7 +15,9 @@ export type MenuKey =
   | "connectPlaylist"
   | "onboardDevice"
   |"uploadFloorMap"
-  | "connectedPlaylists";
+  | "connectedPlaylists"
+  |"blockCoding"
+  |"peopleDetection"
 
 export interface Device {
   _id: string;

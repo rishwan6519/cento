@@ -73,14 +73,29 @@ const BlockCodingGate: React.FC = () => {
   };
 
   useEffect(() => {
+    const checkAccess = async () => {
     const userRole = localStorage.getItem("userRole");
-    if (userRole === "developer") {
-      toast.success("Welcome Developer!");
-    } else {
-      toast.error("You are not authorized to access this page.");
-      window.location.href = "/login";
-      return;
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      toast.error("User ID not found.");
+      return window.location.href = "/login";
     }
+
+    try {
+      const response = await fetch(`/api/user/users?userId=${userId}`);
+      const data = await response.json();
+
+      if (userRole === "developer" && data.blockCoding === true) {
+        toast.success("Welcome Developer!");
+      } else {
+        toast.error("You are not authorized to access this page.");
+             window.location.href = "/login";    }
+    } catch (error) {
+      console.error("Access check failed:", error);
+      toast.error("Something went wrong.");
+            window.location.href = "/login";  }
+  };
 
     // Connect to ROS and setup periodic checking
     const connectAndListen = () => {
@@ -181,6 +196,7 @@ const BlockCodingGate: React.FC = () => {
         clearInterval(checkIntervalRef.current);
       }
     };
+    checkAccess();
   }, [isBlockCodingActive]);
 
   if (!isBlockCodingActive) {
