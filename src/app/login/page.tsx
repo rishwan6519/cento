@@ -46,7 +46,7 @@ export default function LoginPage() {
           router.push("/platform"); // Redirect to superuser page
         }else if (data.user.role === "user") {
 
-          router.push("/user-platform"); // Redirect to the platform page
+          router.push("/home"); // Redirect to the platform page
         }else if (data.user.role === "developer") {
           router.push("/block-code"); // Redirect to the platform page
         }

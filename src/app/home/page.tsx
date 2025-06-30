@@ -9,6 +9,7 @@ import {
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import FloorMapUploader from "@/components/FloorMapUploader/FloorMapUploader"; // ✅ Update path as needed
 
 // Dummy UI for Unauthorized Access
 const DummyUI = ({ title, onBack }: { title: string; onBack: () => void }) => (
@@ -29,8 +30,8 @@ const cardList = [
     id: "customer interaction",
     label: "Customer Interaction",
     icon: <FaComments className="text-4xl text-purple-600" />,
-    route: "/customer-interaction",
-    apiKey: "customerInteraction",
+    route: "/user-platform",
+    apiKey: "blockCoding",
   },
   {
     id: "blockcoding",
@@ -51,11 +52,29 @@ const cardList = [
 const CustomerEngagementPlatform = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [dummyCard, setDummyCard] = useState<string | null>(null);
+  const [hasPeopleDetection, setHasPeopleDetection] = useState(false);
+  const [showUploader, setShowUploader] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const id = localStorage.getItem("userId");
-    if (id) setUserId(id);
+    if (!id) return;
+
+    setUserId(id);
+
+    const fetchUserAccess = async () => {
+      try {
+        const res = await fetch(`/api/user/users?userId=${id}`);
+        const data = await res.json();
+        if (data.peopleDetection) {
+          setHasPeopleDetection(true);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user access info", error);
+      }
+    };
+
+    fetchUserAccess();
   }, []);
 
   const handleCardClick = async (card: typeof cardList[0]) => {
@@ -81,6 +100,22 @@ const CustomerEngagementPlatform = () => {
 
   if (dummyCard) {
     return <DummyUI title={dummyCard} onBack={() => setDummyCard(null)} />;
+  }
+
+  if (showUploader) {
+    return (
+      <div className="min-h-screen bg-blue-50">
+        <FloorMapUploader />
+        <div className="text-center mt-4">
+          <button
+            className="text-blue-600 underline"
+            onClick={() => setShowUploader(false)}
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -119,6 +154,21 @@ const CustomerEngagementPlatform = () => {
             <span className="text-xl font-medium text-gray-700">{card.label}</span>
           </motion.button>
         ))}
+
+        {hasPeopleDetection && (
+          <motion.button
+            className="bg-white rounded-2xl shadow-md p-8 flex flex-col items-center gap-4 hover:shadow-xl transition-all border border-gray-200 hover:scale-105"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.97 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: cardList.length * 0.15 }}
+            onClick={() => setShowUploader(true)}
+          >
+            <FaUsers className="text-4xl text-red-600" />
+            <span className="text-xl font-medium text-gray-700">Upload Floor Map</span>
+          </motion.button>
+        )}
       </div>
     </div>
   );
