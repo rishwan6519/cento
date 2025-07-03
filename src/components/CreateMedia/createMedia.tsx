@@ -16,19 +16,16 @@ interface CreateMediaProps {
   onSuccess: () => void;
 }
 
-const CreateMedia: React.FC<CreateMediaProps> = ({
-  onCancel,
-  onSuccess
-}) => {
+// ✅ You can move these to env variables later
+const CLOUDINARY_UPLOAD_PRESET = "media_upload_preset";
+const CLOUDINARY_CLOUD_NAME = "dzb0gggua"; // ✅ Replace if needed
+
+const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
- 
-
-  const generateUniqueId = () => {
-    return Math.random().toString(36).substr(2, 9);
-  };
+  const generateUniqueId = () => Math.random().toString(36).substring(2, 11);
 
   const getFileType = (fileName: string) => {
     const ext = fileName.split(".").pop()?.toLowerCase();
@@ -45,7 +42,6 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
       type: file.type || getFileType(file.name),
       file: file,
     }));
-    
     setFiles((prev) => [...prev, ...newFiles]);
   };
 
@@ -66,14 +62,12 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
     const droppedFiles = Array.from(e.dataTransfer.files).map((file) => ({
       id: generateUniqueId(),
       name: file.name,
       type: file.type || getFileType(file.name),
       file: file,
     }));
-    
     setFiles((prev) => [...prev, ...droppedFiles]);
   };
 
@@ -82,51 +76,66 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
       toast.error("Please select at least one file");
       return;
     }
-    
-    setIsLoading(true);
-    const loadingToast = toast.loading("Uploading media files...");
-    
-    try {
 
-      const userId = localStorage.getItem("userId");
+    const userId = localStorage.getItem("userId");
     if (!userId) {
-      throw new Error("User not authenticated");
+      toast.error("User not authenticated");
+      return;
     }
 
-      const formData = new FormData();
-      
-      // Add all files to form data
-      files.forEach((file) => {
-        formData.append("files", file.file);
-        formData.append("fileNames", file.name);
-      });
-      
-      formData.append("userId", userId);
-      // Make the API call
-      const response = await fetch("/api/media/upload", {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to upload media files");
+    setIsLoading(true);
+    const loadingToast = toast.loading("Uploading media files...");
+
+    try {
+      const uploadedItems = [];
+
+      for (const fileObj of files) {
+        // Cloudinary Upload
+        const formData = new FormData();
+        formData.append("file", fileObj.file);
+        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+        const cloudRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        const cloudData = await cloudRes.json();
+        if (!cloudRes.ok) {
+          throw new Error(cloudData.error?.message || "Cloudinary upload failed");
+        }
+
+        const secureUrl = cloudData.secure_url || cloudData.url;
+
+        // Save Metadata to DB
+        const metadataRes = await fetch("/api/media/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            name: fileObj.name,
+            type: fileObj.type,
+            url: secureUrl,
+          }),
+        });
+
+        if (!metadataRes.ok) {
+          const errorMeta = await metadataRes.json();
+          throw new Error(errorMeta.message || "Failed to save metadata");
+        }
+
+        const saved = await metadataRes.json();
+        uploadedItems.push(saved);
       }
-      
-      const data = await response.json();
-      
-      // Show success message
-      toast.success("Media uploaded successfully!", {
-        id: loadingToast,
-      });
-      
-      // Reset the form
+
+      toast.success("Media files uploaded successfully", { id: loadingToast });
       setFiles([]);
-      
-      // Notify parent component
       onSuccess();
     } catch (error) {
-      console.error("Error uploading media:", error);
+      console.error("Upload error:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to upload media files",
         { id: loadingToast }
@@ -141,49 +150,43 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
       <div className="p-6 border-b">
         <h2 className="text-2xl font-bold">Create New Media</h2>
       </div>
+
       <div className="p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Upload Section */}
+          {/* Upload Area */}
           <div className="space-y-6">
-            <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Upload Media
-              </h3>
-              <div
-                className={`border-2 border-dashed ${
-                  isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
-                } rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer`}
-                onClick={() =>
-                  document.getElementById("media-upload")?.click()
-                }
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-              >
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                <p className="mt-2 text-sm font-medium text-gray-600">
-                  Click to upload or drag and drop
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  Supports images, videos, and audio files
-                </p>
-                <input
-                  id="media-upload"
-                  type="file"
-                  multiple
-                  hidden
-                  accept="image/*,video/*,audio/*"
-                  onChange={handleFileSelection}
-                />
-              </div>
+            <h3 className="text-lg font-semibold text-gray-800">Upload Media</h3>
+            <div
+              className={`border-2 border-dashed ${
+                isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
+              } rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer`}
+              onClick={() => document.getElementById("media-upload")?.click()}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+            >
+              <Upload className="mx-auto h-12 w-12 text-gray-400" />
+              <p className="mt-2 text-sm font-medium text-gray-600">
+                Click to upload or drag and drop
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Supports images, videos, and audio files
+              </p>
+              <input
+                id="media-upload"
+                type="file"
+                multiple
+                hidden
+                accept="image/*,video/*,audio/*"
+                onChange={handleFileSelection}
+              />
             </div>
           </div>
-          {/* Right Column - Preview Section */}
+
+          {/* File Preview */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-800 mb-4">
-              Media Preview
-            </h3>
+            <h3 className="font-semibold text-gray-800 mb-4">Media Preview</h3>
             <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
               {files.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -236,6 +239,7 @@ const CreateMedia: React.FC<CreateMediaProps> = ({
           </div>
         </div>
       </div>
+
       <div className="p-6 border-t bg-gray-50">
         <div className="flex justify-end gap-4">
           <button
