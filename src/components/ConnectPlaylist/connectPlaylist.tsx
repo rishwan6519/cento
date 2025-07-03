@@ -8,6 +8,7 @@ interface Device {
   _id: string;
   name: string;
   deviceId: {
+    _id: string;
     serialNumber: string;
     imageUrl: string;
     name: string;
@@ -145,7 +146,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          deviceId: selectedDeviceForPlaylist._id,
+          deviceId: selectedDeviceForPlaylist.deviceId._id,
           playlistIds: validPlaylistIds,
           userId: userId,
         }),

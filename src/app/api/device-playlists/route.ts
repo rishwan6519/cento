@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { deviceId, playlistIds,userId } = body;
+    console.log('Request body:', body);
 
     if (!deviceId || !playlistIds || playlistIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

@@ -1038,11 +1038,10 @@ export default function PeopleDetectionPage() {
           {/* Main Card */}
           <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">
             {/* Camera Configuration Section */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6">
-              <h2 className="text-2xl font-semibold text-white mb-4">
-                📹 Camera Configuration
+           <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-8">
+              <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
+                Camera Configuration
               </h2>
-
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <select
                   className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
@@ -1107,11 +1106,11 @@ export default function PeopleDetectionPage() {
 
             {/* Camera Selection */}
             {cameraOptions.length > 0 && (
-              <div className="p-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                  📋 Available Cameras
+            <div className="p-8 font-inter">
+                <h3 className="text-2xl font-semibold text-slate-800 mb-6 tracking-tight">
+                  Available Camera Systems
                 </h3>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-4">
                   {cameraOptions.map((cam) => (
                     <button
                       key={cam}
@@ -1119,13 +1118,13 @@ export default function PeopleDetectionPage() {
                         setSelectedCamera(cam);
                         handleCameraSwitch(cam.toString());
                       }}
-                      className={`px-6 py-3 rounded-xl font-medium transition-all transform hover:scale-105 ${
+                      className={`px-8 py-4 rounded-lg font-medium text-sm tracking-wide transition-all duration-200 border ${
                         activeCamera === cam.toString()
-                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
-                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                          ? "bg-slate-800 text-white border-slate-800 shadow-md"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-400"
                       }`}
                     >
-                      📹{cam}
+                      Camera {cam}
                     </button>
                   ))}
                 </div>
@@ -1134,13 +1133,13 @@ export default function PeopleDetectionPage() {
 
             {/* Snapshot Button */}
             {selectedCamera && (
-              <div className="px-6 pb-6">
-                <div className="flex flex-wrap gap-4 mb-6">
+              <div className="px-8 pb-8">
+                <div className="flex flex-wrap gap-4 mb-8">
                   <button
                     onClick={handleSnapshot}
-                    className="bg-gradient-to-r from-green-500 to-teal-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-green-600 hover:to-teal-700 transform hover:scale-105 transition-all shadow-lg"
+                    className="bg-slate-800 text-white px-10 py-4 rounded-lg font-medium text-sm tracking-wide hover:bg-slate-700 transition-all duration-200 shadow-sm hover:shadow-md border border-slate-800"
                   >
-                    📸 Take Snapshot & Set Zones
+                    Capture Frame & Configure Zones
                   </button>
                 </div>
 
@@ -1148,109 +1147,108 @@ export default function PeopleDetectionPage() {
                 {submittedZones.length > 0 && (
                   <div
                     id="heatmap-controls"
-                    className="bg-gradient-to-r from-orange-50 to-red-50 p-6 rounded-2xl border border-orange-200 mb-6"
+                    className="bg-slate-50 p-8 rounded-lg border border-slate-200 mb-8 shadow-sm"
                   >
-                    <h3 className="text-lg font-semibold text-orange-800 mb-4">
-                      🔥 Heatmap Time Range Selection
+                    <h3 className="text-xl font-semibold text-slate-800 mb-6 tracking-tight">
+                      Heatmap Analysis Configuration
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
                           Start Date
                         </label>
                         <input
                           type="date"
                           value={startDate}
                           onChange={(e) => setStartDate(e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
                           Start Time
                         </label>
                         <input
                           type="time"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
                           End Date
                         </label>
                         <input
                           type="date"
                           value={endDate}
                           onChange={(e) => setEndDate(e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
                           End Time
                         </label>
                         <input
                           type="time"
                           value={endTime}
                           onChange={(e) => setEndTime(e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
                         />
                       </div>
                     </div>
                     <button
                       onClick={fetchHeatmapData}
                       disabled={heatmapLoading || !startDate || !endDate}
-                      className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      className="bg-slate-800 text-white px-8 py-4 rounded-lg font-medium text-sm tracking-wide hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm border border-slate-800"
                     >
-                      {heatmapLoading ? "Loading..." : "🔥 Generate Heatmap"}
+                      {heatmapLoading ? "Processing..." : "Generate Heatmap Analysis"}
                     </button>
                   </div>
                 )}
 
                 {/* Zone Count Display */}
-                {/* Zone Count Display */}
                 {submittedZones.length > 0 && (
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <h3 className="text-xl font-semibold text-gray-800">
-                          📊 Live Zone Counts
+                  <div className="mt-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-6">
+                        <h3 className="text-2xl font-semibold text-slate-800 tracking-tight">
+                          Real-Time Zone Monitoring
                         </h3>
                         {isCountsPolling && (
-                          <div className="flex items-center text-green-600">
-                            <div className="animate-pulse w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                            <span className="text-sm">Live Updates</span>
+                          <div className="flex items-center text-emerald-600">
+                            <div className="animate-pulse w-2 h-2 bg-emerald-500 rounded-full mr-3"></div>
+                            <span className="text-sm font-medium tracking-wide">Live Monitoring Active</span>
                           </div>
                         )}
                       </div>
                       {lastUpdateTime && (
-                        <span className="text-sm text-gray-500">
-                          Last updated: {lastUpdateTime}
+                        <span className="text-sm text-slate-500 font-medium tracking-wide">
+                          Last Update: {lastUpdateTime}
                         </span>
                       )}
                     </div>
 
                     {/* Camera Selection Tabs */}
-                    <div className="flex gap-2 mb-4">
+                    <div className="flex gap-2 mb-6">
                       {Object.keys(zoneCounts).map((cameraId) => (
                         <button
                           key={cameraId}
                           onClick={() => handleCameraSwitch(cameraId)}
-                          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          className={`px-6 py-3 rounded-lg font-medium text-sm tracking-wide transition-all duration-200 border ${
                             activeCamera === cameraId
-                              ? "bg-blue-500 text-white shadow-md"
-                              : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                              ? "bg-slate-800 text-white border-slate-800 shadow-md"
+                              : "bg-white hover:bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-400"
                           }`}
                         >
-                          {cameraId}
+                          Camera {cameraId}
                         </button>
                       ))}
                     </div>
 
                     {/* Zone Grid - Only show zones for active camera */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {activeCamera &&
                         zoneCounts[activeCamera] &&
                         Object.entries(zoneCounts[activeCamera]).map(
@@ -1263,12 +1261,12 @@ export default function PeopleDetectionPage() {
                             return (
                               <div
                                 key={`${activeCamera}-${zoneId}`}
-                                className="relative bg-white border-2 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all"
+                                className="relative bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 border-2"
                                 style={{
                                   borderColor: isOverLimit
-                                    ? "rgb(239, 68, 68)"
-                                    : zoneBorderColors[colorIndex],
-                                  borderWidth: isOverLimit ? "3px" : "2px",
+                                    ? "rgb(220, 38, 38)"
+                                    : "rgb(148, 163, 184)",
+                                  borderWidth: isOverLimit ? "2px" : "1px",
                                 }}
                               >
                                 {isOverLimit && (
@@ -1279,53 +1277,53 @@ export default function PeopleDetectionPage() {
                                   />
                                 )}
 
-                                <div className="flex items-center justify-between mb-4">
-                                  <h4 className="text-lg font-semibold text-gray-800">
+                                <div className="flex items-center justify-between mb-6">
+                                  <h4 className="text-lg font-semibold text-slate-800 tracking-tight">
                                     {activeCamera} - Zone {zoneId}
                                   </h4>
                                   <div
-                                    className="w-4 h-4 rounded-full"
+                                    className="w-3 h-3 rounded-full"
                                     style={{
                                       backgroundColor: isOverLimit
-                                        ? "rgb(239, 68, 68)"
-                                        : zoneBorderColors[colorIndex],
+                                        ? "rgb(220, 38, 38)"
+                                        : "rgb(148, 163, 184)",
                                     }}
                                   ></div>
                                 </div>
 
-                                <div className="space-y-3">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-green-600 font-medium">
-                                      👆 People In:
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                    <span className="text-emerald-700 font-medium text-sm tracking-wide">
+                                      Entries:
                                     </span>
-                                    <span className="text-2xl font-bold text-green-600">
+                                    <span className="text-2xl font-bold text-emerald-700 font-mono">
                                       {counts.in}
                                     </span>
                                   </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-red-600 font-medium">
-                                      👇 People Out:
+                                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                    <span className="text-red-700 font-medium text-sm tracking-wide">
+                                      Exits:
                                     </span>
-                                    <span className="text-2xl font-bold text-red-600">
+                                    <span className="text-2xl font-bold text-red-700 font-mono">
                                       {counts.out}
                                     </span>
                                   </div>
-                                  <div className="border-t pt-2">
-                                    <div className="flex justify-between items-center">
+                                  <div className="pt-2">
+                                    <div className="flex justify-between items-center py-2">
                                       <span
-                                        className={`font-medium ${
+                                        className={`font-semibold text-sm tracking-wide ${
                                           isOverLimit
-                                            ? "text-red-600"
-                                            : "text-blue-600"
+                                            ? "text-red-700"
+                                            : "text-slate-800"
                                         }`}
                                       >
-                                        📈 Net Count:
+                                        Current Occupancy:
                                       </span>
                                       <span
-                                        className={`text-xl font-bold ${
+                                        className={`text-2xl font-bold font-mono ${
                                           isOverLimit
-                                            ? "text-red-600"
-                                            : "text-blue-600"
+                                            ? "text-red-700"
+                                            : "text-slate-800"
                                         }`}
                                       >
                                         {netCount}
@@ -1345,6 +1343,15 @@ export default function PeopleDetectionPage() {
           </div>
         </div>
       </div>
+
+
+
+
+
+
+
+
+
 
       {/* Zone Drawing Modal */}
       {showModal && snapshotUrl && (

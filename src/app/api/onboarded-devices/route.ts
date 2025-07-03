@@ -126,6 +126,7 @@ export async function GET(req: NextRequest) {
         $sort: { createdAt: -1 }
       }
     ]);
+    console.log("Fetched devices:", devices);
 
     return NextResponse.json(
       {
@@ -135,6 +136,7 @@ export async function GET(req: NextRequest) {
       },
       { status: 200 }
     );
+    
   } catch (error) {
     console.error("Error fetching devices:", error);
     return NextResponse.json(

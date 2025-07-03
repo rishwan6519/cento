@@ -415,7 +415,7 @@ case "assignDevice":
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50 text-black">
       {/* Mobile Menu Button */}
       <div className="lg:hidden p-4 bg-white border-b border-gray-200 flex items-center justify-between">
         <h2 className="text-xl font-bold text-primary-600 flex items-center gap-2">

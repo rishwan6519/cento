@@ -14,6 +14,7 @@ export interface UserDocument extends Document {
   role: UserRole;
   blockCoding?: boolean;
   peopleDetection?: boolean;
+  platform?: boolean;
 }
 
 const UserSchema: Schema = new Schema({
@@ -36,6 +37,10 @@ const UserSchema: Schema = new Schema({
     default: false 
   },
   peopleDetection: { 
+    type: Boolean, 
+    default: false 
+  },
+  platform: { 
     type: Boolean, 
     default: false 
   },

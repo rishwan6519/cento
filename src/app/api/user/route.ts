@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
 
-    const { username, password, role, controllerId , blockCoding,peopleDetection} = await req.json();
+    const { username, password, role, controllerId , blockCoding,peopleDetection,platform} = await req.json();
     
     if (!username?.trim() || !password) {
       return NextResponse.json(
@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
       role: role || UserRole.User,
       blockCoding: blockCoding || false, // Default to false if not provided
       peopleDetection: peopleDetection || false, // Default to false if not provided
-      controllerId: controllerId ?  mongoose.Types.ObjectId.createFromHexString(controllerId) : undefined
+      controllerId: controllerId ?  mongoose.Types.ObjectId.createFromHexString(controllerId) : undefined,
+      platform: platform || false // Default to 'web' if not provided
     });
 
     try {

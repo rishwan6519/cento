@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { FaUser, FaLock, FaUserPlus, FaCode, FaCamera } from "react-icons/fa";
+import { FaUser, FaLock, FaUserPlus, FaCode, FaCamera, FaCogs } from "react-icons/fa";
 import Card from "@/components/Platform/Card";
 import Button from "@/components/Platform/Button";
 import toast from "react-hot-toast";
@@ -13,6 +13,7 @@ const CreateUser = () => {
     role: "user", // default role
     blockCoding: false, // new field for blocking coding
     peopleDetection: false, // new field for people detection camera
+    platform: false, // new field for platform access
   });
   const [loading, setLoading] = useState(false);
 
@@ -50,6 +51,7 @@ const CreateUser = () => {
           role: formData.role,
           blockCoding: formData.blockCoding, // send block coding status
           peopleDetection: formData.peopleDetection, // send people detection status
+          platform: formData.platform, // send platform access status
         }),
       });
 
@@ -66,7 +68,8 @@ const CreateUser = () => {
         confirmPassword: "", 
         role: "user",
         blockCoding: false,
-        peopleDetection: false
+        peopleDetection: false,
+        platform: false
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create user");
@@ -169,46 +172,72 @@ const CreateUser = () => {
             </div>
           </div>
 
-          {/* Block Coding Checkbox */}
+          {/* Permissions Section */}
           <div className="border-t pt-4">
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.blockCoding}
-                onChange={(e) => setFormData({ ...formData, blockCoding: e.target.checked })}
-                className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
-              />
-              <div className="flex items-center">
-                <FaCode className="text-red-500 mr-2" />
-                <span className="text-sm font-medium text-gray-700">
-                  Block Coding Access
-                </span>
-              </div>
-            </label>
-            <p className="text-xs text-gray-500 ml-8 mt-1">
-              When enabled, this user will be access block coding features
-            </p>
-          </div>
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Permissions</h3>
+            
+            {/* Block Coding Checkbox */}
+            <div className="mb-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.blockCoding}
+                  onChange={(e) => setFormData({ ...formData, blockCoding: e.target.checked })}
+                  className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+                />
+                <div className="flex items-center">
+                  <FaCode className="text-red-500 mr-2" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Block Coding Access
+                  </span>
+                </div>
+              </label>
+              <p className="text-xs text-gray-500 ml-8 mt-1">
+                When enabled, this user will be access block coding features
+              </p>
+            </div>
 
-          {/* People Detection Camera Checkbox */}
-          <div>
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.peopleDetection}
-                onChange={(e) => setFormData({ ...formData, peopleDetection: e.target.checked })}
-                className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
-              />
-              <div className="flex items-center">
-                <FaCamera className="text-green-500 mr-2" />
-                <span className="text-sm font-medium text-gray-700">
-                  Enable People Detection Camera
-                </span>
-              </div>
-            </label>
-            <p className="text-xs text-gray-500 ml-8 mt-1">
-              When enabled, people detection camera features will be available to this user
-            </p>
+            {/* People Detection Camera Checkbox */}
+            <div className="mb-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.peopleDetection}
+                  onChange={(e) => setFormData({ ...formData, peopleDetection: e.target.checked })}
+                  className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+                />
+                <div className="flex items-center">
+                  <FaCamera className="text-green-500 mr-2" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Enable People Detection Camera
+                  </span>
+                </div>
+              </label>
+              <p className="text-xs text-gray-500 ml-8 mt-1">
+                When enabled, people detection camera features will be available to this user
+              </p>
+            </div>
+
+            {/* Platform Checkbox */}
+            <div className="mb-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.platform}
+                  onChange={(e) => setFormData({ ...formData, platform: e.target.checked })}
+                  className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+                />
+                <div className="flex items-center">
+                  <FaCogs className="text-blue-500 mr-2" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Platform Access
+                  </span>
+                </div>
+              </label>
+              <p className="text-xs text-gray-500 ml-8 mt-1">
+                When enabled, this user will have access to platform management features
+              </p>
+            </div>
           </div>
 
           <div className="mt-6">
