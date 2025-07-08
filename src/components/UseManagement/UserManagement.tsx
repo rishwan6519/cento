@@ -213,7 +213,7 @@ export default function UserManagement() {
       </div>
 
       {isAddingUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-black">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-xl font-semibold mb-4">Add New User</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -244,8 +244,8 @@ export default function UserManagement() {
                   onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                 >
-                  <option value="User">User</option>
-                  <option value="SuperUser">Super User</option>
+                  <option value="user">User</option>
+                  <option value="superUser">Super User</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2">

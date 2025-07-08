@@ -66,8 +66,8 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
   }, [userId]);
 
   useEffect(() => {
-    if (selectedDeviceForPlaylist?._id) {
-      fetchConnectedPlaylists(selectedDeviceForPlaylist._id);
+    if (selectedDeviceForPlaylist?.deviceId._id) {
+      fetchConnectedPlaylists(selectedDeviceForPlaylist.deviceId._id);
     }
   }, [selectedDeviceForPlaylist]);
 
@@ -290,7 +290,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {playlists.map((playlist) => {
                   const isConnected = connectedPlaylists[
-                    selectedDeviceForPlaylist?._id || ""
+                    selectedDeviceForPlaylist?.deviceId._id || ""
                   ]?.includes(playlist._id || "");
                   
                   return (

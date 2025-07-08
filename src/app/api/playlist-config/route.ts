@@ -49,25 +49,27 @@ export async function POST(req: NextRequest) {
     }
 
     // Create new configuration with contentType
-    const playlistConfig = await PlaylistConfig.create({
-      name: configData.name,
-      userId: new Mongoose.Types.ObjectId(userId),
-      type: configData.type ,
-      contentType: configData.contentType , // Default to 'playlist' if not provided, 
-      startTime: configData.startTime ,
-      endTime: configData.endTime,
-      files: configData.files.map((file: any) => ({
-        name: file.name,
-        path: file.path,
-        type: file.type,
-        displayOrder: file.displayOrder,  
-        delay: file.delay || 0,
-        backgroundImageEnabled: file.backgroundImageEnabled || false,
-        // backgoroundImageName: file.backgoroundImageName || null,
-        backgroundImage: file.backgroundImage || null
-      })),
-      status: 'active'
-    });
+   const playlistConfig = await PlaylistConfig.create({
+  name: configData.name,
+  userId: new Mongoose.Types.ObjectId(userId),
+  type: configData.type,
+  contentType: configData.contentType,
+  startTime: configData.startTime,
+  endTime: configData.endTime,
+  startDate: configData.startDate,          
+  endDate: configData.endDate,              
+  daysOfWeek: configData.daysOfWeek,        
+  files: configData.files.map((file: any) => ({
+    name: file.name,
+    path: file.path,
+    type: file.type,
+    displayOrder: file.displayOrder,
+    delay: file.delay || 0,
+    backgroundImageEnabled: file.backgroundImageEnabled || false,
+    backgroundImage: file.backgroundImage || null,
+  })),
+  status: 'active'
+});
 
     return NextResponse.json(playlistConfig, { status: 201 });
 

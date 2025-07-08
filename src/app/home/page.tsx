@@ -106,7 +106,7 @@ const PeopleDetectionOptions = ({ onBack, onUploadFloorPlan, onGoToPlatform }: {
 const cardList = [
   {
     id: "customer interaction",
-    label: "Customer Interaction",
+    label: "Customer Interaction Platform",
     icon: <FaComments className="text-4xl text-purple-600" />,
     route: "/user-platform",
     apiKey: "platform",

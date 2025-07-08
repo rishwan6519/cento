@@ -26,6 +26,9 @@ interface PlaylistConfiguration {
   startTime: string;
   endTime: string;
   files: PlaylistConfigFile[];
+  startDate?: string; // Add this
+  endDate?: string;   // Add this
+  daysOfWeek?: string[]; // Add this
 }
 
 // Create a ShowPlaylist component
@@ -110,6 +113,9 @@ const PlaylistSetup: React.FC = () => {
     startTime: "00:00:00",
     endTime: "00:10:00",
     files: [] as PlaylistConfigFile[],
+    startDate: "",
+    endDate: "",
+    daysOfWeek: [],
   });
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -176,10 +182,36 @@ const PlaylistSetup: React.FC = () => {
     );
   }
 
+  const daysList = [
+    { label: "Sun", value: "sunday" },
+    { label: "Mon", value: "monday" },
+    { label: "Tue", value: "tuesday" },
+    { label: "Wed", value: "wednesday" },
+    { label: "Thu", value: "thursday" },
+    { label: "Fri", value: "friday" },
+    { label: "Sat", value: "saturday" },
+  ];
+
+  const handleDayToggle = (day: string) => {
+    setPlaylistConfig((prev) => ({
+      ...prev,
+      daysOfWeek: prev.daysOfWeek?.includes(day)
+        ? prev.daysOfWeek.filter((d) => d !== day)
+        : [...(prev.daysOfWeek || []), day],
+    }));
+  };
+
   const handleSavePlaylistConfig = async () => {
-    if (!playlistConfig.name || playlistConfig.files.length === 0) {
+    if (
+      !playlistConfig.name ||
+      playlistConfig.files.length === 0 ||
+      !playlistConfig.startDate ||
+      !playlistConfig.endDate ||
+      !playlistConfig.daysOfWeek ||
+      playlistConfig.daysOfWeek.length === 0
+    ) {
       toast.error(
-        `Please add a name and at least one file for the ${playlistConfig.contentType}`
+        `Please add a name, at least one file, date range, and select at least one day for the ${playlistConfig.contentType}`
       );
       return;
     }
@@ -191,6 +223,9 @@ const PlaylistSetup: React.FC = () => {
         contentType: playlistConfig.contentType,
         startTime: playlistConfig.startTime || "00:00:00",
         endTime: playlistConfig.endTime || "00:10:00",
+        startDate: playlistConfig.startDate,
+        endDate: playlistConfig.endDate,
+        daysOfWeek: playlistConfig.daysOfWeek,
         files: playlistConfig.files.map((file, index) => ({
           name: file.name,
           path: file.path,
@@ -199,7 +234,7 @@ const PlaylistSetup: React.FC = () => {
           delay: file.delay || 0,
           backgroundImageEnabled: file.backgroundImageEnabled || false,
           backgroundImage: file.backgroundImage || null,
-          backgroundImageName: file.backgroundImageName || null, // Include backgroundImageName
+          backgroundImageName: file.backgroundImageName || null,
         })),
       };
       const formData = new FormData();
@@ -396,6 +431,47 @@ const PlaylistSetup: React.FC = () => {
         </h2>
       </div>
       <div className="space-y-6">
+        {/* Date Range and Days of Week */}
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Start Date</label>
+            <input
+              type="date"
+              value={playlistConfig.startDate}
+              onChange={(e) =>
+                setPlaylistConfig({ ...playlistConfig, startDate: e.target.value })
+              }
+              className="w-full p-2 border rounded text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">End Date</label>
+            <input
+              type="date"
+              value={playlistConfig.endDate}
+              onChange={(e) =>
+                setPlaylistConfig({ ...playlistConfig, endDate: e.target.value })
+              }
+              className="w-full p-2 border rounded text-sm"
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium mb-1">Days of Week</label>
+            <div className="flex gap-2 flex-wrap">
+              {daysList.map((day) => (
+                <label key={day.value} className="flex items-center gap-1 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={playlistConfig.daysOfWeek?.includes(day.value)}
+                    onChange={() => handleDayToggle(day.value)}
+                    className="h-4 w-4"
+                  />
+                  {day.label}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
         {/* Content Type Selection */}
         <div className="flex gap-4 mb-6">
           <label className="flex items-center gap-2">
@@ -618,6 +694,21 @@ const PlaylistSetup: React.FC = () => {
           {/* Right Column */}
           <div className="border-t lg:border-t-0 lg:border-l pt-4 lg:pt-0 lg:pl-6">
             <h4 className="font-medium mb-4">Selected Media Order</h4>
+            <div className="mb-2 text-xs text-gray-600">
+              <span>
+                Date Range:{" "}
+                {playlistConfig.startDate && playlistConfig.endDate
+                  ? `${playlistConfig.startDate} to ${playlistConfig.endDate}`
+                  : "Not set"}
+              </span>
+              <br />
+              <span>
+                Days:{" "}
+                {playlistConfig.daysOfWeek && playlistConfig.daysOfWeek.length > 0
+                  ? playlistConfig.daysOfWeek.join(", ")
+                  : "None selected"}
+              </span>
+            </div>
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {playlistConfig.files.length === 0 ? (
                 <p className="text-center py-4 text-gray-500">No media files selected</p>

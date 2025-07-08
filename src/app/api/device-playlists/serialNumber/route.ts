@@ -58,10 +58,38 @@ export async function GET(req: NextRequest) {
     let currentPlaylist = null;
     let currentAnnouncement = null;
 
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const weekDays = [
+      'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'
+    ];
+    const todayWeekDay = weekDays[today.getDay()];
+
     for (let i = 0; i < playlists.length; i++) {
       const playlist = playlists[i];
 
-      if (currentTime >= playlist.startTime && currentTime < playlist.endTime) {
+      // Check date range
+      if (
+        playlist.startDate && playlist.endDate &&
+        (todayStr < playlist.startDate || todayStr > playlist.endDate)
+      ) {
+        continue;
+      }
+
+      // Check day of week
+      if (
+        Array.isArray(playlist.daysOfWeek) &&
+        playlist.daysOfWeek.length > 0 &&
+        !playlist.daysOfWeek.includes(todayWeekDay)
+      ) {
+        continue;
+      }
+
+      // Check time range
+      if (
+        currentTime >= playlist.startTime &&
+        currentTime < playlist.endTime
+      ) {
         if (playlist.contentType === 'announcement') {
           currentAnnouncement = playlist;
         } else {

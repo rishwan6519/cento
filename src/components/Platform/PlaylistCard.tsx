@@ -123,7 +123,7 @@ const PlaylistCard: React.FC<PlaylistCardProps> = ({
               const connectedDevice = devices.find(
                 (d) => d._id.toString() === deviceId.id
               );
-              console.log("Connected Devices:", connectedDevice);
+              console.log("Connected Devices:", connectedDevice,devices);
               const deviceStatus = connectedDevice?.status || deviceId.status;
               const statusColor =
                 deviceStatus === "Connected"
