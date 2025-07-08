@@ -13,6 +13,7 @@ import {
 import { motion } from "framer-motion";
 import Image from "next/image";
 import FloorMapUploader from "@/components/FloorMapUploader/FloorMapUploader"; // ✅ Update path as needed
+import { IoPeopleSharp } from "react-icons/io5";
 
 // Dummy UI for Unauthorized Access
 const DummyUI = ({ title, onBack }: { title: string; onBack: () => void }) => (
@@ -107,7 +108,7 @@ const cardList = [
   {
     id: "customer interaction",
     label: "Customer Interaction Platform",
-    icon: <FaComments className="text-4xl text-purple-600" />,
+    icon: <IoPeopleSharp  className="text-4xl text-purple-600" />,
     route: "/user-platform",
     apiKey: "platform",
   },

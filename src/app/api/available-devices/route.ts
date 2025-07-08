@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
     // Find all devices that are not in the assigned devices list
     const availableDevices = await Device.find({
+      userId: userId,
       _id: { $nin: assignedDeviceIds },
       status: 'active'
     });

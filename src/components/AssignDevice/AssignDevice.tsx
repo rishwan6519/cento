@@ -3,6 +3,9 @@ import Card from '../Platform/Card';
 import Button from '../Platform/Button';
 import { MonitorSmartphone, User } from 'lucide-react';
 import Image from 'next/image';
+import { FaCheckCircle } from 'react-icons/fa';
+import { motion, AnimatePresence } from "framer-motion";
+
 
 interface User {
   _id: string;
@@ -26,6 +29,7 @@ export default function AssignDevice() {
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Fetch users
   useEffect(() => {
@@ -91,7 +95,7 @@ export default function AssignDevice() {
         setStep(1);
         setSelectedUser('');
         setSelectedDevice('');
-        alert('Device assigned successfully!');
+        setShowSuccess(true); // Show success message
       } else {
         throw new Error(data.message);
       }
@@ -233,6 +237,16 @@ export default function AssignDevice() {
     }
   };
 
+  useEffect(() => {
+    if (showSuccess) {
+       const timer = setTimeout(() => {
+      window.location.href = "/platform"; // Redirect to platform page
+    }, 1800);
+
+    return () => clearTimeout(timer); // cleanup
+    }
+  }, [showSuccess]);
+
   return (
     <Card className="max-w-2xl mx-auto">
       <div className="mb-8">
@@ -257,6 +271,32 @@ export default function AssignDevice() {
           <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-lg">
             {error}
           </div>
+        )}
+         {showSuccess && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="fixed inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1, rotate: 360 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-full p-8 shadow-2xl mb-6"
+            >
+              <FaCheckCircle className="text-white text-7xl" />
+            </motion.div>
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-3xl font-bold text-green-700 mb-2"
+            >
+              Device Onboarded!
+            </motion.h2>
+            <p className="text-lg text-gray-700">Redirecting to platform...</p>
+          </motion.div>
         )}
         {renderStep()}
       </div>

@@ -52,7 +52,7 @@ const OnboardingPage: React.FC = () => {
   useEffect(() => {
   if (showSuccess) {
     const timer = setTimeout(() => {
-      router.replace("/platform");
+      window.location.href = "/platform"; // Redirect to platform page
     }, 1800);
 
     return () => clearTimeout(timer); // cleanup
