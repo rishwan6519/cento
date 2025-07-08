@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import OnboardedDevice from "@/models/OnboardedDevice";
 import Device from "@/models/Device";
 import { DeviceType } from "@/models/DeviceTypes";
+import DevicePlaylist from "@/models/ConectPlaylist";
 import "@/models/User";
 
 import { connectToDatabase } from "@/lib/db";
@@ -61,6 +62,8 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+import AssignedDevice from "@/models/AssignDevice";
+// ...existing code...
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,22 +71,17 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
-
     if (!userId) {
       return NextResponse.json(
         { success: false, message: "User ID is required" },
         { status: 400 }
       );
     }
-
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    const devices = await OnboardedDevice.aggregate([
-      {
-        $match: {
-          userId: userObjectId,
-        },
-      },
+    // 1. Devices owned by user
+    const ownedDevices = await OnboardedDevice.aggregate([
+      { $match: { userId: userObjectId } },
       {
         $lookup: {
           from: "devices",
@@ -114,19 +112,45 @@ export async function GET(req: NextRequest) {
             _id: { $arrayElemAt: ["$typeInfo._id", 0] },
             name: { $arrayElemAt: ["$typeInfo.name", 0] }
           },
-          userId: {
-            _id: "$userId"
-          },
+          userId: { _id: "$userId" },
           createdAt: 1,
           updatedAt: 1,
-          __v: 1
+          __v: 1,
+          source: { $literal: "owned" }
+        }
+      }
+    ]);
+
+    // 2. Devices assigned to user
+    const assignedDevices = await AssignedDevice.aggregate([
+      { $match: { userId: userObjectId, status: "active" } },
+      {
+        $lookup: {
+          from: "devices",
+          localField: "deviceId",
+          foreignField: "_id",
+          as: "deviceInfo"
         }
       },
       {
-        $sort: { createdAt: -1 }
+        $project: {
+          _id: 1,
+          deviceId: {
+            _id: { $arrayElemAt: ["$deviceInfo._id", 0] },
+            name: { $arrayElemAt: ["$deviceInfo.name", 0] },
+            serialNumber: { $arrayElemAt: ["$deviceInfo.serialNumber", 0] },
+            imageUrl: { $arrayElemAt: ["$deviceInfo.imageUrl", 0] },
+            status: { $arrayElemAt: ["$deviceInfo.status", 0] }
+          },
+          assignedBy: 1,
+          assignedAt: 1,
+          source: { $literal: "assigned" }
+        }
       }
     ]);
-    console.log("Fetched devices:", devices);
+
+    // 3. Merge both lists
+    const devices = [...ownedDevices, ...assignedDevices];
 
     return NextResponse.json(
       {
@@ -136,7 +160,6 @@ export async function GET(req: NextRequest) {
       },
       { status: 200 }
     );
-    
   } catch (error) {
     console.error("Error fetching devices:", error);
     return NextResponse.json(
@@ -162,6 +185,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     const result = await OnboardedDevice.findByIdAndDelete(deviceId);
+    await DevicePlaylist.deleteMany({ deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId)});
+    
 
     if (!result) {
       return NextResponse.json(

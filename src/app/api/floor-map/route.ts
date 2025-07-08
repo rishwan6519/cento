@@ -9,18 +9,16 @@ import FloorMap from "@/models/FloorMap";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, userId, imageBase64, fileName } = body;
-    console.log("Received data:", { name, userId, imageBase64, fileName });
+    const { name, userId, image, fileName } = body;
+    console.log("Received data:", { name, userId, image, fileName });
 
-    if (!name || !userId || !imageBase64 || !fileName) {
+    if (!name || !userId || !image || !fileName) {
       return NextResponse.json(
         { success: false, message: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
     const filePath = path.join(process.cwd(), "public/uploads/floormaps", fileName);
 
     // Ensure upload directory exists
@@ -29,15 +27,13 @@ export async function POST(req: NextRequest) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    fs.writeFileSync(filePath, buffer);
 
-    const imageUrl = `/uploads/floormaps/${fileName}`;
-
+    
     await connectToDatabase();
 
     const newMap = await FloorMap.create({
       name,
-      imageUrl,
+      imageUrl: image, // Assuming image is the URL from Cloudinary
       userId,
       uploadedAt: new Date(),
     });

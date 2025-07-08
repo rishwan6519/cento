@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
     const devicePlaylists: DevicePlaylist[] = await DevicePlaylist.find({ userId })
       .populate("playlistIds")
       .select("-__v -createdAt -updatedAt");
+      console.log('devicePlaylists', devicePlaylists);
 
     const playlistMap = new Map();
 

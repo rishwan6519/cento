@@ -2,6 +2,9 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 
+const CLOUDINARY_UPLOAD_PRESET = "media_upload_preset";
+const CLOUDINARY_CLOUD_NAME = "dzb0gggua"; // ✅ Replace if needed
+
 export default function FloorMapUploader() {
   const [floorPlanName, setFloorPlanName] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -20,7 +23,7 @@ export default function FloorMapUploader() {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
+      reader.onerror = (error) => reject(error);
     });
 
   const handleUpload = async () => {
@@ -36,9 +39,27 @@ export default function FloorMapUploader() {
     }
 
     try {
-      const imageBase64 = await convertToBase64(file);
-      const fileName = `${Date.now()}_${file.name}`;
+      // 1. Upload to Cloudinary
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const cloudData = await cloudRes.json();
+      if (!cloudRes.ok) {
+        throw new Error(cloudData.error?.message || "Cloudinary upload failed");
+      }
+
+      const secureUrl = cloudData.secure_url || cloudData.url;
+
+      // 2. Save metadata to your backend
       const res = await fetch("/api/floor-map", {
         method: "POST",
         headers: {
@@ -47,15 +68,15 @@ export default function FloorMapUploader() {
         body: JSON.stringify({
           name: floorPlanName,
           userId,
-          fileName,
-          imageBase64,
+          fileName: file.name,
+          image: secureUrl,
         }),
       });
 
       const data = await res.json();
       if (data.success) {
         toast.success("Uploaded!");
-        setPreviewUrl(data.data.imageUrl);
+        setPreviewUrl(data.data.imageUrl || secureUrl);
       } else {
         toast.error(data.message || "Upload failed");
       }
@@ -67,10 +88,15 @@ export default function FloorMapUploader() {
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg max-w-lg mx-auto mt-10 border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Upload Floor Map</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+        Upload Floor Map
+      </h2>
 
       <div className="mb-4">
-        <label htmlFor="floorPlanName" className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          htmlFor="floorPlanName"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
           Floor Plan Name
         </label>
         <input
@@ -84,7 +110,10 @@ export default function FloorMapUploader() {
       </div>
 
       <div className="mb-4">
-        <label htmlFor="fileUpload" className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          htmlFor="fileUpload"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
           Upload Image
         </label>
         <input
@@ -98,8 +127,14 @@ export default function FloorMapUploader() {
 
       {previewUrl && (
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Preview</label>
-          <img src={previewUrl} alt="Preview" className="rounded-lg border w-full max-h-64 object-contain" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Preview
+          </label>
+          <img
+            src={previewUrl}
+            alt="Preview"
+            className="rounded-lg border w-full max-h-64 object-contain"
+          />
         </div>
       )}
 

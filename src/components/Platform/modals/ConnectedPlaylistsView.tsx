@@ -82,6 +82,7 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
         }));
 
         setPlaylists(formattedPlaylists);
+        console.log("Formatted playlists:", formattedPlaylists);
       } catch (err) {
         console.error("Failed to fetch playlists:", err);
         setError(
@@ -102,6 +103,7 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
           !playlist.deviceIds.some((device) => device.id === selectedDevice._id)
       )
     : playlists;
+    console.log("playlists", playlists);
 
   return (
     <div className="space-y-6">
