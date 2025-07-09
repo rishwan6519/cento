@@ -28,7 +28,11 @@ interface Playlist {
   files: PlaylistFile[];
   startTime?: string;
   endTime?: string;
+  startDate?: string;    // Add this
+  endDate?: string;      // Add this
+  daysOfWeek?: string[]; // Add this
   createdAt?: string;
+  status?: 'active' | 'inactive';
 }
 
 interface EditablePlaylist {
@@ -37,12 +41,11 @@ interface EditablePlaylist {
   type: string;
   startTime: string;
   endTime: string;
+  startDate: string;    // Add this
+  endDate: string;      // Add this
+  daysOfWeek: string[]; // Add this
   files: PlaylistFile[];
-  backgroundAudio?: {
-    enabled: boolean;
-    file: string | null;
-    volume: number;
-  };
+  status?: 'active' | 'inactive';
 }
 
 interface MediaFile {
@@ -191,12 +194,17 @@ const PlaylistManager: React.FC = () => {
       type: playlist.type,
       startTime: playlist.startTime || "00:00",
       endTime: playlist.endTime || "23:59",
+      startDate: playlist.startDate || "",
+      endDate: playlist.endDate || "",
+      // Ensure daysOfWeek is properly initialized from database data
+      daysOfWeek: playlist.daysOfWeek || [],
+      status: playlist.status || 'active',
       files: playlist.files.map((file, index) => ({
         id: file.id || generateUniqueId(),
         name: file.name,
         type: file.type,
         displayOrder: index + 1,
-        path: file.path , // Handle both path and url properties
+        path: file.path,
         delay: file.delay || 0,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
         backgroundImage: file.backgroundImage || null,
@@ -251,66 +259,47 @@ const PlaylistManager: React.FC = () => {
     if (!playlist || !playlist.id) return;
     
     try {
-      const processedFiles = playlist.files.map((file, index) => {
-        // Determine file type based on extension and current type
-        let fileType = file.type;
+        const response = await fetch(`/api/playlists/id?id=${playlist.id}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name: playlist.name,
+                type: playlist.type,
+                startTime: playlist.startTime,
+                endTime: playlist.endTime,
+                startDate: playlist.startDate,
+                endDate: playlist.endDate,
+                // Ensure daysOfWeek is included in the update
+                daysOfWeek: playlist.daysOfWeek || [], 
+                status: playlist.status,
+                files: playlist.files.map((file, index) => ({
+                    id: file.id,
+                    name: file.name,
+                    type: file.type,
+                    url: file.path,
+                    displayOrder: index + 1,
+                    delay: file.delay || 0,
+                    backgroundImageEnabled: file.backgroundImageEnabled || false,
+                    backgroundImage: file.backgroundImage || null,
+                })),
+            }),
+        });
         
-        if (
-          file.name.toLowerCase().endsWith(".mp3") ||
-          file.name.toLowerCase().endsWith(".wav") ||
-          file.name.toLowerCase().endsWith(".ogg") ||
-          file.type.includes("audio")
-        ) {
-          fileType = "audio";
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to update playlist");
         }
         
-        if (
-          file.name.toLowerCase().endsWith(".mp4") ||
-          file.name.toLowerCase().endsWith(".webm") ||
-          file.name.toLowerCase().endsWith(".mov") ||
-          file.type.includes("video")
-        ) {
-          fileType = "video";
-        }
-        
-        return {
-          id: file.id,
-          name: file.name,
-          type: fileType,
-          url: file.path,
-          displayOrder: index + 1,
-          delay: file.delay || 0,
-          backgroundImageEnabled: file.backgroundImageEnabled || false,
-          backgroundImage: file.backgroundImage || null,
-        };
-      });
-      
-      const response = await fetch(`/api/playlists/id?id=${playlist.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: playlist.name,
-          type: playlist.type,
-          startTime: playlist.startTime,
-          endTime: playlist.endTime,
-          files: processedFiles,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update playlist");
-      }
-      
-      toast.success("Playlist updated successfully");
-      fetchPlaylists();
-      setIsEditing(false);
-      setEditedPlaylist(null);
+        // After successful update, refresh the playlists
+        await fetchPlaylists();
+        toast.success("Playlist updated successfully");
+        setIsEditing(false);
+        setEditedPlaylist(null);
     } catch (error) {
-      console.error("Error updating playlist:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to update playlist");
+        console.error("Error updating playlist:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to update playlist");
     }
   };
 
@@ -363,6 +352,16 @@ const PlaylistManager: React.FC = () => {
     return null;
   };
 
+  const daysOfWeek = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday'
+  ];
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 text-black">
       <div className="flex justify-between items-center mb-6">
@@ -404,6 +403,26 @@ const PlaylistManager: React.FC = () => {
                 className="w-full px-3 py-2 border rounded-lg"
               />
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Status
+              </label>
+              <select
+                value={editedPlaylist.status}
+                onChange={(e) =>
+                  setEditedPlaylist({
+                    ...editedPlaylist,
+                    status: e.target.value as 'active' | 'inactive',
+                  })
+                }
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -436,6 +455,68 @@ const PlaylistManager: React.FC = () => {
                   }
                   className="w-full px-3 py-2 border rounded-lg"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={editedPlaylist.startDate}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      startDate: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={editedPlaylist.endDate}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      endDate: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-2">
+                Days of Week
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {daysOfWeek.map((day) => (
+                  <label key={day} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={editedPlaylist.daysOfWeek?.includes(day) || false}
+                      onChange={(e) => {
+                        const updatedDays = e.target.checked
+                          ? [...(editedPlaylist.daysOfWeek || []), day]
+                          : (editedPlaylist.daysOfWeek || []).filter((d) => d !== day);
+                        setEditedPlaylist({
+                          ...editedPlaylist,
+                          daysOfWeek: updatedDays,
+                        });
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm">{day}</span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
@@ -688,6 +769,9 @@ const PlaylistManager: React.FC = () => {
                   <p className="text-sm text-gray-600">
                     Created:{" "}
                     {playlist.createdAt ? new Date(playlist.createdAt).toLocaleDateString() : "N/A"}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Schedule: {playlist.daysOfWeek?.join(', ') || 'Every day'}
                   </p>
                 </div>
                 <div className="flex gap-2">

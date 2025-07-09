@@ -51,8 +51,12 @@ export async function GET(req: NextRequest) {
 
     // Step 4: Find all playlists and sort by schedule
     const playlists = await Playlist.find({
-      _id: { $in: devicePlaylists.playlistIds }
+      _id: { $in: devicePlaylists.playlistIds },
+      status: 'active'  // Add status check
     }).sort({ startTime: 1 });
+    
+    console.log('Found playlists:', playlists); // Add this debug log
+    console.log('Current time:', currentTime);   // Add this debug log
 
     // Step 5: Find currently active playlist and announcement
     let currentPlaylist = null;
@@ -87,17 +91,24 @@ export async function GET(req: NextRequest) {
 
       // Check time range
       if (
+        playlist.startTime && playlist.endTime &&
         currentTime >= playlist.startTime &&
-        currentTime < playlist.endTime
+        (
+          playlist.endTime > playlist.startTime 
+            ? currentTime < playlist.endTime 
+            : currentTime < '23:59:59' || currentTime >= '00:00:00'
+        )
       ) {
         if (playlist.contentType === 'announcement') {
           currentAnnouncement = playlist;
         } else {
           currentPlaylist = playlist;
         }
+        console.log('Matched playlist:', playlist); // Add debug log
       }
     }
-
+console.log('currentPlaylist', currentPlaylist);
+    console.log('currentAnnouncement', currentAnnouncement);
     // Step 6: Return the result
     return NextResponse.json({
       currentPlaylist: currentPlaylist ? {
