@@ -28,9 +28,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Step 2: Find device's playlist connections
-    const devicePlaylists = await DevicePlaylist.findOne({
-      deviceId: device._id
-    }, 'playlistIds');
+    const devicePlaylists = await DevicePlaylist.findOne(
+      { deviceId: device._id },
+      'playlistIds'
+    );
     console.log('devicePlaylists', devicePlaylists);
 
     if (!devicePlaylists || !devicePlaylists.playlistIds.length) {
@@ -40,41 +41,48 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Step 3: Get current time in HH:mm:ss format
-    const now = new Date();
-    const currentTime = now.toLocaleTimeString('en-US', {
+    // Step 3: Get current time in Melbourne timezone (HH:mm:ss format)
+    const melbourneFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Australia/Melbourne',
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     });
+    const currentTime = melbourneFormatter.format(new Date());
 
-    // Step 4: Find all playlists and sort by schedule
+    // Step 4: Get today's date and weekday in Melbourne
+    const melbourneNow = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Australia/Melbourne' })
+    );
+    const todayStr = melbourneNow.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const weekDays = [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday'
+    ];
+    const todayWeekDay = weekDays[melbourneNow.getDay()];
+
+    // Step 5: Fetch all playlists and sort by start time
     const playlists = await Playlist.find({
-      _id: { $in: devicePlaylists.playlistIds },
-      status: 'active'  // Add status check
+      _id: { $in: devicePlaylists.playlistIds }
     }).sort({ startTime: 1 });
-    
-    console.log('Found playlists:', playlists); // Add this debug log
-    console.log('Current time:', currentTime);   // Add this debug log
 
-    // Step 5: Find currently active playlist and announcement
+    // Step 6: Determine current active playlist and announcement
     let currentPlaylist = null;
     let currentAnnouncement = null;
-
-    const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10); // 'YYYY-MM-DD'
-    const weekDays = [
-      'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'
-    ];
-    const todayWeekDay = weekDays[today.getDay()];
 
     for (let i = 0; i < playlists.length; i++) {
       const playlist = playlists[i];
 
       // Check date range
       if (
-        playlist.startDate && playlist.endDate &&
+        playlist.startDate &&
+        playlist.endDate &&
         (todayStr < playlist.startDate || todayStr > playlist.endDate)
       ) {
         continue;
@@ -91,35 +99,38 @@ export async function GET(req: NextRequest) {
 
       // Check time range
       if (
-        playlist.startTime && playlist.endTime &&
         currentTime >= playlist.startTime &&
-        (
-          playlist.endTime > playlist.startTime 
-            ? currentTime < playlist.endTime 
-            : currentTime < '23:59:59' || currentTime >= '00:00:00'
-        )
+        currentTime < playlist.endTime
       ) {
         if (playlist.contentType === 'announcement') {
           currentAnnouncement = playlist;
         } else {
           currentPlaylist = playlist;
         }
-        console.log('Matched playlist:', playlist); // Add debug log
       }
     }
-console.log('currentPlaylist', currentPlaylist);
-    console.log('currentAnnouncement', currentAnnouncement);
-    // Step 6: Return the result
-    return NextResponse.json({
-      currentPlaylist: currentPlaylist ? {
-        playlistId: currentPlaylist._id,
-        versionId: currentPlaylist.updatedAt.getTime().toString()
-      } : null,
 
-      currentAnnouncement: currentAnnouncement ? {
-        announcementId: currentAnnouncement.announcementId || currentAnnouncement._id,
-        versionId: currentAnnouncement.updatedAt.getTime().toString()
-      } : null
+    // Step 7: Return result
+    return NextResponse.json({
+      currentPlaylist: currentPlaylist
+        ? {
+            playlistId: currentPlaylist._id,
+            versionId: currentPlaylist.updatedAt.getTime().toString()
+          }
+        : null,
+        
+
+      currentAnnouncement: currentAnnouncement
+        ? {
+            announcementId:
+              currentAnnouncement.announcementId || currentAnnouncement._id,
+            versionId: currentAnnouncement.updatedAt.getTime().toString()
+          }
+        : null,
+      currentTime: {
+        australian: currentTime,
+        utcOffset: '+10:00' // Melbourne is UTC+10
+      }
     });
 
   } catch (error) {

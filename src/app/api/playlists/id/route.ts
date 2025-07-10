@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
+import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
+import DevicePlaylist from '@/models/ConectPlaylist';
 import Playlist from '@/models/PlaylistConfig';
 
 interface PlaylistFile {
@@ -23,8 +22,8 @@ interface PlaylistData {
   updatedAt: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'public', 'data');
-const PLAYLISTS_FILE = path.join(DATA_DIR, 'playlists.json');
+// const DATA_DIR = path.join(process.cwd(), 'public', 'data');
+// const PLAYLISTS_FILE = path.join(DATA_DIR, 'playlists.json');
 
 type RouteContext = {
   params: {
@@ -113,8 +112,16 @@ export async function PUT(request: NextRequest) {
 
     const updatedPlaylist = {
       name: data.name,
+      type: data.type,
       startTime: data.startTime,
       endTime: data.endTime,
+      // Add start and end dates
+      startDate: data.startDate || null,
+      endDate: data.endDate || null,
+      // Add days of week
+      daysOfWeek: data.daysOfWeek || [],
+      // Add status
+      status: data.status || 'active',
       files: data.files.map((file: any) => ({
         id: file.id,
         name: file.name,
@@ -129,15 +136,31 @@ export async function PUT(request: NextRequest) {
       updatedAt: new Date()
     };
 
-    await Playlist.findByIdAndUpdate(id, updatedPlaylist, { new: true });
-    return NextResponse.json({ success: true });
+    const updated = await Playlist.findByIdAndUpdate(
+      id, 
+      updatedPlaylist, 
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return NextResponse.json(
+        { success: false, error: 'Playlist not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      playlist: updated
+    });
   } catch (error) {
     console.error('Error updating playlist:', error);
-    return NextResponse.json({ error: 'Failed to update playlist' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update playlist' },
+      { status: 500 }
+    );
   }
-}
-
-export async function DELETE(request: NextRequest) {
+}export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -150,10 +173,48 @@ export async function DELETE(request: NextRequest) {
     }
 
     await connectToDatabase();
-    await Playlist.findByIdAndDelete(id);
-    return NextResponse.json({ success: true });
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Delete the playlist
+      const deletedPlaylist = await Playlist.findByIdAndDelete(id).session(session);
+      
+      if (!deletedPlaylist) {
+        throw new Error('Playlist not found');
+      }
+
+      // Add logging to debug
+      console.log('Attempting to remove playlist from devices:', id);
+      
+      // Fixed query - let MongoDB handle the ObjectId conversion
+      const updateResult = await DevicePlaylist.updateMany(
+        { playlistIds: id }, // MongoDB will automatically convert string to ObjectId for array matching
+        { $pull: { playlistIds: id } }, // Same here
+        { session }
+      );
+
+      console.log('Update result:', updateResult);
+
+      await session.commitTransaction();
+      return NextResponse.json({
+        success: true,
+        deletedPlaylist: deletedPlaylist._id,
+        devicesUpdated: updateResult.modifiedCount
+      });
+    } catch (error) {
+      console.error('Transaction error:', error);
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   } catch (error) {
     console.error('Error deleting playlist:', error);
-    return NextResponse.json({ error: 'Failed to delete playlist' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Failed to delete playlist' },
+      { status: 500 }
+    );
   }
 }

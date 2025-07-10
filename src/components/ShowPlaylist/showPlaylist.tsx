@@ -309,7 +309,7 @@ const PlaylistManager: React.FC = () => {
       return;
     }
     
-    if (!confirm("Are you sure you want to delete this playlist and its files?")) {
+    if (!confirm("Are you sure you want to delete this playlist and its files? This will also remove the playlist from all devices.")) {
       return;
     }
     
@@ -324,9 +324,11 @@ const PlaylistManager: React.FC = () => {
       
       const data = await response.json();
       
-      if (data.success) {
+      if (response.ok && data.success) {
         toast.success("Playlist deleted successfully");
-        fetchPlaylists();
+        // Refresh playlists
+        await fetchPlaylists();
+        // Clear selected playlist if it was the deleted one
         if (selectedPlaylist?._id === playlistId) {
           setSelectedPlaylist(null);
         }
