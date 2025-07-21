@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { FaCheckCircle } from 'react-icons/fa';
 import { motion, AnimatePresence } from "framer-motion";
 
-
 interface User {
   _id: string;
   username: string;
@@ -14,11 +13,24 @@ interface User {
   controllerId: string;
 }
 
-interface Device {
+interface DeviceInfo {
   _id: string;
   name: string;
+  serialNumber: string;
+  typeId: string;
+  imageUrl?: string;
+  color: string;
   status: string;
-    imageUrl?: string;
+}
+
+interface Device {
+  _id: string;
+  deviceId: DeviceInfo;
+  typeId: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
 }
 
 export default function AssignDevice() {
@@ -55,9 +67,10 @@ export default function AssignDevice() {
     const fetchDevices = async () => {
       if (!selectedUser) return;
       try {
-        const id =localStorage.getItem('userId');
+        const id = localStorage.getItem('userId');
         const response = await fetch(`/api/available-devices?id=${id}`);
         const data = await response.json();
+        console.log(data, 'data');
         // console.log(data.data, 'data');
         if (data.success) {
           setDevices(data.data);
@@ -74,7 +87,16 @@ export default function AssignDevice() {
   const handleAssignDevice = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
       const assignedBy = localStorage.getItem('userId');
+      
+      // Find the selected device to get the actual deviceId from the nested structure
+      const selectedDeviceData = devices.find(d => d._id === selectedDevice);
+      const actualDeviceId = selectedDeviceData?.deviceId._id;
+      
+      if (!actualDeviceId) {
+        throw new Error('Device ID not found');
+      }
       
       const response = await fetch('/api/assign-device', {
         method: 'POST',
@@ -83,13 +105,18 @@ export default function AssignDevice() {
         },
         body: JSON.stringify({
           userId: selectedUser,
-          deviceId: selectedDevice,
+          deviceId: actualDeviceId, // Use the actual device ID from the nested structure
           assignedBy,
           status: 'active'
         }),
       });
 
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      }
+      
       if (data.success) {
         // Reset form and show success
         setStep(1);
@@ -97,10 +124,11 @@ export default function AssignDevice() {
         setSelectedDevice('');
         setShowSuccess(true); // Show success message
       } else {
-        throw new Error(data.message);
+        throw new Error(data.message || 'Assignment failed');
       }
     } catch (err) {
-      setError('Failed to assign device');
+      console.error('Assignment error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to assign device');
     } finally {
       setLoading(false);
     }
@@ -110,12 +138,11 @@ export default function AssignDevice() {
     switch (step) {
       case 1:
         return (
-            <div className="space-y-6">
+          <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-800">Step 1: Select User</h3>
           
             <div className="flex flex-wrap gap-4">
               {users.filter(user => user.role === 'user').map((user) => (
-
                 <div
                   key={user._id}
                   className={`flex items-center gap-4 w-64 p-4 border rounded-2xl cursor-pointer shadow-sm transition-all duration-200 ${
@@ -152,7 +179,7 @@ export default function AssignDevice() {
 
       case 2:
         return (
-            <div className="space-y-6">
+          <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-800">Step 2: Select Device</h3>
           
             <div className="flex flex-wrap gap-4">
@@ -168,10 +195,10 @@ export default function AssignDevice() {
                 >
                   {/* Image */}
                   <div className="w-full h-36 mb-4 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                    {device.imageUrl ? (
+                    {device.deviceId.imageUrl ? (
                       <Image
-                        src={device.imageUrl}
-                        alt={device.name}
+                        src={device.deviceId.imageUrl}
+                        alt={device.deviceId.name}
                         width={256}
                         height={144}
                         className="object-cover w-full h-full"
@@ -183,12 +210,22 @@ export default function AssignDevice() {
           
                   {/* Device Info */}
                   <div>
-                    <h4 className="text-lg font-medium text-gray-800">{device.name}</h4>
-                    <p className="text-sm text-gray-500">Status: {device.status}</p>
+                    <h4 className="text-lg font-medium text-gray-800">{device.deviceId.name}</h4>
+                    <p className="text-sm text-gray-500">Serial: {device.deviceId.serialNumber}</p>
+                    <p className="text-sm text-gray-500">Color: {device.deviceId.color}</p>
+                    <p className="text-sm text-gray-500">Status: {device.deviceId.status}</p>
                   </div>
                 </div>
               ))}
             </div>
+          
+            {/* Show message if no devices available */}
+            {devices.length === 0 && (
+              <div className="text-center py-8">
+                <MonitorSmartphone className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-500">No available devices found</p>
+              </div>
+            )}
           
             {/* Navigation Buttons */}
             <div className="flex gap-4 pt-4">
@@ -215,9 +252,17 @@ export default function AssignDevice() {
                 <span className="font-medium">Selected User: </span>
                 {users.find(u => u._id === selectedUser)?.username}
               </p>
-              <p>
+              <p className="mb-2">
                 <span className="font-medium">Selected Device: </span>
-                {devices.find(d => d._id === selectedDevice)?.name}
+                {devices.find(d => d._id === selectedDevice)?.deviceId.name}
+              </p>
+              <p className="mb-2">
+                <span className="font-medium">Serial Number: </span>
+                {devices.find(d => d._id === selectedDevice)?.deviceId.serialNumber}
+              </p>
+              <p>
+                <span className="font-medium">Color: </span>
+                {devices.find(d => d._id === selectedDevice)?.deviceId.color}
               </p>
             </div>
             <div className="flex gap-4">
@@ -239,11 +284,11 @@ export default function AssignDevice() {
 
   useEffect(() => {
     if (showSuccess) {
-       const timer = setTimeout(() => {
-      window.location.href = "/platform"; // Redirect to platform page
-    }, 1800);
+      const timer = setTimeout(() => {
+        window.location.href = "/platform"; // Redirect to platform page
+      }, 1800);
 
-    return () => clearTimeout(timer); // cleanup
+      return () => clearTimeout(timer); // cleanup
     }
   }, [showSuccess]);
 
@@ -272,7 +317,7 @@ export default function AssignDevice() {
             {error}
           </div>
         )}
-         {showSuccess && (
+        {showSuccess && (
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -293,7 +338,7 @@ export default function AssignDevice() {
               transition={{ delay: 0.2 }}
               className="text-3xl font-bold text-green-700 mb-2"
             >
-              Device Onboarded!
+              Device Assigned Successfully!
             </motion.h2>
             <p className="text-lg text-gray-700">Redirecting to platform...</p>
           </motion.div>

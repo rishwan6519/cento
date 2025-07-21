@@ -86,6 +86,7 @@ export default function UserPlatform(): React.ReactElement {
             'Content-Type': 'application/json',
           },
         });
+        
 
         if (!response.ok) {
           throw new Error('Failed to fetch assigned devices');

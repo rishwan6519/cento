@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-   
+   console.log('User ID:', userId);
     
     if (!userId) {
       return NextResponse.json({
@@ -19,21 +19,24 @@ export async function GET(request: Request) {
     }
 
     // Update the query to populate device details and include status check
+
+
     const assignments = await AssignedDevice.find({
       userId,
       status: 'active'
     }).populate({
-      path: 'deviceId',
-      model: Device,
-      select: 'name serialNumber status imageUrl color typeId',
-      populate: {
-        path: 'typeId',
-        model: DeviceType, // Using the imported model directly
-        select: 'name blcockCodingEnabled handMovements bodyMovements screenSize'
-      }
-    });
+  path: 'deviceId',
+  model: Device,
+  select: 'name serialNumber status imageUrl color typeId',
+  populate: {
+    path: 'typeId',
+    model: DeviceType,
+    select: 'name blcockCodingEnabled handMovements bodyMovements screenSize'
+  }
+});
 
-    console.log('Assignments:', assignments.map(a => a.deviceId.typeId));
+console.log('Assignments:', assignments);
+ 
     
     if (!assignments || assignments.length === 0) {
       return NextResponse.json({
