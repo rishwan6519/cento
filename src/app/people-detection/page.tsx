@@ -233,11 +233,11 @@ export default function PeopleDetectionPage() {
 
     try {
       console.log(
-        `Testing API endpoint: http://10.71.172.114:5000/get_counts?camera_id=${selectedCamera}`
+        `Testing API endpoint: http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}`
       );
 
       const response = await fetch(
-        `http://10.71.172.114:5000/get_counts?camera_id=${selectedCamera}`
+        `http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}`
       );
       const data = await response.json();
 
@@ -292,7 +292,7 @@ export default function PeopleDetectionPage() {
     setMessage("Connecting to camera streams...");
 
     try {
-      const response = await fetch("http://10.71.172.114:5000/start_pipeline", {
+      const response = await fetch("http://10.71.172.138:5000/start_pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sources: urls }),
@@ -304,7 +304,7 @@ export default function PeopleDetectionPage() {
       }
 
       const result = await response.json();
-      const cameraRes = await fetch("http://10.71.172.114:5000/get_cameras");
+      const cameraRes = await fetch("http://10.71.172.138:5000/get_cameras");
 
       if (!cameraRes.ok) {
         throw new Error("Failed to get camera list");
@@ -331,7 +331,7 @@ export default function PeopleDetectionPage() {
     try {
       setMessage("Capturing snapshot...");
       const res = await fetch(
-        `http://10.71.172.114:5000/get_snapshot?camera_id=${selectedCamera}`
+        `http://10.71.172.138:5000/get_snapshot?camera_id=${selectedCamera}`
       );
 
       if (!res.ok) {
@@ -404,7 +404,7 @@ export default function PeopleDetectionPage() {
         );
 
         const res = await fetch(
-          `http://10.71.172.114:5000/api/camera/${selectedCamera}/zones`,
+          `http://10.71.172.138:5000/api/camera/${selectedCamera}/zones`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -580,7 +580,7 @@ export default function PeopleDetectionPage() {
 
     try {
       const response = await fetch(
-        `http://10.71.172.114:5000/get_counts?camera_id=${selectedCamera}`,
+        `http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}`,
         {
           method: "GET",
           cache: "no-store",
@@ -664,7 +664,7 @@ export default function PeopleDetectionPage() {
       const endDateTime = `${endDate}T${endTime}:00`;
 
       const response = await fetch(
-        `http://10.71.172.114:5000/get_counts?camera_id=${selectedCamera}&start_time=${startDateTime}&end_time=${endDateTime}`,
+        `http://10.71.172.138:5000/get_counts?camera_id=${selectedCamera}&start_time=${startDateTime}&end_time=${endDateTime}`,
         {
           method: "GET",
           headers: {
