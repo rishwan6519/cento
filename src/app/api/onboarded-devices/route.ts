@@ -87,16 +87,16 @@ export async function GET(req: NextRequest) {
           from: "devices",
           localField: "deviceId",
           foreignField: "_id",
-          as: "deviceInfo"
-        }
+          as: "deviceInfo",
+        },
       },
       {
         $lookup: {
           from: "devicetypes",
           localField: "typeId",
           foreignField: "_id",
-          as: "typeInfo"
-        }
+          as: "typeInfo",
+        },
       },
       {
         $project: {
@@ -106,19 +106,19 @@ export async function GET(req: NextRequest) {
             name: { $arrayElemAt: ["$deviceInfo.name", 0] },
             serialNumber: { $arrayElemAt: ["$deviceInfo.serialNumber", 0] },
             imageUrl: { $arrayElemAt: ["$deviceInfo.imageUrl", 0] },
-            status: { $arrayElemAt: ["$deviceInfo.status", 0] }
+            status: { $arrayElemAt: ["$deviceInfo.status", 0] },
           },
           typeId: {
             _id: { $arrayElemAt: ["$typeInfo._id", 0] },
-            name: { $arrayElemAt: ["$typeInfo.name", 0] }
+            name: { $arrayElemAt: ["$typeInfo.name", 0] },
           },
           userId: { _id: "$userId" },
           createdAt: 1,
           updatedAt: 1,
           __v: 1,
-          source: { $literal: "owned" }
-        }
-      }
+          source: { $literal: "owned" },
+        },
+      },
     ]);
 
     // 2. Devices assigned to user
@@ -129,8 +129,8 @@ export async function GET(req: NextRequest) {
           from: "devices",
           localField: "deviceId",
           foreignField: "_id",
-          as: "deviceInfo"
-        }
+          as: "deviceInfo",
+        },
       },
       {
         $project: {
@@ -140,13 +140,13 @@ export async function GET(req: NextRequest) {
             name: { $arrayElemAt: ["$deviceInfo.name", 0] },
             serialNumber: { $arrayElemAt: ["$deviceInfo.serialNumber", 0] },
             imageUrl: { $arrayElemAt: ["$deviceInfo.imageUrl", 0] },
-            status: { $arrayElemAt: ["$deviceInfo.status", 0] }
+            status: { $arrayElemAt: ["$deviceInfo.status", 0] },
           },
           assignedBy: 1,
           assignedAt: 1,
-          source: { $literal: "assigned" }
-        }
-      }
+          source: { $literal: "assigned" },
+        },
+      },
     ]);
 
     // 3. Merge both lists
@@ -156,14 +156,18 @@ export async function GET(req: NextRequest) {
       {
         success: true,
         data: devices,
-        count: devices.length
+        count: devices.length,
       },
       { status: 200 }
     );
   } catch (error) {
     console.error("Error fetching devices:", error);
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : "Failed to fetch devices" },
+      {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to fetch devices",
+      },
       { status: 500 }
     );
   }
@@ -185,8 +189,12 @@ export async function DELETE(req: NextRequest) {
     }
 
     const result = await OnboardedDevice.findByIdAndDelete(deviceId);
-    await DevicePlaylist.deleteMany({ deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId)});
-    
+    await DevicePlaylist.deleteMany({
+      deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId),
+    });
+    await AssignedDevice.deleteMany({
+      deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId),
+    });
 
     if (!result) {
       return NextResponse.json(
