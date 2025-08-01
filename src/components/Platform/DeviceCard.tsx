@@ -159,8 +159,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         <div className="flex-grow">
           <div className="flex justify-between items-start">
             <h4 className="font-semibold text-gray-900">{deviceId.name}</h4>
+            
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm"> 
             <div>
               <p className="text-gray-500">Type</p>
               <p className="text-gray-800 font-medium">{typeId.name}</p>

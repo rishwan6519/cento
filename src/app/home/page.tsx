@@ -107,21 +107,22 @@ const PeopleDetectionOptions = ({ onBack, onUploadFloorPlan, onGoToPlatform }: {
 const cardList = [
   {
     id: "customer interaction",
-    label: "Customer Interaction Platform",
+    label: "Ambience",
     icon: <IoPeopleSharp  className="text-4xl text-purple-600" />,
     route: "/user-platform",
     apiKey: "platform",
   },
   {
     id: "blockcoding",
-    label: "Block Coding",
+    label: "Cento",
     icon: <FaCode className="text-4xl text-blue-600" />,
     route: "/block-code",
     apiKey: "blockCoding",
   },
+  
   {
     id: "detection",
-    label: "People Detection",
+    label: "Analytics",
     icon: <FaEye className="text-4xl text-green-600" />,
     route: "/people-detection",
     apiKey: "peopleDetection",

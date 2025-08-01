@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date()
       });
 
+
       return NextResponse.json(newDevicePlaylist);
     }
   } catch (error) {
@@ -102,6 +103,7 @@ export async function GET(req: NextRequest) {
     });
 
     const result = Array.from(playlistMap.values());
+    console.log('Resulting playlists:', result);
 
     return NextResponse.json(result);
   } catch (error) {

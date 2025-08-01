@@ -14,6 +14,7 @@ interface DashboardViewProps {
   onManagePlaylists: (device: Device) => void;
   setDevices: React.Dispatch<React.SetStateAction<Device[]>>;
   userRole?: string;
+  
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({
