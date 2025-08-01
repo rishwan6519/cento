@@ -221,7 +221,7 @@ const AnnouncementList: React.FC = () => {
 
     toast.loading("Saving changes...");
     try {
-        const response = await fetch(`/api/announcement/playlist?id=${editedPlaylist._id}`, {
+        const response = await fetch(`/api/announcement/playlist/id?id=${editedPlaylist._id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateBody),
@@ -252,7 +252,7 @@ const AnnouncementList: React.FC = () => {
     
     toast.loading("Deleting playlist...");
     try {
-        const response = await fetch(`/api/announcement/playlist/${playlistId}`, {
+        const response = await fetch(`/api/announcement/playlist/id?id=${playlistId}`, {
             method: 'DELETE',
         });
 

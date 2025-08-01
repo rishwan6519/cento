@@ -309,9 +309,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                       <div className="flex items-center justify-between">
                         <div className="relative">
                           {/* Content type tag in corner */}
-                          <span className="absolute -top-2 -left-2 text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
-                            {playlist?.contentType}
-                          </span>
+                         
                           <h4 className="font-medium text-gray-900 mt-3">
                             {playlist.name}
                           </h4>

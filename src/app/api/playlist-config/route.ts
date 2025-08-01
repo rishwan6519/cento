@@ -23,8 +23,6 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const configString = formData.get("config");
 
-    // console.log('Received config string:', configString);
-
     if (!configString) {
       return NextResponse.json(
         { error: "No configuration data provided" },
@@ -33,11 +31,6 @@ export async function POST(req: NextRequest) {
     }
 
     const configData = JSON.parse(configString as string);
-    console.log(
-      "conentData",
-      configData,
-      "................................ffffffff"
-    );
 
     if (!configData.name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -50,12 +43,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create new configuration with contentType
+    // Create new configuration
     const playlistConfig = await PlaylistConfig.create({
       name: configData.name,
       userId: new Mongoose.Types.ObjectId(userId),
       type: configData.type,
-      contentType: configData.contentType,
       startTime: configData.startTime,
       endTime: configData.endTime,
       startDate: configData.startDate,
@@ -89,12 +81,9 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const serialNumber = searchParams.get("serialNumber");
-    const contentType = searchParams.get("contentType"); // Add this line
 
-    // Update query to include contentType if provided
     const query = {
       ...(serialNumber && { serialNumber }),
-      ...(contentType && { contentType }),
     };
 
     const configs = await PlaylistConfig.find(query).sort({ createdAt: -1 });
@@ -154,7 +143,6 @@ export async function PUT(req: NextRequest) {
       {
         name: configData.name,
         type: configData.type,
-        contentType: configData.contentType, // Add this line
         serialNumber: configData.serialNumber,
         startTime: configData.startTime,
         endTime: configData.endTime,

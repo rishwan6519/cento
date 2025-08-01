@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -21,7 +19,6 @@ interface PlaylistConfiguration {
   id: string;
   name: string;
   type: string;
-  contentType: "playlist" | "announcement";
   serialNumber: string;
   startTime: string;
   endTime: string;
@@ -34,9 +31,8 @@ interface PlaylistConfiguration {
 // Create a ShowPlaylist component
 const ShowPlaylist: React.FC<{
   playlistName: string;
-  contentType: string;
   onCreateNew: () => void;
-}> = ({ playlistName, contentType, onCreateNew }) => {
+}> = ({ playlistName, onCreateNew }) => {
   const router = useRouter();
   const [showPlaylistManager, setShowPlaylistManager] = useState(false);
 
@@ -69,8 +65,7 @@ const ShowPlaylist: React.FC<{
         </div>
         <h2 className="text-2xl font-bold text-gray-800">Success!</h2>
         <p className="text-gray-600 mt-2">
-          {contentType === "announcement" ? "Announcement" : "Playlist"} "
-          {playlistName}" has been saved successfully.
+          Playlist "{playlistName}" has been saved successfully.
         </p>
       </div>
       <div className="flex justify-center gap-4">
@@ -78,15 +73,13 @@ const ShowPlaylist: React.FC<{
           onClick={handleViewList}
           className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-medium"
         >
-          View All{" "}
-          {contentType === "announcement" ? "Announcements" : "Playlists"}
+          View All Playlists
         </button>
         <button
           onClick={onCreateNew}
           className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
         >
-          Create Another{" "}
-          {contentType === "announcement" ? "Announcement" : "Playlist"}
+          Create Another Playlist
         </button>
       </div>
     </div>
@@ -99,16 +92,12 @@ const PlaylistSetup: React.FC = () => {
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   const [isSaved, setIsSaved] = useState(false);
   const [savedPlaylistName, setSavedPlaylistName] = useState("");
-  const [savedContentType, setSavedContentType] = useState<
-    "playlist" | "announcement"
-  >("playlist");
   const [isVisible, setIsVisible] = useState(true);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
     id: "",
     name: "",
     type: "mixed",
-    contentType: "playlist",
     serialNumber: "",
     startTime: "00:00:00",
     endTime: "00:10:00",
@@ -162,7 +151,6 @@ const PlaylistSetup: React.FC = () => {
     return (
       <ShowPlaylist
         playlistName={savedPlaylistName}
-        contentType={savedContentType}
         onCreateNew={() => {
           setIsSaved(false);
           setSavedPlaylistName("");
@@ -171,7 +159,6 @@ const PlaylistSetup: React.FC = () => {
             id: "",
             name: "",
             type: "mixed",
-            contentType: savedContentType, // Maintain the current content type
             serialNumber: "",
             startTime: "00:00:00",
             endTime: "00:10:00",
@@ -211,7 +198,7 @@ const PlaylistSetup: React.FC = () => {
       playlistConfig.daysOfWeek.length === 0
     ) {
       toast.error(
-        `Please add a name, at least one file, date range, and select at least one day for the ${playlistConfig.contentType}`
+        `Please add a name, at least one file, date range, and select at least one day for the playlist`
       );
       return;
     }
@@ -220,7 +207,6 @@ const PlaylistSetup: React.FC = () => {
       const configToSend = {
         name: playlistConfig.name,
         type: "mixed",
-        contentType: playlistConfig.contentType,
         startTime: playlistConfig.startTime || "00:00:00",
         endTime: playlistConfig.endTime || "00:10:00",
         startDate: playlistConfig.startDate,
@@ -250,17 +236,10 @@ const PlaylistSetup: React.FC = () => {
         throw new Error(data.error || "Failed to save playlist");
       }
 
-      toast.success(
-        `${
-          playlistConfig.contentType === "announcement"
-            ? "Announcement"
-            : "Playlist"
-        } saved successfully`
-      );
+      toast.success("Playlist saved successfully");
 
       // Store the saved playlist info for the success screen
       setSavedPlaylistName(playlistConfig.name);
-      setSavedContentType(playlistConfig.contentType);
 
       // Show the success component
       setIsSaved(true);
@@ -280,7 +259,6 @@ const PlaylistSetup: React.FC = () => {
       id: "",
       name: "",
       type: "mixed",
-      contentType: "playlist",
       serialNumber: "",
       startTime: "00:00:00",
       endTime: "00:10:00",
@@ -331,11 +309,11 @@ const PlaylistSetup: React.FC = () => {
                 })
                 .map(
                   (image) => `
-                <div class="aspect-square relative group cursor-pointer hover:opacity-90 bg-white rounded-lg overflow-hidden" 
+                <div class="aspect-square relative group cursor-pointer hover:opacity-90 bg-white rounded-lg overflow-hidden"
                   data-image-url="${image.url}"
                   data-image-name="${image.name}"
                   data-audio-path="${audioPath}">
-                  <img src="${image.url}" 
+                  <img src="${image.url}"
                     alt="${image.name}"
                     loading="lazy"
                     class="w-full h-full object-cover"/>
@@ -357,7 +335,7 @@ const PlaylistSetup: React.FC = () => {
             `
         }
         <div class="flex justify-end mt-6 pt-4 border-t">
-          <button 
+          <button
             id="cancelBgImageSelector"
             class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
@@ -418,23 +396,11 @@ const PlaylistSetup: React.FC = () => {
     }
   };
 
-  // Only allow contentType "playlist"
-  useEffect(() => {
-    setPlaylistConfig((prev) => ({
-      ...prev,
-      contentType: "playlist",
-    }));
-  }, []);
-
   return (
     <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 text-black">
       <div className="mb-4 md:mb-6 border-b pb-4">
         <h2 className="text-xl md:text-2xl font-bold">
-          Create{" "}
-          {playlistConfig.contentType === "announcement"
-            ? "Announcement"
-            : "Playlist"}{" "}
-          Configuration
+          Create Playlist Configuration
         </h2>
       </div>
       <div className="space-y-6">
@@ -495,10 +461,7 @@ const PlaylistSetup: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">
-                {playlistConfig.contentType === "announcement"
-                  ? "Announcement"
-                  : "Playlist"}{" "}
-                Name
+                Playlist Name
               </label>
               <input
                 type="text"
@@ -510,11 +473,7 @@ const PlaylistSetup: React.FC = () => {
                   })
                 }
                 className="w-full p-2 border rounded text-sm"
-                placeholder={`Enter ${
-                  playlistConfig.contentType === "announcement"
-                    ? "announcement"
-                    : "playlist"
-                } name`}
+                placeholder={`Enter playlist name`}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -807,11 +766,7 @@ const PlaylistSetup: React.FC = () => {
                 <span>Saving...</span>
               </div>
             ) : (
-              `Save ${
-                playlistConfig.contentType === "announcement"
-                  ? "Announcement"
-                  : "Playlist"
-              }`
+              `Save Playlist`
             )}
           </button>
         </div>

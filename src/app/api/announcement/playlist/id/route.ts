@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 
-// PUT: Update a playlist
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
-  const body = await req.json();
-  const { name, announcements, schedule, status } = body;
+// PUT: Update a playlist using query param ?id=...
+export async function PUT(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
 
   if (!id) {
     return NextResponse.json({ error: 'Missing playlist ID' }, { status: 400 });
   }
+
+  const body = await req.json();
+  const { name, announcements, schedule, status } = body;
 
   try {
     await connectToDatabase();
@@ -31,9 +33,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-// DELETE: Delete a playlist
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+// DELETE: Delete a playlist using query param ?id=...
+export async function DELETE(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
 
   if (!id) {
     return NextResponse.json({ error: 'Missing playlist ID' }, { status: 400 });
