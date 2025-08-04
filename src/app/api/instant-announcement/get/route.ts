@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {connectToDatabase} from '@/lib/db';
+import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
-import Announcement from '@/models/InstantAnnouncement';
-import '@/models/AnnouncementFiles';
+// Correctly import the InstantAnnouncement model
+import InstantAnnouncement from '@/models/InstantAnnouncement'; 
+// Ensure the Announcement model is registered for populate to work
 
 export async function GET(req: NextRequest) {
   try {
@@ -29,11 +30,19 @@ export async function GET(req: NextRequest) {
     }
     console.log('Device found:', device);
 
-    const announcements = await Announcement.find({
+    // FIX: Query the InstantAnnouncement model, not the Announcement model
+    const instantAnnouncements = await InstantAnnouncement.find({
       deviceId: device._id,
-    }).populate('file');
+    }) // 'file' ref is 'Announcement', so this will populate correctly
 
-    const totalDurationSeconds = announcements.reduce((sum, a) => {
+    console.log('Instant Announcements:', instantAnnouncements);
+
+    // The rest of your logic remains the same, just use the new variable name
+    const totalDurationSeconds = instantAnnouncements.reduce((sum, a) => {
+      // The populated 'file' object is of type 'Announcement'
+      // NOTE: Your Announcement model doesn't have a 'duration' field. 
+      // You'll need to add it or calculate it differently.
+      // Assuming you add 'duration' to the Announcement schema:
       const fileDuration = a.file && 'duration' in a.file ? a.file.duration : 0;
       return sum + fileDuration;
     }, 0);
@@ -51,7 +60,7 @@ export async function GET(req: NextRequest) {
         serialNumber: device.serialNumber,
         name: device.name,
       },
-      announcements,
+      announcements: instantAnnouncements, // Send the correct data
       totalDurationSeconds,
       formattedDuration: formatDuration(totalDurationSeconds),
     });

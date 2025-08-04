@@ -119,14 +119,6 @@ export async function GET(req: NextRequest) {
           }
         : null,
         
-
-      currentAnnouncement: currentAnnouncement
-        ? {
-            announcementId:
-              currentAnnouncement.announcementId || currentAnnouncement._id,
-            versionId: currentAnnouncement.updatedAt.getTime().toString()
-          }
-        : null,
       currentTime: {
         australian: currentTime,
         utcOffset: '+10:00' // Melbourne is UTC+10
