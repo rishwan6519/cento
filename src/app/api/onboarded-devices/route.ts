@@ -185,6 +185,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const result = await OnboardedDevice.findByIdAndDelete(deviceId);
+    console.log("Delete result:", result);
     await DevicePlaylist.deleteMany({ deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId)});
     
 
