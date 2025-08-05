@@ -105,8 +105,8 @@ export async function GET(req: NextRequest) {
 
     // Step 6: Return the final result
     return NextResponse.json({
-      activeAnnouncements,
-      scheduledHourlyAnnouncements,
+      activeAnnouncement: activeAnnouncements.length > 0 ? activeAnnouncements[0] : null,
+  scheduledHourlyAnnouncement: scheduledHourlyAnnouncements.length > 0 ? scheduledHourlyAnnouncements[0] : null,
       currentTime: {
         australian: currentTime,
         day: todayWeekDay,
