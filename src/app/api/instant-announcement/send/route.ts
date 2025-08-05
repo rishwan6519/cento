@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Assuming deviceId is a serial number string — if it's an ObjectId, change this check accordingly
+    // Find device by serial number
     const device = await Device.findOne({ serialNumber: deviceId });
     if (!device) {
       return NextResponse.json(
@@ -38,9 +38,14 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
-console.log(device,"this is device")
+
+    console.log(device, 'this is device');
+
     // Check if announcement file already exists
     let announcementFile = await AnnouncementFile.findOne({ path: audioUrl });
+
+    // Determine file type based on name prefix
+    const fileType = announcementName.trim().toLowerCase().startsWith('ai') ? 'tts' : 'recorded';
 
     // Create new file record if it doesn't exist
     if (!announcementFile) {
@@ -48,8 +53,8 @@ console.log(device,"this is device")
         userId,
         name: announcementName,
         path: audioUrl,
-        type: 'recorded',
-        voice: 'user',
+        type: fileType,
+        voice: fileType === 'tts' ? 'ai' : 'user',
       });
 
       await announcementFile.save();

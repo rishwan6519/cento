@@ -18,6 +18,7 @@ import ShowAnnouncement from "@/components/Announcement/ShowAnnouncement";
 import InstantaneousAnnouncement from "@/components/InstantaneousAnnouncement/InstantaneousAnnouncement";
 import AnnouncementList from "@/components/Announcement/AnnouncementList";
 import ConnectAnnouncement from "@/components/Announcement/ConnectAnnouncement";
+import TTSCreator from "@/components/Announcement/AnnouncementTts";
 
 import {
   FaRobot,
@@ -47,7 +48,7 @@ interface UserData {
   role: string;
 }
 
-type ExtendedMenuKey = MenuKey | "createAnnouncement" | "setupAnnouncement" | "showAnnouncement" | "connectAnnouncement" | "InstantaneousAnnouncement" | "showAnnouncementList";
+type ExtendedMenuKey = MenuKey | "createAnnouncement" | "setupAnnouncement" | "showAnnouncement" | "connectAnnouncement" | "InstantaneousAnnouncement" | "showAnnouncementList"|"TextToSpeech";
 
 interface MenuSection {
   key: string;
@@ -195,6 +196,7 @@ export default function UserPlatform(): React.ReactElement {
       items: [
         { key: "createAnnouncement", label: "Create Announcement", icon: <MdAnnouncement /> },
         { key: "setupAnnouncement", label: "Setup Announcement", icon: <FaCog /> },
+        {key : "TextToSpeech", label: "Text to Speech", icon: <FaVolumeUp />},
         { key: "showAnnouncement", label: "Show Announcement", icon: <FaDisplay /> },
         { key: "showAnnouncementList", label: "Announcement List", icon: <FaListAlt /> },
         { key: "connectAnnouncement", label: "Connect & Disconnect Announcement", icon: <FaLink /> },
@@ -253,6 +255,7 @@ export default function UserPlatform(): React.ReactElement {
       case "showAnnouncement": return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
       case "connectAnnouncement": return <ConnectAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("dashboard")} />;
       case "showAnnouncementList": return <AnnouncementList />;
+      case "TextToSpeech": return < TTSCreator/>;
       default: return <div className="text-center py-20"><p className="text-gray-500">Select a menu item to view its content.</p></div>;
     }
   };

@@ -2,9 +2,27 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Mic, Play, Pause, Trash2, Volume2, AudioLines, ArrowLeft, Send, Wifi
+  Mic, Play, Pause, Trash2, Volume2, AudioLines, ArrowLeft, Send, Wifi, Bot, Languages, ChevronDown
 } from "lucide-react";
 import toast from "react-hot-toast";
+
+// --- CONSTANTS --- //
+
+const geminiVoices = [
+  'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede',
+  'Callirrhoe', 'Autonoe', 'Enceladus', 'Iapetus', 'Umbriel', 'Algieba',
+  'Despina', 'Erinome', 'Algenib', 'Rasalgethi', 'Laomedeia', 'Achernar',
+  'Alnilam', 'Schedar', 'Gacrux', 'Pulcherrima', 'Achird', 'Zubenelgenubi',
+  'Vindemiatrix', 'Sadachbia', 'Sadaltager', 'Sulafat'
+];
+
+const supportedLanguages = [
+    { code: 'en-US', name: 'English (US)' }, { code: 'en-GB', name: 'English (UK)' },
+    { code: 'es-US', name: 'Spanish (US)' }, { code: 'fr-FR', name: 'French (France)' },
+    { code: 'de-DE', name: 'German (Germany)' }, { code: 'it-IT', name: 'Italian (Italy)' },
+    { code: 'ja-JP', name: 'Japanese (Japan)' }, { code: 'pt-BR', name: 'Portuguese (Brazil)' },
+];
+
 
 // --- INTERFACES --- //
 
@@ -20,9 +38,8 @@ interface AnnouncementFile {
   name: string;
   url: string;
   duration?: number;
-  // For new recordings
   blob?: Blob;
-  type?: 'recorded' | 'uploaded';
+  type?: 'recorded' | 'uploaded' | 'tts';
 }
 
 interface InstantaneousAnnouncementProps {
@@ -34,7 +51,6 @@ interface InstantaneousAnnouncementProps {
 
 const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ onCancel, onSuccess }) => {
   const [step, setStep] = useState<number>(1);
-  // FIX 1: Set initial loading state to true to handle initial data fetch.
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -44,7 +60,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
   const [deviceStatus, setDeviceStatus] = useState<{ [deviceId: string]: 'idle' | 'announcing' }>({});
 
   // Step 2: Audio Selection
-  const [activeTab, setActiveTab] = useState<'record' | 'select'>('record');
+  const [activeTab, setActiveTab] = useState<'record' | 'select' | 'tts'>('record');
   const [existingAnnouncements, setExistingAnnouncements] = useState<AnnouncementFile[]>([]);
   const [selectedAudio, setSelectedAudio] = useState<AnnouncementFile | null>(null);
 
@@ -53,6 +69,12 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // TTS State
+  const [ttsText, setTtsText] = useState("Hello! This is an important announcement. The store will be closing in 15 minutes.");
+  const [selectedVoice, setSelectedVoice] = useState('Puck');
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Playback State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -67,18 +89,14 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       setUserId(storedUserId);
     } else {
       toast.error("User not authenticated.");
-      // If no user is found, we should stop the loading process.
       setIsLoading(false);
     }
   }, []);
 
-  // FIX 2: Modified this effect to robustly handle the loading state.
   useEffect(() => {
     if (userId) {
       fetchAvailableDevices();
     } else {
-      // If the component mounts and there's no userId, ensure loading is turned off.
-      // This prevents the loader from spinning indefinitely.
       setIsLoading(false);
     }
   }, [userId]);
@@ -88,10 +106,8 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       const fetchAllStatuses = async () => {
         availableDevices.forEach(device => fetchDeviceStatus(device.serialNumber, device._id));
       };
-
       fetchAllStatuses();
       const intervalId = setInterval(fetchAllStatuses, 5000);
-
       return () => clearInterval(intervalId);
     }
   }, [availableDevices]);
@@ -103,9 +119,11 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
   }, [step, userId]);
 
   useEffect(() => {
+    // Cleanup audio element on component unmount or when audio selection changes
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src); // Revoke URL to prevent memory leaks
         audioRef.current = null;
       }
     };
@@ -116,7 +134,6 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
 
   const fetchDeviceStatus = async (serialNumber: string, deviceId: string) => {
     try {
-      // Note: This API endpoint needs to exist and return the status.
       const response = await fetch(`/api/instant-announcement/get?serialNumber=${serialNumber}`);
       if (response.ok) {
         const data = await response.json();
@@ -125,28 +142,23 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       }
     } catch (error) {
       console.error(`Failed to fetch status for ${serialNumber}:`, error);
-      setDeviceStatus(prev => ({ ...prev, [deviceId]: 'idle' }));
     }
   };
 
   const fetchAvailableDevices = async () => {
-    // We already set isLoading to true initially. No need to set it again here
-    // unless you want a loader for subsequent fetches.
     setIsLoading(true);
     try {
       const response = await fetch(`/api/onboarded-devices?userId=${userId}`);
       if (!response.ok) throw new Error("Failed to fetch devices");
       const data = await response.json();
       const formattedDevices = (data.data || []).map((item: any) => ({
-          _id: item._id,
-          name: item.deviceId.name,
-          serialNumber: item.deviceId.serialNumber,
-          imageUrl: item.deviceId.imageUrl,
+        _id: item._id,
+        name: item.deviceId.name,
+        serialNumber: item.deviceId.serialNumber,
+        imageUrl: item.deviceId.imageUrl,
       }));
       setAvailableDevices(formattedDevices);
-      
     } catch (error) {
-      console.error("Error fetching devices:", error);
       toast.error("Failed to fetch available devices.");
     } finally {
       setIsLoading(false);
@@ -159,7 +171,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       const response = await fetch(`/api/announcement/list?userId=${userId}`);
       if (!response.ok) throw new Error("Failed to fetch announcements");
       const data = await response.json();
-      const formattedAnnouncements = data.map((item: any) => ({
+      const formattedAnnouncements = (data.announcements || data).map((item: any) => ({
         id: item._id,
         name: item.name,
         url: item.path,
@@ -168,18 +180,98 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       }));
       setExistingAnnouncements(formattedAnnouncements);
     } catch (error) {
-      console.error("Error fetching announcements:", error);
       toast.error("Failed to fetch existing announcements.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- RECORDING LOGIC --- //
-  
+  // --- AUDIO & TTS LOGIC --- //
+
+  const createWavBlob = (pcmData: ArrayBuffer): Blob => {
+        const sampleRate = 24000;
+        const numChannels = 1;
+        const bitsPerSample = 16;
+        const bytesPerSample = bitsPerSample / 8;
+        const blockAlign = numChannels * bytesPerSample;
+        const byteRate = sampleRate * blockAlign;
+        const dataSize = pcmData.byteLength;
+        const fileSize = 44 + dataSize;
+        const buffer = new ArrayBuffer(fileSize);
+        const view = new DataView(buffer);
+        const writeString = (offset: number, str: string) => {
+            for (let i = 0; i < str.length; i++) {
+                view.setUint8(offset + i, str.charCodeAt(i));
+            }
+        };
+        writeString(0, 'RIFF');
+        view.setUint32(4, fileSize - 8, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, byteRate, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, bitsPerSample, true);
+        writeString(36, 'data');
+        view.setUint32(40, dataSize, true);
+        const pcmView = new Uint8Array(pcmData);
+        const wavView = new Uint8Array(buffer);
+        wavView.set(pcmView, 44);
+        return new Blob([buffer], { type: 'audio/wav' });
+    };
+
+    const handleGenerateTts = async () => {
+        if (!ttsText.trim()) {
+            toast.error("Please enter some text to generate audio.");
+            return;
+        }
+        setIsGenerating(true);
+        discardRecording(); // Clear any other selections
+
+        try {
+            const response = await fetch('/api/tts/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: `(speak in ${selectedLanguage}) ${ttsText}`,
+                    voice: selectedVoice,
+                }),
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to generate TTS audio.');
+            }
+
+            const rawBlob = await response.blob();
+            const arrayBuffer = await rawBlob.arrayBuffer();
+            const wavBlob = createWavBlob(arrayBuffer);
+            const url = URL.createObjectURL(wavBlob);
+
+            setSelectedAudio({
+                id: `tts-${Date.now()}`,
+                name: `AI: ${ttsText.substring(0, 25)}...`,
+                url,
+                blob: wavBlob,
+                type: 'tts',
+            });
+            toast.success("AI voice generated!");
+
+        } catch (error) {
+            console.error("TTS generation failed:", error);
+            toast.error(error instanceof Error ? error.message : "An unknown error occurred.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
 
   const startRecording = async () => {
     try {
+      discardRecording();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -210,7 +302,6 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       }, 1000);
 
     } catch (error) {
-      console.error('Error accessing microphone:', error);
       toast.error('Could not access microphone. Please check permissions.');
     }
   };
@@ -226,6 +317,9 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
   };
 
   const discardRecording = () => {
+    if (selectedAudio?.url) {
+        URL.revokeObjectURL(selectedAudio.url);
+    }
     setSelectedAudio(null);
     setRecordingTime(0);
   };
@@ -238,9 +332,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       setIsPlaying(false);
     } else {
       if (!audioRef.current || audioRef.current.src !== audioUrl) {
-        if(audioRef.current) {
-             audioRef.current.pause();
-        }
+        if(audioRef.current) audioRef.current.pause();
         audioRef.current = new Audio(audioUrl);
         audioRef.current.addEventListener('timeupdate', () => setCurrentTime(audioRef.current!.currentTime));
         audioRef.current.addEventListener('ended', () => {
@@ -265,18 +357,21 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
     let finalAudioUrl = selectedAudio.url;
 
     try {
-      if (selectedAudio.type === 'recorded' && selectedAudio.blob) {
+
+        const CLOUDINARY_UPLOAD_PRESET = "announcement_upload_preset";
+       const CLOUDINARY_CLOUD_NAME = "dzb0gggua";
+      // If audio is a new recording or TTS, upload it to Cloudinary first
+      if ((selectedAudio.type === 'recorded' || selectedAudio.type === 'tts') && selectedAudio.blob) {
         const formData = new FormData();
-        const audioFile = new File([selectedAudio.blob], `${selectedAudio.name}.wav`, { type: 'audio/wav' });
+        const fileName = `${selectedAudio.name.replace(/ /g, '_')}.wav`;
+        const audioFile = new File([selectedAudio.blob], fileName, { type: 'audio/wav' });
 
         formData.append("file", audioFile);
-        // Replace with your actual Cloudinary preset
-        formData.append("upload_preset", "your_upload_preset"); 
+        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET!);
         formData.append("resource_type", "video");
 
         const cloudRes = await fetch(
-          // Replace with your actual Cloudinary cloud name
-          `https://api.cloudinary.com/v1_1/your_cloud_name/upload`,
+          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`,
           { method: "POST", body: formData }
         );
 
@@ -286,6 +381,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
         finalAudioUrl = cloudData.secure_url;
       }
 
+      // Send the announcement via your backend
       const response = await fetch("/api/instant-announcement/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -306,7 +402,6 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       onSuccess();
 
     } catch (error) {
-      console.error("Sending announcement failed:", error);
       toast.error(error instanceof Error ? error.message : "An unknown error occurred.");
     } finally {
       setIsLoading(false);
@@ -329,11 +424,10 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
   const resetAndGoBack = () => {
     setStep(1);
     setSelectedDevice(null);
-    setSelectedAudio(null);
+    discardRecording();
   };
 
   // --- RENDER LOGIC --- //
-  
 
   const renderStep1 = () => (
     <div>
@@ -396,7 +490,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
           Back to Device Selection
         </button>
         <h2 className="text-2xl font-bold text-black">Instantaneous Announcement</h2>
-        <p className="text-sm text-gray-500 mt-1">Step 2 of 2: Choose or Record Audio</p>
+        <p className="text-sm text-gray-500 mt-1">Step 2 of 2: Choose or Create Audio</p>
       </div>
 
       <div className="bg-blue-50 p-3 rounded-lg mb-6 text-sm">
@@ -407,13 +501,18 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
         <div>
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
             <button onClick={() => setActiveTab('record')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'record' ? 'bg-white shadow-sm text-red-600' : 'text-gray-600'}`}>
-              <Mic size={18} /> Record Audio
+              <Mic size={18} /> Record
+            </button>
+             <button onClick={() => setActiveTab('tts')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'tts' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-600'}`}>
+              <Bot size={18} /> Generate AI
             </button>
             <button onClick={() => setActiveTab('select')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'select' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}>
-              <AudioLines size={18} /> Select from Library
+              <AudioLines size={18} /> Library
             </button>
           </div>
-          {activeTab === 'record' ? renderRecordTab() : renderSelectTab()}
+          {activeTab === 'record' && renderRecordTab()}
+          {activeTab === 'tts' && renderTtsTab()}
+          {activeTab === 'select' && renderSelectTab()}
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4">
@@ -425,7 +524,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
             <div className="bg-white rounded-lg shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="font-medium text-sm text-gray-900 truncate pr-2">{selectedAudio.name}</p>
-                <button onClick={() => setSelectedAudio(null)} className="text-red-500 hover:text-red-700 p-1 rounded flex-shrink-0">
+                <button onClick={discardRecording} className="text-red-500 hover:text-red-700 p-1 rounded flex-shrink-0">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -445,7 +544,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
             <div className="text-center py-8 text-gray-500">
               <Volume2 className="h-12 w-12 mx-auto text-gray-300 mb-3" />
               <p>No audio selected</p>
-              <p className="text-xs mt-1">Record or select an audio file.</p>
+              <p className="text-xs mt-1">Record, generate, or select an audio file.</p>
             </div>
           )}
         </div>
@@ -506,23 +605,90 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
     </div>
   );
 
+  const renderTtsTab = () => (
+    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-6 space-y-4">
+        <div>
+            <label htmlFor="tts-text" className="block text-sm font-medium mb-1 text-gray-700">Announcement Text</label>
+            <textarea
+                id="tts-text"
+                value={ttsText}
+                onChange={(e) => setTtsText(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                rows={4}
+                placeholder="Enter text to convert to speech..."
+                disabled={isGenerating}
+            />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+            <div>
+                 <label className="block text-sm font-medium mb-1 flex items-center gap-1 text-gray-700"><Languages size={14}/> Language</label>
+                 <div className="relative">
+                    <select
+                        value={selectedLanguage}
+                        onChange={e => setSelectedLanguage(e.target.value)}
+                        disabled={isGenerating}
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm appearance-none bg-white focus:ring-2 focus:ring-purple-500"
+                    >
+                        {supportedLanguages.map(lang => (
+                            <option key={lang.code} value={lang.code}>{lang.name}</option>
+                        ))}
+                    </select>
+                    <ChevronDown size={18} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                 </div>
+            </div>
+            <div>
+                 <label className="block text-sm font-medium mb-1 flex items-center gap-1 text-gray-700"><Volume2 size={14}/> Voice</label>
+                 <div className="relative">
+                    <select
+                        value={selectedVoice}
+                        onChange={e => setSelectedVoice(e.target.value)}
+                        disabled={isGenerating}
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm appearance-none bg-white focus:ring-2 focus:ring-purple-500"
+                    >
+                        {geminiVoices.map(voice => (
+                            <option key={voice} value={voice}>{voice}</option>
+                        ))}
+                    </select>
+                    <ChevronDown size={18} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+            </div>
+        </div>
+        <div className="text-center pt-2">
+            <button
+                onClick={handleGenerateTts}
+                disabled={isGenerating || !ttsText.trim()}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto disabled:bg-gray-400"
+            >
+                {isGenerating ? (
+                    <>
+                        <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        Generating...
+                    </>
+                ) : (
+                    <>
+                        <Bot size={18} /> Generate Voice
+                    </>
+                )}
+            </button>
+        </div>
+    </div>
+  );
 
   return (
     <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-6">
-            {step === 1 ? renderStep1() : renderStep2()}
-        </div>
+      <div className="p-6">
+        {step === 1 ? renderStep1() : renderStep2()}
+      </div>
 
-      {/* --- ACTION BUTTONS --- */}
       <div className="p-4 border-t bg-gray-50 rounded-b-xl">
         <div className="flex justify-end gap-4">
-          <button onClick={onCancel} disabled={isLoading} className="px-6 py-2 text-gray-700 hover:bg-gray-200 font-medium rounded-lg disabled:opacity-50">
+          <button onClick={onCancel} disabled={isLoading || isGenerating} className="px-6 py-2 text-gray-700 hover:bg-gray-200 font-medium rounded-lg disabled:opacity-50">
             Cancel
           </button>
           {step === 2 && (
             <button
               onClick={handleSendAnnouncement}
-              disabled={isLoading || !selectedAudio || !selectedDevice}
+              disabled={isLoading || isGenerating || !selectedAudio || !selectedDevice}
               className="px-6 py-2 rounded-lg font-medium text-white flex items-center gap-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700"
             >
               {isLoading ? (
