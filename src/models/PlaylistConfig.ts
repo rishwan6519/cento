@@ -15,12 +15,12 @@ const playlistConfigSchema = new mongoose.Schema({
   name: { type: String, required: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   type: { type: String, required: true },
-  contentType: { type: String, required: true },
+  // contentType: { type: String, required: true },  //<-- REMOVED
   startTime: { type: String, required: true },
   endTime: { type: String, required: true },
-  startDate: { type: String, required: false },      // <-- add this
-  endDate: { type: String, required: false },        // <-- add this
-  daysOfWeek: [{ type: String, required: false }],   // <-- add this
+  startDate: { type: String, required: false },
+  endDate: { type: String, required: false },
+  daysOfWeek: [{ type: String, required: false }],
   files: [playlistFileSchema],
   status: { 
     type: String, 

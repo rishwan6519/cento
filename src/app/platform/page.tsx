@@ -41,6 +41,9 @@ import LoadingState from "@/components/Platform/LoadingState";
 import ShowUsers from "@/components/ShowUsers/ShowUsers";
 import AssignDevice from "@/components/AssignDevice/AssignDevice";
 import toast from "react-hot-toast";
+import Announcement from "@/components/Announcement/Announcement";
+import CreateAnnouncement from "@/components/CreateAnnouncement/CreateAnnouncement";
+import ShowAnnouncement from "@/components/Announcement/ShowAnnouncement";
 
 export default function RoboticPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
@@ -64,42 +67,53 @@ export default function RoboticPlatform(): React.ReactElement {
       toast.error("You are not authorized to access this page.");
       window.location.href = "/login"; // Redirect to login page
     }
-    
+
     const fetchDevices = async () => {
       try {
         setIsLoading(true);
         setError(null); // Reset error state
-        
+
         const userId = localStorage.getItem("userId");
         if (!userId) {
           setError("Please log in to view devices");
           return;
         }
 
-        const response = await fetch(`/api/onboarded-devices?userId=${userId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        const response = await fetch(
+          `/api/onboarded-devices?userId=${userId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch devices');
+          throw new Error(errorData.message || "Failed to fetch devices");
         }
 
         const data = await response.json();
         console.log("Fetched devices:", data);
-        
+
         if (data.success && Array.isArray(data.data)) {
-          console.log("Devices data:", data.data.map((device: any) => device.deviceId.status));
-          setDevices(data.data.map((device: any) => ({
-            ...device,
-            lastActive: new Date(device.updatedAt).toLocaleString(),
-            status: device.deviceId.status === "active" ? "Connected" : "Disconnected",
-          })));
+          console.log(
+            "Devices data:",
+            data.data.map((device: any) => device.deviceId.status)
+          );
+          setDevices(
+            data.data.map((device: any) => ({
+              ...device,
+              lastActive: new Date(device.updatedAt).toLocaleString(),
+              status:
+                device.deviceId.status === "active"
+                  ? "Connected"
+                  : "Disconnected",
+            }))
+          );
         } else {
-          throw new Error('Invalid data format received from server');
+          throw new Error("Invalid data format received from server");
         }
       } catch (err) {
         console.error("Error fetching devices:", err);
@@ -116,31 +130,64 @@ export default function RoboticPlatform(): React.ReactElement {
   const devicesWithPlaylistInfo = devices.map((device) => ({
     ...device,
     connectedPlaylists: playlists.filter((p) =>
-      p.deviceIds.some(deviceRef => deviceRef.id === device._id)
+      p.deviceIds.some((deviceRef) => deviceRef.id === device._id)
     ),
   }));
 
   const menuItems = [
-    { key: "dashboard" as MenuKey, label: "Dashboard", icon: <RiDashboardLine /> },
-    { key: "onboardDevice" as MenuKey, label: "Onboard Devices", icon: <FaMobileAlt /> },
-    { key: "createMedia" as MenuKey, label: "Create Media", icon: <FaRegFileAudio /> },
-    { key: "showMedia" as MenuKey, label: "Show Media", icon: <FaRegFileAudio /> },
-    { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
+    {
+      key: "dashboard" as MenuKey,
+      label: "Dashboard",
+      icon: <RiDashboardLine />,
+    },
+    {
+      key: "onboardDevice" as MenuKey,
+      label: "Onboard Devices",
+      icon: <FaMobileAlt />,
+    },
+    {
+      key: "createMedia" as MenuKey,
+      label: "Create Media",
+      icon: <FaRegFileAudio />,
+    },
+    {
+      key: "showMedia" as MenuKey,
+      label: "Show Media",
+      icon: <FaRegFileAudio />,
+    },
+    {
+      key: "setupPlaylist" as MenuKey,
+      label: "Setup Playlist",
+      icon: <FaListAlt />,
+    },
+    {key:"createAnnouncement" as MenuKey, label: "Create Announcement", icon: <IoMdSettings />},
+    {
+      key: "setupAnnouncement" as MenuKey,
+      label: "Setup Announcement",
+      icon: <IoMdSettings />,
+    },
     { key: "createUser" as MenuKey, label: "Create User ", icon: <FaUser /> },
-    {key:"showUser" as MenuKey, label: "Show User", icon: <FaUser />},
-    {key:"assignDevice" as MenuKey, label: "Assign Device", icon: <FaRobot />},
+    { key: "showUser" as MenuKey, label: "Show User", icon: <FaUser /> },
+    {
+      key: "assignDevice" as MenuKey,
+      label: "Assign Device",
+      icon: <FaRobot />,
+    },
     {
       key: "showPlaylist" as MenuKey,
       label: "Show Playlist",
       icon: <MdOutlinePlaylistPlay />,
     },
-    { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
+    {
+      key: "connectPlaylist" as MenuKey,
+      label: "Connect Playlist",
+      icon: <FaPlug />,
+    },
     {
       key: "ManageDevice" as MenuKey,
       label: "Manage Devices",
       icon: <FaMobileAlt />,
       subItems: [
-       
         {
           key: "connectedPlaylists" as MenuKey,
           label: "Connected Playlists",
@@ -220,20 +267,20 @@ export default function RoboticPlatform(): React.ReactElement {
   };
 
   const connectPlaylist = (playlistId: string, deviceId: string): void => {
-    const deviceToConnect = devices.find(d => d._id === deviceId);
+    const deviceToConnect = devices.find((d) => d._id === deviceId);
     if (!deviceToConnect) return;
 
     const deviceReference: DeviceReference = {
       id: deviceId,
-      name: deviceToConnect.name
+      name: deviceToConnect.name,
     };
 
-    setPlaylists(prevPlaylists => 
-      prevPlaylists.map(playlist =>
+    setPlaylists((prevPlaylists) =>
+      prevPlaylists.map((playlist) =>
         playlist.id === playlistId
           ? {
               ...playlist,
-              deviceIds: [...playlist.deviceIds, deviceReference]
+              deviceIds: [...playlist.deviceIds, deviceReference],
             }
           : playlist
       )
@@ -308,12 +355,11 @@ export default function RoboticPlatform(): React.ReactElement {
               />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Devices</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            Error Loading Devices
+          </h3>
           <p className="text-gray-500 max-w-md mb-6">{error}</p>
-          <Button 
-            variant="primary"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="primary" onClick={() => window.location.reload()}>
             Try Again
           </Button>
         </Card>
@@ -326,7 +372,6 @@ export default function RoboticPlatform(): React.ReactElement {
           <DashboardView
             devices={devices}
             setDevices={setDevices}
-
             onAddNew={() => setShowOnboardModal(true)}
             onEditDevice={handleEditDevice}
             onManagePlaylists={handleManagePlaylists}
@@ -357,12 +402,19 @@ export default function RoboticPlatform(): React.ReactElement {
 
       case "setupPlaylist":
         return <PlaylistSetup />;
-        // In your renderContent function
-case "assignDevice":
-  return <AssignDevice />;
+    // In your renderContent function
+    case "setupAnnouncement":
+      return <Announcement />;
 
-        case "showUser":
-          return <ShowUsers />;
+    case "createAnnouncement":
+      return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("setupAnnouncement")} />;
+      case "showAnnouncement":
+        return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
+    case "assignDevice":
+      return <AssignDevice />;
+
+      case "showUser":
+        return <ShowUsers />;
       case "showPlaylist":
         return <PlaylistManager />;
       case "createMedia":
@@ -423,37 +475,81 @@ case "assignDevice":
     {
       title: "General",
       items: [
-        { key: "dashboard" as MenuKey, label: "Dashboard", icon: <RiDashboardLine /> },
+        {
+          key: "dashboard" as MenuKey,
+          label: "Dashboard",
+          icon: <RiDashboardLine />,
+        },
       ],
     },
     {
       title: "Device Management",
       items: [
-        { key: "onboardDevice" as MenuKey, label: "Onboard Devices", icon: <FaMobileAlt /> },
-        { key: "assignDevice" as MenuKey, label: "Assign Device", icon: <FaRobot /> },
-        { key: "ManageDevice" as MenuKey, label: "Manage Devices", icon: <FaMobileAlt />, subItems: [
-          {
-            key: "connectedPlaylists" as MenuKey,
-            label: "Connected Playlists",
-            icon: <BsMusicNoteList />,
-          },
-        ]},
+        {
+          key: "onboardDevice" as MenuKey,
+          label: "Onboard Devices",
+          icon: <FaMobileAlt />,
+        },
+        {
+          key: "assignDevice" as MenuKey,
+          label: "Assign Device",
+          icon: <FaRobot />,
+        },
+        {
+          key: "ManageDevice" as MenuKey,
+          label: "Manage Devices",
+          icon: <FaMobileAlt />,
+          subItems: [
+            {
+              key: "connectedPlaylists" as MenuKey,
+              label: "Connected Playlists",
+              icon: <BsMusicNoteList />,
+            },
+          ],
+        },
       ],
     },
     {
       title: "Media Management",
       items: [
-        { key: "createMedia" as MenuKey, label: "Create Media", icon: <FaRegFileAudio /> },
-        { key: "showMedia" as MenuKey, label: "Show Media", icon: <FaRegFileAudio /> },
-        { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
-        { key: "showPlaylist" as MenuKey, label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-        { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
+        {
+          key: "createMedia" as MenuKey,
+          label: "Create Media",
+          icon: <FaRegFileAudio />,
+        },
+        {
+          key: "showMedia" as MenuKey,
+          label: "Show Media",
+          icon: <FaRegFileAudio />,
+        },
+        {
+          key: "setupPlaylist" as MenuKey,
+          label: "Setup Playlist",
+          icon: <FaListAlt />,
+        },
+        {key: "setupAnnouncement" as MenuKey, label: "Setup Announcement", icon: <IoMdSettings />},
+        {key: "createAnnouncement" as MenuKey, label: "Create Announcement", icon: <IoMdSettings />},
+        { key: "showAnnouncement" as MenuKey, label: "Show Announcement", icon: <IoMdSettings /> },
+        {
+          key: "showPlaylist" as MenuKey,
+          label: "Show Playlist",
+          icon: <MdOutlinePlaylistPlay />,
+        },
+        {
+          key: "connectPlaylist" as MenuKey,
+          label: "Connect Playlist",
+          icon: <FaPlug />,
+        },
       ],
     },
     {
       title: "User Management",
       items: [
-        { key: "createUser" as MenuKey, label: "Create User", icon: <FaUser /> },
+        {
+          key: "createUser" as MenuKey,
+          label: "Create User",
+          icon: <FaUser />,
+        },
         { key: "showUser" as MenuKey, label: "Show User", icon: <FaUser /> },
       ],
     },
@@ -471,8 +567,18 @@ case "assignDevice":
           onClick={() => setIsMobileMenuOpen(true)}
           className="p-2 rounded-lg hover:bg-gray-100"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
       </div>
@@ -482,9 +588,16 @@ case "assignDevice":
         {/* Sidebar */}
         <aside
           className={`w-full lg:w-64 bg-white shadow-md border-r border-gray-200 transition-all duration-300 z-30
-      ${isMobileMenuOpen ? "fixed inset-0 overflow-auto" : "hidden"} lg:relative lg:block
+      ${
+        isMobileMenuOpen ? "fixed inset-0 overflow-auto" : "hidden"
+      } lg:relative lg:block
       h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300`}
-        style={{ position: isMobileMenuOpen ? "fixed" : "sticky", top: 0, height: "100vh", overflowY: "auto" }}
+          style={{
+            position: isMobileMenuOpen ? "fixed" : "sticky",
+            top: 0,
+            height: "100vh",
+            overflowY: "auto",
+          }}
         >
           <div className="sticky top-0 bg-white z-10">
             <div className="p-6 flex items-center justify-between">
@@ -512,7 +625,7 @@ case "assignDevice":
               </button>
             </div>
             <div className="px-4 pb-2">
-              <div className="relative"> 
+              <div className="relative">
                 <input
                   type="text"
                   placeholder="Search..."
@@ -548,7 +661,9 @@ case "assignDevice":
                           className={`flex items-center justify-between px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 ${
                             selectedMenu === item.key ||
                             (item.subItems &&
-                              item.subItems.some((sub) => sub.key === selectedMenu))
+                              item.subItems.some(
+                                (sub) => sub.key === selectedMenu
+                              ))
                               ? "bg-blue-50 text-blue-600 font-semibold"
                               : "text-gray-700 hover:bg-gray-100"
                           }`}
@@ -666,7 +781,8 @@ case "assignDevice":
                     className="h-1.5 rounded-full bg-green-500"
                     style={{
                       width: `${
-                        (devices.filter((d) => d.status === "Connected").length /
+                        (devices.filter((d) => d.status === "Connected")
+                          .length /
                           devices.length) *
                         100
                       }%`,
@@ -717,7 +833,7 @@ case "assignDevice":
         </main>
 
         {/* Modals */}
-        
+
         <AnimatePresence>
           {showPlaylistModal && (
             <AddPlaylistModal

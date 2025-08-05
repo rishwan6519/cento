@@ -12,15 +12,14 @@ interface Device {
     serialNumber: string;
     imageUrl: string;
     name: string;
-    
   };
-  typeId:{
+  typeId: {
     _id: string;
     name: string;
     handMovements: string[];
     bodyMovements: string[];
     screenSize: string;
-  }
+  };
   imageUrl?: string;
   serialNumber?: string;
   type?: string;
@@ -40,17 +39,27 @@ interface ConnectPlaylistProps {
 
 const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
   onCancel,
-  onSuccess
+  onSuccess,
 }) => {
   const [connectStep, setConnectStep] = useState<number>(1);
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedDeviceForPlaylist, setSelectedDeviceForPlaylist] = useState<Device | null>(null);
-  const [selectedPlaylistsForDevice, setSelectedPlaylistsForDevice] = useState<string[]>([]);
-  const [connectedPlaylists, setConnectedPlaylists] = useState<{[deviceId: string]: string[]}>({});
+  const [
+    selectedDeviceForPlaylist,
+    setSelectedDeviceForPlaylist,
+  ] = useState<Device | null>(null);
+  const [
+    selectedPlaylistsForDevice,
+    setSelectedPlaylistsForDevice,
+  ] = useState<string[]>([]);
+  const [
+    connectedPlaylists,
+    setConnectedPlaylists,
+  ] = useState<{ [deviceId: string]: string[] }>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isDisconnecting, setIsDisconnecting] = useState<string | null>(null); // To track which playlist is disconnecting
   const [userId, setUserId] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
     if (storedUserId) {
@@ -77,7 +86,6 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
       const response = await fetch(`/api/onboarded-devices?userId=${userId}`);
       if (!response.ok) throw new Error("Failed to fetch devices");
       const data = await response.json();
-       console.log(data, "Available devices data");
       setAvailableDevices(data.data || []);
     } catch (error) {
       console.error("Error fetching devices:", error);
@@ -104,7 +112,9 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
 
   const fetchConnectedPlaylists = async (deviceId: string) => {
     try {
-      const response = await fetch(`/api/connected-playlist?deviceId=${deviceId}`);
+      const response = await fetch(
+        `/api/connected-playlist?deviceId=${deviceId}`
+      );
       if (!response.ok) throw new Error("Failed to fetch connected playlists");
       const data = await response.json();
       setConnectedPlaylists((prev) => ({
@@ -122,22 +132,21 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
       toast.error("Please select a device");
       return;
     }
-    
+
     if (selectedPlaylistsForDevice.length === 0) {
       toast.error("Please select at least one playlist");
       return;
     }
-    
-    // Filter out any empty strings or invalid IDs
+
     const validPlaylistIds = selectedPlaylistsForDevice.filter(
       (id) => id && id.trim() !== ""
     );
-    
+
     if (validPlaylistIds.length === 0) {
       toast.error("No valid playlists selected");
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const response = await fetch("/api/device-playlists", {
@@ -151,13 +160,13 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
           userId: userId,
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || "Failed to connect playlists");
       }
-      
+
       toast.success("Playlists connected successfully");
       resetForm();
       onSuccess();
@@ -168,6 +177,47 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDisconnect = async (playlistId: string) => {
+    if (!selectedDeviceForPlaylist?.deviceId._id) {
+      toast.error("No device selected.");
+      return;
+    }
+
+    setIsDisconnecting(playlistId);
+    try {
+      const response = await fetch(
+        `/api/device-playlists?deviceId=${selectedDeviceForPlaylist.deviceId._id}&playlistId=${playlistId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to disconnect playlist.");
+      }
+
+      toast.success("Playlist disconnected successfully.");
+
+      // Update the UI
+      setConnectedPlaylists((prev) => ({
+        ...prev,
+        [selectedDeviceForPlaylist.deviceId._id]: prev[
+          selectedDeviceForPlaylist.deviceId._id
+        ]?.filter((id) => id !== playlistId),
+      }));
+    } catch (error) {
+      console.error("Error disconnecting playlist:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "An unknown error occurred."
+      );
+    } finally {
+      setIsDisconnecting(null);
     }
   };
 
@@ -188,7 +238,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
           {connectStep === 1 ? "Select Device" : "Choose Playlists"}
         </p>
       </div>
-      
+
       {isLoading && connectStep === 1 ? (
         <div className="flex justify-center items-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -227,7 +277,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                   )}
                   <div>
                     <h3 className="font-medium text-gray-900">
-                      {device.deviceId.name||"N/A"}
+                      {device.deviceId.name || "N/A"}
                     </h3>
                     <p className="text-sm text-gray-500">
                       ID: {device.deviceId.serialNumber || "N/A"}
@@ -237,13 +287,13 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
               </button>
             ))}
           </div>
-          
+
           {availableDevices.length === 0 && !isLoading && (
             <p className="text-center text-gray-500 py-4">
               No devices available. Please add devices first.
             </p>
           )}
-          
+
           <div className="flex justify-end gap-3 pt-6 border-t">
             <button
               onClick={onCancel}
@@ -267,17 +317,16 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
               <span>Back to Devices</span>
             </button>
           </div>
-          
+
           <div className="bg-blue-50 p-4 rounded-lg mb-6">
-            <h3 className="font-medium text-blue-900">
-              Selected Device
-            </h3>
+            <h3 className="font-medium text-blue-900">Selected Device</h3>
             <p className="text-sm text-blue-700 mt-1">
               {selectedDeviceForPlaylist?.name} (
-              {`${selectedDeviceForPlaylist?.deviceId.name} serial Number :-${selectedDeviceForPlaylist?.deviceId.serialNumber}`})
+              {`${selectedDeviceForPlaylist?.deviceId.name} serial Number :-${selectedDeviceForPlaylist?.deviceId.serialNumber}`}
+              )
             </p>
           </div>
-          
+
           {isLoading ? (
             <div className="flex justify-center items-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -292,13 +341,15 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                   const isConnected = connectedPlaylists[
                     selectedDeviceForPlaylist?.deviceId._id || ""
                   ]?.includes(playlist._id || "");
-                  
+
+                  const isCurrentlyDisconnecting = isDisconnecting === playlist._id;
+
                   return (
                     <div
                       key={playlist._id}
                       className={`p-4 border rounded-lg ${
                         isConnected
-                          ? "border-gray-300 bg-gray-50 cursor-not-allowed"
+                          ? "border-gray-300 bg-gray-50"
                           : selectedPlaylistsForDevice.includes(
                               playlist._id || ""
                             )
@@ -307,11 +358,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="relative">
-                          {/* Content type tag in corner */}
-                          <span className="absolute -top-2 -left-2 text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
-                            {playlist?.contentType}
-                          </span>
+                        <div>
                           <h4 className="font-medium text-gray-900 mt-3">
                             {playlist.name}
                           </h4>
@@ -321,9 +368,13 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                           {isConnected ? (
-                            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
-                              Already Connected
-                            </span>
+                            <button
+                              onClick={() => handleDisconnect(playlist._id!)}
+                              disabled={isCurrentlyDisconnecting}
+                              className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 disabled:opacity-50 disabled:cursor-wait"
+                            >
+                              {isCurrentlyDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                            </button>
                           ) : (
                             <input
                               type="checkbox"
@@ -334,9 +385,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                                 const playlistId = playlist._id || "";
                                 setSelectedPlaylistsForDevice((prev) =>
                                   prev.includes(playlistId)
-                                    ? prev.filter(
-                                        (id) => id !== playlistId
-                                      )
+                                    ? prev.filter((id) => id !== playlistId)
                                     : [...prev, playlistId]
                                 );
                               }}
@@ -349,7 +398,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
                   );
                 })}
               </div>
-              
+
               {playlists.length === 0 && !isLoading && (
                 <p className="text-center text-gray-500 py-4">
                   No playlists available. Please create playlists first.
@@ -357,7 +406,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
               )}
             </div>
           )}
-          
+
           <div className="flex justify-end gap-3 pt-6 border-t">
             <button
               onClick={() => {

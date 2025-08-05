@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from 'react';
 import Card from '../Platform/Card';
 import Button from '../Platform/Button';

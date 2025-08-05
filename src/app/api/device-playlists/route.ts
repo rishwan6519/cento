@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date()
       });
 
+
       return NextResponse.json(newDevicePlaylist);
     }
   } catch (error) {
@@ -102,6 +103,7 @@ export async function GET(req: NextRequest) {
     });
 
     const result = Array.from(playlistMap.values());
+    console.log('Resulting playlists:', result);
 
     return NextResponse.json(result);
   } catch (error) {
@@ -109,7 +111,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch device playlists' }, { status: 500 });
   }
 }
-
 export async function DELETE(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -122,20 +123,25 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Device ID is required' }, { status: 400 });
     }
 
+    // If a playlistId is provided, remove that specific playlist from the device.
     if (playlistId) {
-      // Remove specific playlist from device
-      await DevicePlaylist.updateOne(
+      const result = await DevicePlaylist.updateOne(
         { deviceId },
         { $pull: { playlistIds: playlistId } }
       );
+
+      if (result.modifiedCount === 0) {
+        return NextResponse.json({ error: 'Device or playlist not found' }, { status: 404 });
+      }
     } else {
-      // Remove all playlists from device
-      await DevicePlaylist.deleteOne({ deviceId });
+      // If no playlistId is provided, you could choose to delete the entire device playlist record.
+      // For this use case, we'll assume we always get a playlistId.
+      return NextResponse.json({ error: 'Playlist ID is required for disconnection' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Playlist disconnected successfully" });
   } catch (error) {
-    console.error('Error removing device playlists:', error);
-    return NextResponse.json({ error: 'Failed to remove playlists' }, { status: 500 });
+    console.error('Error removing device playlist:', error);
+    return NextResponse.json({ error: 'Failed to disconnect playlist' }, { status: 500 });
   }
 }

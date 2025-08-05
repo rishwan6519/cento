@@ -1,13 +1,13 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "./Button";
 import Card from "./Card";
 import Image from "next/image";
 import { BsMusicNoteList } from "react-icons/bs";
-import { IoMdSettings, IoMdTrash } from "react-icons/io";
+import { IoMdTrash } from "react-icons/io";
 import { MdAddCircleOutline } from "react-icons/md";
 
-// Add this component above the DeviceCard component
+// RemoveDeviceModal component
 const RemoveDeviceModal = ({
   isOpen,
   onClose,
@@ -76,7 +76,7 @@ interface DeviceCardProps {
   };
   onEdit: (device: any) => void;
   onManagePlaylists?: (device: any) => void;
-  onRemoveDevice?: (deviceId: string) => void; // Add this new prop
+  onRemoveDevice?: (deviceId: string) => void;
 }
 
 const NoDeviceCard = ({ onboardDevice }: { onboardDevice: () => void }) => {
@@ -107,21 +107,27 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   onManagePlaylists,
   onRemoveDevice,
 }) => {
-  // If no device is provided, show the NoDeviceCard
   if (!device) {
     return <NoDeviceCard onboardDevice={() => onEdit(null)} />;
   }
 
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   const { deviceId, typeId, connectedPlaylists } = device;
 
-  // Helper function to validate image URL
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const role = localStorage.getItem("userRole");
+      setUserRole(role);
+    }
+  }, []);
+
   const isValidImageUrl = (url?: string) => {
     return url && url.trim() !== "" && !url.includes("undefined");
   };
 
-  // Handler for removing device
   const handleRemoveDevice = () => {
     if (onRemoveDevice) {
       onRemoveDevice(device._id);
@@ -153,8 +159,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         <div className="flex-grow">
           <div className="flex justify-between items-start">
             <h4 className="font-semibold text-gray-900">{deviceId.name}</h4>
+            
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm"> 
             <div>
               <p className="text-gray-500">Type</p>
               <p className="text-gray-800 font-medium">{typeId.name}</p>
@@ -195,7 +202,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             </div>
           </div>
         )}
-
+  {userRole === "superUser" && (
         <div className="flex justify-between">
           <Button
             variant="secondary"
@@ -214,16 +221,20 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             )}
           </Button>
           <div className="flex space-x-2">
-            <Button
-              variant="secondary"
-              onClick={() => setShowRemoveModal(true)}
-              className="text-sm text-red-600 hover:text-red-700"
-              icon={<IoMdTrash />}
-            >
-              Remove
-            </Button>
+           
+              <Button
+                variant="secondary"
+                onClick={() => setShowRemoveModal(true)}
+                className="text-sm text-red-600 hover:text-red-700"
+                icon={<IoMdTrash />}
+              >
+                Remove
+              </Button>
           </div>
         </div>
+            )}
+
+
       </div>
 
       <RemoveDeviceModal

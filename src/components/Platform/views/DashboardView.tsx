@@ -14,6 +14,7 @@ interface DashboardViewProps {
   onManagePlaylists: (device: Device) => void;
   setDevices: React.Dispatch<React.SetStateAction<Device[]>>;
   userRole?: string;
+  
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({
@@ -79,6 +80,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         </Card>
       </div>
 
+    
       {/* Device Cards or Empty State */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {devices.length > 0 ? (

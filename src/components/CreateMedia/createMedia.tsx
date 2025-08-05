@@ -77,6 +77,11 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
       return;
     }
 
+    if (!CLOUDINARY_UPLOAD_PRESET) {
+      toast.error("Uploading preset not found");
+      return;  
+    }
+
     const userId = localStorage.getItem("userId");
     if (!userId) {
       toast.error("User not authenticated");

@@ -163,8 +163,7 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
                 <span>{selectedDevice.typeId.name}</span>
                 <span>•</span>
                 <span>Serial: {selectedDevice.deviceId.serialNumber}</span>
-                <span>•</span>
-                <span>Last active: {selectedDevice.lastActive}</span>
+              
               </div>
             </div>
           </div>

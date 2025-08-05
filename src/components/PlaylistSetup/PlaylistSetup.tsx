@@ -1,10 +1,8 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
-import { XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import PlaylistManager from "../ShowPlaylist/showPlaylist";
+import { XCircle } from "lucide-react";
 
 interface PlaylistConfigFile {
   path: string;
@@ -21,25 +19,23 @@ interface PlaylistConfiguration {
   id: string;
   name: string;
   type: string;
-  contentType: "playlist" | "announcement";
   serialNumber: string;
   startTime: string;
   endTime: string;
   files: PlaylistConfigFile[];
   startDate?: string; // Add this
-  endDate?: string;   // Add this
+  endDate?: string; // Add this
   daysOfWeek?: string[]; // Add this
 }
 
 // Create a ShowPlaylist component
 const ShowPlaylist: React.FC<{
   playlistName: string;
-  contentType: string;
   onCreateNew: () => void;
-}> = ({ playlistName, contentType, onCreateNew }) => {
+}> = ({ playlistName, onCreateNew }) => {
   const router = useRouter();
   const [showPlaylistManager, setShowPlaylistManager] = useState(false);
-  
+
   const handleViewList = () => {
     setShowPlaylistManager(true);
   };
@@ -69,8 +65,7 @@ const ShowPlaylist: React.FC<{
         </div>
         <h2 className="text-2xl font-bold text-gray-800">Success!</h2>
         <p className="text-gray-600 mt-2">
-          {contentType === "announcement" ? "Announcement" : "Playlist"} "
-          {playlistName}" has been saved successfully.
+          Playlist "{playlistName}" has been saved successfully.
         </p>
       </div>
       <div className="flex justify-center gap-4">
@@ -78,15 +73,13 @@ const ShowPlaylist: React.FC<{
           onClick={handleViewList}
           className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-medium"
         >
-          View All{" "}
-          {contentType === "announcement" ? "Announcements" : "Playlists"}
+          View All Playlists
         </button>
         <button
           onClick={onCreateNew}
           className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
         >
-          Create Another{" "}
-          {contentType === "announcement" ? "Announcement" : "Playlist"}
+          Create Another Playlist
         </button>
       </div>
     </div>
@@ -99,16 +92,12 @@ const PlaylistSetup: React.FC = () => {
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   const [isSaved, setIsSaved] = useState(false);
   const [savedPlaylistName, setSavedPlaylistName] = useState("");
-  const [savedContentType, setSavedContentType] = useState<
-    "playlist" | "announcement"
-  >("playlist");
   const [isVisible, setIsVisible] = useState(true);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
     id: "",
     name: "",
     type: "mixed",
-    contentType: "playlist",
     serialNumber: "",
     startTime: "00:00:00",
     endTime: "00:10:00",
@@ -129,7 +118,7 @@ const PlaylistSetup: React.FC = () => {
     const fetchMediaFiles = async () => {
       try {
         if (!userId) return; // Don't fetch if userId is not available
-        
+
         const response = await fetch(`/api/media?userId=${userId}`);
         if (!response.ok) {
           throw new Error("Failed to fetch media files");
@@ -162,7 +151,6 @@ const PlaylistSetup: React.FC = () => {
     return (
       <ShowPlaylist
         playlistName={savedPlaylistName}
-        contentType={savedContentType}
         onCreateNew={() => {
           setIsSaved(false);
           setSavedPlaylistName("");
@@ -171,7 +159,6 @@ const PlaylistSetup: React.FC = () => {
             id: "",
             name: "",
             type: "mixed",
-            contentType: savedContentType, // Maintain the current content type
             serialNumber: "",
             startTime: "00:00:00",
             endTime: "00:10:00",
@@ -211,7 +198,7 @@ const PlaylistSetup: React.FC = () => {
       playlistConfig.daysOfWeek.length === 0
     ) {
       toast.error(
-        `Please add a name, at least one file, date range, and select at least one day for the ${playlistConfig.contentType}`
+        `Please add a name, at least one file, date range, and select at least one day for the playlist`
       );
       return;
     }
@@ -220,7 +207,6 @@ const PlaylistSetup: React.FC = () => {
       const configToSend = {
         name: playlistConfig.name,
         type: "mixed",
-        contentType: playlistConfig.contentType,
         startTime: playlistConfig.startTime || "00:00:00",
         endTime: playlistConfig.endTime || "00:10:00",
         startDate: playlistConfig.startDate,
@@ -240,8 +226,6 @@ const PlaylistSetup: React.FC = () => {
       const formData = new FormData();
       formData.append("config", JSON.stringify(configToSend));
 
-   
-
       const response = await fetch(`/api/playlist-config?userId=${userId}`, {
         method: "POST",
         body: formData,
@@ -252,17 +236,10 @@ const PlaylistSetup: React.FC = () => {
         throw new Error(data.error || "Failed to save playlist");
       }
 
-      toast.success(
-        `${
-          playlistConfig.contentType === "announcement"
-            ? "Announcement"
-            : "Playlist"
-        } saved successfully`
-      );
+      toast.success("Playlist saved successfully");
 
       // Store the saved playlist info for the success screen
       setSavedPlaylistName(playlistConfig.name);
-      setSavedContentType(playlistConfig.contentType);
 
       // Show the success component
       setIsSaved(true);
@@ -282,7 +259,6 @@ const PlaylistSetup: React.FC = () => {
       id: "",
       name: "",
       type: "mixed",
-      contentType: "playlist",
       serialNumber: "",
       startTime: "00:00:00",
       endTime: "00:10:00",
@@ -291,14 +267,15 @@ const PlaylistSetup: React.FC = () => {
 
     // Hide the component
     setIsVisible(false);
-    
+
     // Optionally navigate back or to another page
     // router.push('/some-path');
   };
 
   const openBgImageSelector = (audioPath: string) => {
     const modalContainer = document.createElement("div");
-    modalContainer.className = "fixed inset-0 z-50 flex items-center justify-center";
+    modalContainer.className =
+      "fixed inset-0 z-50 flex items-center justify-center";
     modalContainer.innerHTML = `
       <div class="fixed inset-0 bg-black bg-opacity-50"></div>
       <div class="relative bg-white rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto m-4">
@@ -332,11 +309,11 @@ const PlaylistSetup: React.FC = () => {
                 })
                 .map(
                   (image) => `
-                <div class="aspect-square relative group cursor-pointer hover:opacity-90 bg-white rounded-lg overflow-hidden" 
+                <div class="aspect-square relative group cursor-pointer hover:opacity-90 bg-white rounded-lg overflow-hidden"
                   data-image-url="${image.url}"
                   data-image-name="${image.name}"
                   data-audio-path="${audioPath}">
-                  <img src="${image.url}" 
+                  <img src="${image.url}"
                     alt="${image.name}"
                     loading="lazy"
                     class="w-full h-full object-cover"/>
@@ -358,7 +335,7 @@ const PlaylistSetup: React.FC = () => {
             `
         }
         <div class="flex justify-end mt-6 pt-4 border-t">
-          <button 
+          <button
             id="cancelBgImageSelector"
             class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
@@ -370,13 +347,13 @@ const PlaylistSetup: React.FC = () => {
     document.body.appendChild(modalContainer);
 
     // Set up event listeners
-    document.querySelectorAll('[data-audio-path]').forEach(element => {
-      element.addEventListener('click', function(e) {
+    document.querySelectorAll("[data-audio-path]").forEach((element) => {
+      element.addEventListener("click", function (e) {
         const target = e.currentTarget as HTMLElement;
-        const audioPath = target.getAttribute('data-audio-path');
-        const imageUrl = target.getAttribute('data-image-url');
-        const imageName = target.getAttribute('data-image-name');
-        
+        const audioPath = target.getAttribute("data-audio-path");
+        const imageUrl = target.getAttribute("data-image-url");
+        const imageName = target.getAttribute("data-image-name");
+
         if (audioPath && imageUrl && imageName) {
           // Update playlist config with selected image
           const updatedFiles = playlistConfig.files.map((f) => {
@@ -390,12 +367,12 @@ const PlaylistSetup: React.FC = () => {
             }
             return f;
           });
-          
+
           setPlaylistConfig({
             ...playlistConfig,
             files: updatedFiles,
           });
-          
+
           // Remove the modal
           document.body.removeChild(modalContainer);
         }
@@ -403,17 +380,17 @@ const PlaylistSetup: React.FC = () => {
     });
 
     // Close button handler
-    const closeButton = modalContainer.querySelector('#closeBgImageSelector');
+    const closeButton = modalContainer.querySelector("#closeBgImageSelector");
     if (closeButton) {
-      closeButton.addEventListener('click', () => {
+      closeButton.addEventListener("click", () => {
         document.body.removeChild(modalContainer);
       });
     }
 
     // Cancel button handler
-    const cancelButton = modalContainer.querySelector('#cancelBgImageSelector');
+    const cancelButton = modalContainer.querySelector("#cancelBgImageSelector");
     if (cancelButton) {
-      cancelButton.addEventListener('click', () => {
+      cancelButton.addEventListener("click", () => {
         document.body.removeChild(modalContainer);
       });
     }
@@ -423,11 +400,7 @@ const PlaylistSetup: React.FC = () => {
     <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 text-black">
       <div className="mb-4 md:mb-6 border-b pb-4">
         <h2 className="text-xl md:text-2xl font-bold">
-          Create{" "}
-          {playlistConfig.contentType === "announcement"
-            ? "Announcement"
-            : "Playlist"}{" "}
-          Configuration
+          Create Playlist Configuration
         </h2>
       </div>
       <div className="space-y-6">
@@ -439,7 +412,10 @@ const PlaylistSetup: React.FC = () => {
               type="date"
               value={playlistConfig.startDate}
               onChange={(e) =>
-                setPlaylistConfig({ ...playlistConfig, startDate: e.target.value })
+                setPlaylistConfig({
+                  ...playlistConfig,
+                  startDate: e.target.value,
+                })
               }
               className="w-full p-2 border rounded text-sm"
             />
@@ -450,16 +426,24 @@ const PlaylistSetup: React.FC = () => {
               type="date"
               value={playlistConfig.endDate}
               onChange={(e) =>
-                setPlaylistConfig({ ...playlistConfig, endDate: e.target.value })
+                setPlaylistConfig({
+                  ...playlistConfig,
+                  endDate: e.target.value,
+                })
               }
               className="w-full p-2 border rounded text-sm"
             />
           </div>
           <div className="flex flex-col">
-            <label className="block text-sm font-medium mb-1">Days of Week</label>
+            <label className="block text-sm font-medium mb-1">
+              Days of Week
+            </label>
             <div className="flex gap-2 flex-wrap">
               {daysList.map((day) => (
-                <label key={day.value} className="flex items-center gap-1 text-xs">
+                <label
+                  key={day.value}
+                  className="flex items-center gap-1 text-xs"
+                >
                   <input
                     type="checkbox"
                     checked={playlistConfig.daysOfWeek?.includes(day.value)}
@@ -472,50 +456,12 @@ const PlaylistSetup: React.FC = () => {
             </div>
           </div>
         </div>
-        {/* Content Type Selection */}
-        <div className="flex gap-4 mb-6">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="contentType"
-              value="playlist"
-              checked={playlistConfig.contentType === "playlist"}
-              onChange={(e) =>
-                setPlaylistConfig({
-                  ...playlistConfig,
-                  contentType: e.target.value as "playlist" | "announcement",
-                })
-              }
-              className="h-4 w-4"
-            />
-            <span className="text-sm font-medium">Playlist</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="contentType"
-              value="announcement"
-              checked={playlistConfig.contentType === "announcement"}
-              onChange={(e) =>
-                setPlaylistConfig({
-                  ...playlistConfig,
-                  contentType: e.target.value as "playlist" | "announcement",
-                })
-              }
-              className="h-4 w-4"
-            />
-            <span className="text-sm font-medium">Announcement</span>
-          </label>
-        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column */}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">
-                {playlistConfig.contentType === "announcement"
-                  ? "Announcement"
-                  : "Playlist"}{" "}
-                Name
+                Playlist Name
               </label>
               <input
                 type="text"
@@ -527,11 +473,7 @@ const PlaylistSetup: React.FC = () => {
                   })
                 }
                 className="w-full p-2 border rounded text-sm"
-                placeholder={`Enter ${
-                  playlistConfig.contentType === "announcement"
-                    ? "announcement"
-                    : "playlist"
-                } name`}
+                placeholder={`Enter playlist name`}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -574,7 +516,9 @@ const PlaylistSetup: React.FC = () => {
               </label>
               <div className="max-h-[300px] md:max-h-[400px] overflow-y-auto border rounded p-3">
                 {mediaFiles.length === 0 ? (
-                  <p className="text-center py-4 text-gray-500">No media files available</p>
+                  <p className="text-center py-4 text-gray-500">
+                    No media files available
+                  </p>
                 ) : (
                   mediaFiles.map((media: any) => {
                     const isAudio = media.type.startsWith("audio/");
@@ -583,7 +527,10 @@ const PlaylistSetup: React.FC = () => {
                       .split(".")
                       .pop()
                       ?.toLowerCase();
-                    const fileName = media.name.split(".").slice(0, -1).join(".");
+                    const fileName = media.name
+                      .split(".")
+                      .slice(0, -1)
+                      .join(".");
                     if (isImage) {
                       return null;
                     }
@@ -641,8 +588,8 @@ const PlaylistSetup: React.FC = () => {
                                     )?.backgroundImageEnabled
                                   }
                                   onChange={() => {
-                                    const updatedFiles = playlistConfig.files.map(
-                                      (f) => {
+                                    const updatedFiles =
+                                      playlistConfig.files.map((f) => {
                                         if (f.path === media.url) {
                                           return {
                                             ...f,
@@ -655,8 +602,7 @@ const PlaylistSetup: React.FC = () => {
                                           } as PlaylistConfigFile;
                                         }
                                         return f;
-                                      }
-                                    );
+                                      });
                                     setPlaylistConfig({
                                       ...playlistConfig,
                                       files: updatedFiles,
@@ -704,14 +650,17 @@ const PlaylistSetup: React.FC = () => {
               <br />
               <span>
                 Days:{" "}
-                {playlistConfig.daysOfWeek && playlistConfig.daysOfWeek.length > 0
+                {playlistConfig.daysOfWeek &&
+                playlistConfig.daysOfWeek.length > 0
                   ? playlistConfig.daysOfWeek.join(", ")
                   : "None selected"}
               </span>
             </div>
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {playlistConfig.files.length === 0 ? (
-                <p className="text-center py-4 text-gray-500">No media files selected</p>
+                <p className="text-center py-4 text-gray-500">
+                  No media files selected
+                </p>
               ) : (
                 playlistConfig.files.map((file, index) => (
                   <div
@@ -720,13 +669,19 @@ const PlaylistSetup: React.FC = () => {
                   >
                     <span className="text-gray-500 text-sm">{index + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{file.name}</p>
+                      <p className="font-medium text-sm truncate">
+                        {file.name}
+                      </p>
                       {file.type === "audio" && file.backgroundImageEnabled && (
                         <div className="mt-2">
                           {file.backgroundImage ? (
                             <div className="relative w-20 h-20">
                               <img
-                                src={typeof file.backgroundImage === "string" ? file.backgroundImage : "#"}
+                                src={
+                                  typeof file.backgroundImage === "string"
+                                    ? file.backgroundImage
+                                    : "#"
+                                }
                                 alt="Background"
                                 className="w-full h-full object-cover rounded-lg"
                               />
@@ -762,14 +717,17 @@ const PlaylistSetup: React.FC = () => {
                         </div>
                       )}
                       <div className="flex items-center gap-2 mt-2">
-                        <label className="text-xs text-gray-600">Delay (s)</label>
+                        <label className="text-xs text-gray-600">
+                          Delay (s)
+                        </label>
                         <input
                           type="number"
                           min="0"
                           value={file.delay}
                           onChange={(e) => {
                             const newFiles = [...playlistConfig.files];
-                            newFiles[index].delay = parseInt(e.target.value) || 0;
+                            newFiles[index].delay =
+                              parseInt(e.target.value) || 0;
                             setPlaylistConfig({
                               ...playlistConfig,
                               files: newFiles,
@@ -808,11 +766,7 @@ const PlaylistSetup: React.FC = () => {
                 <span>Saving...</span>
               </div>
             ) : (
-              `Save ${
-                playlistConfig.contentType === "announcement"
-                  ? "Announcement"
-                  : "Playlist"
-              }`
+              `Save Playlist`
             )}
           </button>
         </div>
