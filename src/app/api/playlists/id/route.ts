@@ -108,27 +108,24 @@ export async function PUT(request: NextRequest) {
 
     await connectToDatabase();
     const data = await request.json();
-    console.log('Received data:', data);
-
-    const updatedPlaylist = {
+    
+    // Construct the data object for the update
+    const updatedPlaylistData = {
       name: data.name,
       type: data.type,
       startTime: data.startTime,
       endTime: data.endTime,
-      // Add start and end dates
       startDate: data.startDate || null,
       endDate: data.endDate || null,
-      // Add days of week
       daysOfWeek: data.daysOfWeek || [],
-      // Add status
       status: data.status || 'active',
+      shuffle: data.shuffle || false, // Include the shuffle property
       files: data.files.map((file: any) => ({
         id: file.id,
         name: file.name,
-        path: file.url,
+        path: file.url, // Standardize on 'path' for the file location
         displayOrder: file.displayOrder,
         type: file.type,
-        url: file.url,
         delay: file.delay || 0,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
         backgroundImage: file.backgroundImage || null
@@ -136,10 +133,11 @@ export async function PUT(request: NextRequest) {
       updatedAt: new Date()
     };
 
+    // Find the playlist by ID and update it with the new data
     const updated = await Playlist.findByIdAndUpdate(
       id, 
-      updatedPlaylist, 
-      { new: true, runValidators: true }
+      updatedPlaylistData, 
+      { new: true, runValidators: true } // Options: return the new doc, and run schema validators
     );
 
     if (!updated) {
@@ -153,14 +151,24 @@ export async function PUT(request: NextRequest) {
       success: true,
       playlist: updated
     });
+
   } catch (error) {
     console.error('Error updating playlist:', error);
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json(
-      { error: 'Failed to update playlist' },
+      { success: false, error: 'Failed to update playlist', details: message },
       { status: 500 }
     );
   }
-}export async function DELETE(request: NextRequest) {
+}
+
+/**
+ * Handles deleting a playlist by its ID.
+ * It expects the playlist ID in the URL query parameters (`?id=...`).
+ * This function uses a transaction to ensure that the playlist is deleted
+ * AND its reference is removed from all associated devices atomically.
+ */
+export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -174,46 +182,53 @@ export async function PUT(request: NextRequest) {
 
     await connectToDatabase();
 
+    // Start a Mongoose session to perform a transaction
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      // Delete the playlist
+      // Step 1: Find and delete the playlist within the transaction
       const deletedPlaylist = await Playlist.findByIdAndDelete(id).session(session);
       
       if (!deletedPlaylist) {
-        throw new Error('Playlist not found');
+        // If no playlist was found, abort the transaction and throw an error
+        await session.abortTransaction();
+        return NextResponse.json(
+          { success: false, error: 'Playlist not found' },
+          { status: 404 }
+        );
       }
 
-      // Add logging to debug
-      console.log('Attempting to remove playlist from devices:', id);
-      
-      // Fixed query - let MongoDB handle the ObjectId conversion
+      // Step 2: Remove the playlist's ID from the `playlistIds` array in all DevicePlaylist documents
       const updateResult = await DevicePlaylist.updateMany(
-        { playlistIds: id }, // MongoDB will automatically convert string to ObjectId for array matching
-        { $pull: { playlistIds: id } }, // Same here
-        { session }
+        { playlistIds: id }, // Find all devices containing this playlist ID
+        { $pull: { playlistIds: id } }, // Use $pull to remove the ID from the array
+        { session } // Ensure this operation is part of the transaction
       );
-
-      console.log('Update result:', updateResult);
-
+      
+      // If both operations succeed, commit the transaction
       await session.commitTransaction();
+
       return NextResponse.json({
         success: true,
-        deletedPlaylist: deletedPlaylist._id,
+        message: 'Playlist deleted and device references updated successfully.',
+        deletedPlaylistId: deletedPlaylist._id,
         devicesUpdated: updateResult.modifiedCount
       });
     } catch (error) {
-      console.error('Transaction error:', error);
+      // If any error occurs during the transaction, abort it
       await session.abortTransaction();
+      // Re-throw the error to be caught by the outer catch block
       throw error;
     } finally {
+      // Always end the session when the transaction is finished
       session.endSession();
     }
   } catch (error) {
     console.error('Error deleting playlist:', error);
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json(
-      { success: false, error: 'Failed to delete playlist' },
+      { success: false, error: 'Failed to delete playlist', details: message },
       { status: 500 }
     );
   }
