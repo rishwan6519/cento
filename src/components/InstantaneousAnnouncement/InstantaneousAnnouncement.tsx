@@ -18,9 +18,10 @@ const geminiVoices = [
 
 const supportedLanguages = [
     { code: 'en-US', name: 'English (US)' }, { code: 'en-GB', name: 'English (UK)' },
-    { code: 'es-US', name: 'Spanish (US)' }, { code: 'fr-FR', name: 'French (France)' },
-    { code: 'de-DE', name: 'German (Germany)' }, { code: 'it-IT', name: 'Italian (Italy)' },
-    { code: 'ja-JP', name: 'Japanese (Japan)' }, { code: 'pt-BR', name: 'Portuguese (Brazil)' },
+    { code: 'en-AU', name: 'English (Australia)' },  { code: 'en-IN', name: 'English (India)' }, 
+    { code: 'es-US', name: 'Spanish (US)' },{ code: 'fr-FR', name: 'French (France)' }, 
+    { code: 'de-DE', name: 'German (Germany)' }, 
+     
 ];
 
 
@@ -504,7 +505,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
               <Mic size={18} /> Record
             </button>
              <button onClick={() => setActiveTab('tts')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'tts' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-600'}`}>
-              <Bot size={18} /> Generate AI
+              <Bot size={18} /> TextToSpeech
             </button>
             <button onClick={() => setActiveTab('select')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'select' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}>
               <AudioLines size={18} /> Library

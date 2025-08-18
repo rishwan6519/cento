@@ -23,9 +23,10 @@ interface PlaylistConfiguration {
   startTime: string;
   endTime: string;
   files: PlaylistConfigFile[];
-  startDate?: string; // Add this
-  endDate?: string; // Add this
-  daysOfWeek?: string[]; // Add this
+  startDate?: string;
+  endDate?: string;
+  daysOfWeek?: string[];
+  shuffle?: boolean; // Added shuffle property
 }
 
 // Create a ShowPlaylist component
@@ -105,6 +106,7 @@ const PlaylistSetup: React.FC = () => {
     startDate: "",
     endDate: "",
     daysOfWeek: [],
+    shuffle: false, // Default shuffle to false
   });
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -163,6 +165,7 @@ const PlaylistSetup: React.FC = () => {
             startTime: "00:00:00",
             endTime: "00:10:00",
             files: [],
+            shuffle: false,
           });
         }}
       />
@@ -212,6 +215,7 @@ const PlaylistSetup: React.FC = () => {
         startDate: playlistConfig.startDate,
         endDate: playlistConfig.endDate,
         daysOfWeek: playlistConfig.daysOfWeek,
+        shuffle: playlistConfig.shuffle, // Include shuffle in the payload
         files: playlistConfig.files.map((file, index) => ({
           name: file.name,
           path: file.path,
@@ -263,6 +267,7 @@ const PlaylistSetup: React.FC = () => {
       startTime: "00:00:00",
       endTime: "00:10:00",
       files: [],
+      shuffle: false,
     });
 
     // Hide the component
@@ -388,7 +393,9 @@ const PlaylistSetup: React.FC = () => {
     }
 
     // Cancel button handler
-    const cancelButton = modalContainer.querySelector("#cancelBgImageSelector");
+    const cancelButton = modalContainer.querySelector(
+      "#cancelBgImageSelector"
+    );
     if (cancelButton) {
       cancelButton.addEventListener("click", () => {
         document.body.removeChild(modalContainer);
@@ -405,66 +412,88 @@ const PlaylistSetup: React.FC = () => {
       </div>
       <div className="space-y-6">
         {/* Date Range and Days of Week */}
-        <div className="flex flex-col md:flex-row gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Start Date</label>
-            <input
-              type="date"
-              value={playlistConfig.startDate}
-              onChange={(e) =>
-                setPlaylistConfig({
-                  ...playlistConfig,
-                  startDate: e.target.value,
-                })
-              }
-              className="w-full p-2 border rounded text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">End Date</label>
-            <input
-              type="date"
-              value={playlistConfig.endDate}
-              onChange={(e) =>
-                setPlaylistConfig({
-                  ...playlistConfig,
-                  endDate: e.target.value,
-                })
-              }
-              className="w-full p-2 border rounded text-sm"
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="block text-sm font-medium mb-1">
-              Days of Week
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {daysList.map((day) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Date Range */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Date and Day Selection</h3>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
                 <label
-                  key={day.value}
-                  className="flex items-center gap-1 text-xs"
+                  htmlFor="startDate"
+                  className="block text-sm font-medium text-gray-700"
                 >
-                  <input
-                    type="checkbox"
-                    checked={playlistConfig.daysOfWeek?.includes(day.value)}
-                    onChange={() => handleDayToggle(day.value)}
-                    className="h-4 w-4"
-                  />
-                  {day.label}
+                  Start Date
                 </label>
-              ))}
+                <input
+                  type="date"
+                  id="startDate"
+                  value={playlistConfig.startDate}
+                  onChange={(e) =>
+                    setPlaylistConfig({
+                      ...playlistConfig,
+                      startDate: e.target.value,
+                    })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div className="flex-1">
+                <label
+                  htmlFor="endDate"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  id="endDate"
+                  value={playlistConfig.endDate}
+                  onChange={(e) =>
+                    setPlaylistConfig({
+                      ...playlistConfig,
+                      endDate: e.target.value,
+                    })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Days of the Week
+              </label>
+              <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                {daysList.map((day) => (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() => handleDayToggle(day.value)}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      playlistConfig.daysOfWeek?.includes(day.value)
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column */}
+
+          {/* Playlist Settings */}
           <div className="space-y-4">
+            <h3 className="text-lg font-medium">Playlist Settings</h3>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label
+                htmlFor="playlistName"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Playlist Name
               </label>
               <input
                 type="text"
+                id="playlistName"
                 value={playlistConfig.name}
                 onChange={(e) =>
                   setPlaylistConfig({
@@ -472,17 +501,21 @@ const PlaylistSetup: React.FC = () => {
                     name: e.target.value,
                   })
                 }
-                className="w-full p-2 border rounded text-sm"
-                placeholder={`Enter playlist name`}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder="Enter playlist name"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <label
+                  htmlFor="startTime"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Start Time
                 </label>
                 <input
                   type="time"
+                  id="startTime"
                   value={playlistConfig.startTime}
                   onChange={(e) =>
                     setPlaylistConfig({
@@ -490,15 +523,19 @@ const PlaylistSetup: React.FC = () => {
                       startTime: e.target.value,
                     })
                   }
-                  className="w-full p-2 border rounded text-sm"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
+              <div className="flex-1">
+                <label
+                  htmlFor="endTime"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   End Time
                 </label>
                 <input
                   type="time"
+                  id="endTime"
                   value={playlistConfig.endTime}
                   onChange={(e) =>
                     setPlaylistConfig({
@@ -506,10 +543,38 @@ const PlaylistSetup: React.FC = () => {
                       endTime: e.target.value,
                     })
                   }
-                  className="w-full p-2 border rounded text-sm"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">
+                Shuffle Playlist
+              </span>
+              <label
+                htmlFor="shuffle"
+                className="relative inline-flex items-center cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  id="shuffle"
+                  className="sr-only peer"
+                  checked={playlistConfig.shuffle}
+                  onChange={(e) =>
+                    setPlaylistConfig({
+                      ...playlistConfig,
+                      shuffle: e.target.checked,
+                    })
+                  }
+                />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">
                 Select Media Files

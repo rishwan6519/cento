@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       endTime: configData.endTime,
       startDate: configData.startDate,
       endDate: configData.endDate,
+      shuffle: configData.shuffle,
       daysOfWeek: configData.daysOfWeek,
       files: configData.files.map((file: any) => ({
         name: file.name,
