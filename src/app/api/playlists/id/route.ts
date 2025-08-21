@@ -119,14 +119,20 @@ export async function PUT(request: NextRequest) {
       endDate: data.endDate || null,
       daysOfWeek: data.daysOfWeek || [],
       status: data.status || 'active',
-      shuffle: data.shuffle || false, // Include the shuffle property
+      shuffle: data.shuffle || false,
       files: data.files.map((file: any) => ({
         id: file.id,
         name: file.name,
-        path: file.url, // Standardize on 'path' for the file location
+        // =======================================================
+        // THE FIX: Change file.url to file.path
+        // =======================================================
+        path: file.path, 
+        // =======================================================
         displayOrder: file.displayOrder,
         type: file.type,
         delay: file.delay || 0,
+        maxVolume: file.maxVolume,
+        minVolume: file.minVolume,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
         backgroundImage: file.backgroundImage || null
       })),
@@ -137,7 +143,7 @@ export async function PUT(request: NextRequest) {
     const updated = await Playlist.findByIdAndUpdate(
       id, 
       updatedPlaylistData, 
-      { new: true, runValidators: true } // Options: return the new doc, and run schema validators
+      { new: true, runValidators: true }
     );
 
     if (!updated) {

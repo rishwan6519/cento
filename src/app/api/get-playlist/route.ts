@@ -52,6 +52,7 @@ export async function GET(req: Request) {
         id: playlist._id,
         versionId: playlist.updatedAt.getTime().toString(),
         contentType: playlist.contentType,
+        shuffle: playlist.shuffle,
         files: playlist.files.map((file: any) => ({
           path: file.path,
           displayOrder: file.displayOrder,
