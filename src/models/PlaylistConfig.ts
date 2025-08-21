@@ -8,6 +8,8 @@ const playlistFileSchema = new mongoose.Schema({
   shuffle: { type: Boolean, default: false },
   displayOrder: { type: Number, required: true },
   delay: { type: Number, default: 0 },
+  maxVolume: { type: Number, default: 100 },
+  minVolume: { type: Number, default: 0 },
 
   backgroundImageEnabled: { type: Boolean, default: false },
   backgroundImage: { type: String, default: null },

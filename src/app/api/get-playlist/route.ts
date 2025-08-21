@@ -57,6 +57,8 @@ export async function GET(req: Request) {
           displayOrder: file.displayOrder,
             type: file.type,
           delay: file.delay,
+          maxVolume: file.maxVolume,
+          minVolume: file.minVolume,
           backgroundImageEnabled: file.backgroundImageEnabled,
           backgroundImage: file.backgroundImage,
         })),

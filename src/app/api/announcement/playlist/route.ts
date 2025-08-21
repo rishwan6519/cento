@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .populate('announcements.file');
 
+      console.log("Playlists fetched for userId:", userId, playlists);
+
     return NextResponse.json({ playlists }, { status: 200 });
   } catch (error) {
     console.error('Error fetching playlists:', error);

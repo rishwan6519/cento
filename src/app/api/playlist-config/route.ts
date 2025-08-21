@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
         type: file.type,
         displayOrder: file.displayOrder,
         delay: file.delay || 0,
+        maxVolume: file.maxVolume || 100,
+        minVolume: file.minVolume || 0,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
         backgroundImage: file.backgroundImage || null,
       })),

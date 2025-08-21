@@ -13,6 +13,8 @@ interface PlaylistConfigFile {
   backgroundImageEnabled?: boolean;
   backgroundImage?: string | null;
   backgroundImageName?: string | null;
+  minVolume: number; // Added minVolume
+  maxVolume: number; // Added maxVolume
 }
 
 interface PlaylistConfiguration {
@@ -225,6 +227,8 @@ const PlaylistSetup: React.FC = () => {
           backgroundImageEnabled: file.backgroundImageEnabled || false,
           backgroundImage: file.backgroundImage || null,
           backgroundImageName: file.backgroundImageName || null,
+          minVolume: file.minVolume, // Pass minVolume
+          maxVolume: file.maxVolume, // Pass maxVolume
         })),
       };
       const formData = new FormData();
@@ -482,95 +486,103 @@ const PlaylistSetup: React.FC = () => {
           </div>
 
           {/* Playlist Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Playlist Settings</h3>
-            <div>
-              <label
-                htmlFor="playlistName"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Playlist Name
-              </label>
-              <input
-                type="text"
-                id="playlistName"
-                value={playlistConfig.name}
-                onChange={(e) =>
-                  setPlaylistConfig({
-                    ...playlistConfig,
-                    name: e.target.value,
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                placeholder="Enter playlist name"
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <label
-                  htmlFor="startTime"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Start Time
-                </label>
-                <input
-                  type="time"
-                  id="startTime"
-                  value={playlistConfig.startTime}
-                  onChange={(e) =>
-                    setPlaylistConfig({
-                      ...playlistConfig,
-                      startTime: e.target.value,
-                    })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-              <div className="flex-1">
-                <label
-                  htmlFor="endTime"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  End Time
-                </label>
-                <input
-                  type="time"
-                  id="endTime"
-                  value={playlistConfig.endTime}
-                  onChange={(e) =>
-                    setPlaylistConfig({
-                      ...playlistConfig,
-                      endTime: e.target.value,
-                    })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                Shuffle Playlist
-              </span>
-              <label
-                htmlFor="shuffle"
-                className="relative inline-flex items-center cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  id="shuffle"
-                  className="sr-only peer"
-                  checked={playlistConfig.shuffle}
-                  onChange={(e) =>
-                    setPlaylistConfig({
-                      ...playlistConfig,
-                      shuffle: e.target.checked,
-                    })
-                  }
-                />
-                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-          </div>
+         <div className="space-y-6">
+  <h3 className="text-lg font-semibold">Playlist Settings</h3>
+
+  {/* Playlist Name */}
+  <div>
+    <label
+      htmlFor="playlistName"
+      className="block text-sm font-medium text-gray-700"
+    >
+      Playlist Name
+    </label>
+    <input
+      type="text"
+      id="playlistName"
+      value={playlistConfig.name}
+      onChange={(e) =>
+        setPlaylistConfig({
+          ...playlistConfig,
+          name: e.target.value,
+        })
+      }
+      className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
+      placeholder="Enter playlist name"
+    />
+  </div>
+
+  {/* Start & End Time */}
+  <div className="flex items-center gap-6">
+    <div className="flex-1">
+      <label
+        htmlFor="startTime"
+        className="block text-sm font-medium text-gray-700"
+      >
+        Start Time
+      </label>
+      <input
+        type="time"
+        id="startTime"
+        value={playlistConfig.startTime}
+        onChange={(e) =>
+          setPlaylistConfig({
+            ...playlistConfig,
+            startTime: e.target.value,
+          })
+        }
+        className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
+      />
+    </div>
+    <div className="flex-1">
+      <label
+        htmlFor="endTime"
+        className="block text-sm font-medium text-gray-700"
+      >
+        End Time
+      </label>
+      <input
+        type="time"
+        id="endTime"
+        value={playlistConfig.endTime}
+        onChange={(e) =>
+          setPlaylistConfig({
+            ...playlistConfig,
+            endTime: e.target.value,
+          })
+        }
+        className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
+      />
+    </div>
+  </div>
+
+  {/* Shuffle Switch */}
+  <div className="flex items-center justify-between">
+    <span className="text-sm font-medium text-gray-700">
+      Shuffle Playlist
+    </span>
+    <label
+      htmlFor="shuffle"
+      className="relative inline-flex items-center cursor-pointer"
+    >
+      <input
+        type="checkbox"
+        id="shuffle"
+        className="sr-only peer"
+        checked={playlistConfig.shuffle}
+        onChange={(e) =>
+          setPlaylistConfig({
+            ...playlistConfig,
+            shuffle: e.target.checked,
+          })
+        }
+      />
+      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+    </label>
+  </div>
+</div>
+
+          
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column */}
@@ -618,6 +630,8 @@ const PlaylistSetup: React.FC = () => {
                               delay: 2,
                               backgroundImageEnabled: false,
                               backgroundImage: null,
+                              minVolume: 0, // Initialize minVolume
+                              maxVolume: 100, // Initialize maxVolume
                             } as PlaylistConfigFile;
                             setPlaylistConfig({
                               ...playlistConfig,
@@ -800,6 +814,53 @@ const PlaylistSetup: React.FC = () => {
                           }}
                           className="w-16 p-1 border rounded text-sm"
                         />
+                      </div>
+                      {/* NEW: Volume Controls */}
+                      <div className="mt-3 space-y-2">
+                        <div>
+                          <label className="text-xs text-gray-600">
+                            Min Volume: {file.minVolume}
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={file.minVolume}
+                            onChange={(e) => {
+                              const newFiles = [...playlistConfig.files];
+                              newFiles[index].minVolume = parseInt(
+                                e.target.value
+                              );
+                              setPlaylistConfig({
+                                ...playlistConfig,
+                                files: newFiles,
+                              });
+                            }}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">
+                            Max Volume: {file.maxVolume}
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={file.maxVolume}
+                            onChange={(e) => {
+                              const newFiles = [...playlistConfig.files];
+                              newFiles[index].maxVolume = parseInt(
+                                e.target.value
+                              );
+                              setPlaylistConfig({
+                                ...playlistConfig,
+                                files: newFiles,
+                              });
+                            }}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
