@@ -12,18 +12,9 @@ const geminiVoices = [
 
 const supportedLanguages = [
   { code: 'en-US', name: 'English (US)' }, { code: 'en-GB', name: 'English (UK)' },
-  { code: 'en-IN', name: 'English (India)' }, { code: 'es-US', name: 'Spanish (US)' },
-  { code: 'fr-FR', name: 'French (France)' }, { code: 'de-DE', name: 'German (Germany)' },
-  { code: 'it-IT', name: 'Italian (Italy)' }, { code: 'ja-JP', name: 'Japanese (Japan)' },
-  { code: 'ko-KR', name: 'Korean (Korea)' }, { code: 'pt-BR', name: 'Portuguese (Brazil)' },
-  { code: 'ru-RU', name: 'Russian (Russia)' }, { code: 'ar-EG', name: 'Arabic (Egyptian)' },
-  { code: 'hi-IN', name: 'Hindi (India)' }, { code: 'id-ID', name: 'Indonesian (Indonesia)' },
-  { code: 'nl-NL', name: 'Dutch (Netherlands)' }, { code: 'pl-PL', name: 'Polish (Poland)' },
-  { code: 'th-TH', name: 'Thai (Thailand)' }, { code: 'tr-TR', name: 'Turkish (Turkey)' },
-  { code: 'vi-VN', name: 'Vietnamese (Vietnam)' }, { code: 'ro-RO', name: 'Romanian (Romania)' },
-  { code: 'uk-UA', name: 'Ukrainian (Ukraine)' }, { code: 'bn-BD', name: 'Bengali (Bangladesh)' },
-  { code: 'mr-IN', name: 'Marathi (India)' }, { code: 'ta-IN', name: 'Tamil (India)' },
-  { code: 'te-IN', name: 'Telugu (India)' },
+    { code: 'en-AU', name: 'English (Australia)' },  { code: 'en-IN', name: 'English (India)' }, 
+    { code: 'es-US', name: 'Spanish (US)' },{ code: 'fr-FR', name: 'French (France)' }, 
+    { code: 'de-DE', name: 'German (Germany)' }, 
 ];
 
 interface AnnouncementFile {
