@@ -12,8 +12,6 @@ interface ZoneCounts {
   };
 }
 
-
-
 interface HeatmapData {
   timestamp: string;
   zone_id: number;
@@ -24,16 +22,21 @@ interface HeatmapData {
 
 // --- MQTT Configuration ---
 // --- THIS IS THE CORRECT FORMAT ---
-
-
 const MQTT_BROKER_URL = "wss://b04df1c6a94d4dc5a7d1772b53665d8e.s1.eu.hivemq.cloud:8884/mqtt";
 const MQTT_USERNAME = "PeopleCounter";
 const MQTT_PASSWORD = "Counter123";
 
-const MQTT_COMMAND_TOPIC = "pivision/commands";
-const MQTT_DATA_TOPIC = "pivision/data";
-const MQTT_SNAPSHOT_TOPIC = "pivision/snapshot";
+// Updated MQTT Topics based on the provided topic templates
+const PI_ID = "pi-001"; // You can make this dynamic if needed
+const MQTT_COMMAND_REQUEST_TOPIC = `vision/${PI_ID}/command/request`;
+const MQTT_COMMAND_RESPONSE_TOPIC = `vision/${PI_ID}/command/response`;
+const MQTT_LIVE_COUNT_TOPIC = `vision/${PI_ID}/+/counts/update`; // Wildcard for camera_id
+const MQTT_ZONE_FULL_DATA_TOPIC = `vision/${PI_ID}/+/zones/full_data`; // Wildcard for camera_id
+const MQTT_LINE_FULL_DATA_TOPIC = `vision/${PI_ID}/+/lines/full_data`; // Wildcard for camera_id
 
+// Add new MQTT topic for active cameras and snapshot response
+const MQTT_ACTIVE_CAMERAS_TOPIC = `vision/${PI_ID}/cameras/active_list`;
+const MQTT_SNAPSHOT_RESPONSE_TOPIC_PREFIX = `vision/${PI_ID}/`; // Will append camera_id + /snapshot/response
 
 const LoadingSpinner = () => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -46,7 +49,13 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const ConnectionLostModal = ({ onRetry, message }: { onRetry: () => void, message: string }) => (
+const ConnectionLostModal = ({
+  onRetry,
+  message,
+}: {
+  onRetry: () => void;
+  message: string;
+}) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full mx-4">
       <div className="text-center">
@@ -54,9 +63,7 @@ const ConnectionLostModal = ({ onRetry, message }: { onRetry: () => void, messag
         <h3 className="text-xl font-bold text-gray-900 mb-2">
           Connection Issue
         </h3>
-        <p className="text-gray-600 mb-6">
-          {message}
-        </p>
+        <p className="text-gray-600 mb-6">{message}</p>
         <button
           onClick={onRetry}
           className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
@@ -69,7 +76,6 @@ const ConnectionLostModal = ({ onRetry, message }: { onRetry: () => void, messag
 );
 
 // Add this component at the top of your file
-
 const WarningAlert = ({
   zoneId,
   cameraId,
@@ -96,7 +102,9 @@ export default function PeopleDetectionPage() {
   const [password, setPassword] = useState("");
   const [numCameras, setNumCameras] = useState(1);
   const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
-  const [message, setMessage] = useState("Please configure and connect to your cameras to begin.");
+  const [message, setMessage] = useState(
+    "Please configure and connect to your cameras to begin."
+  );
   const [cameraOptions, setCameraOptions] = useState<string[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
@@ -165,12 +173,12 @@ export default function PeopleDetectionPage() {
     useState<string>("");
   const [availableZones, setAvailableZones] = useState<number[]>([]);
   const [drawnZones, setDrawnZones] = useState<{
-  [cameraId: string]: Array<{
-    id: number;
-    coordinates: { x1: number; y1: number; x2: number; y2: number };
-    count: number | null;
-  }>;
-}>({});
+    [cameraId: string]: Array<{
+      id: number;
+      coordinates: { x1: number; y1: number; x2: number; y2: number };
+      count: number | null;
+    }>;
+  }>({});
   const [selectedZoneForDrawing, setSelectedZoneForDrawing] = useState<
     number | null
   >(null);
@@ -183,23 +191,25 @@ export default function PeopleDetectionPage() {
     setIsFullScreen(!isFullScreen);
   };
 
-  const fetchAvailableCameras = async () => {
-    // This function relies on a custom API endpoint not present in the provided backend.
-    // It is left here for completeness of the UI but will need a supporting backend API.
-    try {
-      const response = await fetch(
-        `api/cameras?startDate=${startDate}&startTime=${startTime}&endDate=${endDate}&endTime=${endTime}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch cameras");
-      const data = await response.json();
-      console.log("Available cameras data:", data); // Debugging line
-      if (data.cameras) {
-        setAvailableCameras(data.cameras.map(String));
-      }
-    } catch (error) {
-      console.error("Error fetching cameras:", error);
-      setAvailableCameras([]);
+  const fetchAvailableCameras = () => {
+    if (!mqttClient || !mqttClient.connected) {
+      setMessage("MQTT client not connected. Please wait or check connection.");
+      return;
     }
+    // Publish a request to get active cameras
+    mqttClient.publish(
+      MQTT_COMMAND_REQUEST_TOPIC,
+      JSON.stringify({ command: "get_active_cameras" }),
+      { qos: 1 },
+      (err) => {
+        if (err) {
+          setMessage("Failed to request camera list.");
+          console.error("Camera list request error:", err);
+        } else {
+          setMessage("Requesting active cameras...");
+        }
+      }
+    );
   };
 
   const fetchAvailableZones = async (cameraId: string) => {
@@ -247,95 +257,200 @@ export default function PeopleDetectionPage() {
 
   const [lastUpdateTime, setLastUpdateTime] = useState<string>("");
 
-    // --- NEW: More Robust MQTT Connection useEffect ---
+  // --- NEW: More Robust MQTT Connection useEffect ---
   useEffect(() => {
-      // Prevent connection attempt with placeholder values
-    if (!MQTT_BROKER_URL || MQTT_BROKER_URL.includes("your-actual-broker-address")) {
-        setConnectionLostMessage("MQTT Broker is not configured. Please update the connection details in the code.");
-        setIsConnectionLost(true);
-        return;
+    // Prevent connection attempt with placeholder values
+    if (
+      !MQTT_BROKER_URL ||
+      MQTT_BROKER_URL.includes("your-actual-broker-address")
+    ) {
+      setConnectionLostMessage(
+        "MQTT Broker is not configured. Please update the connection details in the code."
+      );
+      setIsConnectionLost(true);
+      return;
     }
 
     setIsLoading(true);
     setMessage("Connecting to MQTT broker...");
 
     const client = mqtt.connect(MQTT_BROKER_URL, {
-      
       username: MQTT_USERNAME,
       password: MQTT_PASSWORD,
-       clientId: 'client_' + Math.random().toString(16).substr(2, 8),
-      protocol: 'wss',
+      clientId: "client_" + Math.random().toString(16).substr(2, 8),
+      protocol: "wss",
       reconnectPeriod: 5000,
     });
 
     client.on("connect", () => {
       setIsLoading(false);
       setIsConnectionLost(false);
-      setMessage("Successfully connected to MQTT broker. Ready to start pipeline.");
+      setMessage(
+        "Successfully connected to MQTT broker. Ready to start pipeline."
+      );
 
       // Subscribe to topics
-      client.subscribe(MQTT_DATA_TOPIC, { qos: 1 });
-      client.subscribe(`${MQTT_SNAPSHOT_TOPIC}/+`, { qos: 1 }); // Wildcard for all camera snapshots
+      client.subscribe(MQTT_LIVE_COUNT_TOPIC, { qos: 1 });
+      client.subscribe(MQTT_COMMAND_RESPONSE_TOPIC, { qos: 1 });
+      client.subscribe(MQTT_ACTIVE_CAMERAS_TOPIC, { qos: 1 }); // Subscribe to active cameras topic
+      client.subscribe(MQTT_LINE_FULL_DATA_TOPIC, { qos: 1 }); // Subscribe to line counts topic
 
+      // Subscribe to all possible snapshot response topics (for up to 10 cameras)
+      for (let i = 1; i <= 10; i++) {
+        client.subscribe(`${MQTT_SNAPSHOT_RESPONSE_TOPIC_PREFIX}camera${i}/snapshot/response`, { qos: 1 });
+      }
       setMqttClient(client);
     });
 
     client.on("message", (topic, payload) => {
-      // Handle incoming messages
-      if (topic === MQTT_DATA_TOPIC) {
-        try {
-          const data = JSON.parse(payload.toString()).data;
+      // Handle active cameras list
+   if (topic === MQTT_ACTIVE_CAMERAS_TOPIC) {
+  console.log("Active cameras payload:", payload.toString());
+  try {
+    const data = JSON.parse(payload.toString());
+    // Use active_camera array from response
+    if (Array.isArray(data.active_camera)) {
+      setCameraOptions(data.active_camera.map(String));
+      setMessage(`Active cameras: ${data.active_camera.join(", ")}`);
+      console.log("Active cameras:", data.active_camera);
+    }
+    // Optionally set the default selected camera from active_ui_camera
+     if (typeof data.active_ui_camera === "string") {
+      setSelectedCamera(data.active_ui_camera);
+      setActiveCamera(data.active_ui_camera);
+    }
+  } catch (e) {
+    console.error("Error parsing active cameras list:", e);
+  }
+  return;
+}
 
-          const cameraIds = Object.keys(data);
-          if (cameraIds.length > 0) {
-            setCameraOptions(cameraIds);
-            if (cameraIds.length !== cameraOptions.length) {
-                setMessage(`Pipeline running. ${cameraIds.length} camera(s) active.`);
-            }
-          }
+      // Handle snapshot response for specific camera
+      // Example topic: vision/pi-001/camera1/snapshot/response
+     // ...inside client.on("message", (topic, payload) => { ...
+// ...inside client.on("message", (topic, payload) => { ...
+if (
+  topic.startsWith(`${MQTT_SNAPSHOT_RESPONSE_TOPIC_PREFIX}`) &&
+  topic.includes("/snapshot/response")
+) {
+  try {
+    // Try to parse as JSON first
+    let response;
+    try {
+      response = JSON.parse(payload.toString());
+      console.log("Snapshot response payload:", response);
+    } catch (jsonErr) {
+      console.warn("Snapshot payload is not JSON, treating as binary.");
+      // If parsing fails, assume it's binary (e.g., JPEG)
+      // Create a blob URL for the image
+      const blob = new Blob([payload], { type: "image/jpeg" });
+      const imageUrl = URL.createObjectURL(blob);
+      console.log("Snapshot received as image blob:", imageUrl);
+      setSnapshotUrl(imageUrl);
+      setShowModal(true);
+      setMessage("Snapshot received as image. You can now draw zones.");
+      setIsLoading(false);
+      return; // Exit here as we've handled the image
+    }
+
+    // If JSON parsing succeeds, handle as before (for a JSON response containing a URL)
+    if (response.status === "success" && response.payload?.snapshot_url) {
+      setSnapshotUrl(response.payload.snapshot_url);
+      setShowModal(true);
+      setMessage("Snapshot received. You can now draw zones.");
+    } else {
+      setMessage(`Snapshot failed: ${response.error || "Unknown error"}`);
+    }
+    setIsLoading(false);
+  } catch (e) {
+    console.error("Error handling snapshot response:", e);
+  }
+  return;
+}
+      // Handle incoming messages
+      if (topic.startsWith(`vision/${PI_ID}/`) && topic.endsWith(`/counts/update`)) {
+        try {
+          const data = JSON.parse(payload.toString());
+          const camera_id = topic.split('/')[2]; // Extract camera_id from topic
+
+          setCameraOptions(prev => {
+              if (!prev.includes(camera_id)) {
+                  return [...prev, camera_id];
+              }
+              return prev;
+          });
 
           // Update zone counts
-          const newZoneCounts: typeof zoneCounts = {};
-          for (const camId in data) {
-              newZoneCounts[camId] = {};
-              if (data[camId].zones) {
-                  for (const zoneId in data[camId].zones) {
-                      const counts = data[camId].zones[zoneId];
-                      newZoneCounts[camId][zoneId] = {
-                          in: counts.in_count || 0,
-                          out: counts.out_count || 0,
-                      };
-                  }
+          setZoneCounts(prev => ({
+              ...prev,
+              [camera_id]: {
+                  ...prev[camera_id],
+                  ...data // Data directly contains zone/line counts
               }
-          }
-
-          setZoneCounts(newZoneCounts);
+          }));
           setLastUpdateTime(new Date().toLocaleTimeString());
 
         } catch (e) {
-          console.error("Error parsing data message:", e);
+          console.error("Error parsing live count message:", e);
         }
-      } else if (topic.startsWith(MQTT_SNAPSHOT_TOPIC)) {
-          // The payload is raw image bytes
-          const blob = new Blob([payload], { type: 'image/jpeg' });
-          const imageUrl = URL.createObjectURL(blob);
-          setSnapshotUrl(imageUrl);
-          setShowModal(true);
-          setMessage("Snapshot received. You can now draw zones.");
-          setIsLoading(false);
+      } else if (topic === MQTT_COMMAND_RESPONSE_TOPIC) {
+        try {
+            const response = JSON.parse(payload.toString());
+            console.log("Command Response:", response);
+            if (response.status === "success") {
+                setMessage(`Command "${response.command}" successful.`);
+                if (response.command === "get_snapshot" && response.payload?.snapshot_url) {
+                    setSnapshotUrl(response.payload.snapshot_url);
+                    setShowModal(true);
+                    setMessage("Snapshot received. You can now draw zones.");
+                }
+            } else {
+                setMessage(`Command "${response.command}" failed: ${response.error}`);
+            }
+            setIsLoading(false);
+        } catch (e) {
+            console.error("Error parsing command response:", e);
+        }
+      }
+
+      // Handle line counts data
+      if (
+        topic.startsWith(`vision/${PI_ID}/`) &&
+        topic.includes("/lines/full_data")
+      ) {
+        try {
+          const data = JSON.parse(payload.toString());
+          const camera_id = topic.split('/')[2]; // Extract camera_id from topic
+          console.log("Line counts data:", data);
+
+          // Merge line counts into zoneCounts state (or create a separate state if preferred)
+          setZoneCounts(prev => ({
+            ...prev,
+            [camera_id]: {
+              ...prev[camera_id],
+              ...data // Data contains line and zone counts
+            }
+          }));
+          setLastUpdateTime(new Date().toLocaleTimeString());
+        } catch (e) {
+          console.error("Error parsing line counts message:", e);
+        }
+        return;
       }
     });
 
     client.on("error", (err) => {
       console.error("MQTT Connection Error:", err);
-      setConnectionLostMessage("Connection error. Please check broker URL, credentials, and network.");
+      setConnectionLostMessage(
+        "Connection error. Please check broker URL, credentials, and network."
+      );
       setIsConnectionLost(true);
       client.end();
     });
 
     client.on("reconnect", () => {
-        setMessage("Reconnecting to MQTT broker...");
-        setIsLoading(true);
+      setMessage("Reconnecting to MQTT broker...");
+      setIsLoading(true);
     });
 
     return () => {
@@ -372,8 +487,8 @@ export default function PeopleDetectionPage() {
 
   const handleConnect = async () => {
     if (!mqttClient || !mqttClient.connected) {
-        setMessage("MQTT client not connected. Please wait or check connection.");
-        return;
+      setMessage("MQTT client not connected. Please wait or check connection.");
+      return;
     }
 
     const urls = generateRTSPUrls();
@@ -387,19 +502,24 @@ export default function PeopleDetectionPage() {
     setIsLoading(true);
 
     const command = {
-        command: "start_pipeline",
-        payload: { sources: urls }
+      command: "start_pipeline",
+      payload: { sources: urls },
     };
 
-    mqttClient.publish(MQTT_COMMAND_TOPIC, JSON.stringify(command), { qos: 1 }, (err) => {
-        setIsLoading(false);
+    mqttClient.publish(
+      MQTT_COMMAND_REQUEST_TOPIC,
+      JSON.stringify(command),
+      { qos: 1 },
+      (err) => {
         if (err) {
-            setMessage("Failed to send start command. Please try again.");
-            console.error("Publish error:", err);
+          setIsLoading(false);
+          setMessage("Failed to send start command. Please try again.");
+          console.error("Publish error:", err);
         } else {
-            setMessage("Start command sent. Waiting for data from backend...");
+          setMessage("Start command sent. Waiting for data from backend...");
         }
-    });
+      }
+    );
   };
 
   const handleSnapshot = async () => {
@@ -411,24 +531,37 @@ export default function PeopleDetectionPage() {
     setIsLoading(true);
     setMessage("Requesting snapshot from backend...");
 
+    // Send snapshot request command as per your prompt
     const command = {
-        command: "get_snapshot",
-        payload: { camera_id: selectedCamera } // Backend determines active camera, but good to send
+      command: "request_snapshot",
+      payload: { camera_id: selectedCamera },
     };
 
-    mqttClient.publish(MQTT_COMMAND_TOPIC, JSON.stringify(command), { qos: 1 }, (err) => {
+    mqttClient.publish(
+      MQTT_COMMAND_REQUEST_TOPIC,
+      JSON.stringify(command),
+      { qos: 1 },
+      (err) => {
         if (err) {
-            setIsLoading(false);
-            setMessage("Failed to request snapshot.");
-            console.error("Snapshot request error:", err);
+          setIsLoading(false);
+          setMessage("Failed to request snapshot.");
+          console.error("Snapshot request error:", err);
         }
-        // No else needed, success is handled when the snapshot message is received
-    });
+        // Success is handled when the snapshot message is received on the response topic
+      }
+    );
   };
 
   const handleZoneSubmit = async () => {
-    if (!selectedCamera || zones.length === 0 || !mqttClient || !mqttClient.connected) {
-      setMessage("Please select a camera, draw at least one zone, and ensure MQTT is connected.");
+    if (
+      !selectedCamera ||
+      zones.length === 0 ||
+      !mqttClient ||
+      !mqttClient.connected
+    ) {
+      setMessage(
+        "Please select a camera, draw at least one zone, and ensure MQTT is connected."
+      );
       return;
     }
 
@@ -449,38 +582,101 @@ export default function PeopleDetectionPage() {
 
       let successfulSubmissions = 0;
 
-      zones.forEach((zone, index) => {
+      zones.forEach((zone) => {
         const payload = {
           camera_id: selectedCamera,
-          zone: zone.id,
-          top_left: [Math.round(zone.x1 * scaleX), Math.round(zone.y1 * scaleY)],
-          bottom_right: [Math.round(zone.x2 * scaleX), Math.round(zone.y2 * scaleY)],
+          zone: `zone${zone.id}`, // Zone ID now string 'zone1'
+          top_left: [
+            Math.round(zone.x1 * scaleX),
+            Math.round(zone.y1 * scaleY),
+          ],
+          bottom_right: [
+            Math.round(zone.x2 * scaleX),
+            Math.round(zone.y2 * scaleY),
+          ],
         };
 
         const command = { command: "set_zone", payload };
 
-        mqttClient.publish(MQTT_COMMAND_TOPIC, JSON.stringify(command), { qos: 1 }, (err) => {
+        mqttClient.publish(
+          MQTT_COMMAND_REQUEST_TOPIC,
+          JSON.stringify(command),
+          { qos: 1 },
+          (err) => {
             if (err) {
-                setMessage(`Failed to submit zone ${zone.id}.`);
-                console.error(`Error submitting zone ${zone.id}:`, err);
+              setMessage(`Failed to submit zone ${zone.id}.`);
+              console.error(`Error submitting zone ${zone.id}:`, err);
             } else {
-                successfulSubmissions++;
-                if (successfulSubmissions === zones.length) {
-                    setIsLoading(false);
-                    setSubmittedZones(prev => [...prev, ...zones]);
-                    setZones([]);
-                    setZoneCounter(1);
-                    setShowModal(false);
-                    setMessage(`All ${zones.length} zones submitted successfully! Monitoring will begin.`);
-                }
+              successfulSubmissions++;
+              if (successfulSubmissions === zones.length) {
+                setIsLoading(false);
+                setSubmittedZones((prev) => [...prev, ...zones]);
+                setZones([]);
+                setZoneCounter(1);
+                setShowModal(false);
+      
+                setMessage(
+                  `All ${zones.length} zones submitted successfully! Monitoring will begin.`
+                );
+                fetch('/api/zones', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    camera_id: selectedCamera,
+                    zones: zones.map(zone => ({
+                      id: zone.id,
+                      x1: zone.x1,
+                      y1: zone.y1,
+                      x2: zone.x2,
+                      y2: zone.y2,
+                    })),
+                  }),
+                })
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success) {
+                      setMessage('Zones saved to database!');
+                    } else {
+                      setMessage('Failed to save zones to database.');
+                    }
+                  });
+              }
             }
-        });
+          }
+        );
       });
     } catch (err) {
       setIsLoading(false);
       console.error("Zone submission error:", err);
       setMessage("Error while submitting zones. Please try again.");
     }
+  };
+
+  const handleResetLineCounts = async (lineName: string) => {
+    if (!selectedCamera || !mqttClient || !mqttClient.connected) {
+      setMessage("Please select a camera and ensure MQTT is connected.");
+      return;
+    }
+    setIsLoading(true);
+    const payload = {
+      camera_id: selectedCamera,
+      line_name: lineName,
+    };
+    const command = { command: "reset_line_counts", payload };
+    mqttClient.publish(
+      MQTT_COMMAND_REQUEST_TOPIC,
+      JSON.stringify(command),
+      { qos: 1 },
+      (err) => {
+        setIsLoading(false);
+        if (err) {
+          setMessage(`Failed to reset counts for line ${lineName}.`);
+          console.error(`Error resetting line counts for ${lineName}:`, err);
+        } else {
+          setMessage(`Counts for line ${lineName} reset.`);
+        }
+      }
+    );
   };
 
   const getRelativeCoords = (e: React.MouseEvent) => {
@@ -575,7 +771,7 @@ export default function PeopleDetectionPage() {
     const coords = getRelativeCoords(e);
     const newZone = {
       x1: Math.min(startPoint.x, coords.x),
-      y1: Math.min(startPoint.y, coords.y),
+      y1: Math.min(startPoint.y, coords.x),
       x2: Math.max(startPoint.x, coords.x),
       y2: Math.max(startPoint.y, coords.y),
       id: activeZoneId,
@@ -627,14 +823,16 @@ export default function PeopleDetectionPage() {
       return;
     }
 
-    toast.info("Fetching historical data. This feature requires a separate analytics backend.");
+    toast.info(
+      "Fetching historical data. This feature requires a separate analytics backend."
+    );
     setHeatmapLoading(true);
     // This is a placeholder for the API call.
     // Replace with your actual API endpoint for historical data.
     setTimeout(() => {
-        setHeatmapLoading(false);
-        setMessage("No historical data service is configured.");
-        setHeatmapData([]);
+      setHeatmapLoading(false);
+      setMessage("No historical data service is configured.");
+      setHeatmapData([]);
     }, 2000);
   };
 
@@ -863,7 +1061,181 @@ export default function PeopleDetectionPage() {
     );
   };
 
-    // Main component render
+  // Add line drawing states
+const [lines, setLines] = useState<
+  { start: { x: number; y: number }; end: { x: number; y: number }; name: string }[]
+>([]);
+const [activeLineName, setActiveLineName] = useState<string | null>(null);
+const [isDrawingLine, setIsDrawingLine] = useState(false);
+const [lineStartPoint, setLineStartPoint] = useState<{ x: number; y: number } | null>(null);
+const [currentLine, setCurrentLine] = useState<{ start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
+
+// Line drawing handlers
+const handleLineMouseDown = (e: React.MouseEvent) => {
+  if (!imageLoaded) {
+    setMessage("Please wait for the image to load before drawing lines.");
+    return;
+  }
+  if (!activeLineName) {
+    setMessage("Please enter a line name before drawing.");
+    return;
+  }
+  if (lines.some((line) => line.name === activeLineName)) {
+    setMessage(`Line ${activeLineName} already exists. Delete it first to redraw.`);
+    return;
+  }
+  setIsDrawingLine(true);
+  const coords = getRelativeCoords(e);
+  setLineStartPoint(coords);
+  setCurrentLine({ start: coords, end: coords });
+};
+
+const handleLineMouseMove = (e: React.MouseEvent) => {
+  if (!isDrawingLine || !lineStartPoint || !imageLoaded) return;
+  const coords = getRelativeCoords(e);
+  setCurrentLine({ start: lineStartPoint, end: coords });
+};
+
+const handleLineMouseUp = (e: React.MouseEvent) => {
+  if (!isDrawingLine || !lineStartPoint || !currentLine || !imageLoaded || !activeLineName) return;
+  const coords = getRelativeCoords(e);
+  const newLine = {
+    start: lineStartPoint,
+    end: coords,
+    name: activeLineName,
+  };
+  if (
+    Math.abs(newLine.end.x - newLine.start.x) < 10 &&
+    Math.abs(newLine.end.y - newLine.start.y) < 10
+  ) {
+    setMessage("Line too short! Please draw a longer line (minimum 10px).");
+    setIsDrawingLine(false);
+    setLineStartPoint(null);
+    setCurrentLine(null);
+    return;
+  }
+  setLines((prev) => [...prev, newLine]);
+  setActiveLineName(null);
+  setMessage(`Line ${newLine.name} created!`);
+  setIsDrawingLine(false);
+  setLineStartPoint(null);
+  setCurrentLine(null);
+};
+
+const handleLineMouseLeave = () => {
+  if (isDrawingLine) {
+    setIsDrawingLine(false);
+    setLineStartPoint(null);
+    setCurrentLine(null);
+    setMessage("Line drawing cancelled.");
+  }
+};
+
+const removeLine = (lineName: string) => {
+  setLines((prev) => prev.filter((line) => line.name !== lineName));
+  setMessage("Line removed.");
+};
+
+// Submit line to backend
+const handleLineSubmit = async () => {
+  if (!selectedCamera || lines.length === 0 || !mqttClient || !mqttClient.connected || !imageRef.current) {
+    setMessage("Please select a camera, draw at least one line, and ensure MQTT is connected.");
+    return;
+  }
+  setIsLoading(true);
+  const naturalWidth = imageRef.current.naturalWidth;
+  const naturalHeight = imageRef.current.naturalHeight;
+  const displayWidth = imageRef.current.offsetWidth;
+  const displayHeight = imageRef.current.offsetHeight;
+  const scaleX = naturalWidth / displayWidth;
+  const scaleY = naturalHeight / displayHeight;
+
+  let successfulSubmissions = 0;
+  lines.forEach((line) => {
+    const payload = {
+      camera_id: selectedCamera,
+      line_name: line.name,
+      start: [
+        Math.round(line.start.x * scaleX),
+        Math.round(line.start.y * scaleY),
+      ],
+      end: [
+        Math.round(line.end.x * scaleX),
+        Math.round(line.end.y * scaleY),
+      ],
+    };
+    const command = { command: "set_line", payload };
+    mqttClient.publish(
+      MQTT_COMMAND_REQUEST_TOPIC,
+      JSON.stringify(command),
+      { qos: 1 },
+      (err) => {
+        if (err) {
+          setMessage(`Failed to submit line ${line.name}.`);
+          console.error(`Error submitting line ${line.name}:`, err);
+        } else {
+          successfulSubmissions++;
+          if (successfulSubmissions === lines.length) {
+            setIsLoading(false);
+            setMessage(`All ${lines.length} lines submitted successfully!`);
+            setLines([]);
+            fetch('/api/lines', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                camera_id: selectedCamera,
+                lines: lines.map(line => ({
+                  name: line.name,
+                  start: line.start,
+                  end: line.end,
+                })),
+              }),
+            })
+              .then(res => res.json())
+              .then(data => {
+                if (data.success) {
+                  setMessage('Lines saved to database!');
+                } else {
+                  setMessage('Failed to save lines to database.');
+                }
+              });
+          }
+        }
+      }
+    );
+  });
+};
+
+// Delete line from backend
+const handleDeleteLine = async (lineName: string) => {
+  if (!selectedCamera || !mqttClient || !mqttClient.connected) {
+    setMessage("Please select a camera and ensure MQTT is connected.");
+    return;
+  }
+  setIsLoading(true);
+  const payload = {
+    camera_id: selectedCamera,
+    line_name: lineName,
+  };
+  const command = { command: "delete_line", payload };
+  mqttClient.publish(
+    MQTT_COMMAND_REQUEST_TOPIC,
+    JSON.stringify(command),
+    { qos: 1 },
+    (err) => {
+      setIsLoading(false);
+      if (err) {
+        setMessage(`Failed to delete line ${lineName}.`);
+        console.error(`Error deleting line ${lineName}:`, err);
+      } else {
+        removeLine(lineName);
+        setMessage(`Line ${lineName} deleted.`);
+      }
+    }
+  );
+};
+
+  // Main component render
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="container mx-auto px-4 py-8">
@@ -881,7 +1253,7 @@ export default function PeopleDetectionPage() {
           {/* Main Card */}
           <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">
             {/* Camera Configuration Section */}
-           <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-8">
+            <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-8">
               <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
                 Camera Configuration
               </h2>
@@ -950,7 +1322,7 @@ export default function PeopleDetectionPage() {
 
             {/* Camera Selection */}
             {cameraOptions.length > 0 && (
-            <div className="p-8 font-inter">
+              <div className="p-8 font-inter">
                 <h3 className="text-2xl font-semibold text-slate-800 mb-6 tracking-tight">
                   Available Camera Systems
                 </h3>
@@ -1094,43 +1466,29 @@ export default function PeopleDetectionPage() {
                       {activeCamera &&
                         zoneCounts[activeCamera] &&
                         Object.entries(zoneCounts[activeCamera]).map(
-                          ([zoneId, counts]) => {
+                          ([zoneOrLineId, counts]) => {
                             const netCount = counts.in - counts.out;
-                            const isOverLimit = netCount > 5;
-
+                            const isLine = zoneOrLineId.toLowerCase().includes("line");
                             return (
                               <div
-                                key={`${activeCamera}-${zoneId}`}
+                                key={`${activeCamera}-${zoneOrLineId}`}
                                 className="relative bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 border-2"
                                 style={{
-                                  borderColor: isOverLimit
-                                    ? "rgb(220, 38, 38)"
-                                    : "rgb(148, 163, 184)",
-                                  borderWidth: isOverLimit ? "2px" : "1px",
+                                  borderColor: netCount > 5 ? "rgb(220, 38, 38)" : "rgb(148, 163, 184)",
+                                  borderWidth: netCount > 5 ? "2px" : "1px",
                                 }}
                               >
-                                {isOverLimit && (
-                                  <WarningAlert
-                                    zoneId={zoneId}
-                                    cameraId={activeCamera}
-                                    netCount={netCount}
-                                  />
-                                )}
-
                                 <div className="flex items-center justify-between mb-6">
                                   <h4 className="text-lg font-semibold text-slate-800 tracking-tight">
-                                    {activeCamera} - Zone {zoneId}
+                                    {isLine ? "Line" : "Zone"}: {zoneOrLineId}
                                   </h4>
                                   <div
                                     className="w-3 h-3 rounded-full"
                                     style={{
-                                      backgroundColor: isOverLimit
-                                        ? "rgb(220, 38, 38)"
-                                        : "rgb(148, 163, 184)",
+                                      backgroundColor: netCount > 5 ? "rgb(220, 38, 38)" : "rgb(148, 163, 184)",
                                     }}
                                   ></div>
                                 </div>
-
                                 <div className="space-y-4">
                                   <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                     <span className="text-emerald-700 font-medium text-sm tracking-wide">
@@ -1150,26 +1508,23 @@ export default function PeopleDetectionPage() {
                                   </div>
                                   <div className="pt-2">
                                     <div className="flex justify-between items-center py-2">
-                                      <span
-                                        className={`font-semibold text-sm tracking-wide ${
-                                          isOverLimit
-                                            ? "text-red-700"
-                                            : "text-slate-800"
-                                        }`}
-                                      >
+                                      <span className="font-semibold text-sm tracking-wide text-slate-800">
                                         Current Occupancy:
                                       </span>
-                                      <span
-                                        className={`text-2xl font-bold font-mono ${
-                                          isOverLimit
-                                            ? "text-red-700"
-                                            : "text-slate-800"
-                                        }`}
-                                      >
+                                      <span className="text-2xl font-bold font-mono text-slate-800">
                                         {netCount}
                                       </span>
                                     </div>
                                   </div>
+                                  {/* Reset counts button for lines */}
+                                  {isLine && (
+                                    <button
+                                      onClick={() => handleResetLineCounts(zoneOrLineId)}
+                                      className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all"
+                                    >
+                                      Reset Counts
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -1265,6 +1620,53 @@ export default function PeopleDetectionPage() {
                   least 20x20 pixels.
                 </p>
               </div>
+
+              {/* Line Drawing Section */}
+              <div className="mb-4">
+                <p className="text-gray-600 mb-3">Draw Line (Horizontal/Vertical):</p>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Line name (e.g. line1)"
+                    value={activeLineName || ""}
+                    onChange={(e) => setActiveLineName(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-300"
+                    disabled={isDrawingLine}
+                  />
+                  <button
+                    onClick={() => setActiveLineName(activeLineName)}
+                    disabled={!activeLineName || lines.some((l) => l.name === activeLineName)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      activeLineName && !lines.some((l) => l.name === activeLineName)
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                  >
+                    Select Line
+                  </button>
+                </div>
+                {lines.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {lines.map((line) => (
+                      <div key={line.name} className="flex items-center gap-2 bg-green-100 px-3 py-1 rounded-lg">
+                        <span className="text-green-800 font-medium">{line.name}</span>
+                        <button
+                          onClick={() => handleDeleteLine(line.name)}
+                          className="text-red-500 hover:text-red-700 font-bold"
+                        >
+                          ×
+                        </button>
+                        <button
+                          onClick={() => handleResetLineCounts(line.name)}
+                          className="text-blue-500 hover:text-blue-700 font-bold"
+                        >
+                          ⟳
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="p-6">
@@ -1273,16 +1675,32 @@ export default function PeopleDetectionPage() {
                 ref={containerRef}
                 className="relative border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-gray-50"
                 style={{
-                  cursor: isDrawing
+                  cursor: isDrawingLine
+                    ? "crosshair"
+                    : activeLineName
+                    ? "crosshair"
+                    : isDrawing
                     ? "crosshair"
                     : activeZoneId
                     ? "crosshair"
                     : "default",
                 }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
+                onMouseDown={(e) => {
+                  if (activeLineName) handleLineMouseDown(e);
+                  else handleMouseDown(e);
+                }}
+                onMouseMove={(e) => {
+                  if (isDrawingLine) handleLineMouseMove(e);
+                  else handleMouseMove(e);
+                }}
+                onMouseUp={(e) => {
+                  if (isDrawingLine) handleLineMouseUp(e);
+                  else handleMouseUp(e);
+                }}
+                onMouseLeave={() => {
+                  if (isDrawingLine) handleLineMouseLeave();
+                  else handleMouseLeave();
+                }}
               >
                 <img
                   ref={imageRef}
@@ -1334,6 +1752,64 @@ export default function PeopleDetectionPage() {
                     }}
                   />
                 )}
+
+                {/* Render existing lines */}
+                {lines.map((line) => (
+                  <svg
+                    key={line.name}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: 0,
+                      top: 0,
+                      width: "100%",
+                      height: "100%",
+                      zIndex: 10,
+                    }}
+                  >
+                    <line
+                      x1={line.start.x}
+                      y1={line.start.y}
+                      x2={line.end.x}
+                      y2={line.end.y}
+                      stroke="green"
+                      strokeWidth="4"
+                    />
+                    <text
+                      x={(line.start.x + line.end.x) / 2}
+                      y={(line.start.y + line.end.y) / 2 - 10}
+                      fill="green"
+                      fontSize="16"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                    >
+                      {line.name}
+                    </text>
+                  </svg>
+                ))}
+
+                {/* Render current line drawing */}
+                {isDrawingLine && currentLine && (
+                  <svg
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: 0,
+                      top: 0,
+                      width: "100%",
+                      height: "100%",
+                      zIndex: 10,
+                    }}
+                  >
+                    <line
+                      x1={currentLine.start.x}
+                      y1={currentLine.start.y}
+                      x2={currentLine.end.x}
+                      y2={currentLine.end.y}
+                      stroke="blue"
+                      strokeWidth="4"
+                      strokeDasharray="8"
+                    />
+                  </svg>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -1344,6 +1820,9 @@ export default function PeopleDetectionPage() {
                     setZones([]);
                     setCurrentDrawing(null);
                     setIsDrawing(false);
+                    setLines([]);
+                    setCurrentLine(null);
+                    setIsDrawingLine(false);
                   }}
                   className="px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-all"
                 >
@@ -1356,14 +1835,261 @@ export default function PeopleDetectionPage() {
                 >
                   ✅ Submit Zones ({zones.length})
                 </button>
+                <button
+                  onClick={handleLineSubmit}
+                  disabled={lines.length === 0 || isLoading}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  ➖ Submit Lines ({lines.length})
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Heatmap Modal and other modals remain unchanged */}
-      {/* ... (Your existing Heatmap Modal and other UI elements) ... */}
+      {/* Heatmap Modal */}
+      {showHeatmapModal && (
+        <div
+          className={`fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-all duration-300 ${
+            isFullScreen ? "p-0" : "p-4"
+          }`}
+        >
+          <div
+            className={`bg-white rounded-3xl w-full max-h-[95vh] overflow-auto relative transition-all duration-300 ${
+              isFullScreen ? "max-w-full h-full rounded-none" : "max-w-7xl"
+            }`}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-3xl flex justify-between items-center">
+              <h3 className="text-2xl font-semibold text-gray-800">
+                🔥 Heatmap Analysis
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={toggleFullScreen}
+                  className="text-gray-500 hover:text-gray-700 text-xl p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+                >
+                  {isFullScreen ? (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                      className="w-6 h-6"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15L3.75 20.25M15 9V4.5M15 9H19.5M15 9L20.25 3.75M15 15v4.5M15 15H19.5M15 15L20.25 20.25"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                      className="w-6 h-6"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 16.25v-4.5m0 4.5h-4.5m4.5 0L15 15"
+                      />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowHeatmapModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Camera ID
+                  </label>
+                  <select
+                    value={selectedHeatmapCamera}
+                    onChange={(e) => setSelectedHeatmapCamera(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Select Camera</option>
+                    {availableCameras.map((camId) => (
+                      <option key={camId} value={camId}>
+                        {camId}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload Floor Plan (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleHeatmapUpload}
+                    className="w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Draw Zone for Heatmap (Select Zone ID)
+                  </label>
+                  <select
+                    value={selectedZoneForDrawing || ""}
+                    onChange={(e) =>
+                      setSelectedZoneForDrawing(Number(e.target.value))
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">Select Zone to Draw</option>
+                    {[1, 2, 3, 4, 5].map((zoneNum) => (
+                      <option key={zoneNum} value={zoneNum}>
+                        Zone {zoneNum}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={fetchHeatmapData}
+                disabled={heatmapLoading || !selectedHeatmapCamera}
+                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+              >
+                {heatmapLoading ? "Loading..." : "Generate Heatmap"}
+              </button>
+
+              {heatmapLoading && (
+                <div className="flex justify-center items-center h-40">
+                  <LoadingSpinner />
+                </div>
+              )}
+
+              <div
+                ref={containerRef}
+                className="relative border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-gray-50 flex justify-center items-center"
+                style={{
+                  minHeight: "400px",
+                  cursor: isDrawing
+                    ? "crosshair"
+                    : selectedZoneForDrawing
+                    ? "crosshair"
+                    : "default",
+                }}
+                onMouseDown={handleHeatmapMouseDown}
+                onMouseMove={handleHeatmapMouseMove}
+                onMouseUp={handleHeatmapMouseUp}
+                onMouseLeave={handleMouseLeave}
+              >
+                {uploadedHeatmapUrl ? (
+                  <img
+                    ref={imageRef}
+                    src={uploadedHeatmapUrl}
+                    alt="Floor Plan"
+                    className="max-w-full h-auto block"
+                    onLoad={handleHeatmapImageLoad}
+                    draggable={false}
+                    style={{ userSelect: "none" }}
+                  />
+                ) : (
+                  <p className="text-gray-500">
+                    Upload a floor plan to visualize the heatmap.
+                  </p>
+                )}
+
+                {/* Render drawn zones for heatmap with counts */}
+                {selectedHeatmapCamera &&
+                  drawnZones[selectedHeatmapCamera]?.map((zone) => (
+                    <ZoneWithCount
+                      key={`${selectedHeatmapCamera}-${zone.id}`}
+                      zone={zone}
+                      isFullScreen={isFullScreen}
+                    />
+                  ))}
+
+                {/* Render current drawing for heatmap */}
+                {isDrawing && currentDrawing && (
+                  <div
+                    className="absolute border-2 border-dashed border-blue-500 bg-blue-200 bg-opacity-30 pointer-events-none"
+                    style={{
+                      left: currentDrawing.x1,
+                      top: currentDrawing.y1,
+                      width: currentDrawing.x2 - currentDrawing.x1,
+                      height: currentDrawing.y2 - currentDrawing.y1,
+                    }}
+                  />
+                )}
+              </div>
+              {heatmapData.length > 0 && (
+                <div className="mt-8">
+                  <h4 className="text-xl font-semibold text-gray-800 mb-4">
+                    Heatmap Legend:
+                  </h4>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-cyan-400 opacity-70"></div>
+                      <span>Low Activity (0-50 people)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-yellow-400 opacity-70"></div>
+                      <span>Medium Activity (51-100 people)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-orange-400 opacity-70"></div>
+                      <span>High Activity (101-150 people)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-red-500 opacity-70"></div>
+                      <span>Very High Activity (151+ people)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {isLoading && <LoadingSpinner />}
       {isConnectionLost && <ConnectionLostModal onRetry={() => window.location.reload()} message={connectionLostMessage} />}

@@ -24,6 +24,7 @@ export async function GET(request: Request) {
 
     await connectToDatabase();
 
+    // Aggregate counts per zone for the given camera and time range
     const results = await ZoneCount.aggregate([
       {
         $match: {
@@ -41,7 +42,9 @@ export async function GET(request: Request) {
       },
       {
         $group: {
-          _id: '$zone_id'
+          _id: '$zone_id',
+          total_in_count: { $sum: '$counts.in_count' },
+          total_out_count: { $sum: '$counts.out_count' }
         }
       },
       {
@@ -49,10 +52,54 @@ export async function GET(request: Request) {
       }
     ]);
 
-    const zones = results.map(item => item._id);
+    // Return zone IDs and counts for heatmap
+    const zones = results.map(item => ({
+      zone_id: item._id,
+      total_in_count: item.total_in_count,
+      total_out_count: item.total_out_count
+    }));
+
     return NextResponse.json({ zones });
   } catch (error) {
     console.error('Error fetching zones:', error);
     return NextResponse.json({ error: 'Failed to fetch zones' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    await connectToDatabase();
+    const body = await request.json();
+
+    const { camera_id, zones } = body;
+
+    if (!camera_id || !Array.isArray(zones) || zones.length === 0) {
+      return NextResponse.json({ success: false, error: 'Missing camera_id or zones' }, { status: 400 });
+    }
+
+    // Save each zone for the camera  
+    for (const zone of zones) {
+      await ZoneCount.updateOne(
+        { camera_id, zone_id: zone.id },
+        {
+          $setOnInsert: { camera_id, zone_id: zone.id },
+          $set: {
+            // Optionally save coordinates
+            coordinates: {
+              x1: zone.x1,
+              y1: zone.y1,
+              x2: zone.x2,
+              y2: zone.y2,
+            }
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error saving zones:', error);
+    return NextResponse.json({ success: false, error: 'Failed to save zones' }, { status: 500 });
   }
 }

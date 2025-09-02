@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
     if (!devicePlaylists || !devicePlaylists.playlistIds.length) {
       return NextResponse.json({
         currentPlaylist: null,
-        currentAnnouncement: null
       });
     }
 

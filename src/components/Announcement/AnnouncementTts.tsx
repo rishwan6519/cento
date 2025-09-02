@@ -31,7 +31,6 @@ const IntegratedTTSAnnouncement = () => {
   const [selectedVoice, setSelectedVoice] = useState('Puck');
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [generatedAudio, setGeneratedAudio] = useState<Blob | null>(null);
 
   // Save State
@@ -43,6 +42,8 @@ const IntegratedTTSAnnouncement = () => {
   // Files List State
   const [announcementFiles, setAnnouncementFiles] = useState<AnnouncementFile[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
 
   useEffect(() => {
     const id = localStorage.getItem("userId");
@@ -496,4 +497,4 @@ const IntegratedTTSAnnouncement = () => {
   );
 };
 
-export default IntegratedTTSAnnouncement;
+export default IntegratedTTSAnnouncement; 
