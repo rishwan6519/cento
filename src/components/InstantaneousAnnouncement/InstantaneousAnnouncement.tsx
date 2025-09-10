@@ -346,6 +346,27 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
     }
   };
 
+  const uploadAudioToLocal = async (audioBlob: Blob, fileName: string, userId: string, type: string) => {
+    const formData = new FormData();
+    formData.append("file", audioBlob, fileName);
+    formData.append("userId", userId);
+    formData.append("name", fileName);
+    formData.append("type", type); // 'recorded' or 'tts'
+  
+    const res = await fetch("/api/instant-announcement/send", {
+      method: "POST",
+      body: formData,
+    });
+  
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || "Local upload failed");
+    }
+  
+    const data = await res.json();
+    return data.fileUrl; // The relative URL to the uploaded file
+  };
+
   // --- SUBMISSION LOGIC --- //
 
   const handleSendAnnouncement = async () => {
@@ -353,35 +374,17 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       toast.error("Please select a device and an audio announcement.");
       return;
     }
-
+  
     setIsLoading(true);
     let finalAudioUrl = selectedAudio.url;
-
+  
     try {
-
-        const CLOUDINARY_UPLOAD_PRESET = "announcement_upload_preset";
-       const CLOUDINARY_CLOUD_NAME = "dzb0gggua";
-      // If audio is a new recording or TTS, upload it to Cloudinary first
-      if ((selectedAudio.type === 'recorded' || selectedAudio.type === 'tts') && selectedAudio.blob) {
-        const formData = new FormData();
+      // If audio is a new recording or TTS, upload it to local folder first
+      if ((selectedAudio.type === 'recorded' || selectedAudio.type === 'tts') && selectedAudio.blob && userId) {
         const fileName = `${selectedAudio.name.replace(/ /g, '_')}.wav`;
-        const audioFile = new File([selectedAudio.blob], fileName, { type: 'audio/wav' });
-
-        formData.append("file", audioFile);
-        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET!);
-        formData.append("resource_type", "video");
-
-        const cloudRes = await fetch(
-          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`,
-          { method: "POST", body: formData }
-        );
-
-        const cloudData = await cloudRes.json();
-        if (!cloudRes.ok) throw new Error(cloudData.error?.message || "Cloudinary upload failed");
-
-        finalAudioUrl = cloudData.secure_url;
+        finalAudioUrl = await uploadAudioToLocal(selectedAudio.blob, fileName, userId, selectedAudio.type || 'recorded');
       }
-
+  
       // Send the announcement via your backend
       const response = await fetch("/api/instant-announcement/send", {
         method: "POST",
@@ -393,15 +396,15 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
           announcementName: selectedAudio.name,
         }),
       });
-
+  
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to send announcement");
       }
-
+  
       toast.success("Instantaneous announcement sent successfully!");
       onSuccess();
-
+  
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "An unknown error occurred.");
     } finally {

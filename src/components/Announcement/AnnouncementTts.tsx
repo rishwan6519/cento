@@ -184,51 +184,23 @@ const IntegratedTTSAnnouncement = () => {
     setError(null);
 
     try {
-      // 1. Upload to Cloudinary
-   const CLOUDINARY_UPLOAD_PRESET = "announcement_upload_preset";
-      const CLOUDINARY_CLOUD_NAME = "dzb0gggua";
+      // 1. Upload to local server
+      const formData = new FormData();
+      formData.append("file", generatedAudio, `${fileName}.wav`);
+      formData.append("userId", userId);
+      formData.append("name", fileName);
+      formData.append("type", "tts");
+      formData.append("voice", selectedVoice);
+      formData.append("language", selectedLanguage);
 
-      if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-        throw new Error("Cloudinary configuration is missing.");
-      }
-
-      const cloudFormData = new FormData();
-      cloudFormData.append("file", generatedAudio, `${fileName}.wav`);
-      cloudFormData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-      cloudFormData.append("resource_type", "video"); // Cloudinary often uses 'video' for audio files
-
-      const cloudRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`,
-        {
-          method: "POST",
-          body: cloudFormData,
-        }
-      );
-
-      if (!cloudRes.ok) {
-        const cloudErr = await cloudRes.json();
-        throw new Error(cloudErr.error?.message || "Cloudinary upload failed");
-      }
-
-      const cloudData = await cloudRes.json();
-
-      // 2. Save metadata to your backend
-      const metadataRes = await fetch("/api/announcement/upload", {
+      const uploadRes = await fetch("/api/announcement/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          name: fileName,
-          path: cloudData.secure_url, // Use the URL from Cloudinary
-          type: "tts",
-          voice: selectedVoice,
-          language: selectedLanguage,
-        }),
+        body: formData,
       });
 
-      if (!metadataRes.ok) {
-        const appErr = await metadataRes.json();
-        throw new Error(appErr.error?.message || "Failed to save announcement metadata");
+      if (!uploadRes.ok) {
+        const uploadErr = await uploadRes.json();
+        throw new Error(uploadErr.message || "Local upload failed");
       }
 
       setSaveSuccess(true);
@@ -238,7 +210,6 @@ const IntegratedTTSAnnouncement = () => {
       // Refresh the files list
       await fetchAnnouncementFiles(userId);
 
-      // Clear success message after 3 seconds
       setTimeout(() => setSaveSuccess(false), 3000);
 
     } catch (err: any) {
@@ -497,4 +468,4 @@ const IntegratedTTSAnnouncement = () => {
   );
 };
 
-export default IntegratedTTSAnnouncement; 
+export default IntegratedTTSAnnouncement;

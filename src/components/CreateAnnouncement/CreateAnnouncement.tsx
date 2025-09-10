@@ -228,9 +228,8 @@ const CreateAnnouncement: React.FC<CreateAnnouncementProps> = ({ onCancel, onSuc
 
       for (const fileObj of files) {
         let audioFile: File;
-        
+
         if (fileObj.type === 'recorded' && fileObj.blob) {
-          // Convert blob to file for recorded audio
           audioFile = new File([fileObj.blob], `${fileObj.name}.wav`, { type: 'audio/wav' });
         } else if (fileObj.file) {
           audioFile = fileObj.file;
@@ -238,45 +237,24 @@ const CreateAnnouncement: React.FC<CreateAnnouncementProps> = ({ onCancel, onSuc
           continue;
         }
 
-        // Upload to Cloudinary
+        // Upload to local server
         const formData = new FormData();
         formData.append("file", audioFile);
-        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-        formData.append("resource_type", "video"); // Cloudinary uses 'video' for audio files
+        formData.append("userId", userId);
+        formData.append("name", fileObj.name);
+        formData.append("type", fileObj.type);
 
-        const cloudRes = await fetch(
-          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`,
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
-
-        const cloudData = await cloudRes.json();
-        if (!cloudRes.ok) {
-          throw new Error(cloudData.error?.message || "Upload failed");
-        }
-
-        // Save to database
-        const metadataRes = await fetch("/api/announcement/upload", {
+        const uploadRes = await fetch("/api/announcement/upload", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            name: fileObj.name,
-            path: cloudData.secure_url,
-            type: fileObj.type,
-            voice: fileObj.type === 'recorded' ? 'user' : null
-          }),
+          body: formData,
         });
 
-        if (!metadataRes.ok) {
-          const errorMeta = await metadataRes.json();
-          throw new Error(errorMeta.message || "Failed to save announcement");
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) {
+          throw new Error(uploadData.message || "Local upload failed");
         }
 
-        const saved = await metadataRes.json();
-        uploadedItems.push(saved);
+        uploadedItems.push(uploadData);
       }
 
       alert("Announcements created successfully!");

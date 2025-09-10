@@ -77,11 +77,6 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
       return;
     }
 
-    if (!CLOUDINARY_UPLOAD_PRESET) {
-      toast.error("Uploading preset not found");
-      return;  
-    }
-
     const userId = localStorage.getItem("userId");
     if (!userId) {
       toast.error("User not authenticated");
@@ -92,55 +87,27 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
     const loadingToast = toast.loading("Uploading media files...");
 
     try {
-      const uploadedItems = [];
+      const formData = new FormData();
+      files.forEach((fileObj, idx) => {
+        formData.append("files", fileObj.file);
+        formData.append("fileNames", fileObj.name);
+      });
+      formData.append("userId", userId);
 
-      for (const fileObj of files) {
-        // Cloudinary Upload
-        const formData = new FormData();
-        formData.append("file", fileObj.file);
-        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      const res = await fetch("/api/media/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-        const cloudRes = await fetch(
-          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
-
-        const cloudData = await cloudRes.json();
-        if (!cloudRes.ok) {
-          throw new Error(cloudData.error?.message || "Cloudinary upload failed");
-        }
-
-        const secureUrl = cloudData.secure_url || cloudData.url;
-
-        // Save Metadata to DB
-        const metadataRes = await fetch("/api/media/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            name: fileObj.name,
-            type: fileObj.type,
-            url: secureUrl,
-          }),
-        });
-
-        if (!metadataRes.ok) {
-          const errorMeta = await metadataRes.json();
-          throw new Error(errorMeta.message || "Failed to save metadata");
-        }
-
-        const saved = await metadataRes.json();
-        uploadedItems.push(saved);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to upload files");
       }
 
       toast.success("Media files uploaded successfully", { id: loadingToast });
       setFiles([]);
       onSuccess();
     } catch (error) {
-      console.error("Upload error:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to upload media files",
         { id: loadingToast }

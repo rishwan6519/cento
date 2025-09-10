@@ -389,6 +389,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ onCancel }) => {
                       />
                     )}
                     {media.type.startsWith("audio/") && (
+
                       <audio 
                         src={media.url} 
                         className="w-32 h-8" 
