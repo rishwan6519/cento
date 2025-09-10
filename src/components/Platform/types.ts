@@ -21,6 +21,7 @@ export type MenuKey =
   | "connectedPlaylists"
   |"blockCoding"
   |"peopleDetection"
+  |"assignApi"
 
 export interface Device {
   _id: string;

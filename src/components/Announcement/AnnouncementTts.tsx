@@ -53,6 +53,8 @@ const IntegratedTTSAnnouncement = () => {
     }
   }, []);
 
+  
+
   const fetchAnnouncementFiles = async (currentUserId: string) => {
     if (!currentUserId) return;
     setIsLoadingFiles(true);
@@ -125,6 +127,7 @@ const IntegratedTTSAnnouncement = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          userId,
           text: prompt,
           voice: selectedVoice,
         }),

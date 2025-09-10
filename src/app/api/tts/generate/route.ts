@@ -1,96 +1,83 @@
-// File: /src/app/api/tts/gemini-direct/route.ts
-
+import ApiKey from '@/models/ApiKey';
 import { NextRequest, NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/db'; // Make sure DB connection is established
 
-// ===================================================================
-// THE FINAL FIX IS HERE: Use the correct model name from your documentation.
-// ===================================================================
-
-// Define the correct model name as a constant to ensure accuracy.
 const MODEL_NAME = "gemini-2.5-flash-preview-tts";
-
-// Construct the API endpoint URL using the correct model name.
 const GEMINI_TTS_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
 
-// ===================================================================
-
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'API key is not configured on the server.' }, { status: 500 });
-  }
-
   try {
-    const { text, voice } = await request.json();
+    await connectToDatabase(); // Ensure MongoDB is connected
+
+    const { text, voice, userId } = await request.json();
+    if (!userId) {
+      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    }
+
+    // Await the DB call!
+    const keyDoc = await ApiKey.findOne({ userId, status: "active" });
+    if (!keyDoc) {
+      return NextResponse.json({ error: "API key not found for this user." }, { status: 404 });
+    }
+
+    const apiKey = keyDoc.apiKey; // Extract the string
 
     if (!text || !voice) {
       return NextResponse.json(
-        { error: 'Missing required parameters: text and voice.' },
+        { error: "Missing required parameters: text and voice." },
         { status: 400 }
       );
     }
 
-    // Construct the request body precisely as required by the API.
     const requestBody = {
-      model: MODEL_NAME, // Use the correct model name here.
-      contents: [{
-        parts: [{ "text": text }]
-      }],
+      model: MODEL_NAME,
+      contents: [
+        {
+          parts: [{ text }],
+        },
+      ],
       generationConfig: {
         responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: voice
-            }
-          }
-        }
+            prebuiltVoiceConfig: { voiceName: voice },
+          },
+        },
       },
     };
-    console.log("Request body:", JSON.stringify(requestBody, null, 2));
 
-    // Make the direct HTTP request to the Gemini API.
     const apiResponse = await fetch(`${GEMINI_TTS_ENDPOINT}?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     });
 
-    // Handle any errors returned from the API.
     if (!apiResponse.ok) {
       const errorData = await apiResponse.json();
-      console.error('Gemini API Error:', errorData);
       return NextResponse.json(
-        { error: errorData.error?.message || 'Failed to generate audio from the API' },
+        { error: errorData.error?.message || "Failed to generate audio" },
         { status: apiResponse.status }
       );
     }
 
-    // Extract the base64 encoded audio data from the successful response.
     const responseJson = await apiResponse.json();
     const audioData = responseJson.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
     if (!audioData) {
-      throw new Error("No audio data was found in the API response.");
+      throw new Error("No audio data returned from Gemini API.");
     }
 
-    // Decode the base64 string into a Buffer and send it back as an audio file.
-    const audioBuffer = Buffer.from(audioData, 'base64');
+    const audioBuffer = Buffer.from(audioData, "base64");
 
     return new NextResponse(audioBuffer, {
       status: 200,
-      headers: {
-        'Content-Type': 'audio/wav',
-      },
+      headers: { "Content-Type": "audio/wav" },
     });
 
   } catch (error) {
-    console.error('An internal server error occurred:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error("Internal server error:", error);
     return NextResponse.json(
-      { error: `Internal server error: ${errorMessage}` },
+      { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

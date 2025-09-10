@@ -44,6 +44,7 @@ import toast from "react-hot-toast";
 import Announcement from "@/components/Announcement/Announcement";
 import CreateAnnouncement from "@/components/CreateAnnouncement/CreateAnnouncement";
 import ShowAnnouncement from "@/components/Announcement/ShowAnnouncement";
+import AssignApiKey from "@/components/AssignApiKey/AssignApiKey";
 
 export default function RoboticPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
@@ -171,6 +172,11 @@ export default function RoboticPlatform(): React.ReactElement {
     {
       key: "assignDevice" as MenuKey,
       label: "Assign Device",
+      icon: <FaRobot />,
+    },
+    {
+      key: "assignApi" as MenuKey,
+      label: "Assign via API",
       icon: <FaRobot />,
     },
     {
@@ -412,6 +418,8 @@ export default function RoboticPlatform(): React.ReactElement {
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
     case "assignDevice":
       return <AssignDevice />;
+      case "assignApi":
+        return <AssignApiKey />;
 
       case "showUser":
         return <ShowUsers />;
@@ -494,6 +502,9 @@ export default function RoboticPlatform(): React.ReactElement {
           key: "assignDevice" as MenuKey,
           label: "Assign Device",
           icon: <FaRobot />,
+        },
+        {
+          key:"assignApi" as MenuKey, label: "Assign via API", icon: <FaRobot />
         },
         {
           key: "ManageDevice" as MenuKey,

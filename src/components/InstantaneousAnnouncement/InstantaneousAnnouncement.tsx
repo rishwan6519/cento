@@ -237,6 +237,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                      userId,
                     text: `(speak in ${selectedLanguage}) ${ttsText}`,
                     voice: selectedVoice,
                 }),
