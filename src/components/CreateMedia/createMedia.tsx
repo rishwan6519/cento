@@ -89,8 +89,8 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
     try {
       const formData = new FormData();
       files.forEach((fileObj, idx) => {
-        formData.append("files", fileObj.file);
-        formData.append("fileNames", fileObj.name);
+        formData.append(`files[${idx}]`, fileObj.file);
+        formData.append(`fileNames[${idx}]`, fileObj.name);
       });
       formData.append("userId", userId);
 

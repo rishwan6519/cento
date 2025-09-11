@@ -11,8 +11,17 @@ import mongoose from 'mongoose';
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const files = formData.getAll('files') as File[];
-    const fileNames = formData.getAll('fileNames') as string[];
+    const files: File[] = [];
+    const fileNames: string[] = [];
+    let idx = 0;
+    while (true) {
+      const file = formData.get(`files[${idx}]`);
+      const name = formData.get(`fileNames[${idx}]`);
+      if (!file || !name) break;
+      files.push(file as File);
+      fileNames.push(name as string);
+      idx++;
+    }
     const userId = formData.get('userId') as string;
 
     if (!userId) {
