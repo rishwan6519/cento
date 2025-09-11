@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
     const files: File[] = [];
     const fileNames: string[] = [];
     let idx = 0;
+
+    // Collect all files and filenames from formData
     while (true) {
       const file = formData.get(`files[${idx}]`);
       const name = formData.get(`fileNames[${idx}]`);
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
       fileNames.push(name as string);
       idx++;
     }
+
     const userId = formData.get('userId') as string;
 
     if (!userId) {
@@ -42,6 +45,7 @@ export async function POST(req: NextRequest) {
     const baseUploadPath = join(process.cwd(), 'public', 'uploads', userId);
     const directories = ['video', 'audio', 'image'];
 
+    // Ensure directories exist
     for (const dir of directories) {
       const dirPath = join(baseUploadPath, dir);
       if (!existsSync(dirPath)) {
@@ -53,7 +57,8 @@ export async function POST(req: NextRequest) {
 
     const uploadedFiles = await Promise.all(
       files.map(async (file: File, index) => {
-        const originalFileName = sanitize(fileNames[index]);
+        // Sanitize filename and remove/replace spaces
+        const originalFileName = sanitize(fileNames[index]).replace(/\s+/g, '_');
         const fileType = file.type?.split('/')?.[0] || 'unknown';
 
         if (!['audio', 'video', 'image'].includes(fileType)) {
@@ -67,6 +72,7 @@ export async function POST(req: NextRequest) {
         const buffer = Buffer.from(bytes);
         await writeFile(filePath, buffer);
 
+        // Save to MongoDB
         const mediaItem = new MediaItemModel({
           userId: new mongoose.Types.ObjectId(userId),
           name: originalFileName,
