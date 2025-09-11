@@ -90,6 +90,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ onCancel }) => {
         throw new Error(errorData.message || "Failed to fetch media files");
       }
       const data = await response.json();
+      console.log("Fetched media data:", data);
       const mediaData = data.media || [];
       setMediaFiles(mediaData);
       setFilteredFiles(mediaData);
@@ -364,7 +365,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ onCancel }) => {
                         onClick={(e) => handlePreviewClick(media, e)}
                       >
                         <img 
-                          src={media.url} 
+                          src={encodeURI(media.url)} 
                           alt={media.name} 
                           className="h-10 w-16 object-cover rounded"
                           onError={(e) => {
@@ -379,7 +380,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ onCancel }) => {
                     )}
                     {media.type.startsWith("video/") && (
                       <video 
-                        src={media.url} 
+                        src={encodeURI(media.url)} 
                         className="h-10 w-16 object-cover rounded cursor-pointer"
                         controls={false}
                         muted
@@ -391,7 +392,7 @@ const ShowMedia: React.FC<ShowMediaProps> = ({ onCancel }) => {
                     {media.type.startsWith("audio/") && (
 
                       <audio 
-                        src={media.url} 
+                        src={encodeURI(media.url)} 
                         className="w-32 h-8" 
                         controls 
                         onPlay={(e) => handlePlayPause(media._id, e.currentTarget)}
