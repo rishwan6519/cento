@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Invalid or mismatched file data' }, { status: 400 });
     }
 
-    const baseUploadPath = join(process.cwd(), 'public', 'uploads', userId);
+    const baseUploadPath = join(process.cwd(), 'uploads', userId);
     const directories = ['video', 'audio', 'image'];
 
     // Ensure directories exist
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
           userId: new mongoose.Types.ObjectId(userId),
           name: originalFileName,
           type: file.type,
-          url: `/uploads/${userId}/${fileType}/${uniqueFileName}`,
+          url: `/uploads/${userId}/${fileType}/${uniqueFileName}`, // This will be served by Nginx/Express
           createdAt: new Date()
         });
 
