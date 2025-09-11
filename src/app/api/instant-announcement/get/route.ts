@@ -61,7 +61,7 @@ return NextResponse.json({
     name: device.name,
   },
   announcements: instantAnnouncements.map(a => ({
-    path: a.file?.path || null
+    path:`https://iot.centelon.com${a.file?.path}` || null
   })),
 });
 

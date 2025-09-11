@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         if (!ann.file) return null;
         return {
           name: ann.file.name,
-          path: ann.file.path,
+          path: `https://iot.centelon.com${ann.file.path}`,
           displayOrder: ann.displayOrder,
           delay: ann.delay,
         };

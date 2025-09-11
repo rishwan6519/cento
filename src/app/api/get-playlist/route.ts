@@ -54,7 +54,7 @@ export async function GET(req: Request) {
         contentType: playlist.contentType,
         shuffle: playlist.shuffle,
         files: playlist.files.map((file: any) => ({
-          path: file.path,
+          path:`https://iot.centelon.com${file.path}`,
           displayOrder: file.displayOrder,
             type: file.type,
           delay: file.delay,
