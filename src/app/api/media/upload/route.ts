@@ -1,3 +1,10 @@
+export const config = {
+  api: {
+    bodyParser: false,
+    sizeLimit: '1000mb', // Increase as needed
+  },
+};
+
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
