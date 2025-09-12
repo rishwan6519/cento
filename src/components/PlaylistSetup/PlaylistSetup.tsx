@@ -5,6 +5,7 @@ import PlaylistManager from "../ShowPlaylist/showPlaylist";
 import { XCircle } from "lucide-react";
 
 interface PlaylistConfigFile {
+  _id?: string; // Added _id to track media item
   path: string;
   name: string;
   type: string;
@@ -219,6 +220,7 @@ const PlaylistSetup: React.FC = () => {
         daysOfWeek: playlistConfig.daysOfWeek,
         shuffle: playlistConfig.shuffle, // Include shuffle in the payload
         files: playlistConfig.files.map((file, index) => ({
+          mediaId:file._id,
           name: file.name,
           path: file.path,
           type: file.type,

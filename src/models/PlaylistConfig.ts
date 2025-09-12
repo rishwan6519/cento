@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const playlistFileSchema = new mongoose.Schema({
+   mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'MediaItem' },  //<-- REMOVED
   name: { type: String, required: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   path: { type: String, required: true },

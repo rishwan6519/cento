@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       shuffle: configData.shuffle,
       daysOfWeek: configData.daysOfWeek,
       files: configData.files.map((file: any) => ({
+        mediaId: file.mediaId ? new Mongoose.Types.ObjectId(file.mediaId) : null,
         name: file.name,
         path: file.path,
         type: file.type,

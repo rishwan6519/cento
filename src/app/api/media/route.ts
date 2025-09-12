@@ -5,6 +5,7 @@ import { join } from 'path';
 import { connectToDatabase } from '@/lib/db';
 import MediaItemModel from '@/models/MediaItems';
 import mongoose from 'mongoose';
+import PlaylistConfig from '@/models/PlaylistConfig';
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,30 +38,32 @@ export async function DELETE(request: NextRequest) {
   try {
     const { id } = await request.json();
     console.log("Deleting media with ID:", id);
-    
+
     if (!id) {
       return NextResponse.json({ error: 'Media ID is required' }, { status: 400 });
     }
-    
-    await connectToDatabase(); // Ensure DB connection
-    
-    // First find the media item to get the file path
+
+    await connectToDatabase();
+
+    // Find the media item to get the file path
     const mediaItem = await MediaItemModel.findById(id);
-    
+
     if (!mediaItem) {
       return NextResponse.json({ error: 'Media item not found' }, { status: 404 });
     }
-    
+
     // Get the relative file path from the URL field
-    // Your URLs are stored as '/uploads/fileType/uniqueFileName'
+    // Example: '/uploads/fileType/uniqueFileName'
     const relativePath = mediaItem.url;
     console.log("Media relative path:", relativePath);
-    
+
     try {
       // Convert relative path to absolute path on the server
-      const fullPath = join(process.cwd(), 'public', relativePath);
+      // Remove leading slash if present
+      const normalizedPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+      const fullPath = join(process.cwd(), normalizedPath); // Use your actual folder structure
       console.log("Attempting to delete file at:", fullPath);
-      
+
       // Check if the file exists
       if (existsSync(fullPath)) {
         // Delete the file
@@ -73,19 +76,25 @@ export async function DELETE(request: NextRequest) {
       console.error("Error deleting physical file:", fileError);
       // Continue with database deletion even if file deletion fails
     }
-    
+
+  await PlaylistConfig.updateMany(
+  { 'files.path': mediaItem.url },
+  { $pull: { files: { path: mediaItem.url } } }
+);
+
+
     // Now delete from database
     const deletedItem = await MediaItemModel.findByIdAndDelete(id);
-    
+
     if (!deletedItem) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Failed to delete media record from database'
       }, { status: 500 });
     }
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Media deleted successfully from database and file system' 
+
+    return NextResponse.json({
+      success: true,
+      message: 'Media deleted successfully from database and file system'
     });
   } catch (error) {
     console.error('Error deleting media:', error);
