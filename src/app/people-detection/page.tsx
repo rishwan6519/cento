@@ -191,6 +191,8 @@ export default function PeopleDetectionPage() {
     setIsFullScreen(!isFullScreen);
   };
 
+  const [heatmapStep, setHeatmapStep] = useState<"menu" | "upload" | "show">("menu");
+
   const fetchAvailableCameras = () => {
     if (!mqttClient || !mqttClient.connected) {
       setMessage("MQTT client not connected. Please wait or check connection.");
@@ -308,16 +310,18 @@ export default function PeopleDetectionPage() {
   console.log("Active cameras payload:", payload.toString());
   try {
     const data = JSON.parse(payload.toString());
-    // Use active_camera array from response
-    if (Array.isArray(data.active_camera)) {
-      setCameraOptions(data.active_camera.map(String));
-      setMessage(`Active cameras: ${data.active_camera.join(", ")}`);
-      console.log("Active cameras:", data.active_camera);
+    if (Array.isArray(data.active_cameras)) {
+      setCameraOptions(data.active_cameras.map(String));
+      setMessage(`Active cameras: ${data.active_cameras.join(", ")}`);
+      // If no camera is selected, select the first one
+      if (!selectedCamera && data.active_cameras.length > 0) {
+        setSelectedCamera(data.active_cameras[0]);
+        setActiveCamera(data.active_cameras[0]);
+      }
     }
-    // Optionally set the default selected camera from active_ui_camera
-     if (typeof data.active_ui_camera === "string") {
-      setSelectedCamera(data.active_ui_camera);
-      setActiveCamera(data.active_ui_camera);
+    if (typeof data.active_ui_camera === "string") {
+        setSelectedCamera(data.active_camera_for_ui);
+      setActiveCamera(data.active_camera_for_ui);
     }
   } catch (e) {
     console.error("Error parsing active cameras list:", e);
@@ -750,7 +754,7 @@ if (
     const coords = getRelativeCoords(e);
     setCurrentDrawing({
       x1: Math.min(startPoint.x, coords.x),
-      y1: Math.min(startPoint.y, coords.y),
+      y1: Math.min(startPoint.y, coords.x),
       x2: Math.max(startPoint.x, coords.x),
       y2: Math.max(startPoint.y, coords.y),
     });
@@ -1240,6 +1244,21 @@ const handleDeleteLine = async (lineName: string) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
+          {/* Menubar */}
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">
+              🎯 People Detection Dashboard
+            </h1>
+            <div className="flex gap-4">
+              {/* Other menu items... */}
+              <button
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
+                onClick={() => setShowHeatmapModal(true)}
+              >
+                Heatmap
+              </button>
+            </div>
+          </div>
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-800 mb-2">
@@ -1467,15 +1486,15 @@ const handleDeleteLine = async (lineName: string) => {
                         zoneCounts[activeCamera] &&
                         Object.entries(zoneCounts[activeCamera]).map(
                           ([zoneOrLineId, counts]) => {
-                            const netCount = counts.in - counts.out;
                             const isLine = zoneOrLineId.toLowerCase().includes("line");
+                            const netCount = counts.in - counts.out;
                             return (
                               <div
                                 key={`${activeCamera}-${zoneOrLineId}`}
                                 className="relative bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 border-2"
                                 style={{
-                                  borderColor: netCount > 5 ? "rgb(220, 38, 38)" : "rgb(148, 163, 184)",
-                                  borderWidth: netCount > 5 ? "2px" : "1px",
+                                  borderColor: !isLine && netCount > 5 ? "rgb(220, 38, 38)" : "rgb(148, 163, 184)",
+                                  borderWidth: !isLine && netCount > 5 ? "2px" : "1px",
                                 }}
                               >
                                 <div className="flex items-center justify-between mb-6">
@@ -1485,7 +1504,7 @@ const handleDeleteLine = async (lineName: string) => {
                                   <div
                                     className="w-3 h-3 rounded-full"
                                     style={{
-                                      backgroundColor: netCount > 5 ? "rgb(220, 38, 38)" : "rgb(148, 163, 184)",
+                                      backgroundColor: !isLine && netCount > 5 ? "rgb(220, 38, 38)" : "rgb(148, 163, 184)",
                                     }}
                                   ></div>
                                 </div>
@@ -1506,16 +1525,19 @@ const handleDeleteLine = async (lineName: string) => {
                                       {counts.out}
                                     </span>
                                   </div>
-                                  <div className="pt-2">
-                                    <div className="flex justify-between items-center py-2">
-                                      <span className="font-semibold text-sm tracking-wide text-slate-800">
-                                        Current Occupancy:
-                                      </span>
-                                      <span className="text-2xl font-bold font-mono text-slate-800">
-                                        {netCount}
-                                      </span>
+                                  {/* Only show occupancy for zones */}
+                                  {!isLine && (
+                                    <div className="pt-2">
+                                      <div className="flex justify-between items-center py-2">
+                                        <span className="font-semibold text-sm tracking-wide text-slate-800">
+                                          Current Occupancy:
+                                        </span>
+                                        <span className="text-2xl font-bold font-mono text-slate-800">
+                                          {netCount}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
+                                  )}
                                   {/* Reset counts button for lines */}
                                   {isLine && (
                                     <button
@@ -1703,13 +1725,13 @@ const handleDeleteLine = async (lineName: string) => {
                 }}
               >
                 <img
-                  ref={imageRef}
-                  src={snapshotUrl}
-                  alt="Camera snapshot"
-                  className="max-w-full h-auto block"
-                  onLoad={handleImageLoad}
-                  draggable={false}
-                  style={{ userSelect: "none" }}
+                   ref={imageRef}
+                src={snapshotUrl || ""}
+                alt="Camera snapshot"
+               className="max-w-full h-auto block"
+  onLoad={handleImageLoad}
+  draggable={false}
+  style={{ userSelect: "none" }}
                 />
 
                 {/* Render existing zones */}
@@ -1850,240 +1872,85 @@ const handleDeleteLine = async (lineName: string) => {
 
       {/* Heatmap Modal */}
       {showHeatmapModal && (
-        <div
-          className={`fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-all duration-300 ${
-            isFullScreen ? "p-0" : "p-4"
-          }`}
-        >
-          <div
-            className={`bg-white rounded-3xl w-full max-h-[95vh] overflow-auto relative transition-all duration-300 ${
-              isFullScreen ? "max-w-full h-full rounded-none" : "max-w-7xl"
-            }`}
-          >
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[95vh] overflow-auto relative">
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-3xl flex justify-between items-center">
-              <h3 className="text-2xl font-semibold text-gray-800">
-                🔥 Heatmap Analysis
-              </h3>
-              <div className="flex gap-2">
-                <button
-                  onClick={toggleFullScreen}
-                  className="text-gray-500 hover:text-gray-700 text-xl p-2 rounded-full hover:bg-gray-100 transition-colors"
-                  title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
-                >
-                  {isFullScreen ? (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="w-6 h-6"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15L3.75 20.25M15 9V4.5M15 9H19.5M15 9L20.25 3.75M15 15v4.5M15 15H19.5M15 15L20.25 20.25"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="w-6 h-6"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 16.25v-4.5m0 4.5h-4.5m4.5 0L15 15"
-                      />
-                    </svg>
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowHeatmapModal(false)}
-                  className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
-                >
-                  ×
-                </button>
-              </div>
+              <h3 className="text-2xl font-semibold text-gray-800">🔥 Heatmap</h3>
+              <button
+                onClick={() => {
+                  setShowHeatmapModal(false);
+                  setHeatmapStep("menu");
+                }}
+                className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
+              >
+                ×
+              </button>
             </div>
-
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Camera ID
-                  </label>
-                  <select
-                    value={selectedHeatmapCamera}
-                    onChange={(e) => setSelectedHeatmapCamera(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md"
+              {heatmapStep === "menu" && (
+                <div className="flex flex-col gap-6">
+                  <button
+                    className="bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-blue-700 transition"
+                    onClick={() => setHeatmapStep("upload")}
                   >
-                    <option value="">Select Camera</option>
-                    {availableCameras.map((camId) => (
-                      <option key={camId} value={camId}>
-                        {camId}
-                      </option>
-                    ))}
-                  </select>
+                    Upload Floor Plan
+                  </button>
+                  <button
+                    className="bg-green-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-green-700 transition"
+                    onClick={() => setHeatmapStep("show")}
+                  >
+                    Show Data
+                  </button>
                 </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {heatmapStep === "upload" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload Floor Plan (Optional)
-                  </label>
+                  <h4 className="text-lg font-semibold mb-4">Upload Floor Plan</h4>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleHeatmapUpload}
-                    className="w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-full file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100"
+                    className="mb-4"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Draw Zone for Heatmap (Select Zone ID)
-                  </label>
-                  <select
-                    value={selectedZoneForDrawing || ""}
-                    onChange={(e) =>
-                      setSelectedZoneForDrawing(Number(e.target.value))
-                    }
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                  {uploadedHeatmapUrl && (
+                    <img src={uploadedHeatmapUrl} alt="Preview" className="max-w-full rounded-lg mb-4" />
+                  )}
+                  <button
+                    className="mt-2 px-4 py-2 bg-gray-200 rounded"
+                    onClick={() => setHeatmapStep("menu")}
                   >
-                    <option value="">Select Zone to Draw</option>
-                    {[1, 2, 3, 4, 5].map((zoneNum) => (
-                      <option key={zoneNum} value={zoneNum}>
-                        Zone {zoneNum}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <button
-                onClick={fetchHeatmapData}
-                disabled={heatmapLoading || !selectedHeatmapCamera}
-                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-6"
-              >
-                {heatmapLoading ? "Loading..." : "Generate Heatmap"}
-              </button>
-
-              {heatmapLoading && (
-                <div className="flex justify-center items-center h-40">
-                  <LoadingSpinner />
+                    Back
+                  </button>
                 </div>
               )}
 
-              <div
-                ref={containerRef}
-                className="relative border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-gray-50 flex justify-center items-center"
-                style={{
-                  minHeight: "400px",
-                  cursor: isDrawing
-                    ? "crosshair"
-                    : selectedZoneForDrawing
-                    ? "crosshair"
-                    : "default",
-                }}
-                onMouseDown={handleHeatmapMouseDown}
-                onMouseMove={handleHeatmapMouseMove}
-                onMouseUp={handleHeatmapMouseUp}
-                onMouseLeave={handleMouseLeave}
-              >
-                {uploadedHeatmapUrl ? (
-                  <img
-                    ref={imageRef}
-                    src={uploadedHeatmapUrl}
-                    alt="Floor Plan"
-                    className="max-w-full h-auto block"
-                    onLoad={handleHeatmapImageLoad}
-                    draggable={false}
-                    style={{ userSelect: "none" }}
-                  />
-                ) : (
-                  <p className="text-gray-500">
-                    Upload a floor plan to visualize the heatmap.
-                  </p>
-                )}
-
-                {/* Render drawn zones for heatmap with counts */}
-                {selectedHeatmapCamera &&
-                  drawnZones[selectedHeatmapCamera]?.map((zone) => (
-                    <ZoneWithCount
-                      key={`${selectedHeatmapCamera}-${zone.id}`}
-                      zone={zone}
-                      isFullScreen={isFullScreen}
-                    />
-                  ))}
-
-                {/* Render current drawing for heatmap */}
-                {isDrawing && currentDrawing && (
-                  <div
-                    className="absolute border-2 border-dashed border-blue-500 bg-blue-200 bg-opacity-30 pointer-events-none"
-                    style={{
-                      left: currentDrawing.x1,
-                      top: currentDrawing.y1,
-                      width: currentDrawing.x2 - currentDrawing.x1,
-                      height: currentDrawing.y2 - currentDrawing.y1,
+              {heatmapStep === "show" && (
+                <div>
+                  <h4 className="text-lg font-semibold mb-4">Select Floor Plan</h4>
+                  <select
+                    value={selectedFloorPlan?.id || ""}
+                    onChange={e => {
+                      const plan = floorPlans.find(f => f.id === e.target.value);
+                      setSelectedFloorPlan(plan || null);
                     }}
-                  />
-                )}
-              </div>
-              {heatmapData.length > 0 && (
-                <div className="mt-8">
-                  <h4 className="text-xl font-semibold text-gray-800 mb-4">
-                    Heatmap Legend:
-                  </h4>
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-cyan-400 opacity-70"></div>
-                      <span>Low Activity (0-50 people)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-yellow-400 opacity-70"></div>
-                      <span>Medium Activity (51-100 people)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-orange-400 opacity-70"></div>
-                      <span>High Activity (101-150 people)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-red-500 opacity-70"></div>
-                      <span>Very High Activity (151+ people)</span>
-                    </div>
-                  </div>
+                    className="w-full p-2 border border-gray-300 rounded-md mb-4"
+                  >
+                    <option value="">-- Select Floor Map --</option>
+                    {floorPlans.map(plan => (
+                      <option key={plan.id} value={plan.id}>{plan.name}</option>
+                    ))}
+                  </select>
+                  {selectedFloorPlan && (
+                    <img src={selectedFloorPlan.imageUrl} alt="Floor Plan" className="max-w-full rounded-lg mb-4" />
+                  )}
+                  {/* Add your date/time/camera/zone selection and drawing UI here */}
+                  <button
+                    className="mt-2 px-4 py-2 bg-gray-200 rounded"
+                    onClick={() => setHeatmapStep("menu")}
+                  >
+                    Back
+                  </button>
                 </div>
               )}
             </div>

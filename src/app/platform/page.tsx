@@ -45,6 +45,10 @@ import Announcement from "@/components/Announcement/Announcement";
 import CreateAnnouncement from "@/components/CreateAnnouncement/CreateAnnouncement";
 import ShowAnnouncement from "@/components/Announcement/ShowAnnouncement";
 import AssignApiKey from "@/components/AssignApiKey/AssignApiKey";
+import { FaRegFileImage } from "react-icons/fa6";
+import CreateSlider from "@/components/CreatSlider/CreateSlider";
+import SliderManager from "@/components/showSlider/showSlider";
+import AssignSlider from "@/components/AssignSlider/AssignSlider";
 
 export default function RoboticPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
@@ -425,6 +429,18 @@ export default function RoboticPlatform(): React.ReactElement {
         return <ShowUsers />;
       case "showPlaylist":
         return <PlaylistManager />;
+//create slider case
+      case "createSlider":
+        return <CreateSlider onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showSlider")} />;
+
+        // show slider
+        case "showSlider":
+          return <SliderManager/>;  
+
+          //assign slider to device
+          case "assignSlider":
+            return <AssignSlider />;
+
       case "createMedia":
         return (
           <CreateMedia
@@ -434,7 +450,7 @@ export default function RoboticPlatform(): React.ReactElement {
         );
 
       case "showMedia":
-        return <ShowMedia onCancel={() => setSelectedMenu("onboardDevice")} />;
+        return <ShowMedia />;
       case "connectPlaylist":
         return (
           <ConnectPlaylist
@@ -506,6 +522,8 @@ export default function RoboticPlatform(): React.ReactElement {
         {
           key:"assignApi" as MenuKey, label: "Assign via API", icon: <FaRobot />
         },
+
+        {key:"assignSlider" as MenuKey, label: "Assign Slider", icon: <FaRegFileImage />},
         {
           key: "ManageDevice" as MenuKey,
           label: "Manage Devices",
@@ -527,6 +545,12 @@ export default function RoboticPlatform(): React.ReactElement {
           key: "createMedia" as MenuKey,
           label: "Create Media",
           icon: <FaRegFileAudio />,
+        },
+        {key: "createSlider" as MenuKey, label: "Create Slider", icon: <FaRegFileImage />},
+        {
+          key: "showSlider" as MenuKey,
+          label: "Show Slider",
+          icon: <FaRegFileImage />,
         },
         {
           key: "showMedia" as MenuKey,

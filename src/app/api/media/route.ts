@@ -82,13 +82,14 @@ export async function DELETE(request: NextRequest) {
   { $pull: { files: { path: mediaItem.url } } }
 );
 
-
+//  check 
     // Now delete from database
     const deletedItem = await MediaItemModel.findByIdAndDelete(id);
 
     if (!deletedItem) {
       return NextResponse.json({
-        error: 'Failed to delete media record from database'
+        error: 'Failed to delete media item from database'
+
       }, { status: 500 });
     }
 

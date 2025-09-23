@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Trash2, Edit, XCircle, ImageIcon, Music, Video, PlusCircle, Volume2 } from "lucide-react";
+import { Trash2, Edit, XCircle, ImageIcon, Music, Video } from "lucide-react";
 import toast from "react-hot-toast";
 
 // Mock functions for standalone functionality
 const generateUniqueId = () => Math.random().toString(36).substring(2, 15);
+const defaultActiveSection = "showPlaylist";
 
 // Interfaces for types
 interface PlaylistFile {
@@ -17,8 +18,6 @@ interface PlaylistFile {
   delay?: number;
   backgroundImageEnabled?: boolean;
   backgroundImage?: string | null;
-  minVolume?: number; // Added minVolume
-  maxVolume?: number; // Added maxVolume
 }
 
 interface Playlist {
@@ -29,10 +28,9 @@ interface Playlist {
   files: PlaylistFile[];
   startTime?: string;
   endTime?: string;
-  startDate?: string;
-  endDate?: string;
-  daysOfWeek?: string[];
-  shuffle?: boolean;
+  startDate?: string;    // Add this
+  endDate?: string;      // Add this
+  daysOfWeek?: string[]; // Add this
   createdAt?: string;
   status?: 'active' | 'inactive';
 }
@@ -43,10 +41,9 @@ interface EditablePlaylist {
   type: string;
   startTime: string;
   endTime: string;
-  startDate: string;
-  endDate: string;
-  daysOfWeek: string[];
-  shuffle: boolean;
+  startDate: string;    // Add this
+  endDate: string;      // Add this
+  daysOfWeek: string[]; // Add this
   files: PlaylistFile[];
   status?: 'active' | 'inactive';
 }
@@ -69,6 +66,7 @@ const PlaylistManager: React.FC = () => {
   const [localMediaFiles, setLocalMediaFiles] = useState<MediaFile[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Load userId from localStorage only once on mount
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
     if (storedUserId) {
@@ -76,18 +74,21 @@ const PlaylistManager: React.FC = () => {
     }
   }, []);
 
+  // Fetch playlists when userId is available and we're on the playlist section
   useEffect(() => {
-    if (userId) {
+    if (defaultActiveSection === "showPlaylist" && userId) {
       fetchPlaylists();
     }
-  }, [userId]);
+  }, [userId, defaultActiveSection]);
 
+  // Fetch media files when needed
   useEffect(() => {
-    if (userId && localMediaFiles.length === 0) {
+    if (defaultActiveSection === "showPlaylist" && userId && localMediaFiles.length === 0) {
       fetchMedia();
     }
-  }, [userId, localMediaFiles.length]);
+  }, [userId, defaultActiveSection, localMediaFiles.length]);
 
+  // Update available media files when editing a playlist
   useEffect(() => {
     if (isEditing && editedPlaylist) {
       updateAvailableMediaFiles();
@@ -96,25 +97,32 @@ const PlaylistManager: React.FC = () => {
 
   const updateAvailableMediaFiles = () => {
     if (!editedPlaylist) return;
+
     const playlistPaths = editedPlaylist.files.map((file) => file.path);
     const available = localMediaFiles.filter(
       (media) => !playlistPaths.includes(media.url)
     );
+
     setAvailableMediaFiles(available);
   };
 
   const fetchMedia = async () => {
     if (!userId) return;
+    
     setIsLoadingMedia(true);
     try {
       const response = await fetch(`/api/media?userId=${userId}`);
       if (!response.ok) throw new Error("Failed to fetch media files");
+      
       const data = await response.json();
       const mediaFiles = data.media || [];
+      
+      // Ensure each media file has an id
       const processedMediaFiles = mediaFiles.map((file: any) => ({
         ...file,
-        id: file.id || generateUniqueId(),
+        id: file.id || generateUniqueId()
       }));
+      
       setLocalMediaFiles(processedMediaFiles);
       return processedMediaFiles;
     } catch (error) {
@@ -128,15 +136,18 @@ const PlaylistManager: React.FC = () => {
 
   const fetchPlaylists = async () => {
     if (!userId) return;
+    
     setIsLoadingPlaylists(true);
     try {
       const response = await fetch(`/api/playlists?userId=${userId}`);
       if (!response.ok) throw new Error("Failed to fetch playlists");
+      
       const data = await response.json();
       setPlaylists(data || []);
     } catch (error) {
       console.error("Error fetching playlists:", error);
       toast.error("Failed to fetch playlists");
+      setPlaylists([]);
     } finally {
       setIsLoadingPlaylists(false);
     }
@@ -144,31 +155,37 @@ const PlaylistManager: React.FC = () => {
 
   const handleEditClick = async (e: React.MouseEvent, playlist: Playlist) => {
     e.stopPropagation();
+    
     if (localMediaFiles.length === 0) {
-      const loadingToast = toast.loading("Loading media files...");
+      toast.loading("Loading media files...");
       try {
         await fetchMedia();
-        toast.dismiss(loadingToast);
+        toast.dismiss();
+        setIsEditing(true);
+        initializeEditedPlaylist(playlist);
       } catch (error) {
-        toast.error("Failed to load media files for editing.");
-        return;
+        toast.error("Failed to load media files");
+        console.error("Error loading media files:", error);
       }
+    } else {
+      setIsEditing(true);
+      initializeEditedPlaylist(playlist);
     }
-    setIsEditing(true);
-    initializeEditedPlaylist(playlist);
   };
-  
+
   const handleSearch = (term: string) => {
     if (!term.trim()) {
-      fetchPlaylists();
+      fetchPlaylists(); // Reload all if search is cleared
       return;
     }
+    
     const filtered = playlists.filter(
-      (p) => p.name.toLowerCase().includes(term.toLowerCase())
+      (playlist) =>
+        playlist.name.toLowerCase().includes(term.toLowerCase()) ||
+        playlist.type.toLowerCase().includes(term.toLowerCase())
     );
     setPlaylists(filtered);
   };
-
 
   const initializeEditedPlaylist = (playlist: Playlist) => {
     setEditedPlaylist({
@@ -179,8 +196,8 @@ const PlaylistManager: React.FC = () => {
       endTime: playlist.endTime || "23:59",
       startDate: playlist.startDate || "",
       endDate: playlist.endDate || "",
+      // Ensure daysOfWeek is properly initialized from database data
       daysOfWeek: playlist.daysOfWeek || [],
-      shuffle: playlist.shuffle || false,
       status: playlist.status || 'active',
       files: playlist.files.map((file, index) => ({
         id: file.id || generateUniqueId(),
@@ -191,14 +208,13 @@ const PlaylistManager: React.FC = () => {
         delay: file.delay || 0,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
         backgroundImage: file.backgroundImage || null,
-        minVolume: file.minVolume || 0, // Initialize minVolume
-        maxVolume: file.maxVolume || 100, // Initialize maxVolume
       })),
     });
   };
 
   const handleAddFileToPlaylist = (mediaFile: MediaFile) => {
     if (!editedPlaylist) return;
+    
     const newFile: PlaylistFile = {
       id: generateUniqueId(),
       name: mediaFile.name,
@@ -207,13 +223,13 @@ const PlaylistManager: React.FC = () => {
       delay: 0,
       backgroundImageEnabled: false,
       backgroundImage: null,
-      minVolume: 0, // Default values for new files
-      maxVolume: 100,
     };
+    
     setEditedPlaylist({
       ...editedPlaylist,
       files: [...editedPlaylist.files, newFile],
     });
+    
     setAvailableMediaFiles(
       availableMediaFiles.filter((m) => m.url !== mediaFile.url)
     );
@@ -221,11 +237,14 @@ const PlaylistManager: React.FC = () => {
 
   const handleRemoveFileFromPlaylist = (fileId: string) => {
     if (!editedPlaylist) return;
+    
     const fileToRemove = editedPlaylist.files.find((f) => f.id === fileId);
+    
     setEditedPlaylist({
       ...editedPlaylist,
       files: editedPlaylist.files.filter((f) => f.id !== fileId),
     });
+    
     if (fileToRemove) {
       const mediaFileToAdd = localMediaFiles.find(
         (m) => m.url === fileToRemove.path
@@ -238,52 +257,96 @@ const PlaylistManager: React.FC = () => {
 
   const handleEditPlaylist = async (playlist: EditablePlaylist | null) => {
     if (!playlist || !playlist.id) return;
+    
     try {
-      const response = await fetch(`/api/playlists/id?id=${playlist.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...playlist,
-          files: playlist.files.map((file, index) => ({
-            ...file,
-            displayOrder: index + 1,
-            // Ensure volume values are sent to the API
-            minVolume: file.minVolume || 0,
-            maxVolume: file.maxVolume || 100,
-          })),
-        }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update playlist");
-      }
-      await fetchPlaylists();
-      toast.success("Playlist updated successfully");
-      setIsEditing(false);
-      setEditedPlaylist(null);
+        const response = await fetch(`/api/playlists/id?id=${playlist.id}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name: playlist.name,
+                type: playlist.type,
+                startTime: playlist.startTime,
+                endTime: playlist.endTime,
+                startDate: playlist.startDate,
+                endDate: playlist.endDate,
+                // Ensure daysOfWeek is included in the update
+                daysOfWeek: playlist.daysOfWeek || [], 
+                status: playlist.status,
+                files: playlist.files.map((file, index) => ({
+                    id: file.id,
+                    name: file.name,
+                    type: file.type,
+                    url: file.path,
+                    displayOrder: index + 1,
+                    delay: file.delay || 0,
+                    backgroundImageEnabled: file.backgroundImageEnabled || false,
+                    backgroundImage: file.backgroundImage || null,
+                })),
+            }),
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to update playlist");
+        }
+        
+        // After successful update, refresh the playlists
+        await fetchPlaylists();
+        toast.success("Playlist updated successfully");
+        setIsEditing(false);
+        setEditedPlaylist(null);
     } catch (error) {
-      console.error("Error updating playlist:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to update playlist");
+        console.error("Error updating playlist:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to update playlist");
     }
   };
 
   const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => {
-    if (!playlistId || !confirm("Are you sure you want to delete this playlist?")) return;
+    if (!playlistId) {
+      toast.error("Invalid playlist ID");
+      return;
+    }
+    
+    if (!confirm("Are you sure you want to delete this playlist and its files? This will also remove the playlist from all devices.")) {
+      return;
+    }
     
     try {
-      const response = await fetch(`/api/playlists/id?id=${playlistId}`, { method: "DELETE" });
+      const params = new URLSearchParams({ id: playlistId });
+      const response = await fetch(`/api/playlists/id?${params.toString()}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
       const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.error || "Failed to delete");
-
-      toast.success("Playlist deleted successfully");
-      await fetchPlaylists();
-      if (selectedPlaylist?._id === playlistId) setSelectedPlaylist(null);
+      
+      if (response.ok && data.success) {
+        toast.success("Playlist deleted successfully");
+        // Refresh playlists
+        await fetchPlaylists();
+        // Clear selected playlist if it was the deleted one
+        if (selectedPlaylist?._id === playlistId) {
+          setSelectedPlaylist(null);
+        }
+      } else {
+        throw new Error(data.error || "Failed to delete playlist");
+      }
     } catch (error) {
       console.error("Error deleting playlist:", error);
       toast.error(error instanceof Error ? error.message : "Failed to delete playlist");
     }
   };
 
+  // Exit early if not on the playlist section
+  if (defaultActiveSection !== "showPlaylist") {
+    return null;
+  }
+
+  // Helper function to render media icon based on type
   const renderMediaIcon = (type: string, size = 16) => {
     if (type.includes("image")) return <ImageIcon size={size} className="text-green-500" />;
     if (type.includes("video")) return <Video size={size} className="text-blue-500" />;
@@ -291,127 +354,300 @@ const PlaylistManager: React.FC = () => {
     return null;
   };
 
-  const daysList = [
-    { label: "Sun", value: "Sunday" }, { label: "Mon", value: "Monday" },
-    { label: "Tue", value: "Tuesday" }, { label: "Wed", value: "Wednesday" },
-    { label: "Thu", value: "Thursday" }, { label: "Fri", value: "Friday" },
-    { label: "Sat", value: "Saturday" },
+  const daysOfWeek = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday'
   ];
 
-  const handleDayToggle = (day: string) => {
-    if (!editedPlaylist) return;
-    const { daysOfWeek } = editedPlaylist;
-    const updatedDays = daysOfWeek.includes(day)
-      ? daysOfWeek.filter((d) => d !== day)
-      : [...daysOfWeek, day];
-    setEditedPlaylist({ ...editedPlaylist, daysOfWeek: updatedDays });
-  };
-  
-  // Generic handler for updating a file property
-  const handleFileUpdate = (fileId: string, updatedProps: Partial<PlaylistFile>) => {
-    if (!editedPlaylist) return;
-    setEditedPlaylist(prev => ({
-        ...prev!,
-        files: prev!.files.map(file => 
-            file.id === fileId ? { ...file, ...updatedProps } : file
-        )
-    }));
-  };
-
   return (
-    <div className={`bg-white rounded-xl shadow-sm p-6 text-black transition-all duration-300 ${isEditing ? 'bg-gray-50' : 'bg-white'}`}>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">{isEditing ? `Editing: ${editedPlaylist?.name}` : "Playlists"}</h2>
-        {!isEditing && <input type="text" placeholder="Search playlists..." className="px-3 py-2 border rounded-lg" onChange={(e) => handleSearch(e.target.value)} />}
-      </div>
-      
-      {isLoadingPlaylists ? (
-        <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>
-      ) : isEditing && editedPlaylist ? (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-4 border-b pb-2">Playlist Settings</h3>
-              <div className="space-y-4">
-                <div><label className="block text-sm font-medium mb-1">Playlist Name</label><input type="text" value={editedPlaylist.name} onChange={(e) => setEditedPlaylist({...editedPlaylist, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div>
-                <div className="flex items-center justify-between"><span className="text-sm font-medium">Status</span><select value={editedPlaylist.status} onChange={(e) => setEditedPlaylist({...editedPlaylist, status: e.target.value as 'active' | 'inactive'})} className="px-3 py-2 border rounded-lg"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-                <div className="flex items-center justify-between"><span className="text-sm font-medium">Shuffle Playlist</span><label htmlFor="shuffle" className="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="shuffle" className="sr-only peer" checked={editedPlaylist.shuffle} onChange={(e) => setEditedPlaylist({...editedPlaylist, shuffle: e.target.checked})} /><div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div></label></div>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-4 border-b pb-2">Schedule</h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium mb-1">Start Date</label><input type="date" value={editedPlaylist.startDate} onChange={(e) => setEditedPlaylist({...editedPlaylist, startDate: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm font-medium mb-1">End Date</label><input type="date" value={editedPlaylist.endDate} onChange={(e) => setEditedPlaylist({...editedPlaylist, endDate: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div></div>
-                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium mb-1">Start Time</label><input type="time" value={editedPlaylist.startTime} onChange={(e) => setEditedPlaylist({...editedPlaylist, startTime: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm font-medium mb-1">End Time</label><input type="time" value={editedPlaylist.endTime} onChange={(e) => setEditedPlaylist({...editedPlaylist, endTime: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div></div>
-                <div><label className="block text-sm font-medium mb-2">Days of Week</label><div className="flex flex-wrap gap-2">{daysList.map((day) => (<button key={day.value} type="button" onClick={() => handleDayToggle(day.value)} className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${editedPlaylist.daysOfWeek?.includes(day.value) ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}>{day.label}</button>))}</div></div>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-lg border"><h3 className="text-lg font-semibold mb-4 border-b pb-2">Available Media</h3><div className="max-h-[400px] overflow-y-auto space-y-3">{isLoadingMedia ? <p>Loading...</p> : availableMediaFiles.length > 0 ? availableMediaFiles.filter(m => !m.type.includes("image")).map(m => (<div key={m.id} className="flex items-center gap-3 p-2 border rounded-lg">{renderMediaIcon(m.type, 20)}<span className="text-sm font-medium flex-1 truncate">{m.name}</span><button onClick={() => handleAddFileToPlaylist(m)} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-full"><PlusCircle size={20} /></button></div>)) : <p>No media to add.</p>}</div></div>
-            <div className="bg-white p-6 rounded-lg border">
-              <h3 className="text-lg font-semibold mb-4 border-b pb-2">Playlist Content ({editedPlaylist.files.length})</h3>
-              <div className="max-h-[400px] overflow-y-auto space-y-3">
-                {editedPlaylist.files.length > 0 ? (editedPlaylist.files.map((file, index) => (
-                  <div key={file.id} className="p-3 bg-gray-50 rounded-lg border">
-                    <div className="flex items-center gap-3"><span className="text-sm font-bold text-gray-400">{index + 1}</span>{renderMediaIcon(file.type, 20)}<span className="text-sm flex-1 truncate">{file.name}</span><button onClick={() => handleRemoveFileFromPlaylist(file.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-full"><Trash2 size={16} /></button></div>
-                    {file.type.includes("audio") && (
-                      <div className="mt-3 pl-8 space-y-4 border-l-2 ml-2.5">
-                        <div className="flex items-center gap-2"><label className="text-sm">Delay (s):</label><input type="number" min="0" value={file.delay || 0} onChange={(e) => handleFileUpdate(file.id, { delay: parseInt(e.target.value) })} className="w-20 px-2 py-1 border rounded text-sm"/></div>
-                        
-                        {/* --- NEW: VOLUME CONTROLS --- */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700 w-20">Min Volume</label>
-                                <input type="range" min="0" max="100" value={file.minVolume || 0} onChange={(e) => handleFileUpdate(file.id, { minVolume: parseInt(e.target.value) })} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
-                                <span className="text-sm font-mono text-gray-600 w-10 text-right">{file.minVolume || 0}%</span>
-                            </div>
-                             <div className="flex items-center gap-2">
-                                <label className="text-sm font-medium text-gray-700 w-20">Max Volume</label>
-                                <input type="range" min="0" max="100" value={file.maxVolume || 100} onChange={(e) => handleFileUpdate(file.id, { maxVolume: parseInt(e.target.value) })} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
-                                <span className="text-sm font-mono text-gray-600 w-10 text-right">{file.maxVolume || 100}%</span>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-2 border-t"><input type="checkbox" id={`bg-${file.id}`} checked={file.backgroundImageEnabled} onChange={(e) => handleFileUpdate(file.id, { backgroundImageEnabled: e.target.checked, backgroundImage: e.target.checked ? file.backgroundImage : null })} className="h-4 w-4"/><label htmlFor={`bg-${file.id}`} className="text-sm">Add Background Image</label></div>
-                        {file.backgroundImageEnabled && (
-                          <div>
-                            <select value={file.backgroundImage || ""} onChange={(e) => handleFileUpdate(file.id, { backgroundImage: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm"><option value="">Select an image...</option>{localMediaFiles.filter(m => m.type.includes("image")).map(img => (<option key={img.id} value={img.url}>{img.name}</option>))}</select>
-                            {file.backgroundImage && <div className="relative mt-2 inline-block"><img src={file.backgroundImage} alt="BG" className="w-24 h-24 rounded-lg"/><button onClick={() => handleFileUpdate(file.id, { backgroundImage: null })} className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow-md"><XCircle size={16} className="text-red-500" /></button></div>}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))) : <p>Add media to build your playlist.</p>}
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-4 pt-6 border-t mt-4"><button onClick={() => { setIsEditing(false); setEditedPlaylist(null); }} className="px-5 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 font-medium">Cancel</button><button onClick={() => handleEditPlaylist(editedPlaylist)} className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">Save Changes</button></div>
-        </div>
-      ) : playlists && playlists.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {playlists.map((playlist) => (
-            <div key={playlist._id} className="border rounded-lg p-4 flex flex-col justify-between hover:shadow-lg hover:border-blue-500 transition-all">
+    <div className="bg-white rounded-xl shadow-sm p-6 text-black">
+      {/* Edit window/modal */}
+      {isEditing && editedPlaylist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-2xl relative">
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700"
+              onClick={() => { setIsEditing(false); setEditedPlaylist(null); }}
+              aria-label="Close"
+            >
+              <XCircle size={28} />
+            </button>
+            <h2 className="text-xl font-bold mb-4">Edit Playlist</h2>
+            <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold truncate">{playlist.name}</h3>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${playlist.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{playlist.status}</span>
-                <p className="text-sm text-gray-600 mt-2">Files: {playlist.files?.length || 0}</p>
-                <p className="text-sm text-gray-600">Schedule: {playlist.daysOfWeek?.join(', ') || 'Not set'}</p>
-                <p className="text-sm text-gray-500">Created: {new Date(playlist.createdAt || '').toLocaleDateString()}</p>
+                <label className="block text-sm font-medium mb-1">Playlist Name</label>
+                <input
+                  type="text"
+                  value={editedPlaylist.name}
+                  onChange={e => setEditedPlaylist({ ...editedPlaylist, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
               </div>
-              <div className="flex justify-end gap-2 mt-4 border-t pt-3">
-                <button onClick={(e) => handleEditClick(e, playlist)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"><Edit size={18} /></button>
-                <button onClick={(e) => { e.stopPropagation(); handleDeletePlaylistWithFiles(playlist._id); }} className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={18} /></button>
+              <div>
+                <label className="block text-sm font-medium mb-1">Status</label>
+                <select
+                  value={editedPlaylist.status}
+                  onChange={e => setEditedPlaylist({ ...editedPlaylist, status: e.target.value as 'active' | 'inactive' })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    value={editedPlaylist.startTime}
+                    onChange={e => setEditedPlaylist({ ...editedPlaylist, startTime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">End Time</label>
+                  <input
+                    type="time"
+                    value={editedPlaylist.endTime}
+                    onChange={e => setEditedPlaylist({ ...editedPlaylist, endTime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={editedPlaylist.startDate}
+                    onChange={e => setEditedPlaylist({ ...editedPlaylist, startDate: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={editedPlaylist.endDate}
+                    onChange={e => setEditedPlaylist({ ...editedPlaylist, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Days of Week</label>
+                <div className="flex flex-wrap gap-2">
+                  {daysOfWeek.map(day => (
+                    <label key={day} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={editedPlaylist.daysOfWeek?.includes(day) || false}
+                        onChange={e => {
+                          const updatedDays = e.target.checked
+                            ? [...(editedPlaylist.daysOfWeek || []), day]
+                            : (editedPlaylist.daysOfWeek || []).filter(d => d !== day);
+                          setEditedPlaylist({ ...editedPlaylist, daysOfWeek: updatedDays });
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm">{day}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {/* Playlist Files Section */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Playlist Files</label>
+                {editedPlaylist.files.length === 0 ? (
+                  <div className="text-gray-500 text-sm mb-2">No files in this playlist.</div>
+                ) : (
+                  <ul className="mb-2">
+                    {editedPlaylist.files.map((file, idx) => (
+                      <li key={file.id} className="flex items-center justify-between py-1">
+                        <span className="flex items-center gap-2">
+                          {renderMediaIcon(file.type)}
+                          <span className="text-sm">{file.name}</span>
+                        </span>
+                        <button
+                          className="text-red-500 hover:text-red-700"
+                          onClick={() => handleRemoveFileFromPlaylist(file.id)}
+                          type="button"
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Add Media Section */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Add Media</label>
+                {availableMediaFiles.length === 0 ? (
+                  <div className="text-gray-500 text-sm">No available media to add.</div>
+                ) : (
+                  <ul>
+                    {availableMediaFiles.map((media) => (
+                      <li key={media.id} className="flex items-center justify-between py-1">
+                        <span className="flex items-center gap-2">
+                          {renderMediaIcon(media.type)}
+                          <span className="text-sm">{media.name}</span>
+                        </span>
+                        <button
+                          className="text-blue-500 hover:text-blue-700"
+                          onClick={() => handleAddFileToPlaylist(media)}
+                          type="button"
+                        >
+                          Add
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
-          ))}
+            <div className="flex justify-end gap-4 mt-8">
+              <button
+                onClick={() => { setIsEditing(false); setEditedPlaylist(null); }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleEditPlaylist(editedPlaylist)}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
         </div>
-      ) : (
-        <p className="text-gray-500 text-center py-4">No playlists found. Create one to get started!</p>
+      )}
+
+      {/* Table view (always visible unless editing) */}
+      {!isEditing && (
+        <>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Playlists</h2>
+            <div className="flex items-center gap-3">
+              {/* Search */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search playlist"
+                  className="pl-10 pr-4 py-2 border rounded-lg w-64"
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+                <svg
+                  className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M21 21l-4.35-4.35M16.65 16.65A7.5 7.5 0 1110 2.5a7.5 7.5 0 016.65 14.15z"
+                  />
+                </svg>
+              </div>
+              {/* Filter dropdown */}
+              <select className="px-3 py-2 border rounded-lg">
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              {/* View toggle (list/grid) */}
+              <div className="flex items-center gap-2">
+                <button className="p-2 rounded-lg border hover:bg-gray-100">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                <button className="p-2 rounded-lg border hover:bg-gray-100">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-y-2">
+              <thead>
+                <tr className="text-left text-gray-600 text-sm">
+                  <th className="px-4 py-2">Playlist Name</th>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Tracks</th>
+                  <th className="px-4 py-2">Schedule</th>
+                  <th className="px-4 py-2">Date Created</th>
+                  <th className="px-4 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {playlists.map((playlist) => (
+                  <tr
+                    key={playlist._id}
+                    className="bg-blue-50 hover:bg-blue-100 rounded-xl transition"
+                  >
+                    <td className="px-4 py-3 font-medium flex items-center gap-2">
+                      <span className="p-2 bg-blue-900 text-white rounded-lg">
+                        🎵
+                      </span>
+                      {playlist.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2 py-1 text-xs rounded ${
+                          playlist.status === "active"
+                            ? "bg-green-100 text-green-600"
+                            : "bg-gray-200 text-gray-600"
+                        }`}
+                      >
+                        {playlist.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{playlist.files?.length || 0}</td>
+                    <td className="px-4 py-3">
+                      {playlist.daysOfWeek?.join(", ") || "Everyday"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {playlist.createdAt
+                        ? new Date(playlist.createdAt).toLocaleDateString()
+                        : "N/A"}
+                    </td>
+                    <td className="px-4 py-3 flex gap-2">
+                      <button
+                        onClick={(e) => handleEditClick(e, playlist)}
+                        className="p-2 bg-white border rounded-lg hover:bg-gray-100"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePlaylistWithFiles(playlist._id)}
+                        className="p-2 bg-white border rounded-lg text-red-500 hover:bg-red-100"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
 };
 
 export default PlaylistManager;
+
