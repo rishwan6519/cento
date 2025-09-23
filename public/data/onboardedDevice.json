@@ -1,0 +1,55 @@
+[
+  {
+    "id": "DEV-4517",
+    "serialNumber": "1234",
+    "model": "Cento Smart Speaker",
+    "firmware": "v1.2.3",
+    "lastSeen": "Never",
+    "status": "New",
+    "macAddress": "00:1A:2B:3C:4D:5E",
+    "addedAt": "2025-03-12T10:29:18.434Z"
+  },
+  {
+    "id": "DEV-2523",
+    "serialNumber": "123",
+    "model": "Cento Smart Speaker",
+    "firmware": "v1.2.3",
+    "lastSeen": "Never",
+    "status": "New",
+    "macAddress": "00:1A:2B:3C:4D:5E",
+    "addedAt": "2025-03-12T10:49:33.868Z"
+  },
+  {
+    "id": "1742204922077",
+    "name": "demo2",
+    "imageUrl": "/uploads/9995aab9-bc57-4e65-98bd-ab46696f8690.png",
+    "type": "e0eeec59-b948-4fdc-9544-1f2a86d6d61a",
+    "features": [
+      "dfg",
+      "dfgh"
+    ],
+    "handMovements": [
+      "fcgb"
+    ],
+    "serialNumber": "1234",
+    "color": "cvbnm",
+    "description": "dfghj"
+  },
+  {
+    "id": "1742198737074",
+    "name": "demo",
+    "imageUrl": "/uploads/3d5c5e42-f420-45b2-b6ff-62e5671a2598.png",
+    "type": "2873e6b5-b0cc-41ef-97c6-f687b50996c7",
+    "features": [
+      "msdb",
+      "dsd",
+      "dsds"
+    ],
+    "handMovements": [
+      "habd"
+    ],
+    "serialNumber": "123",
+    "color": "mn,",
+    "description": "bnm"
+  }
+]
