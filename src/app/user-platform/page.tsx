@@ -996,7 +996,7 @@ const renderContent = (): React.ReactElement => {
         return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
       case "setupAnnouncement":
         return <Announcement />;
-      case "InstantaneousAnnouncement":
+      case "instantTrigger":
         return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
       case "showAnnouncement":
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
