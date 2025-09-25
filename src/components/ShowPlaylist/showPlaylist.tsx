@@ -2,6 +2,11 @@
 import React, { useState, useEffect } from "react";
 import { Trash2, Edit, XCircle, ImageIcon, Music, Video } from "lucide-react";
 import toast from "react-hot-toast";
+import { FaListUl } from "react-icons/fa6";
+import { LuLayoutGrid } from "react-icons/lu";
+import { BsFillGridFill } from "react-icons/bs";
+import { RiArrowDropDownLine } from "react-icons/ri";
+import { MdQueueMusic } from "react-icons/md";
 
 // Mock functions for standalone functionality
 const generateUniqueId = () => Math.random().toString(36).substring(2, 15);
@@ -65,7 +70,8 @@ const PlaylistManager: React.FC = () => {
   const [availableMediaFiles, setAvailableMediaFiles] = useState<MediaFile[]>([]);
   const [localMediaFiles, setLocalMediaFiles] = useState<MediaFile[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-
+const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   // Load userId from localStorage only once on mount
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
@@ -111,7 +117,7 @@ const PlaylistManager: React.FC = () => {
     
     setIsLoadingMedia(true);
     try {
-      const response = await fetch(`/api/media?userId=${userId}`);
+      const response = await fetch(`/api/media?userId=${encodeURIComponent(userId)}`);
       if (!response.ok) throw new Error("Failed to fetch media files");
       
       const data = await response.json();
@@ -139,7 +145,7 @@ const PlaylistManager: React.FC = () => {
     
     setIsLoadingPlaylists(true);
     try {
-      const response = await fetch(`/api/playlists?userId=${userId}`);
+      const response = await fetch(`/api/playlists?userId=${encodeURIComponent(userId)}`);
       if (!response.ok) throw new Error("Failed to fetch playlists");
       
       const data = await response.json();
@@ -153,23 +159,22 @@ const PlaylistManager: React.FC = () => {
     }
   };
 
-  const handleEditClick = async (e: React.MouseEvent, playlist: Playlist) => {
-    e.stopPropagation();
+  const handleEditClick = async (_e: React.MouseEvent, playlist: Playlist) => {
     
     if (localMediaFiles.length === 0) {
       toast.loading("Loading media files...");
       try {
         await fetchMedia();
         toast.dismiss();
-        setIsEditing(true);
         initializeEditedPlaylist(playlist);
+        setIsEditing(true);
       } catch (error) {
         toast.error("Failed to load media files");
         console.error("Error loading media files:", error);
       }
     } else {
-      setIsEditing(true);
       initializeEditedPlaylist(playlist);
+      setIsEditing(true);
     }
   };
 
@@ -188,25 +193,26 @@ const PlaylistManager: React.FC = () => {
   };
 
   const initializeEditedPlaylist = (playlist: Playlist) => {
+    const safeFiles = Array.isArray(playlist.files) ? playlist.files : [];
     setEditedPlaylist({
       id: playlist._id,
-      name: playlist.name,
-      type: playlist.type,
+      name: playlist.name || "",
+      type: playlist.type || "",
       startTime: playlist.startTime || "00:00",
       endTime: playlist.endTime || "23:59",
       startDate: playlist.startDate || "",
       endDate: playlist.endDate || "",
       // Ensure daysOfWeek is properly initialized from database data
-      daysOfWeek: playlist.daysOfWeek || [],
+      daysOfWeek: Array.isArray(playlist.daysOfWeek) ? playlist.daysOfWeek : [],
       status: playlist.status || 'active',
-      files: playlist.files.map((file, index) => ({
+      files: safeFiles.map((file, index) => ({
         id: file.id || generateUniqueId(),
         name: file.name,
         type: file.type,
         displayOrder: index + 1,
         path: file.path,
         delay: file.delay || 0,
-        backgroundImageEnabled: file.backgroundImageEnabled || false,
+        backgroundImageEnabled: !!file.backgroundImageEnabled,
         backgroundImage: file.backgroundImage || null,
       })),
     });
@@ -363,289 +369,671 @@ const PlaylistManager: React.FC = () => {
     'Friday',
     'Saturday'
   ];
+const filteredPlaylists = playlists.filter((playlist) => {
+  if (statusFilter === "all") return true;
+  return playlist.status === statusFilter;
+});
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 text-black">
-      {/* Edit window/modal */}
-      {isEditing && editedPlaylist && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-2xl relative">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700"
-              onClick={() => { setIsEditing(false); setEditedPlaylist(null); }}
-              aria-label="Close"
-            >
-              <XCircle size={28} />
-            </button>
-            <h2 className="text-xl font-bold mb-4">Edit Playlist</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Playlist Name</label>
-                <input
-                  type="text"
-                  value={editedPlaylist.name}
-                  onChange={e => setEditedPlaylist({ ...editedPlaylist, name: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Status</label>
-                <select
-                  value={editedPlaylist.status}
-                  onChange={e => setEditedPlaylist({ ...editedPlaylist, status: e.target.value as 'active' | 'inactive' })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Start Time</label>
-                  <input
-                    type="time"
-                    value={editedPlaylist.startTime}
-                    onChange={e => setEditedPlaylist({ ...editedPlaylist, startTime: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">End Time</label>
-                  <input
-                    type="time"
-                    value={editedPlaylist.endTime}
-                    onChange={e => setEditedPlaylist({ ...editedPlaylist, endTime: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={editedPlaylist.startDate}
-                    onChange={e => setEditedPlaylist({ ...editedPlaylist, startDate: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={editedPlaylist.endDate}
-                    onChange={e => setEditedPlaylist({ ...editedPlaylist, endDate: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Days of Week</label>
-                <div className="flex flex-wrap gap-2">
-                  {daysOfWeek.map(day => (
-                    <label key={day} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={editedPlaylist.daysOfWeek?.includes(day) || false}
-                        onChange={e => {
-                          const updatedDays = e.target.checked
-                            ? [...(editedPlaylist.daysOfWeek || []), day]
-                            : (editedPlaylist.daysOfWeek || []).filter(d => d !== day);
-                          setEditedPlaylist({ ...editedPlaylist, daysOfWeek: updatedDays });
-                        }}
-                        className="rounded border-gray-300"
-                      />
-                      <span className="text-sm">{day}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {/* Playlist Files Section */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Playlist Files</label>
-                {editedPlaylist.files.length === 0 ? (
-                  <div className="text-gray-500 text-sm mb-2">No files in this playlist.</div>
-                ) : (
-                  <ul className="mb-2">
-                    {editedPlaylist.files.map((file, idx) => (
-                      <li key={file.id} className="flex items-center justify-between py-1">
-                        <span className="flex items-center gap-2">
-                          {renderMediaIcon(file.type)}
-                          <span className="text-sm">{file.name}</span>
-                        </span>
-                        <button
-                          className="text-red-500 hover:text-red-700"
-                          onClick={() => handleRemoveFileFromPlaylist(file.id)}
-                          type="button"
-                        >
-                          Remove
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+      <div >
+        <h2 className="text-2xl font-bold">
+          {isEditing ? "Edit Playlist" : "Playlists"}
+        </h2>
+        {!isEditing && (
+          // <div className="flex gap-4">
+          //   <input
+          //     type="text"
+          //     placeholder="Search playlists..."
+          //     className="px-3 py-2 border rounded-lg"
+          //     onChange={(e) => handleSearch(e.target.value)}
+          //   />
+          // </div>
+         
+          <div > <br/>
+  <div className="flex justify-between items-center mb-6">
+    {/* <h2 className="text-2xl font-bold">Playlists</h2> */}
+    <div className="flex items-center gap-3">
+      {/* Search */}
+      <div className="relative">
+        {/* <input
+          type="text"
+          placeholder="Search playlist"
+          className="pl-10 pr-4 py-2  rounded-lg w-64"
+          onChange={(e) => handleSearch(e.target.value)}
+        /> */}
+        <input
+  type="text"
+  placeholder="Search playlist"
+  onChange={(e) => handleSearch(e.target.value)}
+  className="pl-10 pr-4 py-2  rounded-[9px] focus:outline-none shadow-[2px_4px_10px_0px_rgba(0,0,0,0.12)]"
+/>
 
-              {/* Add Media Section */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Add Media</label>
-                {availableMediaFiles.length === 0 ? (
-                  <div className="text-gray-500 text-sm">No available media to add.</div>
-                ) : (
-                  <ul>
-                    {availableMediaFiles.map((media) => (
-                      <li key={media.id} className="flex items-center justify-between py-1">
-                        <span className="flex items-center gap-2">
-                          {renderMediaIcon(media.type)}
-                          <span className="text-sm">{media.name}</span>
-                        </span>
-                        <button
-                          className="text-blue-500 hover:text-blue-700"
-                          onClick={() => handleAddFileToPlaylist(media)}
-                          type="button"
-                        >
-                          Add
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-4 mt-8">
-              <button
-                onClick={() => { setIsEditing(false); setEditedPlaylist(null); }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+        <svg
+          className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M21 21l-4.35-4.35M16.65 16.65A7.5 7.5 0 1110 2.5a7.5 7.5 0 016.65 14.15z"
+          />
+        </svg>
+      </div>
+
+      {/* Filter dropdown */}
+      {/* <select className="px-3 py-2 border rounded-lg">
+        <option value="all">All</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+
+     
+      <div className="flex items-center gap-2">
+        <button className="p-2 rounded-lg border hover:bg-gray-100">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <button className="p-2 rounded-lg border hover:bg-gray-100">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+          </svg>
+        </button>
+      </div> */}
+ <div className="relative inline-block">
+  <select
+    className="px-3 py-2 pr-8 rounded-lg shadow-md focus:outline-none appearance-none"
+    value={statusFilter}
+    onChange={(e) =>
+      setStatusFilter(e.target.value as "all" | "active" | "inactive")
+    }
+    style={{
+      boxShadow: "2px 4px 10px 0px rgba(0,0,0,0.12)",
+    }}
+  >
+    <option value="all">All</option>
+    <option value="active">Active</option>
+    <option value="inactive">Inactive</option>
+  </select>
+
+  {/* Custom dropdown icon */}
+  <RiArrowDropDownLine
+    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6"
+    color="#FF4500"
+  />
+</div>
+
+<div className="flex items-center gap-2">
+  {/* <button
+    onClick={() => setViewMode("list")}
+    className={`p-2 rounded-lg border hover:bg-gray-100 ${viewMode === "list" ? "bg-gray-200" : ""}`}
+    aria-label="List view"
+  >
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
+  <button
+    onClick={() => setViewMode("grid")}
+    className={`p-2 rounded-lg border hover:bg-gray-100 ${viewMode === "grid" ? "bg-gray-200" : ""}`}
+    aria-label="Grid view"
+  >
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+    </svg>
+  </button> */}
+ <button
+  onClick={() => setViewMode("list")}
+  className={`p-2 rounded-lg shadow-md hover:shadow-lg hover:bg-gray-100 ${
+    viewMode === "list" ? "bg-gray-200" : ""
+  }`}
+  aria-label="List view"
+>
+  <FaListUl className="w-5 h-5" color="#FF4500" />
+</button>
+
+<button
+  onClick={() => setViewMode("grid")}
+  className={`p-2 rounded-lg shadow-md hover:shadow-lg hover:bg-gray-100 ${
+    viewMode === "grid" ? "bg-gray-200" : ""
+  }`}
+  aria-label="Grid view"
+>
+  <BsFillGridFill className="w-5 h-5" color="#FF4500" />
+</button>
+</div>
+
+    </div>
+  </div>
+{viewMode === "list" ? (
+  <div className="overflow-x-auto">
+    <table className="min-w-full border-separate border-spacing-y-2">
+       <thead>
+        <tr className="text-left text-gray-600 text-sm">
+          <th className="px-4 py-2">Playlist Name</th>
+          <th className="px-4 py-2">Status</th>
+          <th className="px-4 py-2">Tracks</th>
+          <th className="px-4 py-2">Schedule</th>
+          <th className="px-4 py-2">Date Created</th>
+          <th className="px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {filteredPlaylists.map((playlist) => (
+          // <tr key={playlist._id} className="bg-blue-50 hover:bg-blue-100 rounded-xl transition">
+            <tr
+            key={playlist._id}
+            className="bg-blue-50 hover:bg-blue-100 rounded-xl transition"
+          >
+            <td className="px-4 py-3 font-medium flex items-center gap-2">
+              {/* <span className="p-2 bg-blue-900 text-white rounded-lg">
+                🎵
+              </span> */}
+              <span
+  className="flex items-center justify-center rounded-[10px]"
+  style={{
+    backgroundColor: "#07323C",
+    width: "40px",
+    height: "40px",
+  }}
+>
+  <MdQueueMusic size={20} color="#FFFFFF" />
+</span>
+              {playlist.name}
+            </td>
+            <td className="px-4 py-3">
+              <span
+                className={`px-2 py-1 text-xs rounded ${
+                  playlist.status === "active"
+                    ? "bg-green-100 text-green-600"
+                    : "bg-gray-200 text-gray-600"
+                }`}
               >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleEditPlaylist(editedPlaylist)}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                {playlist.status}
+              </span>
+            </td>
+            <td className="px-4 py-3">{playlist.files?.length || 0}</td>
+            <td className="px-4 py-3">
+              {playlist.daysOfWeek?.join(", ") || "Everyday"}
+            </td>
+            <td className="px-4 py-3">
+              {playlist.createdAt
+                ? new Date(playlist.createdAt).toLocaleDateString()
+                : "N/A"}
+            </td>
+            <td className="px-4 py-3 flex gap-2">
+              {/* <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditClick(e, playlist);
+                }}
+                className="p-2 bg-white border rounded-lg hover:bg-gray-100"
               >
-                Save Changes
-              </button>
-            </div>
-          </div>
+                <Edit size={16} />
+              </button> */}
+               {/* <button
+                    onClick={(e) => handleEditClick(e, playlist)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    aria-label="Edit playlist"
+                  >
+                    <Edit size={18} />
+                  </button>
+              <button
+                onClick={() => handleDeletePlaylistWithFiles(playlist._id)}
+                className="p-2 bg-white border rounded-lg text-red-500 hover:bg-red-100"
+              >
+                <Trash2 size={16} />
+              </button> */}
+              <button
+  onClick={(e) => handleEditClick(e, playlist)}
+  className="p-2 rounded-lg shadow-md hover:shadow-lg transition-colors"
+  aria-label="Edit playlist"
+>
+  <Edit size={18} color="#FF4500" />
+</button>
+
+<button
+  onClick={() => handleDeletePlaylistWithFiles(playlist._id)}
+  className="p-2 rounded-lg shadow-md hover:shadow-lg transition-colors"
+  aria-label="Delete playlist"
+>
+  <Trash2 size={16} color="#FF4500" />
+</button>
+
+            </td>
+          </tr>
+          
+        ))}
+      </tbody>
+    </table>
+  </div>
+) : (
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+    {filteredPlaylists.map((playlist) => (
+      <div key={playlist._id} className="bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition cursor-pointer">
+        <div className="flex items-center gap-2 mb-2">
+          {/* <span className="p-2 bg-blue-900 text-white rounded-lg">🎵</span> */}
+          <span
+  className="flex items-center justify-center rounded-[10px]"
+  style={{
+    backgroundColor: "#07323C",
+    // width: "40px",
+    // height: "40px",
+    padding: "6px",
+  }}
+>
+  <MdQueueMusic size={20} color="#FFFFFF" />
+</span>
+          <h3 className="font-semibold">{playlist.name}</h3>
         </div>
-      )}
+        <p>Status: <span className={`px-2 py-1 text-xs rounded ${playlist.status === "active" ? "bg-green-100 text-green-600" : "bg-gray-200 text-gray-600"}`}>{playlist.status}</span></p>
+        <p>Tracks: {playlist.files?.length || 0}</p>
+        <p>Schedule: {playlist.daysOfWeek?.join(", ") || "Everyday"}</p>
+        <p>Date Created: {playlist.createdAt ? new Date(playlist.createdAt).toLocaleDateString() : "N/A"}</p>
+        <div className="flex gap-2 mt-3">
+              <button
+  onClick={(e) => handleEditClick(e, playlist)}
+  className="p-2 rounded-lg shadow-md hover:shadow-lg transition-colors"
+  aria-label="Edit playlist"
+>
+  <Edit size={18} color="#FF4500" />
+</button>
 
-      {/* Table view (always visible unless editing) */}
-      {!isEditing && (
-        <>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Playlists</h2>
-            <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search playlist"
-                  className="pl-10 pr-4 py-2 border rounded-lg w-64"
-                  onChange={(e) => handleSearch(e.target.value)}
-                />
-                <svg
-                  className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M21 21l-4.35-4.35M16.65 16.65A7.5 7.5 0 1110 2.5a7.5 7.5 0 016.65 14.15z"
-                  />
-                </svg>
-              </div>
-              {/* Filter dropdown */}
-              <select className="px-3 py-2 border rounded-lg">
-                <option value="all">All</option>
+<button
+  onClick={() => handleDeletePlaylistWithFiles(playlist._id)}
+  className="p-2 rounded-lg shadow-md hover:shadow-lg transition-colors"
+  aria-label="Delete playlist"
+>
+  <Trash2 size={16} color="#FF4500" />
+</button>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+  {/* Table */}
+  
+  
+</div>
+        )}
+      </div>
+      
+      {isLoadingPlaylists ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      ) : isEditing && editedPlaylist ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Playlist Name
+              </label>
+              <input
+                type="text"
+                value={editedPlaylist.name}
+                onChange={(e) =>
+                  setEditedPlaylist({
+                    ...editedPlaylist,
+                    name: e.target.value,
+                  })
+                }
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Status
+              </label>
+              <select
+                value={editedPlaylist.status}
+                onChange={(e) =>
+                  setEditedPlaylist({
+                    ...editedPlaylist,
+                    status: e.target.value as 'active' | 'inactive',
+                  })
+                }
+                className="w-full px-3 py-2 border rounded-lg"
+              >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
-              {/* View toggle (list/grid) */}
-              <div className="flex items-center gap-2">
-                <button className="p-2 rounded-lg border hover:bg-gray-100">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-                <button className="p-2 rounded-lg border hover:bg-gray-100">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
-                  </svg>
-                </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  value={editedPlaylist.startTime}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      startTime: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  value={editedPlaylist.endTime}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      endTime: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={editedPlaylist.startDate}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      startDate: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={editedPlaylist.endDate}
+                  onChange={(e) =>
+                    setEditedPlaylist({
+                      ...editedPlaylist,
+                      endDate: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium mb-2">
+                Days of Week
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {daysOfWeek.map((day) => (
+                  <label key={day} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={editedPlaylist.daysOfWeek?.includes(day) || false}
+                      onChange={(e) => {
+                        const updatedDays = e.target.checked
+                          ? [...(editedPlaylist.daysOfWeek || []), day]
+                          : (editedPlaylist.daysOfWeek || []).filter((d) => d !== day);
+                        setEditedPlaylist({
+                          ...editedPlaylist,
+                          daysOfWeek: updatedDays,
+                        });
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm">{day}</span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-separate border-spacing-y-2">
-              <thead>
-                <tr className="text-left text-gray-600 text-sm">
-                  <th className="px-4 py-2">Playlist Name</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Tracks</th>
-                  <th className="px-4 py-2">Schedule</th>
-                  <th className="px-4 py-2">Date Created</th>
-                  <th className="px-4 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {playlists.map((playlist) => (
-                  <tr
-                    key={playlist._id}
-                    className="bg-blue-50 hover:bg-blue-100 rounded-xl transition"
+          
+          {/* Available Media Files Section */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Available Media Files ({availableMediaFiles.length || 0})
+            </label>
+            {isLoadingMedia ? (
+              <div className="flex justify-center items-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <span className="ml-2 text-sm text-gray-600">
+                  Loading media files...
+                </span>
+              </div>
+            ) : availableMediaFiles.length === 0 ? (
+              <p className="text-sm text-gray-500 py-2">
+                No more media files available to add
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {availableMediaFiles
+                  .filter((media) => media.type.includes("audio") || media.type.includes("video") )
+                  .map((media) => (
+                    <div
+                      key={media.id}
+                      className="border rounded-lg p-3 transition-all hover:border-blue-500 hover:bg-blue-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        {renderMediaIcon(media.type, 20)}
+                        <div className="flex-1">
+                          <span className="text-sm font-medium">{media.name}</span>
+                          {media.type.includes("audio") && (
+                            <audio src={media.url} controls className="w-full mt-2" />
+                          )}
+                          {media.type.includes("video") && (
+                            <video src={media.url} controls className="w-full mt-2" />
+                          )}
+                          {media.type.includes("image") && (
+                            <img src={media.url} alt={media.name} className="w-full h-24 object-cover mt-2 rounded" />
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleAddFileToPlaylist(media)}
+                          className="ml-auto px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Selected Files Order Section */}
+          {editedPlaylist.files.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Selected Files Order ({editedPlaylist.files.length} items)
+              </label>
+              <div className="space-y-2">
+                {editedPlaylist.files.map((file, index) => (
+                  <div
+                    key={file.id}
+                    className="flex flex-col p-3 bg-gray-50 rounded-lg"
                   >
-                    <td className="px-4 py-3 font-medium flex items-center gap-2">
-                      <span className="p-2 bg-blue-900 text-white rounded-lg">
-                        🎵
-                      </span>
-                      {playlist.name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-1 text-xs rounded ${
-                          playlist.status === "active"
-                            ? "bg-green-100 text-green-600"
-                            : "bg-gray-200 text-gray-600"
-                        }`}
-                      >
-                        {playlist.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{playlist.files?.length || 0}</td>
-                    <td className="px-4 py-3">
-                      {playlist.daysOfWeek?.join(", ") || "Everyday"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {playlist.createdAt
-                        ? new Date(playlist.createdAt).toLocaleDateString()
-                        : "N/A"}
-                    </td>
-                    <td className="px-4 py-3 flex gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500">{index + 1}</span>
+                      <div className="flex items-center gap-2 flex-1">
+                        {renderMediaIcon(file.type)}
+                        <span className="text-sm">{file.name}</span>
+                      </div>
                       <button
-                        onClick={(e) => handleEditClick(e, playlist)}
-                        className="p-2 bg-white border rounded-lg hover:bg-gray-100"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeletePlaylistWithFiles(playlist._id)}
-                        className="p-2 bg-white border rounded-lg text-red-500 hover:bg-red-100"
+                        onClick={() => handleRemoveFileFromPlaylist(file.id)}
+                        className="text-red-500 hover:text-red-700"
+                        aria-label="Remove file"
                       >
                         <Trash2 size={16} />
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                    <div className="mt-2">
+                      {file.type.includes("image") && (
+                        <img src={file.path} alt={file.name} className="w-full h-32 object-cover rounded-lg" />
+                      )}
+                      {file.type.includes("video") && (
+                        <video src={file.path} controls className="w-full rounded-lg" />
+                      )}
+                      {file.type.includes("audio") && (
+                        <audio src={file.path} controls className="w-full" />
+                      )}
+                    </div>
+                    
+                    {/* Audio file options */}
+                    {file.type.includes("audio") && (
+                      <div className="mt-3 pl-8 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`bg-image-checkbox-${file.id}`}
+                            checked={file.backgroundImageEnabled}
+                            onChange={(e) => {
+                              const updatedFiles = [...editedPlaylist.files];
+                              updatedFiles[index] = {
+                                ...file,
+                                backgroundImageEnabled: e.target.checked,
+                                backgroundImage: e.target.checked ? file.backgroundImage : null,
+                              };
+                              setEditedPlaylist({
+                                ...editedPlaylist,
+                                files: updatedFiles,
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <label htmlFor={`bg-image-checkbox-${file.id}`} className="text-sm">
+                            Enable Background Image
+                          </label>
+                        </div>
+                        
+                        {file.backgroundImageEnabled && (
+                          <div className="space-y-2">
+                            {file.backgroundImage ? (
+                              <div className="relative inline-block">
+                                <img 
+                                  src={file.backgroundImage} 
+                                  alt="Background" 
+                                  className="w-32 h-32 object-cover rounded-lg" 
+                                />
+                                <button
+                                  onClick={() => {
+                                    const updatedFiles = [...editedPlaylist.files];
+                                    updatedFiles[index] = { ...file, backgroundImage: null };
+                                    setEditedPlaylist({
+                                      ...editedPlaylist,
+                                      files: updatedFiles,
+                                    });
+                                  }}
+                                  className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow-md"
+                                  aria-label="Remove background image"
+                                >
+                                  <XCircle size={16} className="text-red-500" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div>
+                                <select
+                                  value={file.backgroundImage || ""}
+                                  onChange={(e) => {
+                                    const selectedImage = localMediaFiles.find(m => m.url === e.target.value);
+                                    if (selectedImage) {
+                                      const updatedFiles = [...editedPlaylist.files];
+                                      updatedFiles[index] = { ...file, backgroundImage: selectedImage.url };
+                                      setEditedPlaylist({
+                                        ...editedPlaylist,
+                                        files: updatedFiles,
+                                      });
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                                >
+                                  <option value="">Select background image</option>
+                                  {localMediaFiles
+                                    .filter(m => m.type.includes("image"))
+                                    .map((image) => (
+                                      <option key={image.id} value={image.url}>
+                                        {image.name}
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2">
+                          <label htmlFor={`delay-input-${file.id}`} className="text-sm">Delay (seconds):</label>
+                          <input
+                            id={`delay-input-${file.id}`}
+                            type="number"
+                            min="0"
+                            value={file.delay || 0}
+                            onChange={(e) => {
+                              const updatedFiles = [...editedPlaylist.files];
+                              updatedFiles[index] = {
+                                ...file,
+                                delay: parseInt(e.target.value),
+                              };
+                              setEditedPlaylist({
+                                ...editedPlaylist,
+                                files: updatedFiles,
+                              });
+                            }}
+                            className="w-20 px-2 py-1 border rounded text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+          )}
+          
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-4 pt-6 border-t">
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setEditedPlaylist(null);
+              }}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleEditPlaylist(editedPlaylist)}
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Save Changes
+            </button>
           </div>
-        </>
+        </div>
+      ) : playlists && playlists.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4">
+          {/*  */}
+        </div>
+      ) : (
+        <p className="text-gray-500 text-center py-4">No playlists found</p>
       )}
     </div>
+    
+
   );
 };
 

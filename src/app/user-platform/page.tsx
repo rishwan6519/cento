@@ -68,8 +68,6 @@ interface UserData {
   role: string;
 }
 
-
-
 // type ExtendedMenuKey =
 //   | MenuKey
 //   | "createAnnouncement"
@@ -184,9 +182,6 @@ const [current, setCurrent] = useState(0);
     }, 3000);
     return () => clearInterval(timer);
   }, []);
-
-
-
   useEffect(() => {
     const userRole = localStorage.getItem("userRole");
     if (userRole !== "user") {
@@ -1001,7 +996,7 @@ const renderContent = (): React.ReactElement => {
         return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
       case "setupAnnouncement":
         return <Announcement />;
-      case "instantTrigger":
+      case "InstantaneousAnnouncement":
         return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
       case "showAnnouncement":
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;

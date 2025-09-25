@@ -894,14 +894,49 @@ export default function ShowMedia() {
       toast.error("Delete failed");
     }
   };
-  const openPreview = (m: MediaFile) => {
+  const isUrlReachable = async (url: string): Promise<boolean> => {
+    try {
+      const res = await fetch(url, { method: "HEAD" });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+  const extractFilename = (url: string): string => {
+    try {
+      const parts = url.split("/");
+      return parts[parts.length - 1] || url;
+    } catch {
+      return url;
+    }
+  };
+
+  const openPreview = async (m: MediaFile) => {
     // Stop list audio if playing to avoid conflicts
     if (audioPlayer) {
       try { audioPlayer.pause(); } catch {}
       audioPlayer = null;
       setPlayingId(null);
     }
-    setPreview(m);
+
+    const primaryUrl = m.url.startsWith("http") || m.url.startsWith("/") ? m.url : `/${m.url}`;
+    let resolvedUrl = primaryUrl;
+    if (m.type === "video" || m.type === "audio") {
+      const ok = await isUrlReachable(primaryUrl);
+      if (!ok) {
+        // Fallback: try flat uploads root with just the filename
+        const filename = extractFilename(primaryUrl);
+        const flatUrl = `/uploads/${filename}`;
+        const okFlat = await isUrlReachable(flatUrl);
+        if (okFlat) {
+          resolvedUrl = flatUrl;
+        } else {
+          toast.error(`File not found at ${primaryUrl}`);
+          return;
+        }
+      }
+    }
+    setPreview({ ...m, url: resolvedUrl });
   };
 
   const closePreview = () => {
@@ -929,261 +964,445 @@ export default function ShowMedia() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EAF9FB] p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-slate-900 text-2xl font-semibold">Media Library</h1>
-            </div>
+    // <div className="min-h-screen bg-[#EAF9FB] p-8">
+    //   <div className="max-w-7xl mx-auto">
+    //     <div className="bg-white rounded-2xl shadow-xl p-6">
+    //       {/* Header */}
+    //       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    //         <div>
+    //           <h1 className="text-slate-900 text-2xl font-semibold">Media Library</h1>
+    //         </div>
 
-            <div className="flex-1">
-              {/* search + all media + view toggles */}
-              <div className="flex items-center gap-3">
-                {/* Search container */}
-                <div className="flex items-center bg-white border rounded-full px-3 shadow-sm flex-1 sm:flex-none w-full sm:w-[520px]">
-                  <Search size={16} className="text-slate-400 mr-3" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search media"
-                    className="outline-none py-3 w-full text-sm"
-                  />
-                </div>
+    //         <div className="flex-1">
+    //           {/* search + all media + view toggles */}
+    //           <div className="flex items-center gap-3">
+    //             {/* Search container */}
+    //             <div className="flex items-center bg-white border rounded-full px-3 shadow-sm flex-1 sm:flex-none w-full sm:w-[520px]">
+    //               <Search size={16} className="text-slate-400 mr-3" />
+    //               <input
+    //                 value={search}
+    //                 onChange={(e) => setSearch(e.target.value)}
+    //                 placeholder="Search media"
+    //                 className="outline-none py-3 w-full text-sm"
+    //               />
+    //             </div>
 
-                {/* All Media dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowFilterDropdown((s) => !s)}
-                    className="flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-sm text-sm"
-                  >
-                    {filterType === "all"
-                      ? "All media"
-                      : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
-                    <svg
-                      className="w-3 h-3 text-slate-600"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 011.12 1L10.53 13.03a.75.75 0 01-1.06 0L5.2 8.27a.75.75 0 01.03-1.06z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
+    //             {/* All Media dropdown */}
+    //             <div className="relative">
+    //               <button
+    //                 onClick={() => setShowFilterDropdown((s) => !s)}
+    //                 className="flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-sm text-sm"
+    //               >
+    //                 {filterType === "all"
+    //                   ? "All media"
+    //                   : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+    //                 <svg
+    //                   className="w-3 h-3 text-slate-600"
+    //                   viewBox="0 0 20 20"
+    //                   fill="currentColor"
+    //                 >
+    //                   <path
+    //                     fillRule="evenodd"
+    //                     d="M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 011.12 1L10.53 13.03a.75.75 0 01-1.06 0L5.2 8.27a.75.75 0 01.03-1.06z"
+    //                     clipRule="evenodd"
+    //                   />
+    //                 </svg>
+    //               </button>
 
-                  {showFilterDropdown && (
-                    <div className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-20">
-                      <button
-                        onClick={() => {
-                          setFilterType("all");
-                          setShowFilterDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm ${filterType === "all" ? "bg-slate-50" : ""}`}
-                      >
-                        All media
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFilterType("audio");
-                          setShowFilterDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm ${filterType === "audio" ? "bg-slate-50" : ""}`}
-                      >
-                        Audio
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFilterType("video");
-                          setShowFilterDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm ${filterType === "video" ? "bg-slate-50" : ""}`}
-                      >
-                        Video
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFilterType("image");
-                          setShowFilterDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-sm ${filterType === "image" ? "bg-slate-50" : ""}`}
-                      >
-                        Image
-                      </button>
-                    </div>
-                  )}
-                </div>
+    //               {showFilterDropdown && (
+    //                 <div className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-20">
+    //                   <button
+    //                     onClick={() => {
+    //                       setFilterType("all");
+    //                       setShowFilterDropdown(false);
+    //                     }}
+    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "all" ? "bg-slate-50" : ""}`}
+    //                   >
+    //                     All media
+    //                   </button>
+    //                   <button
+    //                     onClick={() => {
+    //                       setFilterType("audio");
+    //                       setShowFilterDropdown(false);
+    //                     }}
+    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "audio" ? "bg-slate-50" : ""}`}
+    //                   >
+    //                     Audio
+    //                   </button>
+    //                   <button
+    //                     onClick={() => {
+    //                       setFilterType("video");
+    //                       setShowFilterDropdown(false);
+    //                     }}
+    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "video" ? "bg-slate-50" : ""}`}
+    //                   >
+    //                     Video
+    //                   </button>
+    //                   <button
+    //                     onClick={() => {
+    //                       setFilterType("image");
+    //                       setShowFilterDropdown(false);
+    //                     }}
+    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "image" ? "bg-slate-50" : ""}`}
+    //                   >
+    //                     Image
+    //                   </button>
+    //                 </div>
+    //               )}
+    //             </div>
 
-                {/* View toggles */}
-                <div className="ml-auto sm:ml-0 flex items-center gap-2">
-                  <button
-                    onClick={() => setViewMode("list")}
-                    title="List view"
-                    className={`p-2 rounded-lg ${viewMode === "list" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}
-                  >
-                    <List size={18} />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    title="Grid view"
-                    className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}
-                  >
-                    <Grid size={18} />
-                  </button>
-                </div>
-              </div>
-            </div>
+    //             {/* View toggles */}
+    //             <div className="ml-auto sm:ml-0 flex items-center gap-2">
+    //               <button
+    //                 onClick={() => setViewMode("list")}
+    //                 title="List view"
+    //                 className={`p-2 rounded-lg ${viewMode === "list" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}
+    //               >
+    //                 <List size={18} />
+    //               </button>
+    //               <button
+    //                 onClick={() => setViewMode("grid")}
+    //                 title="Grid view"
+    //                 className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}
+    //               >
+    //                 <Grid size={18} />
+    //               </button>
+    //             </div>
+    //           </div>
+    //         </div>
+    //       </div>
+
+    //       {/* Content area */}
+    //       <div className="mt-4">
+    //         {/* List layout (rows with pill background) */}
+    //         {viewMode === "list" ? (
+    //           <div className="space-y-3">
+    //             {filtered.map((m) => (
+    //               <div key={m._id} className="flex items-center gap-4 bg-[#E9FBFD] rounded-xl px-4 py-3 shadow-sm">
+    //                 <div className="flex items-center gap-3 w-1/3 min-w-[220px]">
+    //                   <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
+    //                     {/* file icon inside dark teal square */}
+    //                     {m.type === "audio" && <Music size={18} />}
+    //                     {m.type === "video" && <Video size={18} />}
+    //                     {m.type === "image" && <ImageIcon size={18} />}
+    //                   </div>
+    //                   <div className="min-w-0">
+    //                     <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
+    //                   </div>
+    //                 </div>
+
+    //                 <div className="flex-1 flex justify-center text-sm text-slate-700">{m.type.charAt(0).toUpperCase() + m.type.slice(1)}</div>
+
+    //                 <div className="w-40 text-center text-sm text-slate-700">{formatDate(m.createdAt)}</div>
+
+    //                 <div className="flex items-center gap-2 ml-auto">
+    //                   {/* Play / Pause for audio */}
+    //                   {/* <button
+    //                     onClick={() => togglePlay(m)}
+    //                     title={playingId === m._id ? "Pause" : "Play"}
+    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:scale-95 transition"
+    //                   >
+    //                     {m.type === "audio" && playingId === m._id ? (
+    //                       <Pause size={14} className="text-orange-500" />
+    //                     ) : (
+    //                       <Play size={14} className="text-orange-500" />
+    //                     )}
+    //                   </button> */}
+
+    //                   {/* Loop/Repeat */}
+    //                   {/* <button
+    //                     onClick={() => toggleLoop(m)}
+    //                     title={loops[m._id] ? "Loop on" : "Loop off"}
+    //                     className={`h-8 w-8 rounded-full bg-white shadow flex items-center justify-center ${loops[m._id] ? "ring-2 ring-orange-100" : ""}`}
+    //                   >
+    //                     <RotateCcw size={14} className="text-orange-500" />
+    //                   </button> */}
+
+    //                   {/* Favorite */}
+    //                   {/* <button
+    //                     onClick={() => toggleFavorite(m)}
+    //                     title={favorites[m._id] ? "Remove favourite" : "Add favourite"}
+    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
+    //                   >
+    //                     <Heart size={14} className={favorites[m._id] ? "text-orange-500" : "text-slate-400"} />
+    //                   </button> */}
+
+    //                   {/* Download */}
+    //                   <button
+    //                     onClick={() => downloadFile(m)}
+    //                     title="Download"
+    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
+    //                   >
+    //                     <Download size={14} className="text-orange-500" />
+    //                   </button>
+
+    //                   {/* Delete */}
+    //                   <button
+    //                    onClick={() => handleDelete(m._id)}
+    //                     title="Delete"
+    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50"
+    //                   >
+    //                     <Trash2 size={14} className="text-red-500" />
+    //                   </button>
+
+    //                   {/* Preview / Expand */}
+    //                   <button
+    //                     onClick={() => openPreview(m)}
+    //                     title="Preview"
+    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
+    //                   >
+    //                     <Maximize2 size={14} className="text-orange-500" />
+    //                   </button>
+    //                 </div>
+    //               </div>
+    //             ))}
+    //           </div>
+    //         ) : (
+    //           // Grid view - card like
+    //           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    //             {filtered.map((m) => (
+    //               <div key={m._id} className="bg-[#E9FBFD] rounded-xl p-4 shadow-sm">
+    //                 <div className="flex items-center gap-3 mb-3">
+    //                   <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
+    //                     {m.type === "audio" && <Music size={18} />}
+    //                     {m.type === "video" && <Video size={18} />}
+    //                     {m.type === "image" && <ImageIcon size={18} />}
+    //                   </div>
+    //                   <div>
+    //                     <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
+    //                     <div className="text-xs text-slate-600">{formatDate(m.createdAt)}</div>
+    //                   </div>
+    //                 </div>
+
+    //                 <div className="flex items-center gap-2 mt-2">
+    //                   {/* <button
+    //                     onClick={() => togglePlay(m)}
+    //                     className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center"
+    //                   >
+    //                     {m.type === "audio" && playingId === m._id ? (
+    //                       <Pause size={16} className="text-orange-500" />
+    //                     ) : (
+    //                       <Play size={16} className="text-orange-500" />
+    //                     )}
+    //                   </button> */}
+
+    //                   {/* <button onClick={() => toggleLoop(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
+    //                     <RotateCcw size={16} className={`text-orange-500 ${loops[m._id] ? "opacity-100" : "opacity-80"}`} />
+    //                   </button> */}
+
+    //                   {/* <button onClick={() => toggleFavorite(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
+    //                     <Heart size={16} className={favorites[m._id] ? "text-orange-500" : "text-slate-400"} />
+    //                   </button> */}
+
+    //                   <button onClick={() => downloadFile(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
+    //                     <Download size={16} className="text-orange-500" />
+    //                   </button>
+
+    //                   <button onClick={() => handleDelete(m._id)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50">
+    //                     <Trash2 size={16} className="text-red-500" />
+    //                   </button>
+
+    //                   <button onClick={() => openPreview(m)} className="ml-auto h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
+    //                     <Maximize2 size={16} className="text-orange-500" />
+    //                   </button>
+    //                 </div>
+    //               </div>
+    //             ))}
+    //           </div>
+    //         )}
+
+    //         {/* Footer count */}
+    //         <div className="mt-6 text-sm text-slate-600">{filtered.length} {filtered.length === 1 ? "item" : "items"}</div>
+    //       </div>
+    //     </div>
+    //   </div>
+
+    //   {/* Preview Modal */}
+    //   {preview && (
+    //     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
+    //       <div className="bg-white rounded-lg max-w-4xl w-full overflow-hidden">
+    //         <div className="flex items-center justify-between p-4 border-b">
+    //           <div className="text-sm font-medium truncate max-w-[70%]">{preview.name}</div>
+    //           <div className="flex items-center gap-2">
+    //             <button onClick={() => downloadFile(preview)} className="p-2 rounded hover:bg-slate-50">
+    //               <Download size={18} className="text-orange-500" />
+    //             </button>
+    //             <button onClick={closePreview} className="p-2 rounded hover:bg-slate-50">
+    //               <X size={18} />
+    //             </button>
+    //           </div>
+    //         </div>
+
+    //         <div className="bg-black flex items-center justify-center" style={{ height: "60vh" }}>
+    //           {(() => {
+    //             const url = normalizeUrl(preview.url);
+    //             const mime = preview.mime || inferMimeFromUrl(url);
+    //             if (preview.type === "image") {
+    //               return (
+    //                 <img src={url} alt={preview.name} className="max-w-full max-h-full object-contain" />
+    //               );
+    //             }
+    //             if (preview.type === "video") {
+    //               return (
+    //                 <video controls playsInline preload="metadata" className="max-w-full max-h-full pointer-events-auto" onError={() => toast.error("Unable to load or play this video")}>
+    //                   <source src={url} type={mime || "video/mp4"} />
+    //                 </video>
+    //               );
+    //             }
+    //             if (preview.type === "audio") {
+    //               return (
+    //                 <div className="p-6 w-full max-w-2xl bg-white rounded-md">
+    //                   <audio controls preload="metadata" className="w-full pointer-events-auto" onError={() => toast.error("Unable to load or play this audio")}>
+    //                     <source src={url} type={mime || "audio/mpeg"} />
+    //                   </audio>
+    //                 </div>
+    //               );
+    //             }
+    //             return null;
+    //           })()}
+    //         </div>
+
+    //         <div className="p-3 border-t flex items-center justify-between">
+    //           <div className="text-xs text-slate-600">{preview.type} • {formatDate(preview.createdAt)}</div>
+    //           <div>
+    //             <button onClick={closePreview} className="px-4 py-2 bg-slate-100 rounded">Close</button>
+    //           </div>
+    //         </div>
+    //       </div>
+    //     </div>
+    //   )}
+    // </div>
+    <div className="min-h-screen bg-[#EAF9FB] p-4 sm:p-8">
+  <div className="max-w-7xl mx-auto">
+    <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+        <h1 className="text-slate-900 text-xl sm:text-2xl font-semibold truncate">
+          Media Library
+        </h1>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          {/* Search */}
+          <div className="flex items-center bg-white border rounded-full px-3 shadow-sm flex-1 sm:flex-none w-full sm:w-[320px]">
+            <Search size={16} className="text-slate-400 mr-2" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search media"
+              className="outline-none py-2 sm:py-3 w-full text-sm"
+            />
           </div>
 
-          {/* Content area */}
-          <div className="mt-4">
-            {/* List layout (rows with pill background) */}
-            {viewMode === "list" ? (
-              <div className="space-y-3">
-                {filtered.map((m) => (
-                  <div key={m._id} className="flex items-center gap-4 bg-[#E9FBFD] rounded-xl px-4 py-3 shadow-sm">
-                    <div className="flex items-center gap-3 w-1/3 min-w-[220px]">
-                      <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
-                        {/* file icon inside dark teal square */}
-                        {m.type === "audio" && <Music size={18} />}
-                        {m.type === "video" && <Video size={18} />}
-                        {m.type === "image" && <ImageIcon size={18} />}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 flex justify-center text-sm text-slate-700">{m.type.charAt(0).toUpperCase() + m.type.slice(1)}</div>
-
-                    <div className="w-40 text-center text-sm text-slate-700">{formatDate(m.createdAt)}</div>
-
-                    <div className="flex items-center gap-2 ml-auto">
-                      {/* Play / Pause for audio */}
-                      <button
-                        onClick={() => togglePlay(m)}
-                        title={playingId === m._id ? "Pause" : "Play"}
-                        className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:scale-95 transition"
-                      >
-                        {m.type === "audio" && playingId === m._id ? (
-                          <Pause size={14} className="text-orange-500" />
-                        ) : (
-                          <Play size={14} className="text-orange-500" />
-                        )}
-                      </button>
-
-                      {/* Loop/Repeat */}
-                      {/* <button
-                        onClick={() => toggleLoop(m)}
-                        title={loops[m._id] ? "Loop on" : "Loop off"}
-                        className={`h-8 w-8 rounded-full bg-white shadow flex items-center justify-center ${loops[m._id] ? "ring-2 ring-orange-100" : ""}`}
-                      >
-                        <RotateCcw size={14} className="text-orange-500" />
-                      </button> */}
-
-                      {/* Favorite */}
-                      {/* <button
-                        onClick={() => toggleFavorite(m)}
-                        title={favorites[m._id] ? "Remove favourite" : "Add favourite"}
-                        className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
-                      >
-                        <Heart size={14} className={favorites[m._id] ? "text-orange-500" : "text-slate-400"} />
-                      </button> */}
-
-                      {/* Download */}
-                      <button
-                        onClick={() => downloadFile(m)}
-                        title="Download"
-                        className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
-                      >
-                        <Download size={14} className="text-orange-500" />
-                      </button>
-
-                      {/* Delete */}
-                      <button
-                       onClick={() => handleDelete(m._id)}
-                        title="Delete"
-                        className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50"
-                      >
-                        <Trash2 size={14} className="text-red-500" />
-                      </button>
-
-                      {/* Preview / Expand */}
-                      <button
-                        onClick={() => openPreview(m)}
-                        title="Preview"
-                        className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
-                      >
-                        <Maximize2 size={14} className="text-orange-500" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              // Grid view - card like
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filtered.map((m) => (
-                  <div key={m._id} className="bg-[#E9FBFD] rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
-                        {m.type === "audio" && <Music size={18} />}
-                        {m.type === "video" && <Video size={18} />}
-                        {m.type === "image" && <ImageIcon size={18} />}
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
-                        <div className="text-xs text-slate-600">{formatDate(m.createdAt)}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-2">
-                      <button
-                        onClick={() => togglePlay(m)}
-                        className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center"
-                      >
-                        {m.type === "audio" && playingId === m._id ? (
-                          <Pause size={16} className="text-orange-500" />
-                        ) : (
-                          <Play size={16} className="text-orange-500" />
-                        )}
-                      </button>
-
-                      <button onClick={() => toggleLoop(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-                        <RotateCcw size={16} className={`text-orange-500 ${loops[m._id] ? "opacity-100" : "opacity-80"}`} />
-                      </button>
-
-                      <button onClick={() => toggleFavorite(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-                        <Heart size={16} className={favorites[m._id] ? "text-orange-500" : "text-slate-400"} />
-                      </button>
-
-                      <button onClick={() => downloadFile(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-                        <Download size={16} className="text-orange-500" />
-                      </button>
-
-                      <button onClick={() => handleDelete(m._id)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50">
-                        <Trash2 size={16} className="text-red-500" />
-                      </button>
-
-                      <button onClick={() => openPreview(m)} className="ml-auto h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-                        <Maximize2 size={16} className="text-orange-500" />
-                      </button>
-                    </div>
-                  </div>
+          {/* Filter Dropdown */}
+          <div className="relative w-full sm:w-auto">
+            <button
+              onClick={() => setShowFilterDropdown((s) => !s)}
+              className="flex items-center justify-between gap-2 bg-white border rounded-full px-4 py-2 shadow-sm w-full sm:w-auto text-sm"
+            >
+              {filterType === "all" ? "All media" : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
+              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 011.12 1L10.53 13.03a.75.75 0 01-1.06 0L5.2 8.27a.75.75 0 01.03-1.06z" clipRule="evenodd"/>
+              </svg>
+            </button>
+            {showFilterDropdown && (
+              <div className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-20">
+                {["all", "audio", "video", "image"].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => { setFilterType(type as any); setShowFilterDropdown(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm ${filterType === type ? "bg-slate-50" : ""}`}
+                  >
+                    {type === "all" ? "All media" : type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
                 ))}
               </div>
             )}
+          </div>
 
-            {/* Footer count */}
-            <div className="mt-6 text-sm text-slate-600">{filtered.length} {filtered.length === 1 ? "item" : "items"}</div>
+          {/* View toggles */}
+          <div className="flex items-center gap-2 mt-2 sm:mt-0">
+            <button onClick={() => setViewMode("list")} title="List view" className={`p-2 rounded-lg ${viewMode === "list" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}>
+              <List size={18} />
+            </button>
+            <button onClick={() => setViewMode("grid")} title="Grid view" className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}>
+              <Grid size={18} />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Preview Modal */}
-      {preview && (
+      {/* Content */}
+      {viewMode === "list" ? (
+        <div className="space-y-3">
+          {filtered.map((m) => (
+            <div key={m._id} className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 bg-[#E9FBFD] rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-sm">
+              <div className="flex items-center gap-2 w-full sm:w-1/3 min-w-[180px]">
+                <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
+                  {m.type === "audio" && <Music size={18} />}
+                  {m.type === "video" && <Video size={18} />}
+                  {m.type === "image" && <ImageIcon size={18} />}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
+                </div>
+              </div>
+              <div className="flex-1 flex justify-between sm:justify-center text-sm text-slate-700 w-full">
+                <div className="truncate">{m.type.charAt(0).toUpperCase() + m.type.slice(1)}</div>
+                <div className="hidden sm:block w-40 text-center">{formatDate(m.createdAt)}</div>
+              </div>
+
+              <div className="flex gap-2 ml-auto flex-wrap mt-2 sm:mt-0">
+                <button onClick={() => downloadFile(m)} title="Download" className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center">
+                  <Download size={14} className="text-orange-500" />
+                </button>
+                <button onClick={() => handleDelete(m._id)} title="Delete" className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50">
+                  <Trash2 size={14} className="text-red-500" />
+                </button>
+                <button onClick={() => openPreview(m)} title="Preview" className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center">
+                  <Maximize2 size={14} className="text-orange-500" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((m) => (
+            <div key={m._id} className="bg-[#E9FBFD] rounded-xl p-3 sm:p-4 shadow-sm flex flex-col">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
+                  {m.type === "audio" && <Music size={18} />}
+                  {m.type === "video" && <Video size={18} />}
+                  {m.type === "image" && <ImageIcon size={18} />}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
+                  <div className="text-xs text-slate-600">{formatDate(m.createdAt)}</div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-auto flex-wrap">
+                <button onClick={() => downloadFile(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
+                  <Download size={16} className="text-orange-500" />
+                </button>
+                <button onClick={() => handleDelete(m._id)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50">
+                  <Trash2 size={16} className="text-red-500" />
+                </button>
+                <button onClick={() => openPreview(m)} className="ml-auto h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
+                  <Maximize2 size={16} className="text-orange-500" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer count */}
+      <div className="mt-4 text-sm text-slate-600">{filtered.length} {filtered.length === 1 ? "item" : "items"}</div>
+    </div>
+  </div>
+
+ {/* Preview Modal */}
+       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b">
@@ -1236,6 +1455,7 @@ export default function ShowMedia() {
           </div>
         </div>
       )}
-    </div>
+</div>
+
   );
 }

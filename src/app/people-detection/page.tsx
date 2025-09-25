@@ -482,7 +482,7 @@ if (
         );
       } else {
         urls.push(
-          `rtsp://${username}:${password}@${ip}:554/Streaming/Channels/${i}02`
+          `rtsp://${username}:${password}@${ip}:554/Streaming/Channels/${i}01`
         );
       }
     }
