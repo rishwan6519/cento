@@ -33,75 +33,50 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
 export async function DELETE(request: NextRequest) {
   try {
-    const { id } = await request.json();
-    console.log("Deleting media with ID:", id);
-
+   const id = request.nextUrl.searchParams.get('userId');
     if (!id) {
       return NextResponse.json({ error: 'Media ID is required' }, { status: 400 });
     }
 
     await connectToDatabase();
 
-    // Find the media item to get the file path
     const mediaItem = await MediaItemModel.findById(id);
-
     if (!mediaItem) {
       return NextResponse.json({ error: 'Media item not found' }, { status: 404 });
     }
 
-    // Get the relative file path from the URL field
-    // Example: '/uploads/fileType/uniqueFileName'
-    const relativePath = mediaItem.url;
-    console.log("Media relative path:", relativePath);
+    // Remove from playlists if applicable
+    await PlaylistConfig.updateMany(
+      { 'files.path': mediaItem.url },
+      { $pull: { files: { path: mediaItem.url } } }
+    );
+
+    // Delete physical file
+    const relativePath = mediaItem.url.startsWith('/') ? mediaItem.url.slice(1) : mediaItem.url;
+    const fullPath = join(process.cwd(), relativePath);
 
     try {
-      // Convert relative path to absolute path on the server
-      // Remove leading slash if present
-      const normalizedPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-      const fullPath = join(process.cwd(), normalizedPath); // Use your actual folder structure
-      console.log("Attempting to delete file at:", fullPath);
-
-      // Check if the file exists
       if (existsSync(fullPath)) {
-        // Delete the file
         await unlink(fullPath);
-        console.log("File deleted successfully from:", fullPath);
+        console.log("File deleted successfully:", fullPath);
       } else {
-        console.warn("File not found at path:", fullPath);
+        console.warn("File not found:", fullPath);
       }
     } catch (fileError) {
-      console.error("Error deleting physical file:", fileError);
-      // Continue with database deletion even if file deletion fails
+      console.error("Error deleting file:", fileError);
     }
 
-  await PlaylistConfig.updateMany(
-  { 'files.path': mediaItem.url },
-  { $pull: { files: { path: mediaItem.url } } }
-);
-
-//  check 
-    // Now delete from database
+    // Delete from DB
     const deletedItem = await MediaItemModel.findByIdAndDelete(id);
-
     if (!deletedItem) {
-      return NextResponse.json({
-        error: 'Failed to delete media item from database'
-
-      }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to delete media item from database' }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Media deleted successfully from database and file system'
-    });
+    return NextResponse.json({ success: true, message: 'Media deleted from DB and file system' });
   } catch (error) {
     console.error('Error deleting media:', error);
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to delete media'
-    }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Failed to delete media' }, { status: 500 });
   }
 }

@@ -885,7 +885,7 @@ export default function ShowMedia() {
   // };
  const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/media/${id}`, { method: "DELETE" });
+const res = await fetch(`/api/media/?userId=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       setMedia(media.filter((m) => m._id !== id));
       toast.success("Media deleted");

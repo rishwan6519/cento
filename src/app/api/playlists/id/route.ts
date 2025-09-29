@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { connectToDatabase } from '@/lib/db';
-import DevicePlaylist from '@/models/ConectPlaylist';
-import Playlist from '@/models/PlaylistConfig';
+import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { connectToDatabase } from "@/lib/db";
+import DevicePlaylist from "@/models/ConectPlaylist";
+import Playlist from "@/models/PlaylistConfig";
 
 interface PlaylistFile {
   name: string;
@@ -82,9 +82,9 @@ type RouteContext = {
 //       }
 //     };
 
-//     return NextResponse.json({ 
-//       success: true, 
-//       playlist: enrichedPlaylist 
+//     return NextResponse.json({
+//       success: true,
+//       playlist: enrichedPlaylist
 //     });
 //   } catch (error) {
 //     console.error('Error fetching playlist:', error);
@@ -97,18 +97,18 @@ type RouteContext = {
 export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Playlist ID is required' },
+        { success: false, error: "Playlist ID is required" },
         { status: 400 }
       );
     }
 
     await connectToDatabase();
     const data = await request.json();
-    
+
     // Construct the data object for the update
     const updatedPlaylistData = {
       name: data.name,
@@ -118,51 +118,48 @@ export async function PUT(request: NextRequest) {
       startDate: data.startDate || null,
       endDate: data.endDate || null,
       daysOfWeek: data.daysOfWeek || [],
-      status: data.status || 'active',
+      status: data.status || "active",
       shuffle: data.shuffle || false,
       files: data.files.map((file: any) => ({
         id: file.id,
         name: file.name,
-        // =======================================================
-        // THE FIX: Change file.url to file.path
-        // =======================================================
-        path: file.path, 
-        // =======================================================
+
+        path: file.path,
+
         displayOrder: file.displayOrder,
         type: file.type,
         delay: file.delay || 0,
         maxVolume: file.maxVolume,
         minVolume: file.minVolume,
         backgroundImageEnabled: file.backgroundImageEnabled || false,
-        backgroundImage: file.backgroundImage || null
+        backgroundImage: file.backgroundImage || null,
       })),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     // Find the playlist by ID and update it with the new data
-    const updated = await Playlist.findByIdAndUpdate(
-      id, 
-      updatedPlaylistData, 
-      { new: true, runValidators: true }
-    );
+    const updated = await Playlist.findByIdAndUpdate(id, updatedPlaylistData, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!updated) {
       return NextResponse.json(
-        { success: false, error: 'Playlist not found' },
+        { success: false, error: "Playlist not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      playlist: updated
+      playlist: updated,
     });
-
   } catch (error) {
-    console.error('Error updating playlist:', error);
-    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error("Error updating playlist:", error);
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json(
-      { success: false, error: 'Failed to update playlist', details: message },
+      { success: false, error: "Failed to update playlist", details: message },
       { status: 500 }
     );
   }
@@ -177,11 +174,11 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
+    const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Playlist ID is required' },
+        { success: false, error: "Playlist ID is required" },
         { status: 400 }
       );
     }
@@ -194,13 +191,15 @@ export async function DELETE(request: NextRequest) {
 
     try {
       // Step 1: Find and delete the playlist within the transaction
-      const deletedPlaylist = await Playlist.findByIdAndDelete(id).session(session);
-      
+      const deletedPlaylist = await Playlist.findByIdAndDelete(id).session(
+        session
+      );
+
       if (!deletedPlaylist) {
         // If no playlist was found, abort the transaction and throw an error
         await session.abortTransaction();
         return NextResponse.json(
-          { success: false, error: 'Playlist not found' },
+          { success: false, error: "Playlist not found" },
           { status: 404 }
         );
       }
@@ -211,15 +210,15 @@ export async function DELETE(request: NextRequest) {
         { $pull: { playlistIds: id } }, // Use $pull to remove the ID from the array
         { session } // Ensure this operation is part of the transaction
       );
-      
+
       // If both operations succeed, commit the transaction
       await session.commitTransaction();
 
       return NextResponse.json({
         success: true,
-        message: 'Playlist deleted and device references updated successfully.',
+        message: "Playlist deleted and device references updated successfully.",
         deletedPlaylistId: deletedPlaylist._id,
-        devicesUpdated: updateResult.modifiedCount
+        devicesUpdated: updateResult.modifiedCount,
       });
     } catch (error) {
       // If any error occurs during the transaction, abort it
@@ -231,11 +230,14 @@ export async function DELETE(request: NextRequest) {
       session.endSession();
     }
   } catch (error) {
-    console.error('Error deleting playlist:', error);
-    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error("Error deleting playlist:", error);
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json(
-      { success: false, error: 'Failed to delete playlist', details: message },
+      { success: false, error: "Failed to delete playlist", details: message },
       { status: 500 }
     );
   }
 }
+  
+

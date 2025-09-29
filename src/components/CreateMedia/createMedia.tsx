@@ -277,8 +277,6 @@
 //     </div>
 //   );
 // };
-
-// export default CreateMedia;
 "use client";
 
 import React, { useState } from "react";
@@ -297,10 +295,6 @@ interface CreateMediaProps {
   onCancel: () => void;
   onSuccess: () => void;
 }
-
-// ✅ Prefer env vars, fallback to defaults
-const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "media_upload_preset";
-const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dzb0gggua";
 
 const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
   const [files, setFiles] = useState<SelectedFile[]>([]);
@@ -372,8 +366,6 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
       return;
     }
 
-    // Cloudinary credentials are optional now; we'll try backend upload first
-
     const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
     if (!userId) {
       toast.error("User not authenticated");
@@ -386,102 +378,26 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
     try {
       for (const fileObj of files) {
         try {
-          // Reflect uploading state for this file
           setFiles((prev) => prev.map((f) => (f.id === fileObj.id ? { ...f, status: "uploading" } : f)));
 
-          // 1) Try uploading to local backend first
-          const backendForm = new FormData();
-          backendForm.append("file", fileObj.file);
-          backendForm.append("userId", userId);
-          backendForm.append("type", fileObj.type);
-          const backendRes = await fetch("/api/upload", { method: "POST", body: backendForm });
-          let fileUrl: string | null = null;
+          // Backend upload
+          const formData = new FormData();
+          formData.append("files[0]", fileObj.file);
+          formData.append("fileNames[0]", fileObj.name);
+          formData.append("userId", userId);
 
-          if (backendRes.ok) {
-            const backendJson = await backendRes.json();
-            fileUrl = backendJson?.url || null;
-          } else {
-            // 2) Fallback to Cloudinary if backend upload fails
-            if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-              throw new Error("Backend upload failed and Cloudinary is not configured.");
-            }
-
-            const formData = new FormData();
-            formData.append("file", fileObj.file);
-            formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-
-            const mimeType = fileObj.type || "";
-            const resourceType = mimeType.startsWith("image/")
-              ? "image"
-              : mimeType.startsWith("video/") || mimeType.startsWith("audio/")
-              ? "video"
-              : "raw";
-
-            const unsignedRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`, {
-              method: "POST",
-              body: formData,
-            });
-            let cloudData = await unsignedRes.json();
-
-            if (!unsignedRes.ok) {
-              const msg = cloudData?.error?.message?.toLowerCase?.() || "";
-              const unsignedDisabled = msg.includes("unsigned") || msg.includes("preset") || msg.includes("invalid signature");
-
-              if (!unsignedDisabled) {
-                throw new Error(cloudData?.error?.message || "Cloudinary upload failed");
-              }
-
-              const signRes = await fetch("/api/cloudinary/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
-              const signJson = await signRes.json();
-              if (!signRes.ok) {
-                throw new Error(signJson?.error || "Failed to obtain Cloudinary signature");
-              }
-
-              const signedForm = new FormData();
-              signedForm.append("file", fileObj.file);
-              signedForm.append("api_key", signJson.apiKey);
-              signedForm.append("timestamp", String(signJson.timestamp));
-              signedForm.append("signature", signJson.signature);
-              if (signJson.folder) signedForm.append("folder", signJson.folder);
-
-              const signedRes = await fetch(`https://api.cloudinary.com/v1_1/${signJson.cloudName}/${resourceType}/upload`, {
-                method: "POST",
-                body: signedForm,
-              });
-              cloudData = await signedRes.json();
-              if (!signedRes.ok) {
-                throw new Error(cloudData?.error?.message || "Cloudinary signed upload failed");
-              }
-            }
-
-            fileUrl = cloudData.secure_url || cloudData.url || null;
-          }
-
-          if (!fileUrl) {
-            throw new Error("No file URL returned from upload");
-          }
-
-          // Save metadata to DB
-          const metadataRes = await fetch("/api/media/upload", {
+          const res = await fetch("/api/media/upload", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId,
-              name: fileObj.name,
-              type: fileObj.type,
-              url: fileUrl,
-            }),
+            body: formData,
           });
 
-          if (!metadataRes.ok) {
-            const errorMeta = await metadataRes.json();
-            throw new Error(errorMeta.message || "Failed to save metadata");
+          if (!res.ok) {
+            const errJson = await res.json();
+            throw new Error(errJson?.message || "Backend upload failed");
           }
 
-          // Mark file as completed
           setFiles((prev) => prev.map((f) => (f.id === fileObj.id ? { ...f, status: "completed" } : f)));
         } catch (err) {
-          // Per-file failure; mark failed and continue
           setFiles((prev) => prev.map((f) => (f.id === fileObj.id ? { ...f, status: "failed" } : f)));
           toast.error(err instanceof Error ? err.message : "Failed to upload this file");
         }
@@ -497,10 +413,7 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload media files",
-        { id: loadingToast }
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to upload media files", { id: loadingToast });
     } finally {
       setIsLoading(false);
     }
@@ -508,9 +421,7 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
 
   return (
     <div className="bg-[#DFF4F7] min-h-screen flex justify-center items-center p-6">
-      {/* <div className="bg-white rounded-2xl shadow-md w-full max-w-7xl p-6"> */}
-        <div className="bg-white rounded-2xl shadow-md w-full max-w-7xl p-6 min-h-[500px]">
-        {/* Header */}
+      <div className="bg-white rounded-2xl shadow-md w-full max-w-7xl p-6 min-h-[500px]">
         <h2 className="text-lg font-semibold mb-6">Let's create new media</h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -566,32 +477,17 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
                     className="bg-[#EAF8FC] rounded-lg p-4 shadow flex justify-between items-center"
                   >
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-800">
-                        {file.name}
-                      </p>
+                      <p className="text-sm font-medium text-gray-800">{file.name}</p>
                       {file.type.startsWith("audio/") && (
-                        <audio
-                          controls
-                          className="w-full mt-2"
-                          src={URL.createObjectURL(file.file)}
-                        />
+                        <audio controls className="w-full mt-2" src={URL.createObjectURL(file.file)} />
                       )}
                       {file.type.startsWith("video/") && (
-                        <video
-                          controls
-                          className="w-full mt-2 h-20 rounded"
-                          src={URL.createObjectURL(file.file)}
-                        />
+                        <video controls className="w-full mt-2 h-20 rounded" src={URL.createObjectURL(file.file)} />
                       )}
                       {file.type.startsWith("image/") && (
-                        <img
-                          src={URL.createObjectURL(file.file)}
-                          alt={file.name}
-                          className="mt-2 h-20 w-20 object-cover rounded"
-                        />
+                        <img src={URL.createObjectURL(file.file)} alt={file.name} className="mt-2 h-20 w-20 object-cover rounded" />
                       )}
 
-                      {/* Progress bar */}
                       <div className="w-full h-1 bg-gray-200 rounded mt-2">
                         <div
                           className={`h-1 rounded ${
@@ -601,18 +497,11 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
                           }`}
                         ></div>
                       </div>
-
                       <p className="text-xs mt-1 text-gray-500">
-                        {file.status === "uploading"
-                          ? "Uploading..."
-                          : "Upload completed"}
+                        {file.status === "uploading" ? "Uploading..." : "Upload completed"}
                       </p>
                     </div>
-
-                    <button
-                      onClick={() => handleFileDelete(file.id)}
-                      className="text-red-500 hover:text-red-700 ml-4"
-                    >
+                    <button onClick={() => handleFileDelete(file.id)} className="text-red-500 hover:text-red-700 ml-4">
                       <Trash2 size={18} />
                     </button>
                   </div>

@@ -59,6 +59,7 @@ import InstantaneousAnnouncement from "@/components/InstantaneousAnnouncement/In
 import AnnouncementList from "@/components/Announcement/AnnouncementList";
 import ConnectAnnouncement from "@/components/Announcement/ConnectAnnouncement";
 import TTSCreator from "@/components/Announcement/AnnouncementTts";
+import Scheduler from "@/components/Scheduler/Scheduler";
 // import RobotIcon from "@/components/icons/centelon-logo.svg";
 
 // Define interfaces
@@ -1006,6 +1007,8 @@ const renderContent = (): React.ReactElement => {
         return <AnnouncementList />;
       case "TextToSpeech":
         return <TTSCreator />;
+      case "calendarView":
+        return <Scheduler />;
       default:
         return (
           <div className="p-4 text-center py-20">
