@@ -1003,12 +1003,13 @@ const renderContent = (): React.ReactElement => {
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
       case "connectAnnouncement":
         return <ConnectAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("dashboard")} />;
-      case "showAnnouncementList":
+      case "announcementPlaylist":
         return <AnnouncementList />;
       case "TextToSpeech":
         return <TTSCreator />;
       case "calendarView":
         return <Scheduler />;
+
       default:
         return (
           <div className="p-4 text-center py-20">
