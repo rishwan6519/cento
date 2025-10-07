@@ -1,26 +1,28 @@
 import ApiKey from '@/models/ApiKey';
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/db'; // Make sure DB connection is established
+import { connectToDatabase } from '@/lib/db';
 
 const MODEL_NAME = "gemini-2.5-flash-preview-tts";
 const GEMINI_TTS_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    await connectToDatabase(); // Ensure MongoDB is connected
+    console.log("Received TTS request");
+    await connectToDatabase();
 
-    const { text, voice, userId } = await request.json();
+    const { text, voice, userId } = await req.json();
+    console.log("Request parameters:", { text, voice, userId });
     if (!userId) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
 
-    // Await the DB call!
-    const keyDoc = await ApiKey.findOne({ userId, status: "active" });
+    const keyDoc = await ApiKey.findOne({ userId });
+    console.log("Fetched API key document:", keyDoc);
     if (!keyDoc) {
       return NextResponse.json({ error: "API key not found for this user." }, { status: 404 });
     }
 
-    const apiKey = keyDoc.apiKey; // Extract the string
+    const apiKey = keyDoc.apiKey;
 
     if (!text || !voice) {
       return NextResponse.json(
@@ -71,7 +73,10 @@ export async function POST(request: NextRequest) {
 
     return new NextResponse(audioBuffer, {
       status: 200,
-      headers: { "Content-Type": "audio/wav" },
+      headers: {
+        "Content-Type": "audio/wav",
+        "Content-Disposition": "attachment; filename=tts.wav",
+      },
     });
 
   } catch (error) {
@@ -81,4 +86,15 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Optional: CORS preflight support
+export async function OPTIONS() {
+  return NextResponse.json({}, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    }
+  });
 }

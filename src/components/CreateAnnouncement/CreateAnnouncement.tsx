@@ -884,7 +884,7 @@ const CreateAnnouncement: React.FC<CreateAnnouncementProps> = ({ onCancel, onSuc
     
     try {
       // Simulate TTS API call - Replace with actual TTS API integration
-      const response = await fetch('/api/tts/generate-tts', { // Your actual TTS API endpoint
+      const response = await fetch('/api/tts', { // Your actual TTS API endpoint
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
