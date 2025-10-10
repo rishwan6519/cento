@@ -449,10 +449,6 @@
 
 
 
-
-
-
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -497,10 +493,24 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
 }) => {
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const [selectedPlaylists, setSelectedPlaylists] = useState<string[]>([]);
+  // const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [
+    selectedDeviceForPlaylist,
+    setSelectedDeviceForPlaylist,
+  ] = useState<Device | null>(null);
+  // const [selectedPlaylists, setSelectedPlaylists] = useState<string[]>([]);
+  const [
+    selectedPlaylistsForDevice,
+    setSelectedPlaylistsForDevice,
+  ] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-console.log("selectedDevice",selectedDevice)
+   const [
+    connectedPlaylists,
+    setConnectedPlaylists,
+  ] = useState<{ [deviceId: string]: string[] }>({});
+  const [isDisconnecting, setIsDisconnecting] = useState<string | null>(null); // To track which playlist is disconnecting
+
+console.log("selectedDevice",selectedDeviceForPlaylist)
 console.log("playlists",playlists)
 console.log("availableDevices",availableDevices);
 
@@ -548,11 +558,11 @@ console.log("availableDevices",availableDevices);
   }, [userId]);
 
   const handleConnect = async () => {
-    if (!selectedDevice) {
+    if (!selectedDeviceForPlaylist) {
       toast.error("Select a device first");
       return;
     }
-    if (selectedPlaylists.length === 0) {
+    if (selectedPlaylistsForDevice.length === 0) {
       toast.error("Select at least one playlist");
       return;
     }
@@ -563,8 +573,8 @@ console.log("availableDevices",availableDevices);
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          deviceId: selectedDevice.deviceId._id,
-          playlistIds: selectedPlaylists,
+          deviceId: selectedDeviceForPlaylist.deviceId._id,
+          playlistIds: selectedPlaylistsForDevice,
           userId,
         }),
       });
@@ -582,7 +592,67 @@ console.log("availableDevices",availableDevices);
       setIsLoading(false);
     }
   };
+   const fetchConnectedPlaylists = async (deviceId: string) => {
+    try {
+      const response = await fetch(
+        `/api/connected-playlist?deviceId=${deviceId}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch connected playlists");
+      const data = await response.json();
+      setConnectedPlaylists((prev) => ({
+        ...prev,
+        [deviceId]: data.playlistIds || [],
+      }));
+    } catch (error) {
+      console.error("Error fetching connected playlists:", error);
+      toast.error("Failed to fetch connected playlists");
+    }
+  };
+   const handleDisconnect = async (playlistId: string) => {
+    if (!selectedDeviceForPlaylist?.deviceId._id) {
+      toast.error("No device selected.");
+      return;
+    }
 
+    setIsDisconnecting(playlistId);
+    try {
+      const response = await fetch(
+        `/api/device-playlists?deviceId=${selectedDeviceForPlaylist.deviceId._id}&playlistId=${playlistId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to disconnect playlist.");
+      }
+
+      toast.success("Playlist disconnected successfully.");
+
+      // Update the UI
+      setConnectedPlaylists((prev) => ({
+        ...prev,
+        [selectedDeviceForPlaylist.deviceId._id]: prev[
+          selectedDeviceForPlaylist.deviceId._id
+        ]?.filter((id) => id !== playlistId),
+      }));
+    } catch (error) {
+      console.error("Error disconnecting playlist:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "An unknown error occurred."
+      );
+    } finally {
+      setIsDisconnecting(null);
+    }
+  };
+useEffect(() => {
+    if (selectedDeviceForPlaylist?.deviceId._id) {
+      fetchConnectedPlaylists(selectedDeviceForPlaylist.deviceId._id);
+    }
+  }, [selectedDeviceForPlaylist]);
   return (
     <div className="bg-[#f0f9fb] min-h-screen p-6">
       <h2 className="text-xl font-bold mb-6">Connect playlist to device</h2>
@@ -650,9 +720,9 @@ console.log("availableDevices",availableDevices);
       <div
         key={device._id}
         className={`bg-[#0f3b50] text-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-transform ${
-          selectedDevice?._id === device._id ? "ring-2 ring-blue-400" : ""
+          selectedDeviceForPlaylist?._id === device._id ? "ring-2 ring-blue-400" : ""
         }`}
-        onClick={() => setSelectedDevice(device)}
+        onClick={() => setSelectedDeviceForPlaylist(device)}
       >
         {/* Device Image */}
         <div className="relative h-40 w-full bg-gray-800">
@@ -689,7 +759,7 @@ console.log("availableDevices",availableDevices);
             className="hover:text-blue-400 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
-              setSelectedDevice(device);
+              setSelectedDeviceForPlaylist(device);
             }}
           >
             Select
@@ -707,7 +777,7 @@ console.log("availableDevices",availableDevices);
       )}
 
       {/* Selected device & Playlists section */}
-      {selectedDevice && (
+      {selectedDeviceForPlaylist && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white rounded-xl p-6 shadow">
           {/* Selected Device */}
           {/* <div className="border border-dashed border-gray-300 rounded-lg p-4">
@@ -746,15 +816,15 @@ console.log("availableDevices",availableDevices);
     {/* Device Icon */}
     <div className="flex justify-center mb-3">
       <img
-        src={selectedDevice.deviceId.imageUrl}
-        alt={selectedDevice.deviceId.name}
+        src={selectedDeviceForPlaylist.deviceId.imageUrl}
+        alt={selectedDeviceForPlaylist.deviceId.name}
         className="w-14 h-14"
       />
     </div>
 
     {/* Device Name */}
     <p className="text-base font-semibold text-[#00353E] mb-1">
-      {selectedDevice.deviceId.name}
+      {selectedDeviceForPlaylist.deviceId.name}
     </p>
 
     {/* Device Type & Zone */}
@@ -765,11 +835,11 @@ console.log("availableDevices",availableDevices);
     {/* Status Info */}
     <div className="flex justify-center items-center gap-3 text-xs mb-4">
       <span className="flex items-center gap-1 text-green-600">
-        <span className="w-2 h-2 bg-green-600 rounded-full"></span>  {selectedDevice.deviceId.status}
+        <span className="w-2 h-2 bg-green-600 rounded-full"></span>  {selectedDeviceForPlaylist.deviceId.status}
       </span>
       <span className="flex items-center gap-1 text-orange-500">
         {/* ⟳ */}
-         {selectedDevice.deviceId.serialNumber}
+         {selectedDeviceForPlaylist.deviceId.serialNumber}
       </span>
       {/* <span className="flex items-center gap-1 text-red-500">
         ⚠ Nothing is connected
@@ -778,7 +848,7 @@ console.log("availableDevices",availableDevices);
 
     {/* Switch Button */}
     <button
-      onClick={() => setSelectedDevice(null)}
+      onClick={() => setSelectedDeviceForPlaylist(null)}
       className="px-4 py-1 border border-[#00353E] rounded-lg text-xs text-[#00353E] hover:bg-[#00353E] hover:text-white transition-all"
     >
       Switch device
@@ -796,29 +866,37 @@ console.log("availableDevices",availableDevices);
               <p>No playlists available.</p>
             ) : (
               <div className="space-y-3">
-                {playlists.map((pl) => (
+                {/* {playlists.map((pl) => ( */}
+               {playlists.map((playlist) => {
+                  const isConnected = connectedPlaylists[
+                    selectedDeviceForPlaylist?.deviceId._id || ""
+                  ]?.includes(playlist._id || "");
+
+                  const isCurrentlyDisconnecting = isDisconnecting === playlist._id;
+
+                  return (    
                   <div
-                    key={pl._id}
+                    key={playlist._id}
                     className="flex justify-between items-center bg-[#e8f8fc] p-3 rounded-lg"
                   >
                     <div>
-                      <p className="font-medium">{pl.name}</p>
+                      <p className="font-medium">{playlist.name}</p>
                       <p className="text-xs text-gray-500">
-                         {pl.files.length} Tracks
+                         {playlist.files.length} Tracks
                       </p>
                       {/* <p className="text-xs text-gray-500">
                          Schedule : {pl.daysOfWeek} 
                       </p> */}
                       <p className="text-xs text-gray-500">
-  Schedule: {Array.isArray(pl.daysOfWeek) ? pl.daysOfWeek.join(" | ") : pl.daysOfWeek}
+  Schedule: {Array.isArray(playlist.daysOfWeek) ? playlist.daysOfWeek.join(" | ") : playlist.daysOfWeek}
 </p>
 
                     </div>
-                    <input
+                    {/* <input
                       type="checkbox"
-                      checked={selectedPlaylists.includes(pl._id!)}
+                      checked={selectedPlaylistsForDevice.includes(pl._id!)}
                       onChange={() => {
-                        setSelectedPlaylists((prev) =>
+                        setSelectedPlaylistsForDevice((prev) =>
                           prev.includes(pl._id!)
                             ? prev.filter((id) => id !== pl._id)
                             : [...prev, pl._id!]
@@ -826,11 +904,39 @@ console.log("availableDevices",availableDevices);
                       }}
                       // className="h-4 w-4"
                        className="accent-[#FF4500] w-5 h-5"
-                    />
+                    /> */}
+                    {isConnected ? (
+                            <button
+                              onClick={() => handleDisconnect(playlist._id!)}
+                              disabled={isCurrentlyDisconnecting}
+                              className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 disabled:opacity-50 disabled:cursor-wait"
+                            >
+                              {isCurrentlyDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                            </button>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={selectedPlaylistsForDevice.includes(
+                                playlist._id || ""
+                              )}
+                              onChange={() => {
+                                const playlistId = playlist._id || "";
+                                setSelectedPlaylistsForDevice((prev) =>
+                                  prev.includes(playlistId)
+                                    ? prev.filter((id) => id !== playlistId)
+                                    : [...prev, playlistId]
+                                );
+                              }}
+                              // className="h-5 w-5 text-blue-600 rounded"
+                               className="accent-[#FF4500] w-5 h-5 rounded"
+                            />
+                          )}
                     
 
                   </div>
-                ))}
+                  );
+                })}
+                {/* ))} */}
               </div>
             )}
           </div>
@@ -838,7 +944,7 @@ console.log("availableDevices",availableDevices);
       )}
 
       {/* Actions */}
-      {selectedDevice && (
+      {selectedDeviceForPlaylist && (
         <div className="flex justify-center gap-3 mt-6">
           <button
             onClick={onCancel}

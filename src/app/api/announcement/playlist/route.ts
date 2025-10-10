@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
+import '@/models/AnnouncementFiles'; 
 
 // GET: Fetch playlists by userId
 export async function GET(req: NextRequest) {
@@ -13,30 +14,33 @@ export async function GET(req: NextRequest) {
 
   try {
     await connectToDatabase();
+
     const playlists = await AnnouncementPlaylist.find({ userId })
       .sort({ createdAt: -1 })
-      .populate('announcements.file');
-
-      console.log("Playlists fetched for userId:", userId, playlists);
+      .populate({
+        path: 'announcements.file',
+        model: 'Announcement', // ✅ references your Announcement model
+      });
 
     return NextResponse.json({ playlists }, { status: 200 });
-  } catch (error) {
-    console.error('Error fetching playlists:', error);
+  } catch (error: any) {
+    console.error('Error fetching playlists:', error.message || error);
     return NextResponse.json({ error: 'Failed to fetch playlists' }, { status: 500 });
   }
 }
 
 // POST: Create a new playlist
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { userId, name, announcements, schedule, status } = body;
-
-  if (!userId || !name || !Array.isArray(announcements) || !schedule) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
-
   try {
+    const body = await req.json();
+    const { userId, name, announcements, schedule, status } = body;
+
+    if (!userId || !name || !Array.isArray(announcements) || !schedule) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
     await connectToDatabase();
+
     const newPlaylist = await AnnouncementPlaylist.create({
       userId,
       name,
@@ -46,8 +50,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ playlist: newPlaylist }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating playlist:', error);
+  } catch (error: any) {
+    console.error('Error creating playlist:', error.message || error);
     return NextResponse.json({ error: 'Failed to create playlist' }, { status: 500 });
   }
 }

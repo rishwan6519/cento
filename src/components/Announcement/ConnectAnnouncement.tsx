@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Database, ArrowLeft, Mic, Clock, Calendar, XCircle, CheckCircle } from "lucide-react";
+import { Database } from "lucide-react";
 import toast from "react-hot-toast";
 
-// --- INTERFACES (no changes) ---
 interface Device {
   _id: string;
   name: string;
@@ -13,11 +12,12 @@ interface Device {
     serialNumber: string;
     imageUrl: string;
     name: string;
+    status: string;
   };
-  typeId:{
+  typeId: {
     _id: string;
     name: string;
-  }
+  };
 }
 
 interface AnnouncementPlaylist {
@@ -38,7 +38,6 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
   onCancel,
   onSuccess
 }) => {
-  const [connectStep, setConnectStep] = useState<number>(1);
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [announcementPlaylists, setAnnouncementPlaylists] = useState<AnnouncementPlaylist[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -47,7 +46,7 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDisconnecting, setIsDisconnecting] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
     if (storedUserId) {
@@ -77,7 +76,6 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
       const data = await response.json();
       setAvailableDevices(data.data || []);
     } catch (error) {
-      console.error("Error fetching devices:", error);
       toast.error("Failed to fetch devices");
     } finally {
       setIsLoading(false);
@@ -93,7 +91,6 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
       const data = await response.json();
       setAnnouncementPlaylists(data.playlists || []);
     } catch (error) {
-      console.error("Error fetching announcement playlists:", error);
       toast.error("Failed to fetch announcement playlists");
     } finally {
       setIsLoading(false);
@@ -104,11 +101,11 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
     try {
       const response = await fetch(`/api/announcement/device-announcement?deviceId=${deviceId}`);
       if (!response.ok) {
-          if(response.status === 404) {
-             setConnectedAnnouncements((prev) => ({ ...prev, [deviceId]: [] }));
-             return;
-          }
-          throw new Error("Failed to fetch connected announcements");
+        if(response.status === 404) {
+          setConnectedAnnouncements((prev) => ({ ...prev, [deviceId]: [] }));
+          return;
+        }
+        throw new Error("Failed to fetch connected announcements");
       }
       const data = await response.json();
       setConnectedAnnouncements((prev) => ({
@@ -116,26 +113,21 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
         [deviceId]: data.announcementPlaylistIds || [],
       }));
     } catch (error) {
-      console.error("Error fetching connected announcements:", error);
       toast.error("Failed to fetch connected announcements");
     }
   };
 
-  // --- MODIFIED CONNECT FUNCTION ---
   const handleConnectAnnouncementsToDevice = async () => {
     if (!selectedDevice?.deviceId._id || !userId) {
       toast.error("Please select a device.");
       return;
     }
-    
     if (selectedAnnouncements.length === 0) {
       toast.error("Please select an announcement playlist to connect.");
       return;
     }
-    
     setIsLoading(true);
     try {
-      // Combine newly selected playlists with existing ones
       const alreadyConnectedIds = connectedAnnouncements[selectedDevice.deviceId._id] || [];
       const combinedIds = [...new Set([...alreadyConnectedIds, ...selectedAnnouncements])];
 
@@ -144,201 +136,201 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           deviceId: selectedDevice.deviceId._id,
-          announcementPlaylistIds: combinedIds, // Send the full list
+          announcementPlaylistIds: combinedIds,
           userId: userId,
         }),
       });
-      
+
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || "Failed to connect announcements");
       }
-      
-      toast.success("Announcements connected successfully");
 
-      // Update local state for immediate UI feedback
+      toast.success("Announcements connected successfully");
       setConnectedAnnouncements(prev => ({ ...prev, [selectedDevice.deviceId._id]: combinedIds }));
-      setSelectedAnnouncements([]); // Clear selection
+      setSelectedAnnouncements([]);
       onSuccess();
 
     } catch (error) {
-      console.error("Error connecting announcements:", error);
       toast.error(error instanceof Error ? error.message : "Failed to connect announcements");
     } finally {
       setIsLoading(false);
     }
   };
-  
-  // --- Disconnect function (no changes) ---
+
   const handleDisconnectAnnouncement = async (playlistId: string) => {
     if (!selectedDevice?.deviceId._id) {
-        toast.error("No device selected for disconnection.");
-        return;
+      toast.error("No device selected for disconnection.");
+      return;
     }
-
     setIsDisconnecting(playlistId);
     try {
-        const response = await fetch(
-            `/api/announcement/device-announcement?deviceId=${selectedDevice.deviceId._id}&announcementPlaylistId=${playlistId}`,
-            { method: "DELETE" }
-        );
-
-        if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.error || "Failed to disconnect announcement.");
-        }
-
-        toast.success("Announcement disconnected successfully.");
-
-        setConnectedAnnouncements((prev) => {
-            const currentIds = prev[selectedDevice.deviceId._id] || [];
-            return {
-                ...prev,
-                [selectedDevice.deviceId._id]: currentIds.filter(id => id !== playlistId),
-            };
-        });
-
+      const response = await fetch(
+        `/api/announcement/device-announcement?deviceId=${selectedDevice.deviceId._id}&announcementPlaylistId=${playlistId}`,
+        { method: "DELETE" }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to disconnect announcement.");
+      }
+      toast.success("Announcement disconnected successfully.");
+      setConnectedAnnouncements((prev) => {
+        const currentIds = prev[selectedDevice.deviceId._id] || [];
+        return {
+          ...prev,
+          [selectedDevice.deviceId._id]: currentIds.filter(id => id !== playlistId),
+        };
+      });
     } catch (error) {
-        console.error("Error disconnecting announcement:", error);
-        toast.error(error instanceof Error ? error.message : "An unknown error occurred.");
+      toast.error(error instanceof Error ? error.message : "An unknown error occurred.");
     } finally {
-        setIsDisconnecting(null);
+      setIsDisconnecting(null);
     }
   };
 
-  const resetForm = () => {
-    setConnectStep(1);
-    setSelectedDevice(null);
-    setSelectedAnnouncements([]);
-  };
-
-  const renderScheduleIcon = (scheduleType: 'hourly' | 'timed') => {
-    return scheduleType === 'hourly' 
-      ? <Clock size={14} className="text-gray-500" /> 
-      : <Calendar size={14} className="text-gray-500" />;
-  }
-
-  // --- LOGIC TO ENFORCE SELECTION RULES ---
-  const connectedPlaylistDetails = announcementPlaylists.filter(p => 
-      connectedAnnouncements[selectedDevice?.deviceId._id || ""]?.includes(p._id)
+  const connectedPlaylistDetails = announcementPlaylists.filter(p =>
+    connectedAnnouncements[selectedDevice?.deviceId._id || ""]?.includes(p._id)
   );
   const selectedPlaylistDetails = announcementPlaylists.filter(p => selectedAnnouncements.includes(p._id));
 
-  const isTimedSlotTaken = 
+  const isTimedSlotTaken =
     connectedPlaylistDetails.some(p => p.schedule.scheduleType === 'timed') ||
     selectedPlaylistDetails.some(p => p.schedule.scheduleType === 'timed');
 
-  const isHourlySlotTaken = 
+  const isHourlySlotTaken =
     connectedPlaylistDetails.some(p => p.schedule.scheduleType === 'hourly') ||
     selectedPlaylistDetails.some(p => p.schedule.scheduleType === 'hourly');
 
-
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 text-black">
-      {/* Header and Step 1 JSX remain the same */}
-       <div className="mb-6 border-b pb-4">
-        <h2 className="text-2xl font-bold">
-          Connect Announcement to Device
-        </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Step {connectStep} of 2:{" "}
-          {connectStep === 1 ? "Select Device" : "Choose Announcements"}
-        </p>
-      </div>
-      
-      {isLoading && connectStep === 1 ? (
-         <div className="flex justify-center items-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        </div>
-      ) : connectStep === 1 ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {availableDevices.map((device) => (
-              <button
+    <div className="bg-[#f0f9fb] min-h-screen p-6">
+      <h2 className="text-xl font-bold mb-6">Connect announcement to device</h2>
+
+      {/* Available Devices */}
+      <h3 className="text-lg font-semibold mb-3">Available Devices</h3>
+      {isLoading && availableDevices.length === 0 ? (
+        <p>Loading devices...</p>
+      ) : availableDevices.length === 0 ? (
+        <p>No devices available.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
+          {availableDevices.map((device) => {
+            const imageUrl = device.deviceId?.imageUrl || "/placeholder.jpg";
+            const deviceName = device.deviceId?.name || device.name;
+
+            return (
+              <div
                 key={device._id}
-                onClick={() => {
-                  setSelectedDevice(device);
-                  setConnectStep(2);
-                }}
-                className={`p-4 border rounded-lg text-left transition-all hover:border-blue-500`}
+                className={`bg-[#0f3b50] text-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transform hover:scale-105 transition-transform ${
+                  selectedDevice?._id === device._id ? "ring-2 ring-orange-400" : ""
+                }`}
+                onClick={() => setSelectedDevice(device)}
               >
-                <div className="flex items-center gap-3">
+                {/* Device Image */}
+                <div className="relative h-40 w-full bg-gray-800 flex items-center justify-center">
                   {device.deviceId.imageUrl ? (
                     <img
                       src={device.deviceId.imageUrl}
-                      alt={device.deviceId.name}
-                      className="w-12 h-12 rounded-lg object-cover"
+                      alt={deviceName}
+                      className="h-16 w-16 object-cover rounded-full"
                     />
                   ) : (
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Database size={24} className="text-gray-400" />
-                    </div>
+                    <Database size={40} className="text-white" />
                   )}
-                  <div>
-                    <h3 className="font-medium text-gray-900">
-                      {device.deviceId.name || "N/A"}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      ID: {device.deviceId.serialNumber || "N/A"}
-                    </p>
+                  {device.deviceId.status === "active" && (
+                    <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full border border-white"></span>
+                  )}
+                </div>
+
+                {/* Device Info */}
+                <div className="p-4 flex flex-col gap-2">
+                  <h4 className="font-bold text-lg truncate">{deviceName}</h4>
+                  <p className="text-xs text-gray-300 truncate">
+                    Serial: {device.deviceId?.serialNumber || "N/A"}
+                  </p>
+                  <div className="flex flex-col gap-1 text-sm">
+                    <span className="flex items-center gap-2 text-green-400">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      {device.deviceId.status || "Online"}
+                    </span>
                   </div>
                 </div>
-              </button>
-            ))}
-          </div>
-          
-          {availableDevices.length === 0 && !isLoading && (
-            <p className="text-center text-gray-500 py-4">
-              No devices available. Please add devices first.
-            </p>
-          )}
-          
-          <div className="flex justify-end gap-3 pt-6 border-t">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 text-gray-600 hover:text-gray-900"
-            >
-              Cancel
-            </button>
-          </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-around bg-[#0b2735] py-3 text-sm font-medium border-t border-gray-700">
+                  <button
+                    className="hover:text-orange-400 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedDevice(device);
+                    }}
+                  >
+                    Select
+                  </button>
+                  <button className="text-gray-500 cursor-not-allowed" disabled>
+                    Restart
+                  </button>
+                  <button className="text-gray-500 cursor-not-allowed" disabled>
+                    Reassign
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 mb-6">
-            <button
-              onClick={resetForm}
-              className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
-            >
-              <ArrowLeft size={20} />
-              <span>Back to Devices</span>
-            </button>
-          </div>
-          
-          <div className="bg-blue-50 p-4 rounded-lg mb-6">
-            <h3 className="font-medium text-blue-900">
-              Selected Device
-            </h3>
-            <p className="text-sm text-blue-700 mt-1">
-              {selectedDevice?.deviceId.name} (Serial: {selectedDevice?.deviceId.serialNumber})
-            </p>
-          </div>
-          
-          {isLoading ? (
-             <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      )}
+
+      {/* Selected Device & Announcements */}
+      {selectedDevice && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white rounded-xl p-6 shadow">
+          {/* Selected Device */}
+          <div className="flex flex-col">
+            <h3 className="font-semibold mb-3">Your selected device</h3>
+            <div className="border-2 border-dashed border-[#FFB6A3] mt-6 rounded-xl p-6 text-center w-[300px] bg-white">
+              <div className="flex justify-center mb-3">
+                {selectedDevice.deviceId.imageUrl ? (
+                  <img
+                    src={selectedDevice.deviceId.imageUrl}
+                    alt={selectedDevice.deviceId.name}
+                    className="w-14 h-14 rounded-full"
+                  />
+                ) : (
+                  <Database size={40} className="text-[#0A2E3C]" />
+                )}
+              </div>
+              <p className="text-base font-semibold text-[#00353E] mb-1">
+                {selectedDevice.deviceId.name}
+              </p>
+              <p className="text-xs text-gray-500 mb-3">
+                Serial: {selectedDevice.deviceId.serialNumber}
+              </p>
+              <div className="flex justify-center items-center gap-3 text-xs mb-4">
+                <span className="flex items-center gap-1 text-green-600">
+                  <span className="w-2 h-2 bg-green-600 rounded-full"></span>
+                  {selectedDevice.deviceId.status}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedDevice(null)}
+                className="px-4 py-1 border border-[#00353E] rounded-lg text-xs text-[#00353E] hover:bg-[#00353E] hover:text-white transition-all"
+              >
+                Switch device
+              </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <h3 className="font-medium text-gray-900">
-                Available Announcement Playlists (Max: 1 Timed, 1 Hourly)
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          </div>
+
+          {/* Announcements */}
+          <div>
+            <h3 className="font-semibold mb-3">Available Announcement</h3>
+            {isLoading && announcementPlaylists.length === 0 ? (
+              <p>Loading announcements...</p>
+            ) : announcementPlaylists.length === 0 ? (
+              <p>No announcement playlists available.</p>
+            ) : (
+              <div className="space-y-3">
                 {announcementPlaylists.map((playlist) => {
                   const isConnected = connectedPlaylistDetails.some(p => p._id === playlist._id);
                   const isSelected = selectedAnnouncements.includes(playlist._id);
                   const isBeingDisconnected = isDisconnecting === playlist._id;
-                  
-                  // --- NEW: Determine if the card should be disabled ---
                   let isDisabled = false;
                   if (playlist.schedule.scheduleType === 'timed' && isTimedSlotTaken && !isSelected && !isConnected) {
                     isDisabled = true;
@@ -346,87 +338,92 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
                   if (playlist.schedule.scheduleType === 'hourly' && isHourlySlotTaken && !isSelected && !isConnected) {
                     isDisabled = true;
                   }
-
                   return (
                     <div
                       key={playlist._id}
-                      className={`p-4 border rounded-lg transition-all ${
-                        isDisabled ? "bg-gray-100 opacity-60 cursor-not-allowed" :
-                        isConnected ? "border-green-300 bg-green-50" :
-                        isSelected ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500" : 
-                        "hover:border-blue-500 cursor-pointer"
+                      className={`flex justify-between items-center bg-[#e8f8fc] p-3 rounded-lg ${
+                        isDisabled ? "opacity-50 cursor-not-allowed" :
+                        isConnected ? "ring-2 ring-green-400" :
+                        isSelected ? "ring-2 ring-orange-500" :
+                        "hover:shadow-md cursor-pointer"
                       }`}
                       onClick={() => {
-                          if (isConnected || isDisabled) return;
-                          setSelectedAnnouncements((prev) =>
-                              prev.includes(playlist._id)
-                                ? prev.filter((id) => id !== playlist._id)
-                                : [...prev, playlist._id]
-                          );
+                        if (isConnected || isDisabled) return;
+                        setSelectedAnnouncements((prev) =>
+                          prev.includes(playlist._id)
+                            ? prev.filter((id) => id !== playlist._id)
+                            : [...prev, playlist._id]
+                        );
                       }}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-medium text-gray-900">
-                            {playlist.name}
-                          </h4>
-                          <div className="flex items-center gap-3 text-sm text-gray-500 mt-2">
-                            <span className="flex items-center gap-1"><Mic size={14}/> {playlist.announcements?.length || 0} files</span>
-                            <span className="flex items-center gap-1 capitalize">{renderScheduleIcon(playlist.schedule.scheduleType)} {playlist.schedule.scheduleType}</span>
-                          </div>
-                        </div>
-                        {isConnected ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDisconnectAnnouncement(playlist._id); }}
-                              disabled={isBeingDisconnected}
-                              className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full hover:bg-red-200 disabled:opacity-50 flex items-center gap-1"
-                            >
-                              <XCircle size={14} />
-                              {isBeingDisconnected ? 'Wait' : 'Disconnect'}
-                            </button>
-                        ) : isDisabled ? (
-                            <span className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-200 rounded-full">Slot taken</span>
-                        ) : (
-                          <div className={`h-5 w-5 rounded-md flex items-center justify-center ${isSelected ? 'bg-blue-600' : 'border border-gray-300'}`}>
-                            {isSelected && <CheckCircle size={14} className="text-white"/>}
-                          </div>
-                        )}
+                      <div>
+                        <p className="font-medium">{playlist.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {playlist.announcements?.length || 0} Tracks
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Schedule: {playlist.schedule.scheduleType}
+                        </p>
                       </div>
+                      {isConnected ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDisconnectAnnouncement(playlist._id);
+                          }}
+                          disabled={isBeingDisconnected}
+                          className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-full hover:bg-red-200 disabled:opacity-50"
+                        >
+                          {isBeingDisconnected ? "Wait..." : "Disconnect"}
+                        </button>
+                      ) : isDisabled ? (
+                        <span className="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded-full">
+                          Slot taken
+                        </span>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="accent-orange-500 w-5 h-5 cursor-pointer"
+                        />
+                      )}
                     </div>
                   );
                 })}
               </div>
-              
-              {announcementPlaylists.length === 0 && !isLoading && (
-                <p className="text-center text-gray-500 py-4">
-                  No announcement playlists found. Please create one first.
-                </p>
-              )}
-            </div>
-          )}
-          
-          <div className="flex justify-end gap-3 pt-6 border-t">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 text-gray-600 hover:text-gray-900"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConnectAnnouncementsToDevice}
-              disabled={selectedAnnouncements.length === 0 || isLoading}
-              className="px-6 py-2 rounded-lg text-white font-medium transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700"
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                  <span>Connecting...</span>
-                </div>
-              ) : (
-                `Connect ${selectedAnnouncements.length} Announcement${selectedAnnouncements.length === 1 ? '' : 's'}`
-              )}
-            </button>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      {selectedDevice && (
+        <div className="flex justify-center gap-3 mt-6">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConnectAnnouncementsToDevice}
+            disabled={isLoading || selectedAnnouncements.length === 0}
+            className="px-6 py-2 rounded-lg bg-[#07323C] text-white hover:bg-[#006377] disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isLoading ? "Connecting..." : "Connect announcement"}
+          </button>
+        </div>
+      )}
+
+      {!selectedDevice && (
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
         </div>
       )}
     </div>

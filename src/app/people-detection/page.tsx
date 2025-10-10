@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { toast } from "react-toastify";
 import mqtt from "mqtt"; // Make sure to install mqtt: npm install mqtt
+import FloorPlanUploader from "@/components/FloorPlanUPloader/FloorPlanUploader";
 
 // Add this type definition at the top of the file
 interface ZoneCounts {
@@ -892,17 +893,42 @@ if (
   const [activeHeatmapAnnotationZoneId, setActiveHeatmapAnnotationZoneId] =
     useState<number | null>(null);
 
-  const handleHeatmapUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setUploadedHeatmapUrl(imageUrl);
-      setHeatmapImageLoaded(false);
-      await fetchAvailableCameras();
+// ... inside PeopleDetectionPage component ...
+
+const handleHeatmapUpload = async (
+  event: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = event.target.files?.[0];
+  const userId = localStorage.getItem("userId"); // Assuming userId is stored here
+
+  if (file && userId) {
+    const formData = new FormData();
+    formData.append("floorMap", file);
+    formData.append("userId", userId); // Pass the userId
+
+    try {
+      const res = await fetch("/api/floor-map", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (data.success) {
+        setUploadedHeatmapUrl(data.imageUrl); // URL from backend
+        setHeatmapImageLoaded(false);
+        toast.success("Floor plan uploaded successfully!");
+        fetchAvailableCameras(); // Re-fetch cameras if needed or just update local state
+        // Optionally, update floorPlans state to include the new plan
+        setFloorPlans(prev => [...prev, { id: data.data._id, name: data.data.name, imageUrl: data.data.imageUrl }]);
+        setHeatmapStep("show"); // Automatically move to show data after upload
+      } else {
+        toast.error(`Failed to upload floor plan: ${data.message}`);
+      }
+    } catch (error) {
+      console.error("Error uploading floor plan:", error);
+      toast.error("An error occurred during floor plan upload.");
     }
-  };
+  } else if (!userId) {
+    toast.error("User ID not found. Please log in.");
+  }
+};
 
   const handleHeatmapImageLoad = () => {
     setHeatmapImageLoaded(true);
@@ -1245,18 +1271,21 @@ const handleDeleteLine = async (lineName: string) => {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           {/* Menubar */}
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">
-              🎯 People Detection Dashboard
-            </h1>
+          <div className=" mb-8">
+           
+
+
+             
             <div className="flex gap-4">
               {/* Other menu items... */}
-              <button
+          
+              {/* <button
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
                 onClick={() => setShowHeatmapModal(true)}
               >
                 Heatmap
-              </button>
+              </button> */}
+
             </div>
           </div>
           {/* Header */}
@@ -1264,10 +1293,13 @@ const handleDeleteLine = async (lineName: string) => {
             <h1 className="text-4xl font-bold text-gray-800 mb-2">
               🎯 People Detection Dashboard
             </h1>
+
+            
             <p className="text-gray-600">
               Configure cameras and set detection zones via MQTT
             </p>
           </div>
+              {/* <FloorPlanUploader /> */}
 
           {/* Main Card */}
           <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">
@@ -1376,70 +1408,7 @@ const handleDeleteLine = async (lineName: string) => {
                   </button>
                 </div>
 
-                {/* Heatmap Controls */}
-                {Object.keys(zoneCounts).length > 0 && (
-                  <div
-                    id="heatmap-controls"
-                    className="bg-slate-50 p-8 rounded-lg border border-slate-200 mb-8 shadow-sm"
-                  >
-                    <h3 className="text-xl font-semibold text-slate-800 mb-6 tracking-tight">
-                      Heatmap Analysis (Requires Analytics Backend)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
-                          Start Date
-                        </label>
-                        <input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
-                          Start Time
-                        </label>
-                        <input
-                          type="time"
-                          value={startTime}
-                          onChange={(e) => setStartTime(e.target.value)}
-                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
-                          End Date
-                        </label>
-                        <input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-3 tracking-wide">
-                          End Time
-                        </label>
-                        <input
-                          type="time"
-                          value={endTime}
-                          onChange={(e) => setEndTime(e.target.value)}
-                          className="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-700 bg-white"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      onClick={fetchHeatmapData}
-                      disabled={heatmapLoading || !startDate || !endDate}
-                      className="bg-slate-800 text-white px-8 py-4 rounded-lg font-medium text-sm tracking-wide hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm border border-slate-800"
-                    >
-                      {heatmapLoading ? "Processing..." : "Generate Heatmap Analysis"}
-                    </button>
-                  </div>
-                )}
+               
 
                 {/* Zone Count Display */}
                 {Object.keys(zoneCounts).length > 0 && (
@@ -1870,93 +1839,8 @@ const handleDeleteLine = async (lineName: string) => {
         </div>
       )}
 
-      {/* Heatmap Modal */}
-      {showHeatmapModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[95vh] overflow-auto relative">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-3xl flex justify-between items-center">
-              <h3 className="text-2xl font-semibold text-gray-800">🔥 Heatmap</h3>
-              <button
-                onClick={() => {
-                  setShowHeatmapModal(false);
-                  setHeatmapStep("menu");
-                }}
-                className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-            <div className="p-6">
-              {heatmapStep === "menu" && (
-                <div className="flex flex-col gap-6">
-                  <button
-                    className="bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-blue-700 transition"
-                    onClick={() => setHeatmapStep("upload")}
-                  >
-                    Upload Floor Plan
-                  </button>
-                  <button
-                    className="bg-green-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-green-700 transition"
-                    onClick={() => setHeatmapStep("show")}
-                  >
-                    Show Data
-                  </button>
-                </div>
-              )}
-
-              {heatmapStep === "upload" && (
-                <div>
-                  <h4 className="text-lg font-semibold mb-4">Upload Floor Plan</h4>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleHeatmapUpload}
-                    className="mb-4"
-                  />
-                  {uploadedHeatmapUrl && (
-                    <img src={uploadedHeatmapUrl} alt="Preview" className="max-w-full rounded-lg mb-4" />
-                  )}
-                  <button
-                    className="mt-2 px-4 py-2 bg-gray-200 rounded"
-                    onClick={() => setHeatmapStep("menu")}
-                  >
-                    Back
-                  </button>
-                </div>
-              )}
-
-              {heatmapStep === "show" && (
-                <div>
-                  <h4 className="text-lg font-semibold mb-4">Select Floor Plan</h4>
-                  <select
-                    value={selectedFloorPlan?.id || ""}
-                    onChange={e => {
-                      const plan = floorPlans.find(f => f.id === e.target.value);
-                      setSelectedFloorPlan(plan || null);
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-md mb-4"
-                  >
-                    <option value="">-- Select Floor Map --</option>
-                    {floorPlans.map(plan => (
-                      <option key={plan.id} value={plan.id}>{plan.name}</option>
-                    ))}
-                  </select>
-                  {selectedFloorPlan && (
-                    <img src={selectedFloorPlan.imageUrl} alt="Floor Plan" className="max-w-full rounded-lg mb-4" />
-                  )}
-                  {/* Add your date/time/camera/zone selection and drawing UI here */}
-                  <button
-                    className="mt-2 px-4 py-2 bg-gray-200 rounded"
-                    onClick={() => setHeatmapStep("menu")}
-                  >
-                    Back
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+     
+      
 
       {isLoading && <LoadingSpinner />}
       {isConnectionLost && <ConnectionLostModal onRetry={() => window.location.reload()} message={connectionLostMessage} />}

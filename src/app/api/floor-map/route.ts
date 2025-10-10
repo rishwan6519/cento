@@ -8,37 +8,42 @@ import FloorMap from "@/models/FloorMap";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { name, userId, image, fileName } = body;
-    console.log("Received data:", { name, userId, image, fileName });
+    const formData = await req.formData();
 
-    if (!name || !userId || !image || !fileName) {
+    // Extract fields correctly
+    const file = formData.get("file") as File | null;
+    const floorName = formData.get("floorName") as string | null;
+    const userId = formData.get("userId") as string | null;
+
+    console.log("Received data:", { floorName, userId, file });
+
+    if (!file || !floorName || !userId) {
       return NextResponse.json(
         { success: false, message: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const filePath = path.join(process.cwd(), "public/uploads/floormaps", fileName);
+    // Save the file locally (optional – depends on your storage choice)
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const uploadDir = path.join(process.cwd(), `/uploads/${userId}/floormaps`);
+    const filePath = path.join(uploadDir, file.name);
 
-    // Ensure upload directory exists
-    const uploadDir = path.dirname(filePath);
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
+    fs.writeFileSync(filePath, buffer);
 
-
-    
     await connectToDatabase();
 
     const newMap = await FloorMap.create({
-      name,
-      imageUrl: image, // Assuming image is the URL from Cloudinary
+      name: floorName,
+      imageUrl: `/uploads/${userId}/floormaps/${file.name}`, // Or cloud URL
       userId,
       uploadedAt: new Date(),
     });
 
-    return NextResponse.json({ success: true, data: newMap });
+    return NextResponse.json({ success: true, floorMapId: newMap._id });
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json(
@@ -47,7 +52,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
 
 
 // GET /api/floor-map?userId=123

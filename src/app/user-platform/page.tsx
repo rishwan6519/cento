@@ -68,16 +68,13 @@ interface UserData {
   username: string;
   role: string;
 }
+interface Slide {
+  id: string;
+  src: string;
+  alt: string;
+  description: string;
+}
 
-// type ExtendedMenuKey =
-//   | MenuKey
-//   | "createAnnouncement"
-//   | "setupAnnouncement"
-//   | "showAnnouncement"
-//   | "connectAnnouncement"
-//   | "InstantaneousAnnouncement"
-//   | "showAnnouncementList"
-//   | "TextToSpeech";
 type ExtendedMenuKey =
   | MenuKey
   // Announcement
@@ -135,7 +132,7 @@ interface MenuSection {
   }[];
 }
 
-// Dummy data for recently played (replace with real data as needed)
+
 const recentPlayed = [
   {
     id: 1,
@@ -159,13 +156,79 @@ const recentPlayed = [
     image: "/assets/service_robot.jpg",
   },
 ];
-const slides = [
-  { id: 1, src: "/assets/slider1home.jpg", alt: "Robot 1" },
-  { id: 2, src: "/assets/engagement_robot.jpg", alt: "Robot 2" },
-  { id: 3, src: "/assets/service_robot.jpg", alt: "Robot 3" },
-];
+// const slides = [
+//   { id: 1, src: "/assets/slider1home.jpg", alt: "Robot 1" },
+//   { id: 2, src: "/assets/engagement_robot.jpg", alt: "Robot 2" },
+//   { id: 3, src: "/assets/service_robot.jpg", alt: "Robot 3" },
+// ];
+
 export default function UserPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<ExtendedMenuKey>("dashboard");
+  const [sliderData, setSliderData] = useState<{ url: string; description: string; _id: string }[]>([]);
+const [slides, setSlides] = useState<Slide[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const fetchSliderData = async () => {
+      try {
+        const response = await fetch(
+          "https://iot.centelon.com/api/get-slider?userId=688c8989c3f5fa5504dfb2f6"
+        );
+        const result = await response.json();
+
+        if (result.success && result.data?.length > 0) {
+          const sliderItems = result.data[0].sliderId?.sliders || [];
+
+          const formattedSlides: Slide[] = sliderItems.map((item: any, index: number) => ({
+            id: item._id || index.toString(),
+            src: `https://iot.centelon.com${item.url}`, // prepend base URL
+            alt: item.description || `Slide ${index + 1}`,
+            description: item.description || "",
+          }));
+
+          setSlides(formattedSlides);
+        } else {
+          console.error("Invalid slider data structure:", result);
+        }
+      } catch (error) {
+        console.error("Error fetching slider data:", error);
+      }
+    };
+
+    fetchSliderData();
+  }, []);
+
+  // Auto slide every 4 seconds
+  useEffect(() => {
+    if (slides.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % slides.length);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [slides]);
+ useEffect(() => {
+  const fetchSliderData = async () => {
+    try {
+      const response = await fetch(`/api/assign-device?userId=${localStorage.getItem("userId")}`);
+      if (!response.ok) throw new Error("Failed to fetch slider data");
+      const data = await response.json();
+      if (data.success && data.data?.length > 0) {
+        const sliders = data.data[0].sliderId.sliders.map((slide: any) => ({
+          url: slide.url,
+          description: slide.description,
+        }));
+        setSliderData(sliders);
+      }
+    } catch (err) {
+      console.error("Error fetching slider data:", err);
+    }
+  };
+
+  fetchSliderData();
+}, []);
+
+
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -298,37 +361,6 @@ const [current, setCurrent] = useState(0);
     }
   };
 
-//   const menuSections: MenuSection[] = [
-//     // { key: "dashboard", label: "Dashboard", icon: <RiDashboardLine size={20} /> },
-// { key: "dashboard", label: "Dashboard", icon: <FaThLarge  size={15} /> },
-
-//     {
-//       key: "playlist",
-//       label: "Media Management",
-//       icon: <FaMusic size={20} />,
-//       items: [
-//         { key: "createMedia", label: "Create Media", icon: <FaRegFileAudio /> },
-//         { key: "showMedia", label: "Show Media", icon: <FaPlay /> },
-//         { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
-//         { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-//         { key: "connectPlaylist", label: "Connect & Disconnect Playlist", icon: <FaPlug /> },
-//       ],
-//     },
-//     {
-//       key: "announcement",
-//       label: "Announcement Hub",
-//       icon: <FaBullhorn size={20} />,
-//       items: [
-//         { key: "createAnnouncement", label: "Create Announcement", icon: <MdAnnouncement /> },
-//         { key: "setupAnnouncement", label: "Setup Announcement", icon: <FaCog /> },
-//         { key: "TextToSpeech", label: "Text to Speech", icon: <FaVolumeUp /> },
-//         { key: "showAnnouncement", label: "Show Announcement", icon: <FaDisplay /> },
-//         { key: "showAnnouncementList", label: "Announcement List", icon: <FaListAlt /> },
-//         { key: "connectAnnouncement", label: "Connect & Disconnect Announcement", icon: <FaLink /> },
-//         { key: "InstantaneousAnnouncement", label: "Instant Announcement", icon: <FaVolumeUp /> },
-//       ],
-//     },
-//   ];
 const menuSections: MenuSection[] = [
   { key: "dashboard", label: "Dashboard", icon: <FaThLarge size={15} /> },
   {
@@ -344,7 +376,7 @@ const menuSections: MenuSection[] = [
 
       { key: "showPlaylist", label: "Show playlist", icon: <MdOutlinePlaylistPlay /> },
       { key: "connectPlaylist", label: "Connect playlist to store", icon: <FaPlug /> },
-      { key: "playlistTemplates", label: "Playlist templates", icon: <FaListAlt /> },
+      // { key: "playlistTemplates", label: "Playlist templates", icon: <FaListAlt /> },
     ],
   },
   {
@@ -357,52 +389,20 @@ const menuSections: MenuSection[] = [
       { key: "announcementPlaylist", label: "Announcement playlist", icon: <FaListAlt /> },
       { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
       { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
-      { key: "connectDeviceZone", label: "Connect to device to zone", icon: <FaLink /> },
-      { key: "instantTrigger", label: "Instant announcement trigger", icon: <FaVolumeUp /> },
-      { key: "announcementTemplate", label: "Announcement template", icon: <FaDisplay /> },
+      
     ],
   },
-  {
-    key: "device",
-    label: "Device Management",
-    icon: <FaDesktop size={20} />,
-    items: [
-      { key: "storeDeviceList", label: "Store device list", icon: <FaDesktop /> },
-      { key: "addPairDevice", label: "Add/Pair device", icon: <FaPlug /> },
-      { key: "deviceStatus", label: "Device status", icon: <FaDisplay /> },
-      { key: "zoneMapping", label: "Zone mapping per store", icon: <FaMap /> },
-    ],
-  },
+  
   {
     key: "scheduler",
     label: "Scheduler",
     icon: <FaCalendarAlt size={20} />,
     items: [
       { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
-      { key: "conflictAlerts", label: "Conflict alerts", icon: <FaExclamationTriangle /> },
-      { key: "autoSchedule", label: "Auto scheduling assistant", icon: <FaRobot /> },
+      
     ],
   },
-  {
-    key: "reports",
-    label: "Reports and Logs",
-    icon: <FaFileAlt size={20} />,
-    items: [
-      { key: "playbackHistory", label: "Playback history", icon: <FaHistory /> },
-      { key: "announcementLog", label: "Announcement delivery log", icon: <FaBullhorn /> },
-      { key: "engagementTrends", label: "Engagement/usage trends", icon: <FaChartLine /> },
-      { key: "exportReports", label: "Export reports", icon: <FaDownload /> },
-    ],
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: <FaCog size={20} />,
-    items: [
-      { key: "zoneSetup", label: "Zone setup", icon: <FaMap /> },
-      { key: "notificationPreferences", label: "Notification preferences", icon: <FaBell /> },
-    ],
-  },
+ 
 ];
 
 const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
@@ -573,15 +573,7 @@ const handleMenuToggle = (key: string) => {
   // Dashboard content matching image layout
   const DashboardContent = () => (
     <div className="flex flex-col space-y-8">
-      {/* Welcome Header */}
-      {/* <header className="px-4 pt-4 pb-2 border-b border-gray-200">
-        <h1 className="text-2xl font-semibold text-gray-900 font-sans mb-1">
-          Welcome Back, {userData?.username || "John"}!
-        </h1>
-        <p className="text-gray-700 font-sans text-sm max-w-xl">
-          Here’s what’s happening with your store today.
-        </p>
-      </header> */}
+     
         <header className="px-6 pt-4 pb-3 border-b border-gray-200 bg-[#E6F9FD] flex items-center justify-between">
       {/* Left Content */}
       <div>
@@ -617,78 +609,90 @@ const handleMenuToggle = (key: string) => {
       </div>
     </header>
 
-      {/* Top Content - Wide */}
-      {/* <div className="flex flex-wrap gap-8"> */}
-        {/* Left Large Image + text */}
-        {/* <div className="flex-1 min-w-[320px] max-w-3xl rounded-xl overflow-hidden shadow-xl bg-white relative">
-          <img
-            src="/assets/slider1home.jpg"
-            alt="Featured Robot"
-            className="w-full object-cover max-h-60 sm:max-h-72"
-            loading="lazy"
-          />
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white font-sans text-sm rounded-b-xl">
-            Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy
-          </div>
-        </div> */}
-
-        {/* Recently Played */}
-        {/* <aside className="w-72 flex flex-col space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 font-sans mb-2">Recently played</h2>
-          <div className="space-y-4 max-h-[19rem] overflow-y-auto">
-            {recentPlayed.map((item) => (
-              <div
-                key={item.id}
-                className="flex gap-3 bg-white rounded-xl shadow-lg p-2 items-center cursor-pointer"
-              >
-                <img
-                  src={item.image}
-                  alt={item.playlistName}
-                  className="h-14 w-14 rounded-lg object-cover"
-                  loading="lazy"
-                />
-                <div className="flex flex-col flex-1">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{item.playlistName}</p>
-                  <p className="text-xs font-sans text-gray-600 truncate">{item.creator}</p>
-                  <p className="text-xs font-sans text-gray-500 mt-auto">{item.duration}</p>
-                </div>
-                <button
-                  aria-label="RSS Icon"
-                  className="p-1 rounded hover:bg-gray-100 transition-colors"
-                  onClick={() => alert("Cast action")}
-                >
-                  <FaBroadcastTower className="text-orange-500 w-5 h-5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </aside> */}
-      {/* </div> */}
+     
   <div className="flex flex-col lg:flex-row gap-8">
       {/* Left: Slider */}
       <div className="relative flex-1 min-w-[320px] rounded-2xl overflow-hidden shadow-lg">
         {/* Slides container */}
-        <div
-          className="flex transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(-${current * 100}%)` }}
-        >
-          {slides.map((slide) => (
-            <img
-              key={slide.id}
-              src={slide.src}
-              alt={slide.alt}
-              className="w-full object-cover max-h-[22rem] flex-shrink-0"
-            />
-          ))}
-        </div>
+        {/* <div
+  className="flex transition-transform duration-700 ease-in-out"
+  style={{ transform: `translateX(-${current * 100}%)` }}
+>
+  {sliderData.map((slide) => (
+    <img
+      key={slide._id}
+      src={slide.url}
+      alt={slide.description}
+      className="w-full object-cover max-h-[22rem] flex-shrink-0"
+    />
+  ))}
+</div> */}
+ <div className="relative w-full overflow-hidden rounded-2xl shadow-lg">
+      <img
+        src={slides[currentIndex].src}
+        alt={slides[currentIndex].alt}
+        className="w-full h-[450px] object-cover transition-all duration-700 ease-in-out"
+      />
 
-        {/* Caption */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 text-white text-sm">
-          Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy.
-        </div>
+      {/* Description overlay */}
+      
+      {/* <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 text-white text-sm text-center">
+ {slides[currentIndex].description}
+</div>
+
+      
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+        {slides.map((slide, index) => (
+          <button
+            key={slide.id}
+            className={`w-3 h-3 rounded-full ${
+              index === currentIndex ? "bg-white" : "bg-gray-400"
+            }`}
+            onClick={() => setCurrentIndex(index)}
+          ></button>
+        ))}
+      </div> */}
+      {/* Description + Dots overlay */}
+<div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 text-white text-center flex flex-col items-center gap-2">
+  {/* Description */}
+  <div className="text-sm">
+    {slides[currentIndex].description}
+  </div>
+
+  {/* Dots navigation */}
+  <div className="flex gap-2">
+    {slides.map((slide, index) => (
+      <button
+        key={slide.id}
+        className={`w-3 h-3 rounded-full ${
+          index === currentIndex ? "bg-white" : "bg-gray-400"
+        }`}
+        onClick={() => setCurrentIndex(index)}
+      ></button>
+    ))}
+  </div>
+</div>
+
+    </div>
+{/* <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 text-white text-sm">
+  {sliderData[current]?.description || ""}
+</div>
+
+<div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
+  {sliderData.map((_, index) => (
+    <span
+      key={index}
+      onClick={() => setCurrent(index)}
+      className={`h-2.5 w-2.5 rounded-full cursor-pointer ${
+        index === current ? "bg-white" : "bg-gray-400"
+      }`}
+    />
+  ))}
+</div> */}
+
 
         {/* Dots */}
-        <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
+        {/* <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
           {slides.map((_, index) => (
             <span
               key={index}
@@ -698,7 +702,7 @@ const handleMenuToggle = (key: string) => {
               }`}
             />
           ))}
-        </div>
+        </div> */}
       </div>
 
       {/* Right: Recently Played */}
@@ -751,8 +755,12 @@ const handleMenuToggle = (key: string) => {
   );
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full  text-white font-sans select-none" style={{backgroundColor:"#07323C"}}>
-      <div className="px-6 py-6 border-b border-teal-800 flex items-center gap-4">
+    // <div className="flex flex-col h-full  text-white font-sans select-none" style={{backgroundColor:"#07323C"}}>
+     <div
+  className="flex flex-col h-full w-100 text-white font-sans select-none"
+  style={{ backgroundColor: "#07323C" }}
+>
+     <div className="px-6 py-6 border-b border-teal-800 flex items-center gap-4">
         {/* <FaRobot className="text-emerald-300" size={28} />
          <RobotIcon size={28} className="text-emerald-300" /> */}
           <Image
@@ -911,75 +919,7 @@ const handleMenuToggle = (key: string) => {
     </div>
   );
 
-  // const renderContent = (): React.ReactElement => {
-  //   if (selectedMenu !== "dashboard") {
-  //     // Render original content pages if not dashboard to keep existing functionality
-  //     return (
-  //       <div className="p-4">
-  //         <p className="text-gray-700 text-center py-20">
-  //           {`Content for "${selectedMenu}" is not yet styled with new design.`}
-  //         </p>
-  //         <button
-  //           onClick={() => setSelectedMenu("dashboard")}
-  //           className="text-blue-600 hover:underline"
-  //         >
-  //           Return to Dashboard
-  //         </button>
-  //       </div>
-  //     );
-  //   }
-
-  //   if (isLoading) return <p className="text-center font-sans text-gray-500 pt-16">Loading devices...</p>;
-  //   if (error)
-  //     return (
-  //       <div className="flex flex-col items-center justify-center py-16 text-center bg-red-50 rounded-lg max-w-md mx-auto">
-  //         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-  //           <FaTimes className="w-8 h-8 text-red-500" />
-  //         </div>
-  //         <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h3>
-  //         <p className="text-gray-600 max-w-md mb-6">{error}</p>
-  //         <button
-  //           onClick={() => window.location.reload()}
-  //           className="bg-red-600 hover:bg-red-700 text-white rounded px-6 py-2 font-semibold transition"
-  //         >
-  //           Try Again
-  //         </button>
-  //       </div>
-  //     );
-
-  //   return <DashboardContent />;
-  // };
-//  const renderContent = (): React.ReactElement => {
-//     if (isLoading) return <LoadingState />;
-//     if (error) return (
-//       <Card className="flex flex-col items-center justify-center py-16 text-center bg-red-50">
-//         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-//           <FaTimes className="w-8 h-8 text-red-500" />
-//         </div>
-//         <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h3>
-//         <p className="text-gray-600 max-w-md mb-6">{error}</p>
-//         <Button variant="primary" onClick={() => window.location.reload()}>Try Again</Button>
-//       </Card>
-//     );
-
-//     switch (selectedMenu) {
-//       // case "dashboard": return <DashboardView devices={devices} setDevices={setDevices} onAddNew={() => { }} onEditDevice={handleEditDevice} onManagePlaylists={() => { }} userRole="user" />;
-//       case "createMedia": return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showMedia")} />;
-//       case "showMedia": return <ShowMedia onCancel={() => setSelectedMenu("dashboard")} />;
-//       case "setupPlaylist": return <PlaylistSetup />;
-//       case "showPlaylist": return <PlaylistManager />;
-//       case "connectPlaylist": return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
-//       case "createAnnouncement": return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
-//       case "setupAnnouncement": return <Announcement />;
-//       case "InstantaneousAnnouncement": return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
-//       case "showAnnouncement": return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
-//       case "connectAnnouncement": return <ConnectAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("dashboard")} />;
-//       case "showAnnouncementList": return <AnnouncementList />;
-//       case "TextToSpeech": return < TTSCreator/>;
-//       default: return <div className="text-center py-20"><p className="text-gray-500">Select a menu item to view its content.</p></div>;
-//     }
-//   };
-const renderContent = (): React.ReactElement => {
+  const renderContent = (): React.ReactElement => {
   if (selectedMenu !== "dashboard") {
     // Render original content pages if not dashboard to keep existing functionality
     switch (selectedMenu) {
@@ -995,21 +935,21 @@ const renderContent = (): React.ReactElement => {
         return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
       case "createAnnouncement":
         return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
-      case "setupAnnouncement":
+      case "scheduleAnnouncement":
         return <Announcement />;
-      case "instantTrigger":
-        return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
-      case "showAnnouncement":
+      case "announcementPlaylist":
+         return <AnnouncementList />;
+        // return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
+      case "announcementLibrary":
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
+      case "calendarView":
+        return < Scheduler />;
       case "connectAnnouncement":
         return <ConnectAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("dashboard")} />;
-      case "announcementPlaylist":
+      case "connectDeviceZone":
         return <AnnouncementList />;
       case "TextToSpeech":
         return <TTSCreator />;
-      case "calendarView":
-        return <Scheduler />;
-
       default:
         return (
           <div className="p-4 text-center py-20">

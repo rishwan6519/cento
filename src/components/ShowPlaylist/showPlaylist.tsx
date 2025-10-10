@@ -261,7 +261,54 @@ const [viewMode, setViewMode] = useState<"list" | "grid">("list");
     }
   };
 
-  const handleEditPlaylist = async (playlist: EditablePlaylist | null) => {
+  // const handleEditPlaylist = async (playlist: EditablePlaylist | null) => {
+  //   if (!playlist || !playlist.id) return;
+    
+  //   try {
+  //       const response = await fetch(`/api/playlists/id?id=${playlist.id}`, {
+  //           method: "PUT",
+  //           headers: {
+  //               "Content-Type": "application/json",
+  //           },
+  //           body: JSON.stringify({
+  //               name: playlist.name,
+  //               type: playlist.type,
+  //               startTime: playlist.startTime,
+  //               endTime: playlist.endTime,
+  //               startDate: playlist.startDate,
+  //               endDate: playlist.endDate,
+  //               // Ensure daysOfWeek is included in the update
+  //               daysOfWeek: playlist.daysOfWeek || [], 
+  //               status: playlist.status,
+  //               files: playlist.files.map((file, index) => ({
+  //                   id: file.id,
+  //                   name: file.name,
+  //                   type: file.type,
+  //                   url: file.path,
+  //                   displayOrder: index + 1,
+  //                   delay: file.delay || 0,
+  //                   backgroundImageEnabled: file.backgroundImageEnabled || false,
+  //                   backgroundImage: file.backgroundImage || null,
+  //               })),
+  //           }),
+  //       });
+        
+  //       if (!response.ok) {
+  //           const errorData = await response.json();
+  //           throw new Error(errorData.error || "Failed to update playlist");
+  //       }
+        
+  //       // After successful update, refresh the playlists
+  //       await fetchPlaylists();
+  //       toast.success("Playlist updated successfully");
+  //       setIsEditing(false);
+  //       setEditedPlaylist(null);
+  //   } catch (error) {
+  //       console.error("Error updating playlist:", error);
+  //       toast.error(error instanceof Error ? error.message : "Failed to update playlist");
+  //   }
+  // };
+ const handleEditPlaylist = async (playlist: EditablePlaylist | null) => {
     if (!playlist || !playlist.id) return;
     
     try {
@@ -287,6 +334,7 @@ const [viewMode, setViewMode] = useState<"list" | "grid">("list");
                     url: file.path,
                     displayOrder: index + 1,
                     delay: file.delay || 0,
+                     path: file.path,
                     backgroundImageEnabled: file.backgroundImageEnabled || false,
                     backgroundImage: file.backgroundImage || null,
                 })),
@@ -308,7 +356,6 @@ const [viewMode, setViewMode] = useState<"list" | "grid">("list");
         toast.error(error instanceof Error ? error.message : "Failed to update playlist");
     }
   };
-
   const handleDeletePlaylistWithFiles = async (playlistId: string | undefined) => {
     if (!playlistId) {
       toast.error("Invalid playlist ID");
