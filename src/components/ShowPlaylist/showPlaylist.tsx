@@ -408,13 +408,13 @@ const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   };
 
   const daysOfWeek = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday'
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday'
   ];
 const filteredPlaylists = playlists.filter((playlist) => {
   if (statusFilter === "all") return true;
