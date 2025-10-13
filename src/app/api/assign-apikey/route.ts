@@ -17,13 +17,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if this API key already exists
-    const existingKey = await ApiKey.findOne({ apiKey });
-    if (existingKey) {
-      return NextResponse.json(
-        { success: false, message: "API Key already exists" },
-        { status: 409 }
-      );
-    }
+    // const existingKey = await ApiKey.findOne({ apiKey });
+    // if (existingKey) {
+    //   return NextResponse.json(
+    //     { success: false, message: "API Key already exists" },
+    //     { status: 409 }
+    //   );
+    // }
 
     // Assign new API key
     const newKey = await ApiKey.create({

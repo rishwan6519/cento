@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     const formData = await req.formData();
+    console.log(formData);
     const configString = formData.get("config");
 
     if (!configString) {

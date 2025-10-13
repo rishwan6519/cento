@@ -13,7 +13,7 @@ export interface IApiKey extends Document {
 const ApiKeySchema = new Schema<IApiKey>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    apiKey: { type: String, required: true, unique: true },
+    apiKey: { type: String, required: true },
     assignedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: {
       type: String,

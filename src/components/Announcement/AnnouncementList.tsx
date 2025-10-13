@@ -469,6 +469,8 @@ const AnnouncementList: React.FC = () => {
   }, []);
 
   useEffect(() => {
+
+    
     if (isEditing && editedPlaylist) {
       const playlistFileIds = new Set(editedPlaylist.announcements.map(a => a.file));
       const available = allAnnouncementFiles.filter(file => !playlistFileIds.has(file._id));
@@ -1017,6 +1019,7 @@ const AnnouncementList: React.FC = () => {
     </div>
   )}
 </div>
+
 
   );
 };

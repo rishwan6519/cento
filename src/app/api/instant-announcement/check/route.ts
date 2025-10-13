@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
-import Announcement from '@/models/InstantAnnouncement';
+import InstantAnnouncement from '@/models/InstantAnnouncement'; // ✅ renamed for clarity
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,26 +12,28 @@ export async function POST(req: NextRequest) {
 
     if (!serialNumber || status !== 'done') {
       return NextResponse.json(
-        { message: 'Missing serialNumber or invalid status' },
+        { success: false, message: 'Missing serialNumber or invalid status' },
         { status: 400 }
       );
     }
 
     const device = await Device.findOne({ serialNumber });
-
     if (!device) {
       return NextResponse.json(
-        { message: 'Device not found' },
+        { success: false, message: 'Device not found' },
         { status: 404 }
       );
     }
 
-    // Delete all instant announcements for the device
-    await Announcement.deleteMany({ deviceId: device._id });
+    // Log before deletion
+    console.log(`Clearing InstantAnnouncements for device ID: ${device._id}`);
+
+    const deleted = await InstantAnnouncement.deleteMany({ deviceId: device._id });
+    console.log(`Deleted count: ${deleted.deletedCount}`);
 
     return NextResponse.json({
       success: true,
-      message: `Cleared announcements for device ${serialNumber}`,
+      message: `Cleared ${deleted.deletedCount} announcements for device ${serialNumber}`,
     });
   } catch (error) {
     console.error('Error clearing announcements:', error);
@@ -44,5 +47,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-

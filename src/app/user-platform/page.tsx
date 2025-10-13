@@ -37,7 +37,7 @@ import {
   FaCalendarAlt,
   FaDesktop
 } from "react-icons/fa";
-import { FaDisplay } from "react-icons/fa6";
+import { FaBolt, FaDisplay } from "react-icons/fa6";
 import { RiArrowDropDownLine, RiDashboardLine } from "react-icons/ri";
 import { MdOutlinePlaylistPlay, MdAnnouncement } from "react-icons/md";
 import { Device, MenuKey } from "@/components/Platform/types";
@@ -388,6 +388,7 @@ const menuSections: MenuSection[] = [
       { key: "scheduleAnnouncement", label: "Schedule announcement", icon: <FaCog /> },
       { key: "announcementPlaylist", label: "Announcement playlist", icon: <FaListAlt /> },
       { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
+      {key: "InstantaneousAnnouncement", label: "Instantaneous Announcement", icon: <FaBolt /> },
       { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
       
     ],
@@ -939,6 +940,8 @@ const handleMenuToggle = (key: string) => {
         return <Announcement />;
       case "announcementPlaylist":
          return <AnnouncementList />;
+      case "InstantaneousAnnouncement":
+        return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("announcementLibrary")} />;
         // return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
       case "announcementLibrary":
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;

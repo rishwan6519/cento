@@ -529,67 +529,86 @@ const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
 
   // Save playlist (same endpoint approach as your original)
    const handleSavePlaylistConfig = async () => {
-    if (
-      !playlistConfig.name ||
-      playlistConfig.files.length === 0 ||
-      !playlistConfig.startDate ||
-      !playlistConfig.endDate ||
-      !playlistConfig.daysOfWeek ||
-      playlistConfig.daysOfWeek.length === 0
-    ) {
-      toast.error(
-        `Please add a name, at least one file, date range, and select at least one day for the playlist`
-      );
-      return;
-    }
-    setIsLoading(true);
-    try {
-      // Build announcements array for backend
-      const announcements = playlistConfig.files.map((file, index) => ({
-        file: file._id, // <-- This is required by backend schema!
+  if (
+    !playlistConfig.name ||
+    playlistConfig.files.length === 0 ||
+    !playlistConfig.startDate ||
+    !playlistConfig.endDate ||
+    !playlistConfig.daysOfWeek ||
+    playlistConfig.daysOfWeek.length === 0
+  ) {
+    toast.error(
+      `Please add a name, at least one file, date range, and select at least one day for the playlist`
+    );
+    return;
+  }
+  
+  setIsLoadingSave(true);
+  try {
+    // Map files to match backend schema
+    const files = playlistConfig.files.map((file, index) => {
+      // Find the original media file to get its _id
+      const mediaFile = mediaFiles.find(m => filePath(m) === file.path);
+      
+      return {
+        mediaId: mediaFile?._id || mediaFile?.id, // ✅ Add mediaId
+        name: file.name,
+        path: file.path,
+        type: file.type,
         displayOrder: index + 1,
         delay: file.delay || 0,
         maxVolume: file.maxVolume ?? 100,
-        // You can add other fields if your backend expects them
-      }));
-
-      const payload = {
-        name: playlistConfig.name,
-        announcements, // <-- Use this array!
-        schedule: {
-          startDate: playlistConfig.startDate,
-          endDate: playlistConfig.endDate,
-          startTime: playlistConfig.startTime,
-          endTime: playlistConfig.endTime,
-          daysOfWeek: playlistConfig.daysOfWeek,
-          // Add scheduleType/frequency if needed
-        },
-        status: "active",
+        minVolume: file.minVolume ?? 0,
+        backgroundImageEnabled: file.backgroundImageEnabled || false,
+        backgroundImage: file.backgroundImage || null,
       };
+    });
 
-      const response = await fetch(`/api/announcement/playlist-setup?userId=${userId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    // Create FormData object
+    const formData = new FormData();
+    
+    // Add config as JSON string
+    const configData = {
+      name: playlistConfig.name,
+      type: playlistConfig.type,
+      startTime: playlistConfig.startTime,
+      endTime: playlistConfig.endTime,
+      startDate: playlistConfig.startDate,
+      endDate: playlistConfig.endDate,
+      shuffle: playlistConfig.shuffle || false,
+      daysOfWeek: playlistConfig.daysOfWeek,
+      files: files,
+    };
+    
+    formData.append("config", JSON.stringify(configData));
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to save playlist");
-      }
+    const response = await fetch(`/api/playlist-config?userId=${userId}`, {
+      method: "POST",
+      body: formData, // ✅ Send FormData, not JSON
+      // Don't set Content-Type header - browser will set it automatically with boundary
+    });
 
-      toast.success("Playlist saved successfully");
-      setSavedPlaylistName(playlistConfig.name);
-      setIsSaved(true);
-    } catch (error) {
-      console.error("Error saving playlist:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save playlist"
-      );
-    } finally {
-      setIsLoading(false);
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Failed to save playlist");
     }
-  };
+
+    const result = await response.json();
+    toast.success("Playlist saved successfully");
+    setSavedPlaylistName(playlistConfig.name);
+    setIsSaved(true);
+  } catch (error) {
+    console.error("Error saving playlist:", error);
+    toast.error(
+      error instanceof Error ? error.message : "Failed to save playlist"
+    );
+  } finally {
+    setIsLoadingSave(false);
+  }
+};
+
+
+
 
   // If saved show simple success card (you can replace with your ShowPlaylist)
   if (isSaved) {
