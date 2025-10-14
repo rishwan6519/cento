@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     // Determine folder
     const fileType = type === 'recorded' ? 'recorded' : 'audio';
-    const baseUploadPath = join(process.cwd(), 'public', 'uploads', 'announcement', userId, fileType);
+    const baseUploadPath = join(process.cwd(), 'uploads', 'announcement', userId, fileType);
 
     if (!existsSync(baseUploadPath)) {
       await mkdir(baseUploadPath, { recursive: true });
