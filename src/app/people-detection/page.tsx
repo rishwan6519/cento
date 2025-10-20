@@ -1300,9 +1300,9 @@ const handleDeleteLine = async (lineName: string) => {
               Configure cameras and set detection zones via MQTT
             </p>
           </div>
-              <FloorPlanUploader />
+              {/* <FloorPlanUploader />
 
-              <HeatmapViewer />
+              <HeatmapViewer /> */}
 
           {/* Main Card */}
           <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">
