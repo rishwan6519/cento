@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { toast } from "react-toastify";
 import mqtt from "mqtt"; // Make sure to install mqtt: npm install mqtt
 import FloorPlanUploader from "@/components/FloorPlanUPloader/FloorPlanUploader";
+import HeatmapViewer from "@/components/ShowHeatmap/ShowHeatmap";
 
 // Add this type definition at the top of the file
 interface ZoneCounts {
@@ -1299,7 +1300,9 @@ const handleDeleteLine = async (lineName: string) => {
               Configure cameras and set detection zones via MQTT
             </p>
           </div>
-              {/* <FloorPlanUploader /> */}
+              <FloorPlanUploader />
+
+              <HeatmapViewer />
 
           {/* Main Card */}
           <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">

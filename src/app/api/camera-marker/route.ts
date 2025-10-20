@@ -4,11 +4,12 @@ import CameraMarker from "@/models/CameraMarker";
 
 // POST /api/camera-marker
 export async function POST(req: NextRequest) {
-  try {
+ try {
     const body = await req.json();
-    const { cameraId, x, y, floorMapId } = body;
+    const { cameraId, x, y, width, height, floorMapId } = body;
 
-    if (!cameraId || !x || !y || !floorMapId) {
+    // --- Basic Validation ---
+    if (!cameraId || x == null || y == null || width == null || height == null || !floorMapId) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
         { status: 400 }
@@ -17,16 +18,19 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
+    // --- Create marker ---
     const marker = await CameraMarker.create({
       cameraId,
       x,
       y,
+      width,
+      height,
       floorMapId,
     });
 
     return NextResponse.json({ success: true, data: marker }, { status: 201 });
   } catch (error: any) {
-    console.error("Error saving camera marker:", error);
+    console.error("❌ Error saving camera marker:", error);
     return NextResponse.json(
       { success: false, error: "Internal Server Error" },
       { status: 500 }

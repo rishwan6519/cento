@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useState, useRef, ChangeEvent, MouseEvent, FormEvent } from "react";
+import React, { useState, useRef, ChangeEvent, MouseEvent } from "react";
 
 // Define types for better type safety
 interface CameraMarker {
   id: string;
   x: number;
   y: number;
+  width: number;
+  height: number;
   floorMapId: string;
 }
 
 interface TempMarker {
   x: number;
   y: number;
+  width: number;
+  height: number;
 }
 
 interface SaveMarkerResponse {
@@ -26,6 +30,8 @@ const saveMarker = async (marker: {
   cameraId: string;
   x: number;
   y: number;
+  width: number;
+  height: number;
   floorMapId: string;
 }): Promise<SaveMarkerResponse> => {
   try {
@@ -49,16 +55,12 @@ const saveMarker = async (marker: {
   }
 };
 
-const uploadFloorPlan = async (file: File, name: string, userId?: string): Promise<{ success: boolean; floorMapId?: string; error?: string }> => {
+const uploadFloorPlan = async (file: File, name: string): Promise<{ success: boolean; floorMapId?: string; error?: string }> => {
   console.log("Uploading floor plan:", name, file.name);
   try {
-    const userId=localStorage.getItem("userId")||"";
     const formData = new FormData();
     formData.append("file", file);
     formData.append("floorName", name);
-    if (userId) {
-      formData.append("userId", userId);
-    }
     
     const res = await fetch("/api/floor-map", {
       method: "POST",
@@ -91,6 +93,11 @@ const FloorPlanUploader: React.FC = () => {
   const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  
+  // Drawing state
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [currentRect, setCurrentRect] = useState<TempMarker | null>(null);
 
   const floorPlanImageRef = useRef<HTMLImageElement>(null);
 
@@ -106,19 +113,16 @@ const FloorPlanUploader: React.FC = () => {
     }
   };
 
-  const handleUploadSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleUploadSubmit = () => {
     if (!floorPlanFile || !floorName.trim()) {
       setErrorMessage("Please provide a floor plan name and upload an image.");
       return;
     }
     setErrorMessage("");
-    // Don't upload yet, just move to camera count step
     setStep("cameraCount");
   };
 
-  const handleCameraCountSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const handleCameraCountSubmit = () => {
     if (cameraCount < 1) {
       setErrorMessage("Camera count must be at least 1.");
       return;
@@ -127,22 +131,56 @@ const FloorPlanUploader: React.FC = () => {
     setStep("marking");
   };
 
-  const handleMark = (e: MouseEvent<HTMLImageElement>) => {
-    if (!floorPlanImageRef.current || isLoading) return;
-
+  const getRelativeCoordinates = (e: MouseEvent<HTMLDivElement>): { x: number; y: number } => {
+    if (!floorPlanImageRef.current) return { x: 0, y: 0 };
+    
     const img = floorPlanImageRef.current;
     const rect = img.getBoundingClientRect();
-
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const markerX = clickX;
-    const markerY = clickY;
-
-    // Store marker temporarily (not saved to API yet)
-    setTempMarkers((prev) => [...prev, { x: markerX, y: markerY }]);
     
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  };
 
+  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    if (!floorPlanImageRef.current || isLoading || currentCameraIndex >= cameraCount) return;
+    
+    const coords = getRelativeCoordinates(e);
+    setIsDrawing(true);
+    setStartPoint(coords);
+    setCurrentRect({ x: coords.x, y: coords.y, width: 0, height: 0 });
+  };
+
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (!isDrawing || !startPoint || !floorPlanImageRef.current) return;
+    
+    const coords = getRelativeCoordinates(e);
+    const width = coords.x - startPoint.x;
+    const height = coords.y - startPoint.y;
+    
+    setCurrentRect({
+      x: width < 0 ? coords.x : startPoint.x,
+      y: height < 0 ? coords.y : startPoint.y,
+      width: Math.abs(width),
+      height: Math.abs(height)
+    });
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawing || !currentRect || currentRect.width < 5 || currentRect.height < 5) {
+      setIsDrawing(false);
+      setStartPoint(null);
+      setCurrentRect(null);
+      return;
+    }
+    
+    // Add the completed rectangle to temp markers
+    setTempMarkers((prev) => [...prev, currentRect]);
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentRect(null);
+    
     if (currentCameraIndex + 1 < cameraCount) {
       setCurrentCameraIndex((prev) => prev + 1);
     } else {
@@ -179,11 +217,13 @@ const FloorPlanUploader: React.FC = () => {
 
       for (let i = 0; i < tempMarkers.length; i++) {
         const tempMarker = tempMarkers[i];
-        const cameraId = `camera-${i + 1}`;
+       const cameraId = `camera${i + 1}`;
         const markerData = {
           cameraId,
           x: tempMarker.x,
           y: tempMarker.y,
+          width: tempMarker.width,
+          height: tempMarker.height,
           floorMapId: uploadedFloorMapId,
         };
 
@@ -224,6 +264,9 @@ const FloorPlanUploader: React.FC = () => {
     setCurrentCameraIndex(0);
     setIsLoading(false);
     setErrorMessage("");
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentRect(null);
   };
 
   return (
@@ -241,7 +284,7 @@ const FloorPlanUploader: React.FC = () => {
           )}
 
           {step === "upload" && (
-            <form onSubmit={handleUploadSubmit} className="space-y-4">
+            <div className="space-y-4">
               <h2 className="text-xl font-semibold text-gray-700">Step 1: Upload Floor Plan</h2>
               <div>
                 <label htmlFor="floorName" className="block text-sm font-medium text-gray-700 mb-1">
@@ -274,17 +317,17 @@ const FloorPlanUploader: React.FC = () => {
                 )}
               </div>
               <button
-                type="submit"
+                onClick={handleUploadSubmit}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!floorPlanFile || !floorName.trim() || isLoading}
               >
                 {isLoading ? "Processing..." : "Next: Set Camera Count"}
               </button>
-            </form>
+            </div>
           )}
 
           {step === "cameraCount" && (
-            <form onSubmit={handleCameraCountSubmit} className="space-y-4">
+            <div className="space-y-4">
               <h2 className="text-xl font-semibold text-gray-700">Step 2: Number of Cameras</h2>
               <div>
                 <label htmlFor="cameraCount" className="block text-sm font-medium text-gray-700 mb-1">
@@ -301,22 +344,25 @@ const FloorPlanUploader: React.FC = () => {
                 />
               </div>
               <button
-                type="submit"
+                onClick={handleCameraCountSubmit}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={cameraCount < 1 || isLoading}
               >
-                Next: Mark Camera Positions
+                Start Drawing Cameras
               </button>
-            </form>
+            </div>
           )}
 
           {step === "marking" && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-700">Step 3: Mark Camera Locations</h2>
+              <h2 className="text-xl font-semibold text-gray-700">Step 3: Draw Camera Areas</h2>
               {currentCameraIndex < cameraCount ? (
-                <p className="text-lg text-indigo-600 font-medium">
-                  Click on the floor plan to mark Camera {currentCameraIndex + 1} of {cameraCount}.
-                </p>
+                <div className="bg-blue-50 border border-blue-300 text-blue-700 px-4 py-3 rounded">
+                  <p className="font-medium text-lg mb-2">
+                    Drawing Camera {currentCameraIndex + 1} of {cameraCount}
+                  </p>
+                  <p className="text-sm">Click and drag to draw a rectangle on the floor plan</p>
+                </div>
               ) : (
                 <div className="bg-green-50 border border-green-300 text-green-700 px-4 py-3 rounded">
                   <p className="font-medium">All cameras marked! Uploading...</p>
@@ -332,7 +378,7 @@ const FloorPlanUploader: React.FC = () => {
                 </div>
               )}
               <div className="bg-gray-100 rounded p-3">
-                <p className="text-sm text-gray-600">Progress: {tempMarkers.length} / {cameraCount} cameras marked</p>
+                <p className="text-sm text-gray-600">Progress: {tempMarkers.length} / {cameraCount} cameras drawn</p>
                 <div className="mt-2 w-full bg-gray-300 rounded-full h-2">
                   <div
                     className="bg-indigo-600 h-2 rounded-full transition-all"
@@ -373,44 +419,81 @@ const FloorPlanUploader: React.FC = () => {
       {/* Main content area for floor plan display */}
       <main className="flex-1 p-6 flex flex-col items-center justify-center bg-gray-100">
         {floorPlanImageUrl && (step === "marking" || step === "done" || step === "error" || step === "cameraCount") ? (
-          <div className="relative border-2 border-dashed border-gray-300 bg-white p-2 rounded-lg shadow-md max-w-full max-h-full overflow-auto">
+          <div 
+            className="relative border-2 border-dashed border-gray-300 bg-white p-2 rounded-lg shadow-md max-w-full max-h-full overflow-auto"
+            onMouseDown={step === "marking" && !isLoading && currentCameraIndex < cameraCount ? handleMouseDown : undefined}
+            onMouseMove={step === "marking" && !isLoading ? handleMouseMove : undefined}
+            onMouseUp={step === "marking" && !isLoading ? handleMouseUp : undefined}
+            onMouseLeave={step === "marking" && isDrawing ? handleMouseUp : undefined}
+            style={{
+              cursor: step === "marking" && !isLoading && currentCameraIndex < cameraCount ? "crosshair" : "default"
+            }}
+          >
             <img
               ref={floorPlanImageRef}
               src={floorPlanImageUrl}
               alt="Floor Plan"
-              className="block max-w-full h-auto cursor-crosshair"
-              onClick={step === "marking" && !isLoading && currentCameraIndex < cameraCount ? handleMark : undefined}
+              className="block max-w-full h-auto select-none"
               style={{
-                pointerEvents: step === "marking" && !isLoading && currentCameraIndex < cameraCount ? "auto" : "none",
+                pointerEvents: "none",
                 opacity: isLoading ? 0.7 : 1,
               }}
+              draggable={false}
             />
+            
             {/* Show temporary markers while marking */}
             {step === "marking" && tempMarkers.map((marker, index) => (
               <div
                 key={`temp-${index}`}
-                className="absolute w-6 h-6 rounded-full bg-yellow-500 border-2 border-white flex items-center justify-center text-xs font-bold text-white shadow-md"
+                className="absolute border-4 border-yellow-500 bg-yellow-500 bg-opacity-30"
                 style={{
-                  left: marker.x - 12,
-                  top: marker.y - 12,
+                  left: marker.x,
+                  top: marker.y,
+                  width: marker.width,
+                  height: marker.height,
+                  pointerEvents: "none"
                 }}
-                title={`Camera ${index + 1}`}
               >
-                {index + 1}
+                <div className="absolute -top-7 left-0 bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">
+                  Cam {index + 1}
+                </div>
               </div>
             ))}
+            
+            {/* Show current drawing rectangle */}
+            {step === "marking" && currentRect && currentRect.width > 0 && currentRect.height > 0 && (
+              <div
+                className="absolute border-4 border-blue-500 bg-blue-500 bg-opacity-20"
+                style={{
+                  left: currentRect.x,
+                  top: currentRect.y,
+                  width: currentRect.width,
+                  height: currentRect.height,
+                  pointerEvents: "none"
+                }}
+              >
+                <div className="absolute -top-7 left-0 bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">
+                  Drawing...
+                </div>
+              </div>
+            )}
+            
             {/* Show saved markers after completion */}
             {step === "done" && cameraMarkers.map((marker, index) => (
               <div
                 key={marker.id}
-                className="absolute w-6 h-6 rounded-full bg-green-500 border-2 border-white flex items-center justify-center text-xs font-bold text-white shadow-md"
+                className="absolute border-4 border-green-500 bg-green-500 bg-opacity-30"
                 style={{
-                  left: marker.x - 12,
-                  top: marker.y - 12,
+                  left: marker.x,
+                  top: marker.y,
+                  width: marker.width,
+                  height: marker.height,
+                  pointerEvents: "none"
                 }}
-                title={`Camera ${index + 1} (Saved)`}
               >
-                {index + 1}
+                <div className="absolute -top-7 left-0 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">
+                  Cam {index + 1} ✓
+                </div>
               </div>
             ))}
           </div>

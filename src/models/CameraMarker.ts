@@ -4,6 +4,8 @@ export interface ICameraMarker extends Document {
   cameraId: string;
   x: number;
   y: number;
+  width: number;
+  height: number;
   floorMapId: string;
   createdAt: Date;
 }
@@ -13,6 +15,8 @@ const CameraMarkerSchema = new Schema<ICameraMarker>(
     cameraId: { type: String, required: true },
     x: { type: Number, required: true },
     y: { type: Number, required: true },
+    width: { type: Number, required: true },
+    height: { type: Number, required: true },
     floorMapId: { type: String, required: true, ref: "FloorMap" },
   },
   { timestamps: true }

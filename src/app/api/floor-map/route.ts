@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     // Extract fields correctly
     const file = formData.get("file") as File | null;
     const floorName = formData.get("floorName") as string | null;
-    const userId = formData.get("userId") as string | null;
+    const userId = "686cc66d9c011d7c23ae8b64";
 
     console.log("Received data:", { floorName, userId, file });
 
@@ -53,28 +53,33 @@ export async function POST(req: NextRequest) {
   }
 }
 
-
-// GET /api/floor-map?userId=123
 export async function GET(req: NextRequest) {
   try {
     const userId = req.nextUrl.searchParams.get("userId");
     if (!userId) {
-      return NextResponse.json({ success: false, message: "Missing userId" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "Missing userId" },
+        { status: 400 }
+      );
     }
 
     await connectToDatabase();
     const floorMaps = await FloorMap.find({ userId });
 
-    // Return only necessary fields (e.g., _id, name, imageUrl)
-    const result = floorMaps.map((map: any) => ({
-      id: map._id,
+    const result = floorMaps.map((map) => ({
+      _id: map._id.toString(),
       name: map.name,
-      imageUrl: map.imageUrl, // Make sure your FloorMap model has this field
+      imageUrl: map.imageUrl,
+      userId: map.userId,
+      uploadedAt: map.uploadedAt,
     }));
 
     return NextResponse.json({ success: true, floorMaps: result });
   } catch (error) {
     console.error("Fetch error:", error);
-    return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
