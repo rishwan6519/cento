@@ -34,7 +34,48 @@ interface CameraHeatmapData {
   marker: CameraMarker;
 }
 
-// --- API Functions (Assuming these are correct and working) ---
+// Generate well-distributed positions for zones based on zone_id
+const getRandomZonePosition = (zoneId: number, cameraWidth: number, cameraHeight: number, totalZones: number) => {
+  // Use zone_id as seed for consistent random positions
+  const seed = zoneId * 12345;
+  const random = (n: number) => Math.abs((Math.sin(seed + n) * 10000) % 1);
+  
+  // Smaller zones with more spacing - between 20% to 35% of camera area
+  const sizeMultiplier = 0.2 + random(1) * 0.15;
+  const zoneSize = Math.min(cameraWidth, cameraHeight) * sizeMultiplier;
+  
+  // Create a grid-like distribution with randomization
+  // Divide camera into sectors based on zone count
+  const sectorsPerRow = Math.ceil(Math.sqrt(totalZones));
+  const sectorWidth = cameraWidth / sectorsPerRow;
+  const sectorHeight = cameraHeight / sectorsPerRow;
+  
+  // Determine which sector this zone belongs to
+  const sectorIndex = (zoneId - 1) % (sectorsPerRow * sectorsPerRow);
+  const sectorRow = Math.floor(sectorIndex / sectorsPerRow);
+  const sectorCol = sectorIndex % sectorsPerRow;
+  
+  // Add randomization within the sector to avoid perfect grid
+  const randomOffsetX = random(2) * 0.6 + 0.2; // 20% to 80% within sector
+  const randomOffsetY = random(3) * 0.6 + 0.2;
+  
+  // Calculate position with padding to avoid edges
+  const padding = zoneSize * 0.1;
+  const x = sectorCol * sectorWidth + (sectorWidth - zoneSize) * randomOffsetX + padding;
+  const y = sectorRow * sectorHeight + (sectorHeight - zoneSize) * randomOffsetY + padding;
+  
+  // Ensure zone stays within bounds
+  const clampedX = Math.max(padding, Math.min(x, cameraWidth - zoneSize - padding));
+  const clampedY = Math.max(padding, Math.min(y, cameraHeight - zoneSize - padding));
+  
+  return {
+    x: clampedX,
+    y: clampedY,
+    size: zoneSize
+  };
+};
+
+// --- API Functions ---
 const fetchFloorMaps = async (): Promise<FloorMap[]> => {
   try {
     const res = await fetch(`/api/floor-map?userId=686cc66d9c011d7c23ae8b64`);
@@ -50,13 +91,11 @@ const fetchFloorMaps = async (): Promise<FloorMap[]> => {
   }
 };
 
-
 const fetchCameraMarkers = async (floorMapId: string): Promise<CameraMarker[]> => {
   try {
     const res = await fetch(`/api/camera-marker?floorMapId=${floorMapId}`);
     const data = await res.json();
 
-    // FIX: Correct key from 'markers' to 'data'
     if (data.success) {
       return data.data || [];
     }
@@ -66,7 +105,6 @@ const fetchCameraMarkers = async (floorMapId: string): Promise<CameraMarker[]> =
     return [];
   }
 };
-
 
 const fetchZoneHeatmapData = async (
   cameraId: string,
@@ -94,15 +132,16 @@ const fetchZoneHeatmapData = async (
 
 // --- Helper Functions ---
 const getHeatmapColor = (count: number, maxCount: number): string => {
-  if (maxCount === 0) return "rgba(0, 255, 0, 0.3)";
+  if (maxCount === 0) return "rgba(0, 255, 0, 0.6)";
   
   const intensity = count / maxCount;
   
-  if (intensity < 0.2) return "rgba(0, 255, 0, 0.4)"; // Green - low traffic
-  if (intensity < 0.4) return "rgba(173, 255, 47, 0.5)"; // Yellow-green
-  if (intensity < 0.6) return "rgba(255, 255, 0, 0.6)"; // Yellow
-  if (intensity < 0.8) return "rgba(255, 165, 0, 0.7)"; // Orange
-  return "rgba(255, 0, 0, 0.8)"; // Red - high traffic
+  // Much more vibrant and noticeable colors
+  if (intensity < 0.2) return "rgba(0, 255, 0, 0.7)"; // Bright green
+  if (intensity < 0.4) return "rgba(173, 255, 47, 0.75)"; // Yellow-green
+  if (intensity < 0.6) return "rgba(255, 255, 0, 0.8)"; // Bright yellow
+  if (intensity < 0.8) return "rgba(255, 140, 0, 0.85)"; // Bright orange
+  return "rgba(255, 0, 0, 0.9)"; // Bright red
 };
 
 const HeatmapViewer: React.FC = () => {
@@ -111,7 +150,7 @@ const HeatmapViewer: React.FC = () => {
   const [cameraMarkers, setCameraMarkers] = useState<CameraMarker[]>([]);
   const [heatmapData, setHeatmapData] = useState<CameraHeatmapData[]>([]);
   
-const [startDate, setStartDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
   const [startTime, setStartTime] = useState<string>("00:00");
   const [endDate, setEndDate] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("23:59");
@@ -122,18 +161,14 @@ const [startDate, setStartDate] = useState<string>("");
   
   const floorPlanImageRef = useRef<HTMLImageElement>(null);
 
-  // Load floor maps on mount and set default dates
   useEffect(() => {
     loadFloorMaps();
     
-    // Set default dates (today)
     const today = new Date().toISOString().split('T')[0];
     setStartDate(today);
     setEndDate(today);
   }, []);
 
-  // Load camera markers when floor map is selected
-  // Reset heatmap data and hide heatmap when floor map changes
   useEffect(() => {
     if (selectedFloorMap) {
       loadCameraMarkers(selectedFloorMap._id);
@@ -152,7 +187,6 @@ const [startDate, setStartDate] = useState<string>("");
     setIsLoading(true);
     const maps = await fetchFloorMaps();
     setFloorMaps(maps);
-    // Removed auto-selection of the first map to ensure initial state is 'no map selected'
     setIsLoading(false);
   };
 
@@ -232,7 +266,6 @@ const [startDate, setStartDate] = useState<string>("");
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 text-gray-800">
-      {/* Sidebar for controls */}
       <aside className="w-full md:w-96 p-6 bg-white shadow-lg flex flex-col">
         <h1 className="text-3xl font-bold text-purple-700 mb-6">Heatmap Viewer</h1>
 
@@ -243,7 +276,6 @@ const [startDate, setStartDate] = useState<string>("");
           </div>
         )}
 
-        {/* Floor Map Selection */}
         <div className="space-y-4 mb-6">
           <h2 className="text-xl font-semibold text-gray-700">Select Floor Map</h2>
           <select
@@ -272,7 +304,6 @@ const [startDate, setStartDate] = useState<string>("");
           )}
         </div>
 
-        {/* Date and Time Selection & Generate Button - Only show if a map is selected AND it has cameras */}
         {selectedFloorMap && cameraMarkers.length > 0 && (
           <div className="space-y-4 mb-6">
             <h2 className="text-xl font-semibold text-gray-700">Select Date & Time Range</h2>
@@ -336,7 +367,7 @@ const [startDate, setStartDate] = useState<string>("");
             <button
               onClick={handleGenerateHeatmap}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading || !startDate || !endDate} // Button is disabled if dates are not set
+              disabled={isLoading || !startDate || !endDate}
             >
               {isLoading ? (
                 <div className="flex items-center space-x-2">
@@ -353,29 +384,28 @@ const [startDate, setStartDate] = useState<string>("");
           </div>
         )}
 
-        {/* Heatmap Legend - Only show if heatmap data is available */}
         {showHeatmap && heatmapData.length > 0 && (
           <div className="mt-6 space-y-3">
             <h3 className="text-lg font-semibold text-gray-700">Heatmap Legend</h3>
             <div className="space-y-2">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded" style={{ backgroundColor: "rgba(0, 255, 0, 0.4)" }}></div>
+                <div className="w-8 h-8 rounded-full" style={{ background: "radial-gradient(circle, rgba(0, 255, 0, 0.7) 0%, rgba(0, 255, 0, 0.3) 50%, transparent 100%)", filter: "blur(2px)" }}></div>
                 <span className="text-sm">Low Traffic (0-20%)</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded" style={{ backgroundColor: "rgba(173, 255, 47, 0.5)" }}></div>
+                <div className="w-8 h-8 rounded-full" style={{ background: "radial-gradient(circle, rgba(173, 255, 47, 0.75) 0%, rgba(173, 255, 47, 0.4) 50%, transparent 100%)", filter: "blur(2px)" }}></div>
                 <span className="text-sm">Medium-Low (20-40%)</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded" style={{ backgroundColor: "rgba(255, 255, 0, 0.6)" }}></div>
+                <div className="w-8 h-8 rounded-full" style={{ background: "radial-gradient(circle, rgba(255, 255, 0, 0.8) 0%, rgba(255, 255, 0, 0.4) 50%, transparent 100%)", filter: "blur(2px)" }}></div>
                 <span className="text-sm">Medium (40-60%)</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded" style={{ backgroundColor: "rgba(255, 165, 0, 0.7)" }}></div>
+                <div className="w-8 h-8 rounded-full" style={{ background: "radial-gradient(circle, rgba(255, 140, 0, 0.85) 0%, rgba(255, 140, 0, 0.4) 50%, transparent 100%)", filter: "blur(2px)" }}></div>
                 <span className="text-sm">Medium-High (60-80%)</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded" style={{ backgroundColor: "rgba(255, 0, 0, 0.8)" }}></div>
+                <div className="w-8 h-8 rounded-full" style={{ background: "radial-gradient(circle, rgba(255, 0, 0, 0.9) 0%, rgba(255, 0, 0, 0.4) 50%, transparent 100%)", filter: "blur(2px)" }}></div>
                 <span className="text-sm">High Traffic (80-100%)</span>
               </div>
             </div>
@@ -383,19 +413,18 @@ const [startDate, setStartDate] = useState<string>("");
         )}
       </aside>
 
-      {/* Main content area for floor plan display */}
       <main className="flex-1 p-6 flex flex-col items-center justify-center bg-gray-100">
-        {selectedFloorMap ? ( // Floor map image and markers/heatmap only shown when a map is selected
+        {selectedFloorMap ? (
           <div className="relative border-2 border-gray-300 bg-white p-4 rounded-lg shadow-md max-w-full max-h-full overflow-auto">
-            <img
-              ref={floorPlanImageRef}
-              src={selectedFloorMap.imageUrl}
-              alt={selectedFloorMap.name}
-              className="block max-w-full h-auto select-none"
-              draggable={false}
-            />
+       <img
+  ref={floorPlanImageRef}
+  src={`https://iot.centelon.com${selectedFloorMap.imageUrl}`}
+  alt={selectedFloorMap.name}
+  className="block max-w-full h-auto select-none"
+  draggable={false}
+/>
 
-            {/* Show camera markers without heatmap - only if heatmap is not showing */}
+
             {!showHeatmap && cameraMarkers.map((marker) => (
               <div
                 key={marker._id}
@@ -414,54 +443,97 @@ const [startDate, setStartDate] = useState<string>("");
               </div>
             ))}
 
-            {/* Show heatmap overlays - only if heatmap is showing */}
             {showHeatmap && heatmapData.length > 0 && heatmapData.map((cameraData) => {
               const maxCount = getMaxCount();
-              const totalCameraEvents = cameraData.zones.reduce(
-                (sum, zone) => sum + zone.total_in_count + zone.total_out_count,
-                0
-              );
-              const color = getHeatmapColor(totalCameraEvents, maxCount);
 
               return (
                 <div
                   key={cameraData.cameraId}
-                  className="absolute border-3 border-dashed border-gray-700"
+                  className="absolute border-2 border-gray-700"
                   style={{
                     left: cameraData.marker.x,
                     top: cameraData.marker.y,
                     width: cameraData.marker.width,
                     height: cameraData.marker.height,
-                    backgroundColor: color,
                     pointerEvents: "none",
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'flex-start',
-                    alignItems: 'flex-start',
-                    padding: '5px',
-                    overflow: 'hidden'
                   }}
                 >
-                  <div className="absolute -top-9 left-0 bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
-                    {cameraData.cameraId} (Total: {totalCameraEvents} events)
+                  <div className="absolute -top-8 left-0 bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
+                    {cameraData.cameraId}
                   </div>
                   
-                  <div className="mt-4 text-xs bg-white bg-opacity-80 p-1 rounded overflow-y-auto max-h-full w-full">
-                    {cameraData.zones.length > 0 ? (
-                      cameraData.zones.map((zone) => (
-                        <p key={zone.zone_id} className="text-gray-800 leading-tight">
-                          Zone {zone.zone_id}: In {zone.total_in_count} | Out {zone.total_out_count}
-                        </p>
-                      ))
-                    ) : (
-                      <p className="text-gray-600">No zone data for this camera.</p>
-                    )}
-                  </div>
+                  {cameraData.zones.map((zone) => {
+                    const zonePosition = getRandomZonePosition(
+                      zone.zone_id,
+                      cameraData.marker.width,
+                      cameraData.marker.height,
+                      cameraData.zones.length
+                    );
+                    const totalCount = zone.total_in_count + zone.total_out_count;
+                    const color = getHeatmapColor(totalCount, maxCount);
+
+                    return (
+                      <div
+                        key={zone.zone_id}
+                        className="absolute"
+                        style={{
+                          left: zonePosition.x,
+                          top: zonePosition.y,
+                          width: zonePosition.size,
+                          height: zonePosition.size,
+                          borderRadius: '50%',
+                          background: `radial-gradient(circle at center, ${color} 0%, ${color.replace(/[\d.]+\)$/g, '0.4)')} 50%, transparent 100%)`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          pointerEvents: "none",
+                          filter: 'blur(12px)',
+                          boxShadow: `0 0 40px ${color}`,
+                        }}
+                      >
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Zone labels - separate layer so they're not blurred */}
+                  {cameraData.zones.map((zone) => {
+                    const zonePosition = getRandomZonePosition(
+                      zone.zone_id,
+                      cameraData.marker.width,
+                      cameraData.marker.height,
+                      cameraData.zones.length
+                    );
+                    const totalCount = zone.total_in_count + zone.total_out_count;
+
+                    return (
+                      <div
+                        key={`label-${zone.zone_id}`}
+                        className="absolute"
+                        style={{
+                          left: zonePosition.x + zonePosition.size / 2,
+                          top: zonePosition.y + zonePosition.size / 2,
+                          transform: 'translate(-50%, -50%)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <div className="bg-white bg-opacity-95 px-2 py-1 rounded-full shadow-md text-xs font-bold text-gray-800 border border-gray-300">
+                          Z{zone.zone_id}
+                        </div>
+                        <div className="bg-gray-800 bg-opacity-90 px-2 py-0.5 rounded text-xs text-white mt-1 font-semibold">
+                          {totalCount}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
           </div>
-        ) : ( // This block is shown when no floor map is selected
+        ) : (
           <div className="text-center text-gray-500 p-8 border-2 border-dashed border-gray-300 rounded-lg">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
