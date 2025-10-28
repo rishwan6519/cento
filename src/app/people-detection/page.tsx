@@ -261,6 +261,11 @@ export default function PeopleDetectionPage() {
 
   const [lastUpdateTime, setLastUpdateTime] = useState<string>("");
 
+  // New state for connection mode
+  const [connectionMode, setConnectionMode] = useState<"normal" | "urbanRain">(
+    "normal"
+  );
+
   // --- NEW: More Robust MQTT Connection useEffect ---
   useEffect(() => {
     // Prevent connection attempt with placeholder values
@@ -474,22 +479,58 @@ if (
     setEndDate(todayStr);
   }, []);
 
-  const generateRTSPUrls = (): string[] => {
-    if (!ip || !username || !password) return [];
-    const urls: string[] = [];
-    for (let i = 1; i <= numCameras; i++) {
+ const generateRTSPUrls = (): string[] => {
+  if (!ip || !username || !password) return [];
+  const urls: string[] = [];
+
+  const staticChannel = 1; // 👈 Keep channel fixed
+
+  if (connectionMode === "urbanRain") {
+    const ipParts = ip.split(".");
+    if (ipParts.length !== 4) {
+      setMessage("Invalid IP address format for Urban Rain connection.");
+      return [];
+    }
+
+    const baseIp = ipParts.slice(0, 3).join(".");
+    let lastOctet = parseInt(ipParts[3]);
+
+    if (isNaN(lastOctet)) {
+      setMessage("Invalid IP address format for Urban Rain connection.");
+      return [];
+    }
+
+    for (let i = 0; i < numCameras; i++) {
+      const currentIp = `${baseIp}.${lastOctet + i}`; // Increment last octet
+
       if (cameraType === "dahua") {
         urls.push(
-          `rtsp://${username}:${password}@${ip}:554/cam/realmonitor?channel=${i}&subtype=0`
+          `rtsp://${username}:${password}@${currentIp}:554/cam/realmonitor?channel=${staticChannel}&subtype=0`
         );
       } else {
         urls.push(
-          `rtsp://${username}:${password}@${ip}:554/Streaming/Channels/${i}01`
+          `rtsp://${username}:${password}@${currentIp}:554/Streaming/Channels/${staticChannel}01`
         );
       }
     }
-    return urls;
-  };
+  } else {
+    // Normal connection mode (same IP for all)
+    for (let i = 1; i <= numCameras; i++) {
+      if (cameraType === "dahua") {
+        urls.push(
+          `rtsp://${username}:${password}@${ip}:554/cam/realmonitor?channel=${staticChannel}&subtype=0`
+        );
+      } else {
+        urls.push(
+          `rtsp://${username}:${password}@${ip}:554/Streaming/Channels/${staticChannel}01`
+        );
+      }
+    }
+  }
+
+  return urls;
+};
+
 
   const handleConnect = async () => {
     if (!mqttClient || !mqttClient.connected) {
@@ -601,6 +642,7 @@ if (
             Math.round(zone.y2 * scaleY),
           ],
         };
+        
 
         const command = { command: "set_zone", payload };
 
@@ -623,6 +665,7 @@ if (
       
                 setMessage(
                   `All ${zones.length} zones submitted successfully! Monitoring will begin.`
+                  
                 );
                 fetch('/api/zones', {
                   method: 'POST',
@@ -1273,10 +1316,6 @@ const handleDeleteLine = async (lineName: string) => {
         <div className="max-w-6xl mx-auto">
           {/* Menubar */}
           <div className=" mb-8">
-           
-
-
-             
             <div className="flex gap-4">
               {/* Other menu items... */}
           
@@ -1311,6 +1350,32 @@ const handleDeleteLine = async (lineName: string) => {
               <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
                 Camera Configuration
               </h2>
+
+              {/* Connection Mode Selection */}
+              <div className="mb-6 flex gap-4">
+                <button
+                  onClick={() => setConnectionMode("normal")}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                    connectionMode === "normal"
+                      ? "bg-blue-500 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Standard Connection
+                </button>
+                <button
+                  onClick={() => setConnectionMode("urbanRain")}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                    connectionMode === "urbanRain"
+                      ? "bg-green-500 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Urban Rain (Multi-IP)
+                </button>
+              </div>
+
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <select
                   className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
@@ -1325,7 +1390,7 @@ const handleDeleteLine = async (lineName: string) => {
 
                 <input
                   className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
-                  placeholder="🌐 Camera IP Address"
+                  placeholder={connectionMode === "urbanRain" ? "🌐 Base IP Address (e.g., 192.168.20.11)" : "🌐 Camera IP Address"}
                   value={ip}
                   onChange={(e) => setIp(e.target.value)}
                 />
@@ -1840,10 +1905,8 @@ const handleDeleteLine = async (lineName: string) => {
             </div>
           </div>
         </div>
-      )}
-
-     
       
+       )}
 
       {isLoading && <LoadingSpinner />}
       {isConnectionLost && <ConnectionLostModal onRetry={() => window.location.reload()} message={connectionLostMessage} />}

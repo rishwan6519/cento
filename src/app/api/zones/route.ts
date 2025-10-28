@@ -1,70 +1,82 @@
-import { NextResponse } from 'next/server';
-import { ZoneCount } from '../../../models/Camera/SaveCount';
-import { connectToDatabase } from '@/lib/db';
+import { NextRequest, NextResponse } from "next/server";
+import { MongoClient } from "mongodb";
+import { ZoneCount } from "@/models/Camera/SaveCount";
 
-export async function GET(request: Request) {
+// ✅ MongoDB connection details
+const uri =
+  "mongodb+srv://mqtt_writer:vO4kWOXGYljnoof5@retail-analytics.daxsdcl.mongodb.net/?retryWrites=true&w=majority&appName=Retail-Analytics";
+const dbName = "Retail-Analytics";
+
+// ✅ Reuse MongoDB client
+let client: MongoClient | null = null;
+
+async function connectToDatabase() {
+  if (!client) {
+    client = new MongoClient(uri);
+    await client.connect();
+    console.log("[MongoDB] Connected successfully");
+  }
+  return client.db(dbName);
+}
+
+// ✅ GET API route
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const cameraId = searchParams.get('cameraId');
-    const startDate = searchParams.get('startDate');
-    const startTime = searchParams.get('startTime');
-    const endDate = searchParams.get('endDate');
-    const endTime = searchParams.get('endTime');
+    const db = await connectToDatabase();
+    const collection = db.collection("zone_events");
 
-    if (!cameraId || !startDate || !startTime || !endDate || !endTime) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
-    }
+    console.log("[MongoDB] Connected to collection: zone_events");
 
-    const startDateTime = new Date(`${startDate}T${startTime}:00`);
-    const endDateTime = new Date(`${endDate}T${endTime}:00`);
+    // ✅ Fetch all documents
+    const documents = await collection.find({}).toArray();
 
-    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-      return NextResponse.json({ error: 'Invalid date/time format' }, { status: 400 });
-    }
+    // ✅ Extract only relevant metadata
+    const metadataList = documents.map((doc) => doc.metadata);
 
-    await connectToDatabase();
+    console.log("[MongoDB] Sample metadata:", metadataList.slice(0, 3)); // Just first 3 for debug
 
-    // Aggregate counts per zone for the given camera and time range
-    const results = await ZoneCount.aggregate([
-      {
-        $match: {
-          camera_id: cameraId
-        }
-      },
-      { $unwind: '$counts' },
-      {
-        $match: {
-          'counts.timestamp': {
-            $gte: startDateTime,
-            $lte: endDateTime
-          }
-        }
-      },
-      {
-        $group: {
-          _id: '$zone_id',
-          total_in_count: { $sum: '$counts.in_count' },
-          total_out_count: { $sum: '$counts.out_count' }
-        }
-      },
-      {
-        $sort: { _id: 1 }
+    // ✅ Aggregate entry and exit counts per zone
+    const zoneCounts: Record<
+      string,
+      { total_in_count: number; total_out_count: number }
+    > = {};
+
+    metadataList.forEach((meta) => {
+      if (!meta?.zone_name || !meta?.event_type) return;
+
+      const zone = meta.zone_name;
+      if (!zoneCounts[zone]) {
+        zoneCounts[zone] = { total_in_count: 0, total_out_count: 0 };
       }
-    ]);
 
-    // Return zone IDs and counts for heatmap
-    const zones = results.map(item => ({
-      zone_id: item._id,
-      total_in_count: item.total_in_count,
-      total_out_count: item.total_out_count
+      if (meta.event_type === "entry") {
+        zoneCounts[zone].total_in_count += 1;
+      } else if (meta.event_type === "exit") {
+        zoneCounts[zone].total_out_count += 1;
+      }
+    });
+
+    // ✅ Convert to array format for response
+    const zones = Object.keys(zoneCounts).map((zone_id) => ({
+      zone_id,
+      total_in_count: zoneCounts[zone_id].total_in_count,
+      total_out_count: zoneCounts[zone_id].total_out_count,
     }));
 
+    console.log(`[MongoDB] Computed zone summary:`, zones);
+
+    // ✅ Final API response
     return NextResponse.json({ zones });
-  } catch (error) {
-    console.error('Error fetching zones:', error);
-    return NextResponse.json({ error: 'Failed to fetch zones' }, { status: 500 });
+  } catch (error: any) {
+    console.error("[API ERROR] Failed to fetch zone events:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch zone events" },
+      { status: 500 }
+    );
   }
 }
+
+
 
 export async function POST(request: Request) {
   try {

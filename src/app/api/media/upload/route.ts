@@ -57,7 +57,6 @@ export async function POST(req: NextRequest) {
 
     const uploadedFiles = await Promise.all(
       files.map(async (file: File, index) => {
-        // Sanitize filename and remove/replace spaces
         const originalFileName = sanitize(fileNames[index]).replace(/\s+/g, '_');
         const fileType = file.type?.split('/')?.[0] || 'unknown';
 
@@ -72,12 +71,12 @@ export async function POST(req: NextRequest) {
         const buffer = Buffer.from(bytes);
         await writeFile(filePath, buffer);
 
-        // Save to MongoDB
+        // ✅ Save only "audio", "video", or "image" in database
         const mediaItem = new MediaItemModel({
           userId: new mongoose.Types.ObjectId(userId),
           name: originalFileName,
-          type: file.type,
-          url: `/uploads/${userId}/${fileType}/${uniqueFileName}`, // This will be served by Nginx/Express
+          type: fileType, // <-- simplified type
+          url: `/uploads/${userId}/${fileType}/${uniqueFileName}`,
           createdAt: new Date()
         });
 
