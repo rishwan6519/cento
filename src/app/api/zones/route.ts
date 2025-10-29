@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import { ZoneCount } from "@/models/Camera/SaveCount";
 
-// ✅ MongoDB connection details
+// MongoDB connection details
 const uri =
-  "mongodb+srv://mqtt_writer:vO4kWOXGYljnoof5@retail-analytics.daxsdcl.mongodb.net/?retryWrites=true&w=majority&appName=Retail-Analytics";
-const dbName = "Retail-Analytics";
+  "mongodb+srv://retail_admin:LCQ3b6kYRiN6wUEl@retailanalytics.kznhbji.mongodb.net/?retryWrites=true&w=majority&appName=RetailAnalytics";
+const dbName = "retail_analytics_test";
 
-// ✅ Reuse MongoDB client
 let client: MongoClient | null = null;
 
 async function connectToDatabase() {
@@ -19,58 +18,120 @@ async function connectToDatabase() {
   return client.db(dbName);
 }
 
-// ✅ GET API route
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const cameraId = searchParams.get("cameraId");
+    const startDate = searchParams.get("startDate");
+    const startTime = searchParams.get("startTime");
+    const endDate = searchParams.get("endDate");
+    const endTime = searchParams.get("endTime");
+
+    console.log("[API] Received params:", {
+      cameraId,
+      startDate,
+      startTime,
+      endDate,
+      endTime,
+    });
+
+    if (!cameraId || !startDate || !endDate) {
+      return NextResponse.json(
+        { error: "Missing required parameters: cameraId, startDate, endDate" },
+        { status: 400 }
+      );
+    }
+
     const db = await connectToDatabase();
     const collection = db.collection("zone_events");
 
-    console.log("[MongoDB] Connected to collection: zone_events");
+    // Build date range
+    const startDateTime = new Date(`${startDate}T${startTime || "00:00"}:00.000Z`);
+    const endDateTime = new Date(`${endDate}T${endTime || "23:59"}:59.999Z`);
 
-    // ✅ Fetch all documents
-    const documents = await collection.find({}).toArray();
+    console.log("[API] Date range:", {
+      startDateTime: startDateTime.toISOString(),
+      endDateTime: endDateTime.toISOString(),
+    });
 
-    // ✅ Extract only relevant metadata
-    const metadataList = documents.map((doc) => doc.metadata);
+    // ✅ Query for the given camera and time range
+    const query = {
+      "metadata.camera_id": cameraId,
+      timestamp: {
+        $gte: startDateTime,
+        $lte: endDateTime,
+      },
+    };
 
-    console.log("[MongoDB] Sample metadata:", metadataList.slice(0, 3)); // Just first 3 for debug
+    console.log("[API] MongoDB query:", JSON.stringify(query, null, 2));
 
-    // ✅ Aggregate entry and exit counts per zone
+    const documents = await collection.find(query).toArray();
+    console.log(`[API] Found ${documents.length} documents`);
+
+    if (documents.length > 0) {
+      console.log("[API] Sample document:", JSON.stringify(documents[0], null, 2));
+    }
+
+    // ✅ Count unique person_ids for Entered and Exited actions
     const zoneCounts: Record<
       string,
-      { total_in_count: number; total_out_count: number }
+      { in_ids: Set<number>; out_ids: Set<number> }
     > = {};
 
-    metadataList.forEach((meta) => {
-      if (!meta?.zone_name || !meta?.event_type) return;
+    documents.forEach((doc: any) => {
+      const zoneName = doc.metadata?.zone_name;
+      const action = doc.action;
+      const personId = doc.person_id;
 
-      const zone = meta.zone_name;
-      if (!zoneCounts[zone]) {
-        zoneCounts[zone] = { total_in_count: 0, total_out_count: 0 };
+      if (!zoneName || !action || personId === undefined) return;
+
+      if (!zoneCounts[zoneName]) {
+        zoneCounts[zoneName] = { in_ids: new Set(), out_ids: new Set() };
       }
 
-      if (meta.event_type === "entry") {
-        zoneCounts[zone].total_in_count += 1;
-      } else if (meta.event_type === "exit") {
-        zoneCounts[zone].total_out_count += 1;
+      if (action === "Entered") {
+        zoneCounts[zoneName].in_ids.add(personId);
+      } else if (action === "Exited") {
+        zoneCounts[zoneName].out_ids.add(personId);
       }
     });
 
-    // ✅ Convert to array format for response
-    const zones = Object.keys(zoneCounts).map((zone_id) => ({
-      zone_id,
-      total_in_count: zoneCounts[zone_id].total_in_count,
-      total_out_count: zoneCounts[zone_id].total_out_count,
-    }));
+    // ✅ Convert results to array
+    const zones = Object.keys(zoneCounts).map((zoneName) => {
+      const zoneIdMatch = zoneName.match(/\d+/);
+      const zoneId = zoneIdMatch ? parseInt(zoneIdMatch[0]) : 0;
 
-    console.log(`[MongoDB] Computed zone summary:`, zones);
+      return {
+        zone_id: zoneId,
+        zone_name: zoneName,
+        total_in_count: zoneCounts[zoneName].in_ids.size, // unique entered persons
+        total_out_count: zoneCounts[zoneName].out_ids.size, // unique exited persons
+      };
+    });
 
-    // ✅ Final API response
-    return NextResponse.json({ zones });
+    zones.sort((a, b) => a.zone_id - b.zone_id);
+
+    console.log(`[API] Final zone summary (${zones.length} zones):`, zones);
+
+    return NextResponse.json({
+      zones,
+      summary: {
+        total_documents: documents.length,
+        date_range: {
+          start: startDateTime.toISOString(),
+          end: endDateTime.toISOString(),
+        },
+        camera_id: cameraId,
+      },
+    });
   } catch (error: any) {
     console.error("[API ERROR] Failed to fetch zone events:", error);
     return NextResponse.json(
-      { error: "Failed to fetch zone events" },
+      {
+        error: "Failed to fetch zone events",
+        details: error.message,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
       { status: 500 }
     );
   }

@@ -561,7 +561,6 @@
 //new code 
 
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -600,35 +599,27 @@ interface CameraHeatmapData {
 
 // Generate well-distributed positions for zones based on zone_id
 const getRandomZonePosition = (zoneId: number, cameraWidth: number, cameraHeight: number, totalZones: number) => {
-  // Use zone_id as seed for consistent random positions
   const seed = zoneId * 12345;
   const random = (n: number) => Math.abs((Math.sin(seed + n) * 10000) % 1);
   
-  // Smaller zones with more spacing - between 20% to 35% of camera area
   const sizeMultiplier = 0.2 + random(1) * 0.15;
   const zoneSize = Math.min(cameraWidth, cameraHeight) * sizeMultiplier;
   
-  // Create a grid-like distribution with randomization
-  // Divide camera into sectors based on zone count
   const sectorsPerRow = Math.ceil(Math.sqrt(totalZones));
   const sectorWidth = cameraWidth / sectorsPerRow;
   const sectorHeight = cameraHeight / sectorsPerRow;
   
-  // Determine which sector this zone belongs to
   const sectorIndex = (zoneId - 1) % (sectorsPerRow * sectorsPerRow);
   const sectorRow = Math.floor(sectorIndex / sectorsPerRow);
   const sectorCol = sectorIndex % sectorsPerRow;
   
-  // Add randomization within the sector to avoid perfect grid
-  const randomOffsetX = random(2) * 0.6 + 0.2; // 20% to 80% within sector
+  const randomOffsetX = random(2) * 0.6 + 0.2;
   const randomOffsetY = random(3) * 0.6 + 0.2;
   
-  // Calculate position with padding to avoid edges
   const padding = zoneSize * 0.1;
   const x = sectorCol * sectorWidth + (sectorWidth - zoneSize) * randomOffsetX + padding;
   const y = sectorRow * sectorHeight + (sectorHeight - zoneSize) * randomOffsetY + padding;
   
-  // Ensure zone stays within bounds
   const clampedX = Math.max(padding, Math.min(x, cameraWidth - zoneSize - padding));
   const clampedY = Math.max(padding, Math.min(y, cameraHeight - zoneSize - padding));
   
@@ -639,12 +630,11 @@ const getRandomZonePosition = (zoneId: number, cameraWidth: number, cameraHeight
   };
 };
 
-// --- API Functions ---
+// API Functions
 const fetchFloorMaps = async (): Promise<FloorMap[]> => {
   try {
     const res = await fetch(`/api/floor-map?userId=686cc66d9c011d7c23ae8b64`);
     const data = await res.json();
-
     if (data.success && Array.isArray(data.floorMaps)) {
       return data.floorMaps;
     }
@@ -659,7 +649,6 @@ const fetchCameraMarkers = async (floorMapId: string): Promise<CameraMarker[]> =
   try {
     const res = await fetch(`/api/camera-marker?floorMapId=${floorMapId}`);
     const data = await res.json();
-
     if (data.success) {
       return data.data || [];
     }
@@ -687,6 +676,12 @@ const fetchZoneHeatmapData = async (
     });
     const res = await fetch(`/api/zones?${params}`);
     const data = await res.json();
+    
+    if (data.error) {
+      console.error("API Error:", data.error);
+      return [];
+    }
+    
     return data.zones || [];
   } catch (error) {
     console.error("Error fetching zone data:", error);
@@ -694,18 +689,16 @@ const fetchZoneHeatmapData = async (
   }
 };
 
-// --- Helper Functions ---
 const getHeatmapColor = (count: number, maxCount: number): string => {
   if (maxCount === 0) return "rgba(0, 255, 0, 0.6)";
   
   const intensity = count / maxCount;
   
-  // Much more vibrant and noticeable colors
-  if (intensity < 0.2) return "rgba(0, 255, 0, 0.7)"; // Bright green
-  if (intensity < 0.4) return "rgba(173, 255, 47, 0.75)"; // Yellow-green
-  if (intensity < 0.6) return "rgba(255, 255, 0, 0.8)"; // Bright yellow
-  if (intensity < 0.8) return "rgba(255, 140, 0, 0.85)"; // Bright orange
-  return "rgba(255, 0, 0, 0.9)"; // Bright red
+  if (intensity < 0.2) return "rgba(0, 255, 0, 0.7)";
+  if (intensity < 0.4) return "rgba(173, 255, 47, 0.75)";
+  if (intensity < 0.6) return "rgba(255, 255, 0, 0.8)";
+  if (intensity < 0.8) return "rgba(255, 140, 0, 0.85)";
+  return "rgba(255, 0, 0, 0.9)";
 };
 
 const HeatmapViewer: React.FC = () => {
@@ -716,8 +709,8 @@ const HeatmapViewer: React.FC = () => {
   
   const [startDate, setStartDate] = useState<string>("");
   const [startTime, setStartTime] = useState<string>("00:00");
-  const [endDate, setEndDate] = useState<string>("23:59");
-  const [endTime, setEndTime] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [endTime, setEndTime] = useState<string>("23:59");
   
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -784,6 +777,8 @@ const HeatmapViewer: React.FC = () => {
       const heatmapResults: CameraHeatmapData[] = [];
 
       for (const marker of cameraMarkers) {
+        console.log(`Fetching data for camera: ${marker.cameraId}`);
+        
         const zones = await fetchZoneHeatmapData(
           marker.cameraId,
           startDate,
@@ -791,6 +786,8 @@ const HeatmapViewer: React.FC = () => {
           endDate,
           endTime
         );
+
+        console.log(`Received ${zones.length} zones for camera ${marker.cameraId}`);
 
         if (zones.length > 0) {
           heatmapResults.push({
@@ -807,6 +804,7 @@ const HeatmapViewer: React.FC = () => {
       } else {
         setHeatmapData(heatmapResults);
         setShowHeatmap(true);
+        console.log("Heatmap generated successfully:", heatmapResults);
       }
     } catch (error: any) {
       console.error("Error generating heatmap:", error);
@@ -821,7 +819,7 @@ const HeatmapViewer: React.FC = () => {
     let max = 0;
     heatmapData.forEach((camera) => {
       camera.zones.forEach((zone) => {
-        const total = zone.total_in_count + zone.total_out_count;
+        const total = zone.total_in_count 
         if (total > max) max = total;
       });
     });
@@ -1001,7 +999,7 @@ const HeatmapViewer: React.FC = () => {
                     width: cameraData.marker.width,
                     height: cameraData.marker.height,
                     pointerEvents: "none",
-                    border: "2px dotted #4A5568", // Dotted border for heatmap display
+                    border: "2px dotted #4A5568",
                   }}
                 >
                   <div className="absolute -top-8 left-0 bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">
@@ -1015,7 +1013,7 @@ const HeatmapViewer: React.FC = () => {
                       cameraData.marker.height,
                       cameraData.zones.length
                     );
-                    const totalCount = zone.total_in_count + zone.total_out_count;
+                    const totalCount = zone.total_in_count 
                     const color = getHeatmapColor(totalCount, maxCount);
 
                     return (
@@ -1042,7 +1040,6 @@ const HeatmapViewer: React.FC = () => {
                     );
                   })}
                   
-                  {/* Zone labels - separate layer so they're not blurred */}
                   {cameraData.zones.map((zone) => {
                     const zonePosition = getRandomZonePosition(
                       zone.zone_id,
@@ -1050,7 +1047,7 @@ const HeatmapViewer: React.FC = () => {
                       cameraData.marker.height,
                       cameraData.zones.length
                     );
-                    const totalCount = zone.total_in_count + zone.total_out_count;
+                    const totalCount = zone.total_in_count 
 
                     return (
                       <div
@@ -1078,7 +1075,8 @@ const HeatmapViewer: React.FC = () => {
                 </div>
               );
             })}
-             {!showHeatmap && cameraMarkers.map((marker) => (
+             
+            {!showHeatmap && cameraMarkers.map((marker) => (
               <div
                 key={marker._id}
                 className="absolute border-3 border-blue-500 bg-blue-500 bg-opacity-20"

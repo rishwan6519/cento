@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
 import InstantAnnouncement from '@/models/InstantAnnouncement';
-import Announcement from '@/models/AnnouncementFiles';
+import '@/models/AnnouncementFiles';
 
 // ==================== GET - Retrieve Announcements for Device ====================
 export async function GET(req: NextRequest) {
@@ -34,6 +34,18 @@ export async function GET(req: NextRequest) {
       );
     }
     console.log('Device found:', device);
+
+    // Update lastConnection time only
+    device.lastConnection = new Date();
+    await device.save();
+
+    // Calculate online status for response (not saved in DB)
+    let isOnline = true;
+    if (device.lastConnection) {
+      const now = new Date();
+      const diffSeconds = (now.getTime() - new Date(device.lastConnection).getTime()) / 1000;
+      isOnline = diffSeconds <= 20;
+    }
 
     // Query instant announcements for this device
     const instantAnnouncements = await InstantAnnouncement.find({
@@ -63,6 +75,8 @@ export async function GET(req: NextRequest) {
         _id: device._id,
         serialNumber: device.serialNumber,
         name: device.name,
+        lastConnection: device.lastConnection,
+        isOnline // true if lastConnection within 20 seconds, else false
       },
       announcements: instantAnnouncements.map(a => {
         const file = a.file as any;

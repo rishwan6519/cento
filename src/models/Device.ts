@@ -25,6 +25,11 @@ const deviceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    lastConnection: {
+    type: Date,
+    required: false,
+    default: null
+  },
   status: {
     type: String,
     enum: ['active', 'inactive', 'maintenance'],
