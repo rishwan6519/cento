@@ -14,6 +14,7 @@ interface ZoneCounts {
   };
 }
 
+
 interface HeatmapData {
   timestamp: string;
   zone_id: number;
@@ -58,6 +59,7 @@ const LoadingSpinner = () => (
       <div className="flex items-center space-x-4">
         <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
         <span className="text-lg font-medium">Loading...</span>
+
       </div>
     </div>
   </div>
@@ -168,7 +170,10 @@ export default function PeopleDetectionPage() {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const snapshotHandledRef = useRef(false);
 
+
+
   const zoneColors = [
+
     "rgba(255, 99, 132, 0.3)",
     "rgba(54, 162, 235, 0.3)",
     "rgba(255, 206, 86, 0.3)",
@@ -444,35 +449,39 @@ export default function PeopleDetectionPage() {
     if (!ip || !username || !password) return [];
     const urls: string[] = [];
     const staticChannel = 1;
+if (connectionMode === "urbanRain") {
 
-    if (connectionMode === "urbanRain") {
-      // Urban Rain Mode
-      const ipParts = ip.split(".");
-      if (ipParts.length !== 4) {
-        setMessage("Invalid IP address format for Urban Rain connection.");
-        return [];
-      }
 
-      const baseIp = ipParts.slice(0, 3).join(".");
-      let lastOctet = parseInt(ipParts[3]);
+  // Urban Rain Mode: Increment IP for each camera, channel stays the same
+  
+  const ipParts = ip.split(".");
+  if (ipParts.length !== 4) {
+    setMessage("Invalid IP address format for Urban Rain connection.");
+    return [];
+  }
 
-      if (isNaN(lastOctet)) {
-        setMessage("Invalid IP address format for Urban Rain connection.");
-        return [];
-      }
+  const baseIp = ipParts.slice(0, 3).join(".");
+  let lastOctet = parseInt(ipParts[3]);
 
-      for (let i = 1; i <= numCameras; i++) {
-        if (cameraType === "dahua") {
-          urls.push(
-            `rtsp://${username}:${password}@${ip}:554/cam/realmonitor?channel=${staticChannel}&subtype=0`
-          );
-        } else {
-          const channelNumber = i * 100 + 1; // 101, 201, 301, ...
-          urls.push(
-            `rtsp://${username}:${password}@${ip}:554/Streaming/Channels/${channelNumber}`
-          );
-        }
-      }
+  if (isNaN(lastOctet)) {
+    setMessage("Invalid IP address format for Urban Rain connection.");
+    return [];
+
+  }
+
+  for (let i = 0; i < numCameras; i++) {
+    const cameraIp = `${baseIp}.${lastOctet + i}`;
+    if (cameraType === "dahua") {
+      urls.push(
+        `rtsp://${username}:${password}@${cameraIp}:554/cam/realmonitor?channel=1&subtype=0`
+      );
+    } else {
+      urls.push(
+        `rtsp://${username}:${password}@${cameraIp}:554/Streaming/Channels/101`
+      );
+     
+    }
+  }
     } else {
       // Normal Mode (non-UrbanRain)
       for (let i = 1; i <= numCameras; i++) {

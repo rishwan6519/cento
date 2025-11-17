@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    
 
     const device = await Device.findOne({ serialNumber });
     if (!device) {
