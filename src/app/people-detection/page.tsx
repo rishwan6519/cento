@@ -127,6 +127,8 @@ export default function PeopleDetectionPage() {
   } | null>(null);
   const [activeZoneId, setActiveZoneId] = useState<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<"floorplan" | "heatmap" | null>(null);
+
 
   // Line Drawing States
   const [lines, setLines] = useState<Line[]>([]);
@@ -1134,9 +1136,32 @@ if (connectionMode === "urbanRain") {
             <p className="text-gray-600">
               Configure cameras and set detection zones via MQTT
             </p>
-            <FloorPlanUploader />
-
-            <HeatmapViewer />
+            {/* Menu Bar */}
+            <div className="flex justify-center gap-4 mb-6">
+              <button
+                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                  activeMenu === "floorplan"
+                    ? "bg-blue-500 text-white shadow-md"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+                onClick={() => setActiveMenu("floorplan")}
+              >
+                Floor Plan
+              </button>
+              <button
+                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                  activeMenu === "heatmap"
+                    ? "bg-green-500 text-white shadow-md"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+                onClick={() => setActiveMenu("heatmap")}
+              >
+                Heatmap
+              </button>
+            </div>
+            {/* Show selected component */}
+            {activeMenu === "floorplan" && <FloorPlanUploader />}
+            {activeMenu === "heatmap" && <HeatmapViewer />}
           </div>
 
           <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">

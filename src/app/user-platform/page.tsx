@@ -1106,7 +1106,7 @@ import { RiArrowDropDownLine, RiDashboardLine } from "react-icons/ri";
 import { MdOutlinePlaylistPlay, MdAnnouncement } from "react-icons/md";
 import { Device, MenuKey } from "@/components/Platform/types";
 import Image from "next/image";
-import { Search, Bell, User } from "lucide-react";
+import { Search, Bell, User, Speech } from "lucide-react";
 import Button from "@/components/Platform/Button";
 import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
@@ -1451,8 +1451,10 @@ const menuSections: MenuSection[] = [
       { key: "createAnnouncement", label: "Create new announcement", icon: <MdAnnouncement /> },
       { key: "scheduleAnnouncement", label: "Schedule announcement", icon: <FaCog /> },
       { key: "announcementPlaylist", label: "Announcement playlist", icon: <FaListAlt /> },
+      // {key:"TextToSpeech", label:"Text to speech",icon:<Speech/> },
       { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
       { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
+      {key:"InstantaneousAnnouncement",label: "Instant announcement", icon:<FaVolumeUp />},
       
     ],
   },
@@ -2274,6 +2276,9 @@ const DeviceCard = ({ device }: { device: Device }) => {
         return <AnnouncementList />;
       case "TextToSpeech":
         return <TTSCreator />;
+        case "InstantaneousAnnouncement":
+         return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("announcementLibrary")} />;
+
       default:
         return (
           <div className="p-4 text-center py-20">
