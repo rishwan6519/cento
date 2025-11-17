@@ -320,7 +320,7 @@ export default function PeopleDetectionPage() {
             response = JSON.parse(payload.toString());
           } catch (jsonErr) {
             // Binary image fallback
-            const blob = new Blob([payload], { type: "image/jpeg" });
+            const blob = new Blob([new Uint8Array(payload as Buffer)], { type: "image/jpeg" });
             const imageUrl = URL.createObjectURL(blob);
             setSnapshotUrl(imageUrl);
             console.log("Received binary image snapshot.", imageUrl);

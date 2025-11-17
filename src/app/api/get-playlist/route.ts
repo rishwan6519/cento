@@ -12,51 +12,46 @@ export async function GET(req: Request) {
 
     if (!playlistId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Playlist ID is required",
-        },
+        { success: false, error: "Playlist ID is required" },
         { status: 400 }
       );
     }
 
     if (!mongoose.Types.ObjectId.isValid(playlistId)) {
-      console.log("Invalid MongoDB ObjectId format");
       return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid playlist ID format",
-        },
+        { success: false, error: "Invalid playlist ID format" },
         { status: 400 }
       );
     }
 
     const playlist = await Playlist.findById(playlistId);
 
-   
-
     if (!playlist) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "No playlist found for this ID",
-        },
+        { success: false, message: "No playlist found for this ID" },
         { status: 404 }
       );
     }
 
+    // Normalize type (ONLY CHANGE)
+    const normalizeType = (type: string) => {
+      if (!type) return type;
+      const lower = type.toLowerCase();
+      if (lower.includes("video")) return "video";
+      if (lower.includes("audio")) return "audio";
+      return type;
+    };
+
     return NextResponse.json({
       success: true,
-      
       playlistData: {
         id: playlist._id,
         versionId: playlist.updatedAt.getTime().toString(),
-        contentType: playlist.contentType,
         shuffle: playlist.shuffle,
         files: playlist.files.map((file: any) => ({
-          path:`https://iot.centelon.com${file.path}`,
+          path: `https://iot.centelon.com${file.path}`,
           displayOrder: file.displayOrder,
-            type: file.type,
+          type: normalizeType(file.type), // ← ONLY CHANGE
           delay: file.delay,
           maxVolume: file.maxVolume,
           minVolume: file.minVolume,
@@ -64,7 +59,6 @@ export async function GET(req: Request) {
           backgroundImage: file.backgroundImage,
         })),
       },
-      
     });
   } catch (error) {
     console.error("Server error:", error);
