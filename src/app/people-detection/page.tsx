@@ -170,7 +170,7 @@ export default function PeopleDetectionPage() {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const snapshotHandledRef = useRef(false);
 
-
+// console.log("Rendering PeopleDetectionPage component");
 
   const zoneColors = [
 
