@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, ChangeEvent, MouseEvent } from "react";
+import React, { useState, useRef, ChangeEvent, MouseEvent, useEffect } from "react";
 
 // Define types for better type safety
 interface CameraMarker {
@@ -174,19 +174,17 @@ const FloorPlanUploader: React.FC = () => {
       setCurrentRect(null);
       return;
     }
-    
-    // Add the completed rectangle to temp markers
+
     setTempMarkers((prev) => [...prev, currentRect]);
     setIsDrawing(false);
     setStartPoint(null);
     setCurrentRect(null);
-    
+
     if (currentCameraIndex + 1 < cameraCount) {
       setCurrentCameraIndex((prev) => prev + 1);
     } else {
-      // All markers placed, now upload floor plan and save all markers
       setCurrentCameraIndex((prev) => prev + 1);
-      uploadAndSaveAll();
+      // REMOVE: uploadAndSaveAll();
     }
   };
 
@@ -268,6 +266,17 @@ const FloorPlanUploader: React.FC = () => {
     setStartPoint(null);
     setCurrentRect(null);
   };
+
+  useEffect(() => {
+    if (
+      step === "marking" &&
+      tempMarkers.length === cameraCount &&
+      !isLoading
+    ) {
+      uploadAndSaveAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempMarkers]);
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 text-gray-800">

@@ -1380,6 +1380,7 @@ const [current, setCurrent] = useState(0);
             }))
             .filter(Boolean);
           setDevices(mappedDevices);
+          console.log("Mapped Devices:", mappedDevices);
         } else {
           setDevices([]);
         }
@@ -2254,7 +2255,7 @@ const DeviceCard = ({ device }: { device: Device }) => {
       case "mediaLibrary":
         return <ShowMedia  />;
       case "setupPlaylist":
-        return <PlaylistSetup />;
+        return <PlaylistSetup onSuccess={()=>setSelectedMenu("showPlaylist")} onCancel={()=>setSelectedMenu("dashboard")}/>;
       case "showPlaylist":
         return <PlaylistManager />;
       case "connectPlaylist":
