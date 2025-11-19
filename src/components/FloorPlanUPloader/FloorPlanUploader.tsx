@@ -98,6 +98,7 @@ const FloorPlanUploader: React.FC = () => {
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [currentRect, setCurrentRect] = useState<TempMarker | null>(null);
+  const [redoMarkers, setRedoMarkers] = useState<TempMarker[]>([]); // Add this state
 
   const floorPlanImageRef = useRef<HTMLImageElement>(null);
 
@@ -176,6 +177,7 @@ const FloorPlanUploader: React.FC = () => {
     }
 
     setTempMarkers((prev) => [...prev, currentRect]);
+    setRedoMarkers([]); // Clear redo stack on new draw
     setIsDrawing(false);
     setStartPoint(null);
     setCurrentRect(null);
@@ -278,6 +280,17 @@ const FloorPlanUploader: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tempMarkers]);
 
+  const handleUndo = () => {
+    if (tempMarkers.length === 0 || isLoading) return;
+    setTempMarkers(prev => {
+      const newArr = [...prev];
+      const removed = newArr.pop();
+      if (removed) setRedoMarkers(r => [removed, ...r]);
+      return newArr;
+    });
+    setCurrentCameraIndex(prev => Math.max(0, prev - 1));
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 text-gray-800">
       {/* Sidebar for controls */}
@@ -365,6 +378,18 @@ const FloorPlanUploader: React.FC = () => {
           {step === "marking" && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-gray-700">Step 3: Draw Camera Areas</h2>
+              {/* Undo button appears instantly after any draw */}
+              {tempMarkers.length > 0 && (
+                <div className="flex gap-2 mb-2">
+                  <button
+                    onClick={handleUndo}
+                    className="flex-1 py-2 px-3 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium disabled:opacity-50"
+                    disabled={isLoading}
+                  >
+                    Undo
+                  </button>
+                </div>
+              )}
               {currentCameraIndex < cameraCount ? (
                 <div className="bg-blue-50 border border-blue-300 text-blue-700 px-4 py-3 rounded">
                   <p className="font-medium text-lg mb-2">
