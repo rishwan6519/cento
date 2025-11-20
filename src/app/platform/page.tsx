@@ -411,7 +411,7 @@ export default function RoboticPlatform(): React.ReactElement {
         );
 
       case "setupPlaylist":
-        return <PlaylistSetup />;
+        return <PlaylistSetup onCancel={()=>setSelectedMenu("dashboard")} onSuccess={()=>setSelectedMenu("showPlaylist")} />;
     // In your renderContent function
     case "setupAnnouncement":
       return <Announcement />;
