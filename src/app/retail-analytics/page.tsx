@@ -1388,22 +1388,8 @@ if (connectionMode === "urbanRain") {
                                   ></div>
                                 </div>
                                 <div className="space-y-4">
-                                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                    <span className="text-emerald-700 font-medium text-sm tracking-wide">
-                                      Live Entries:
-                                    </span>
-                                    <span className="text-2xl font-bold text-emerald-700 font-mono">
-                                      {counts.in}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                    <span className="text-red-700 font-medium text-sm tracking-wide">
-                                      Live Exits:
-                                    </span>
-                                    <span className="text-2xl font-bold text-red-700 font-mono">
-                                      {counts.out}
-                                    </span>
-                                  </div>
+                                  
+                                 
                                   <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                     <span className="text-blue-700 font-medium text-sm tracking-wide">
                                       Total Entries:
@@ -1420,18 +1406,7 @@ if (connectionMode === "urbanRain") {
                                       {totalOut}
                                     </span>
                                   </div>
-                                  {!isLine && (
-                                    <div className="pt-2">
-                                      <div className="flex justify-between items-center py-2">
-                                        <span className="font-semibold text-sm tracking-wide text-slate-800">
-                                          Current Occupancy:
-                                        </span>
-                                        <span className="text-2xl font-bold font-mono text-slate-800">
-                                          {netCount}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
+                               
                                   {!isLine && (
                                     <button
                                       onClick={(e) => {

@@ -938,7 +938,7 @@ const DeviceCard = ({ device }: { device: Device }) => {
           </h3>
 
           <p className="text-xs text-gray-600 mt-1">
-            Type : {device.deviceId?._id} <span className="mx-1">|</span> Zone :{" "}
+            Type : {device.typeId?.name} <span className="mx-1">|</span> Serial Number :{" "}
             {device.deviceId?.serialNumber}
           </p>
 
