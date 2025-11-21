@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     .populate('file') // Populate the file reference
     .sort({ createdAt: -1 }); // Most recent first
 
+    
     console.log('Instant Announcements found:', instantAnnouncements.length);
 
     // Calculate total duration

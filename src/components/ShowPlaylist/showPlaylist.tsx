@@ -122,6 +122,8 @@ const [viewMode, setViewMode] = useState<"list" | "grid">("list");
       
       const data = await response.json();
       const mediaFiles = data.media || [];
+      console.log(mediaFiles,"this is media files ");
+      
       
       // Ensure each media file has an id
       const processedMediaFiles = mediaFiles.map((file: any) => ({

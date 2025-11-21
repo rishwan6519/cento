@@ -62,6 +62,17 @@ import TTSCreator from "@/components/Announcement/AnnouncementTts";
 import Scheduler from "@/components/Scheduler/Scheduler";
 // import RobotIcon from "@/components/icons/centelon-logo.svg";
 
+interface DeviceStatuses {
+  [serial: string]: {
+    status: "online" | "offline";
+    lastSync: string;
+  };
+}
+
+interface DeviceCardProps {
+  device: Device;
+  deviceStatuses: DeviceStatuses;
+}
 // Define interfaces
 interface UserData {
   _id: string;
@@ -868,6 +879,8 @@ const [deviceStatus, setDeviceStatus] = useState<"online" | "offline" | null>(nu
   const [lastSync, setLastSync] = useState<string>("");
   const previousStatus = useRef<"online" | "offline" | null>(null);
   const previousLastSync = useRef<string>("");
+  const [deviceStatuses, setDeviceStatuses] = useState({});
+
 useEffect(() => {
   if (!devices?.length) return;
 
@@ -882,55 +895,119 @@ useEffect(() => {
         );
 
         const data = await response.json();
+        // console.log("status data -->", data);
 
-         if (data.success) {
-        const currentStatus = data.status as "online" | "offline";
-        const currentLastSync = data.lastConnection
-          ? new Date(data.lastConnection).toLocaleString()
-          : "";
+        if (data.success) {
+          const currentStatus = data.status; // online | offline
+          // const currentLastSync = data.lastConnection
+          //   ? new Date(data.lastConnection).toLocaleString()
+          //   : "";
+          const currentLastSync = data.lastConnection
+  ? new Date(data.lastConnection).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).replace("AM", "am").replace("PM", "pm")
+  : "";
 
-        setDeviceStatus(currentStatus);
-        setLastSync(currentLastSync);
 
-        // Toast show only once on first offline
-        if (currentStatus === "offline") {
-          toast.error(`The device ${serial} is offline.`);
+          setDeviceStatuses((prev) => ({
+            ...prev,
+            [serial]: {
+              status: currentStatus,
+              lastSync: currentLastSync,
+            },
+          }));
+
+          // Toast per device when offline
+          if (currentStatus === "offline") {
+            toast.error(`The device ${serial} is offline.`);
+          }
         }
-      }
       } catch (error) {
         console.error("Error fetching device status:", error);
       }
     }
   };
 
-  // Call all API requests only once
+  // Fetch all statuses once on load
   fetchStatuses();
-  const intervalId = setInterval(fetchStatuses, 10000);
-    return () => clearInterval(intervalId);
 
+  // Repeat every 10s
+  const intervalId = setInterval(fetchStatuses, 10000);
+  return () => clearInterval(intervalId);
 }, [devices]);
 
-const DeviceCard = ({ device }: { device: Device }) => {
-  
+// useEffect(() => {
+//   if (!devices?.length) return;
 
+//   const fetchStatuses = async () => {
+//     for (const d of devices) {
+//       const serial = d?.deviceId?.serialNumber;
+//       if (!serial) continue;
 
+//       try {
+//         const response = await fetch(
+//           `https://iot.centelon.com/api/status-check?serialNumber=${serial}`
+//         );
 
+//         const data = await response.json();
+// console.log("data-->",data.device);
 
-  const isOnline = deviceStatus === "online";
-  const playingPlaylist = device.connectedPlaylists?.length
-    ? device.connectedPlaylists[0].name
-    : isOnline
-    ? "Soft Playlist"
-    : null;
-  const remainingTime = isOnline ? "30 min left" : null;
+//          if (data.success) {
+//         const currentStatus = data.status as "online" | "offline";
+//         const currentLastSync = data.lastConnection
+//           ? new Date(data.lastConnection).toLocaleString()
+//           : "";
+
+//         setDeviceStatus(currentStatus);
+//         setLastSync(currentLastSync);
+
+//         // Toast show only once on first offline
+//         if (currentStatus === "offline") {
+//           toast.error(`The device ${serial} is offline.`);
+//         }
+//       }
+//       } catch (error) {
+//         console.error("Error fetching device status:", error);
+//       }
+//     }
+//   };
+
+//   // Call all API requests only once
+//   fetchStatuses();
+//   const intervalId = setInterval(fetchStatuses, 10000);
+//     return () => clearInterval(intervalId);
+
+// }, [devices]);
+// const DeviceCard = ({ device, deviceStatuses }) => {
+const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
+  const serial = device.deviceId.serialNumber;
+
+  const deviceState = deviceStatuses[serial] || {};
+  const isOnline = deviceState.status === "online";
+  const lastSync = deviceState.lastSync || "None";
+
+  const playingPlaylist =
+    device.connectedPlaylists?.length
+      ? device.connectedPlaylists[0].name
+      : isOnline
+      ? "Soft Playlist"
+      : null;
+
+  const remainingTime = isOnline ? device.deviceId.status : null;
 
   return (
     <div
       className={`relative flex flex-col rounded-xl shadow-lg overflow-hidden w-72 cursor-pointer select-none transition-transform transform hover:scale-[1.02] ${
-        isOnline ? "bg-gradient-to-tr from-blue-200 to-blue-100" : "bg-gray-100"
+        isOnline
+          ? "bg-gradient-to-tr from-blue-200 to-blue-100"
+          : "bg-gray-100"
       }`}
     >
-      {/* ... Keep all other UI same */}
       <div className="flex-1 p-4 flex flex-col justify-between">
         <div>
           <h3 className="font-semibold text-lg text-gray-900">
@@ -938,8 +1015,9 @@ const DeviceCard = ({ device }: { device: Device }) => {
           </h3>
 
           <p className="text-xs text-gray-600 mt-1">
-            Type : {device.typeId?.name} <span className="mx-1">|</span> Serial Number :{" "}
-            {device.deviceId?.serialNumber}
+            Type : {device.deviceId?.name || "Unknown Type"}
+            <span className="mx-1">|</span>
+            Serial Number : {serial}
           </p>
 
           <div className="mt-2 space-y-1 text-sm">
@@ -954,8 +1032,10 @@ const DeviceCard = ({ device }: { device: Device }) => {
 
             <p className="flex items-center gap-2">
               <FaSyncAlt className="inline" />
-              Last connection - {lastSync || "Fetching..."}
+              Last connection - {lastSync}
             </p>
+            
+
 
             <p className="flex items-center gap-2 truncate">
               {isOnline && playingPlaylist ? (
@@ -976,6 +1056,73 @@ const DeviceCard = ({ device }: { device: Device }) => {
     </div>
   );
 };
+
+// const DeviceCard = ({ device }: { device: Device }) => {
+  
+
+
+
+
+//   const isOnline = deviceStatus === "online";
+//   const playingPlaylist = device.connectedPlaylists?.length
+//     ? device.connectedPlaylists[0].name
+//     : isOnline
+//     ? "Soft Playlist"
+//     : null;
+//   const remainingTime = isOnline ? "30 min left" : null;
+
+//   return (
+//     <div
+//       className={`relative flex flex-col rounded-xl shadow-lg overflow-hidden w-72 cursor-pointer select-none transition-transform transform hover:scale-[1.02] ${
+//         isOnline ? "bg-gradient-to-tr from-blue-200 to-blue-100" : "bg-gray-100"
+//       }`}
+//     >
+//       {/* ... Keep all other UI same */}
+//       <div className="flex-1 p-4 flex flex-col justify-between">
+//         <div>
+//           <h3 className="font-semibold text-lg text-gray-900">
+//             {device.deviceId.name || "Device Name"}
+//           </h3>
+
+//           <p className="text-xs text-gray-600 mt-1">
+//             Type : {device.deviceId?._id} <span className="mx-1">|</span> Zone :{" "}
+//             {device.deviceId?.serialNumber}
+//           </p>
+
+//           <div className="mt-2 space-y-1 text-sm">
+//             <p className="flex items-center gap-2">
+//               <span
+//                 className={`w-2 h-2 rounded-full inline-block ${
+//                   isOnline ? "bg-green-500" : "bg-red-500"
+//                 }`}
+//               />
+//               {isOnline ? "Online" : "Offline"}
+//             </p>
+
+//             <p className="flex items-center gap-2">
+//               <FaSyncAlt className="inline" />
+//               Last connection - {lastSync || "Fetching..."}
+//             </p>
+
+//             <p className="flex items-center gap-2 truncate">
+//               {isOnline && playingPlaylist ? (
+//                 <>
+//                   <FaPlay className="inline text-orange-600" />
+//                   Playing {playingPlaylist} | {remainingTime}
+//                 </>
+//               ) : (
+//                 <>
+//                   <FaPauseCircle className="inline text-red-600" />
+//                   Playlist is not connected
+//                 </>
+//               )}
+//             </p>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
 
 
 
@@ -1155,11 +1302,21 @@ const DeviceCard = ({ device }: { device: Device }) => {
         ) : devices.length === 0 ? (
           <p className="text-gray-500 font-sans">No devices found.</p>
         ) : (
+          // <div className="flex flex-wrap gap-6">
+          //   {devices.map((device) => (
+          //     <DeviceCard key={device._id} device={device} />
+          //   ))}
+          // </div>
           <div className="flex flex-wrap gap-6">
-            {devices.map((device) => (
-              <DeviceCard key={device._id} device={device} />
-            ))}
-          </div>
+  {devices.map((d) => (
+    <DeviceCard
+      key={d.deviceId.serialNumber}
+      device={d}
+      deviceStatuses={deviceStatuses}
+    />
+  ))}
+</div>
+
         )}
       </section>
     </div>

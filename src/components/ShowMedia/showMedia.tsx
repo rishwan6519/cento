@@ -757,6 +757,7 @@ export default function ShowMedia() {
 
         const data = await res.json();
         const rawList: any[] = data.media || data || [];
+        console.log("Fetched media:", rawList);
 
         // Normalize types to base categories and keep original mime
         const mediaList: MediaFile[] = rawList.map((item) => {
