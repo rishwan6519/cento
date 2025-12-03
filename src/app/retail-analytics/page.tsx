@@ -6,6 +6,25 @@ import FloorMapUploader from "@/components/FloorMapUploader/FloorMapUploader";
 import FloorPlanUploader from "@/components/FloorPlanUPloader/FloorPlanUploader";
 import HeatmapViewer from "@/components/ShowHeatmap/ShowHeatmap";
 
+// --- ICONS ---
+const Icons = {
+  Analytics: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+  ),
+  Camera: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.818v6.364a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+  ),
+  Map: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0121 18.382V7.618a1 1 0 01-1.447-.894L15 7m0 13V7" /></svg>
+  ),
+  Heatmap: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+  ),
+  Settings: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+  ),
+};
+
 // Types
 interface ZoneCounts {
   [key: string]: {
@@ -13,7 +32,6 @@ interface ZoneCounts {
     out_count: number;
   };
 }
-
 
 interface HeatmapData {
   timestamp: string;
@@ -38,8 +56,7 @@ interface Line {
 }
 
 // MQTT Configuration
-const MQTT_BROKER_URL =
-  "wss://b04df1c6a94d4dc5a7d1772b53665d8e.s1.eu.hivemq.cloud:8884/mqtt";
+const MQTT_BROKER_URL = "wss://b04df1c6a94d4dc5a7d1772b53665d8e.s1.eu.hivemq.cloud:8884/mqtt";
 const MQTT_USERNAME = "PeopleCounter";
 const MQTT_PASSWORD = "Counter123";
 const PI_ID = "pi-001";
@@ -54,13 +71,10 @@ const MQTT_SNAPSHOT_RESPONSE_TOPIC_PREFIX = `vision/${PI_ID}/`;
 
 // Components
 const LoadingSpinner = () => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-xl shadow-xl">
-      <div className="flex items-center space-x-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-        <span className="text-lg font-medium">Loading...</span>
-
-      </div>
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+      <span className="text-lg font-semibold text-gray-700">Processing...</span>
     </div>
   </div>
 );
@@ -72,19 +86,19 @@ const ConnectionLostModal = ({
   onRetry: () => void;
   message: string;
 }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full mx-4">
+  <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-red-100">
       <div className="text-center">
         <div className="text-6xl mb-4">📡</div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">
           Connection Issue
         </h3>
-        <p className="text-gray-600 mb-6">{message}</p>
+        <p className="text-gray-600 mb-8 leading-relaxed">{message}</p>
         <button
           onClick={onRetry}
-          className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          className="w-full bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-lg shadow-blue-200"
         >
-          Retry
+          Retry Connection
         </button>
       </div>
     </div>
@@ -92,15 +106,19 @@ const ConnectionLostModal = ({
 );
 
 export default function PeopleDetectionPage() {
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<"analytics" | "setup" | "floorplan" | "heatmap">("setup");
+
   // Camera Configuration States
   const [cameraType, setCameraType] = useState<"dahua" | "hikvision">("dahua");
   const [ip, setIp] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [numCameras, setNumCameras] = useState(1);
-  const [connectionMode, setConnectionMode] = useState<"normal" | "urbanRain">(
-    "normal"
-  );
+  const [connectionMode, setConnectionMode] = useState<"normal" | "urbanRain">("normal");
+  
+  // NEW: State for Dynamic Camera Names
+  const [cameraNames, setCameraNames] = useState<string[]>(["Camera 1"]);
 
   // Camera States
   const [cameraOptions, setCameraOptions] = useState<string[]>([]);
@@ -116,9 +134,7 @@ export default function PeopleDetectionPage() {
   const [showModal, setShowModal] = useState(false);
   const [zones, setZones] = useState<Zone[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
-    null
-  );
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [currentDrawing, setCurrentDrawing] = useState<{
     x1: number;
     y1: number;
@@ -127,7 +143,6 @@ export default function PeopleDetectionPage() {
   } | null>(null);
   const [activeZoneId, setActiveZoneId] = useState<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<"floorplan" | "heatmap" | null>(null);
 
 
   // Line Drawing States
@@ -172,10 +187,7 @@ export default function PeopleDetectionPage() {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const snapshotHandledRef = useRef(false);
 
-// console.log("Rendering PeopleDetectionPage component");
-
   const zoneColors = [
-
     "rgba(255, 99, 132, 0.3)",
     "rgba(54, 162, 235, 0.3)",
     "rgba(255, 206, 86, 0.3)",
@@ -190,6 +202,28 @@ export default function PeopleDetectionPage() {
     "rgb(75, 192, 192)",
     "rgb(153, 102, 255)",
   ];
+
+  // --- NEW: Sync Camera Names with Count ---
+  useEffect(() => {
+    setCameraNames((prev) => {
+      const newNames = [...prev];
+      if (numCameras > prev.length) {
+        for (let i = prev.length; i < numCameras; i++) {
+          newNames.push(`Camera ${i + 1}`);
+        }
+      } else {
+        newNames.length = numCameras;
+      }
+      return newNames;
+    });
+  }, [numCameras]);
+
+  // --- NEW: Handle Name Change ---
+  const handleCameraNameChange = (index: number, value: string) => {
+    const updated = [...cameraNames];
+    updated[index] = value;
+    setCameraNames(updated);
+  };
 
   // Fetch zone counts from database
   const fetchDbZoneCounts = useCallback(async (cameraId: string) => {
@@ -280,12 +314,9 @@ export default function PeopleDetectionPage() {
             setCameraOptions(cameras);
             setMessage(`Active cameras: ${cameras.join(", ")}`);
 
-            // Only auto-select if there is NO selectedCamera at all
-            // (prevents resetting user's selection on every update)
             if (!selectedCameraRef.current && cameras.length > 0) {
               setSelectedCamera(cameras[0]);
               setActiveCamera(cameras[0]);
-              // Do NOT close modal or clear snapshot here!
             } else if (
               selectedCameraRef.current &&
               !cameras.includes(selectedCameraRef.current)
@@ -296,8 +327,6 @@ export default function PeopleDetectionPage() {
               setSnapshotUrl(null);
               setImageLoaded(false);
             }
-            // Otherwise, do nothing: keep the user's selection
-            // Otherwise, do nothing: keep the user's selection
           }
         } catch (e) {
           console.error("Error parsing active cameras list:", e);
@@ -306,13 +335,10 @@ export default function PeopleDetectionPage() {
       }
 
       // Handle snapshot response
-      // ...inside client.on("message", ...)...
-      // ...inside client.on("message", ...)...
       if (
         topic.startsWith(`${MQTT_SNAPSHOT_RESPONSE_TOPIC_PREFIX}`) &&
         topic.includes("/snapshot/response")
       ) {
-        // Prevent handling multiple snapshot responses for a single request
         if (snapshotHandledRef.current) return;
         snapshotHandledRef.current = true;
 
@@ -325,8 +351,7 @@ export default function PeopleDetectionPage() {
             const blob = new Blob([new Uint8Array(payload as Buffer)], { type: "image/jpeg" });
             const imageUrl = URL.createObjectURL(blob);
             setSnapshotUrl(imageUrl);
-            console.log("Received binary image snapshot.", imageUrl);
-            setShowModal(true); // Only open modal after image is ready
+            setShowModal(true); 
             setMessage("Snapshot received. You can now draw zones.");
             setIsLoading(false);
             return;
@@ -334,7 +359,7 @@ export default function PeopleDetectionPage() {
 
           if (response.status === "success" && response.payload?.snapshot_url) {
             setSnapshotUrl(response.payload.snapshot_url);
-            setShowModal(true); // Only open modal after image is ready
+            setShowModal(true);
             setMessage("Snapshot received. You can now draw zones.");
           } else {
             setMessage(`Snapshot failed: ${response.error || "Unknown error"}`);
@@ -344,8 +369,6 @@ export default function PeopleDetectionPage() {
           setIsLoading(false);
           setMessage("Error handling snapshot response.");
         }
-        // Reset the flag only when the user requests a new snapshot
-        // (do NOT reset it automatically after a timeout)
         return;
       }
 
@@ -374,8 +397,6 @@ export default function PeopleDetectionPage() {
           }));
 
           setLastUpdateTime(new Date().toLocaleTimeString());
-
-          // Fetch DB counts when live counts update
           fetchDbZoneCounts(camera_id);
         } catch (e) {
           console.error("Error parsing live count message:", e);
@@ -447,61 +468,49 @@ export default function PeopleDetectionPage() {
     }
   }, [activeCamera, fetchDbZoneCounts]);
 
-  const generateRTSPUrls = (): string[] => {
-    if (!ip || !username || !password) return [];
-    const urls: string[] = [];
-    const staticChannel = 1;
-if (connectionMode === "urbanRain") {
+  // --- REFACTORED: Generate RTSP Sources as a Dictionary ---
+  const generateSourceConfig = (): Record<string, string> => {
+    if (!ip || !username || !password) return {};
+    const sources: Record<string, string> = {};
 
+    cameraNames.forEach((name, index) => {
+      // Default to "Camera X" if name is empty
+      const cleanName = name.trim() || `Camera ${index + 1}`;
+      let url = "";
 
-  // Urban Rain Mode: Increment IP for each camera, channel stays the same
-  
-  const ipParts = ip.split(".");
-  if (ipParts.length !== 4) {
-    setMessage("Invalid IP address format for Urban Rain connection.");
-    return [];
-  }
-
-  const baseIp = ipParts.slice(0, 3).join(".");
-  let lastOctet = parseInt(ipParts[3]);
-
-  if (isNaN(lastOctet)) {
-    setMessage("Invalid IP address format for Urban Rain connection.");
-    return [];
-
-  }
-
-  for (let i = 0; i < numCameras; i++) {
-    const cameraIp = `${baseIp}.${lastOctet + i}`;
-    if (cameraType === "dahua") {
-      urls.push(
-        `rtsp://${username}:${password}@${cameraIp}:554/cam/realmonitor?channel=1&subtype=0`
-      );
-    } else {
-      urls.push(
-        `rtsp://${username}:${password}@${cameraIp}:554/Streaming/Channels/101`
-      );
-     
-    }
-  }
-    } else {
-      // Normal Mode (non-UrbanRain)
-      for (let i = 1; i <= numCameras; i++) {
+      if (connectionMode === "urbanRain") {
+        // Multi-IP Mode Logic
+        const ipParts = ip.split(".");
+        if (ipParts.length === 4) {
+          const baseIp = ipParts.slice(0, 3).join(".");
+          const lastOctet = parseInt(ipParts[3]);
+          if (!isNaN(lastOctet)) {
+            const cameraIp = `${baseIp}.${lastOctet + index}`;
+            if (cameraType === "dahua") {
+              url = `rtsp://${username}:${password}@${cameraIp}:554/cam/realmonitor?channel=1&subtype=0`;
+            } else {
+              url = `rtsp://${username}:${password}@${cameraIp}:554/Streaming/Channels/101`;
+            }
+          }
+        }
+      } else {
+        // Normal Mode Logic (Single IP, Multiple Channels)
+        // Note: index is 0-based, channels are 1-based
+        const channelNum = index + 1;
         if (cameraType === "dahua") {
-          urls.push(
-            `rtsp://${username}:${password}@${ip}:554/cam/realmonitor?channel=${i}&subtype=0`
-          );
+          url = `rtsp://${username}:${password}@${ip}:554/cam/realmonitor?channel=${channelNum}&subtype=0`;
         } else {
-          // Generate 101, 201, 301 for multiple cameras
-          const channelNumber = i * 100 + 1;
-          urls.push(
-            `rtsp://${username}:${password}@${ip}:554/Streaming/Channels/${channelNumber}`
-          );
+          const hikChannel = channelNum * 100 + 1;
+          url = `rtsp://${username}:${password}@${ip}:554/Streaming/Channels/${hikChannel}`;
         }
       }
-    }
-    console.log("Generated RTSP URLs:", urls);
-    return urls;
+
+      if (url) {
+        sources[cleanName] = url;
+      }
+    });
+
+    return sources;
   };
 
   const handleConnect = async () => {
@@ -510,8 +519,10 @@ if (connectionMode === "urbanRain") {
       return;
     }
 
-    const urls = generateRTSPUrls();
-    if (urls.length === 0) {
+    // Use the new generator to get the dictionary
+    const sourceConfig = generateSourceConfig();
+    
+    if (Object.keys(sourceConfig).length === 0) {
       setMessage("Please enter valid IP, username, and password.");
       return;
     }
@@ -521,7 +532,7 @@ if (connectionMode === "urbanRain") {
 
     const command = {
       command: "start_pipeline",
-      payload: { sources: urls },
+      payload: { sources: sourceConfig }, // UPDATED: Payload structure
     };
 
     mqttClient.publish(
@@ -535,10 +546,13 @@ if (connectionMode === "urbanRain") {
           console.error("Publish error:", err);
         } else {
           setMessage("Start command sent. Waiting for data from backend...");
+          // Switch to analytics after a short delay
+          setTimeout(() => setActiveTab("analytics"), 2000);
         }
       }
     );
   };
+
   const handleSnapshot = async () => {
     if (isLoading) {
       setMessage("Snapshot request already in progress.");
@@ -549,13 +563,12 @@ if (connectionMode === "urbanRain") {
       return;
     }
 
-    // Reset the snapshot handled flag so we can accept a new image
     snapshotHandledRef.current = false;
 
     setIsLoading(true);
     setSnapshotUrl(null);
     setImageLoaded(false);
-    setShowModal(false); // Only open after image loads
+    setShowModal(false); 
     setMessage("Requesting snapshot from backend...");
 
     const snapshotTopic = `${MQTT_SNAPSHOT_RESPONSE_TOPIC_PREFIX}${selectedCamera}/snapshot/response`;
@@ -594,7 +607,6 @@ if (connectionMode === "urbanRain") {
     }, 15000);
   };
 
-  //delete zone
   const handleDeleteZone = async (zoneId: string) => {
     if (!selectedCamera || !mqttClient || !mqttClient.connected) {
       setMessage("Please select a camera and ensure MQTT is connected.");
@@ -618,10 +630,8 @@ if (connectionMode === "urbanRain") {
         setIsLoading(false);
         if (err) {
           setMessage(`Failed to delete ${zoneId}.`);
-          console.error(`Error deleting zone ${zoneId}:`, err);
         } else {
           setMessage(`${zoneId} deleted.`);
-          // Optionally remove from UI immediately:
           setZoneCounts((prev) => {
             const updated = { ...prev };
             if (updated[selectedCamera]) {
@@ -634,7 +644,6 @@ if (connectionMode === "urbanRain") {
     );
   };
 
-  //reset zone counts
   const handleResetZoneCounts = async (zoneId: string) => {
     if (!selectedCamera || !mqttClient || !mqttClient.connected) {
       setMessage("Please select a camera and ensure MQTT is connected.");
@@ -658,7 +667,6 @@ if (connectionMode === "urbanRain") {
         setIsLoading(false);
         if (err) {
           setMessage(`Failed to reset counts for ${zoneId}.`);
-          console.error(`Error resetting zone counts for ${zoneId}:`, err);
         } else {
           setMessage(`Counts for ${zoneId} reset.`);
         }
@@ -669,11 +677,11 @@ if (connectionMode === "urbanRain") {
   const handleCameraSwitch = (cameraId: string) => {
     setSelectedCamera(cameraId);
     setActiveCamera(cameraId);
-    setShowModal(false); // Close modal if open
-    setSnapshotUrl(null); // Clear snapshot
-    setImageLoaded(false); // Reset image loaded state
-    setZones([]); // Clear zones
-    setLines([]); // Clear lines
+    setShowModal(false); 
+    setSnapshotUrl(null); 
+    setImageLoaded(false); 
+    setZones([]); 
+    setLines([]); 
     setCurrentDrawing(null);
     setCurrentLine(null);
     setIsDrawing(false);
@@ -735,7 +743,6 @@ if (connectionMode === "urbanRain") {
           (err) => {
             if (err) {
               setMessage(`Failed to submit zone ${zone.id}.`);
-              console.error(`Error submitting zone ${zone.id}:`, err);
             } else {
               successfulSubmissions++;
               if (successfulSubmissions === zones.length) {
@@ -820,7 +827,6 @@ if (connectionMode === "urbanRain") {
         (err) => {
           if (err) {
             setMessage(`Failed to submit line ${line.name}.`);
-            console.error(`Error submitting line ${line.name}:`, err);
           } else {
             successfulSubmissions++;
             if (successfulSubmissions === lines.length) {
@@ -875,7 +881,6 @@ if (connectionMode === "urbanRain") {
         setIsLoading(false);
         if (err) {
           setMessage(`Failed to reset counts for line ${lineName}.`);
-          console.error(`Error resetting line counts for ${lineName}:`, err);
         } else {
           setMessage(`Counts for line ${lineName} reset.`);
         }
@@ -905,7 +910,6 @@ if (connectionMode === "urbanRain") {
         setIsLoading(false);
         if (err) {
           setMessage(`Failed to delete line ${lineName}.`);
-          console.error(`Error deleting line ${lineName}:`, err);
         } else {
           setLines((prev) => prev.filter((line) => line.name !== lineName));
           setMessage(`Line ${lineName} deleted.`);
@@ -1125,623 +1129,530 @@ if (connectionMode === "urbanRain") {
     setCurrentLine(null);
   };
 
+  // --- RENDER HELPERS ---
+  const renderSidebar = () => (
+    <div className="w-64 bg-slate-900 text-slate-300 flex flex-col fixed h-full shadow-2xl z-20">
+      <div className="p-6 border-b border-slate-800">
+        <h1 className="text-xl font-bold text-white tracking-wider flex items-center gap-2">
+          🎯 PeopleSense
+        </h1>
+      </div>
+      
+      <nav className="flex-1 p-4 space-y-2">
+        <button
+          onClick={() => setActiveTab("setup")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+            activeTab === "setup" 
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50" 
+              : "hover:bg-slate-800 hover:text-white"
+          }`}
+        >
+          <Icons.Camera /> Camera Setup
+        </button>
+
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+            activeTab === "analytics" 
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50" 
+              : "hover:bg-slate-800 hover:text-white"
+          }`}
+        >
+          <Icons.Analytics /> Retail Analytics
+        </button>
+
+        <button
+          onClick={() => setActiveTab("floorplan")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+            activeTab === "floorplan" 
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50" 
+              : "hover:bg-slate-800 hover:text-white"
+          }`}
+        >
+          <Icons.Map /> Floor Plan
+        </button>
+
+        <button
+          onClick={() => setActiveTab("heatmap")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+            activeTab === "heatmap" 
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50" 
+              : "hover:bg-slate-800 hover:text-white"
+          }`}
+        >
+          <Icons.Heatmap /> Heatmap
+        </button>
+      </nav>
+
+      <div className="p-4 border-t border-slate-800 text-xs text-slate-500">
+        Status: {mqttClient?.connected ? <span className="text-emerald-400">Connected</span> : <span className="text-red-400">Disconnected</span>}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">
-              🎯 People Detection Dashboard
-            </h1>
-            <p className="text-gray-600">
-              Configure cameras and set detection zones via MQTT
-            </p>
-            {/* Menu Bar */}
-            <div className="flex justify-center gap-4 mb-6">
-              <button
-                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                  activeMenu === "floorplan"
-                    ? "bg-blue-500 text-white shadow-md"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-                onClick={() => setActiveMenu("floorplan")}
-              >
-                Floor Plan
-              </button>
-              <button
-                className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                  activeMenu === "heatmap"
-                    ? "bg-green-500 text-white shadow-md"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-                onClick={() => setActiveMenu("heatmap")}
-              >
-                Heatmap
-              </button>
-            </div>
-            {/* Show selected component */}
-            {activeMenu === "floorplan" && <FloorPlanUploader />}
-            {activeMenu === "heatmap" && <HeatmapViewer />}
+    <div className="flex min-h-screen bg-gray-50 font-sans">
+      {renderSidebar()}
+
+      {/* Main Content Area */}
+      <div className="flex-1 ml-64 flex flex-col">
+        
+        {/* Top Header */}
+        <header className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-10 flex justify-between items-center shadow-sm">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 capitalize">
+              {activeTab === "setup" ? "Camera Configuration" : 
+               activeTab === "analytics" ? "Retail Analytics Dashboard" : 
+               activeTab === "floorplan" ? "Store Floor Plan" : "Traffic Heatmap"}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">Manage your detection system and view insights</p>
           </div>
-
-          <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-8">
-              <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
-                Camera Configuration
-              </h2>
-
-              <div className="mb-6 flex gap-4">
-                <button
-                  onClick={() => setConnectionMode("normal")}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                    connectionMode === "normal"
-                      ? "bg-blue-500 text-white shadow-md"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
-                >
-                  Standard Connection
-                </button>
-                <button
-                  onClick={() => setConnectionMode("urbanRain")}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                    connectionMode === "urbanRain"
-                      ? "bg-green-500 text-white shadow-md"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
-                >
-                  Urban Rain (Multi-IP)
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <select
-                  className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
-                  value={cameraType}
-                  onChange={(e) =>
-                    setCameraType(e.target.value as "dahua" | "hikvision")
-                  }
-                >
-                  <option value="dahua">📷 Dahua Camera</option>
-                  <option value="hikvision">📹 Hikvision Camera</option>
-                </select>
-
-                <input
-                  className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
-                  placeholder={
-                    connectionMode === "urbanRain"
-                      ? "🌐 Base IP Address (e.g., 192.168.20.11)"
-                      : "🌐 Camera IP Address"
-                  }
-                  value={ip}
-                  onChange={(e) => setIp(e.target.value)}
-                />
-
-                <input
-                  className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
-                  placeholder="👤 Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-
-                <input
-                  className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
-                  type="password"
-                  placeholder="🔒 Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-
-                <input
-                  className="p-3 border-0 rounded-xl shadow-md focus:ring-4 focus:ring-blue-200 transition-all"
-                  type="number"
-                  min={1}
-                  placeholder="📊 Number of cameras"
-                  value={numCameras}
-                  onChange={(e) => setNumCameras(Number(e.target.value))}
-                />
-
-                <button
-                  onClick={handleConnect}
-                  disabled={!mqttClient || !mqttClient.connected || isLoading}
-                  className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transform hover:scale-105 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  🔗 Connect Cameras
-                </button>
-              </div>
-            </div>
-
+          
+          <div className="flex items-center gap-4">
             {message && (
-              <div className="mx-6 mt-6 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500">
-                <div className="flex items-center">
-                  <span className="text-2xl mr-3">ℹ️</span>
-                  <span className="text-blue-800 font-medium">{message}</span>
+               <div className="hidden lg:flex items-center bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-100 max-w-md truncate">
+                  ℹ️ {message}
+               </div>
+            )}
+            <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2 ${mqttClient?.connected ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+               <span className={`w-2 h-2 rounded-full ${mqttClient?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+               {mqttClient?.connected ? "System Online" : "System Offline"}
+            </div>
+          </div>
+        </header>
+
+        {/* Content Container */}
+        <main className="flex-1 p-8 overflow-y-auto">
+          
+          {/* VIEW: CAMERA SETUP */}
+          {activeTab === "setup" && (
+            <div className="space-y-6 max-w-5xl mx-auto">
+              {/* Connection Card */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+                <div className="flex justify-between items-center mb-6">
+                   <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                     <Icons.Settings /> Connection Details
+                   </h3>
+                   <div className="flex bg-gray-100 p-1 rounded-lg">
+                      <button
+                        onClick={() => setConnectionMode("normal")}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${connectionMode === "normal" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"}`}
+                      >
+                        Standard
+                      </button>
+                      <button
+                        onClick={() => setConnectionMode("urbanRain")}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${connectionMode === "urbanRain" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"}`}
+                      >
+                        Multi-IP Mode
+                      </button>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-black">
+                    <div className="space-y-2 ">
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Camera Brand</label>
+                      <select
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                        value={cameraType}
+                        onChange={(e) => setCameraType(e.target.value as "dahua" | "hikvision")}
+                      >
+                        <option value="dahua">Dahua Camera</option>
+                        <option value="hikvision">Hikvision Camera</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-gray-500 uppercase">IP Address</label>
+                      <input
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                        placeholder={connectionMode === "urbanRain" ? "Base IP (e.g. 192.168.1.10)" : "Camera IP"}
+                        value={ip}
+                        onChange={(e) => setIp(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Username</label>
+                      <input
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="admin"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Password</label>
+                      <input
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••"
+                      />
+                    </div>
+                </div>
+
+                {/* --- UPDATED CAMERA CONFIG SECTION --- */}
+                <div className="mt-8 border-t border-gray-100 pt-6">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="space-y-2 w-32">
+                          <label className="text-xs font-semibold text-gray-500 uppercase">Camera Count</label>
+                          <input
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                            type="number"
+                            min={1}
+                            max={16}
+                            value={numCameras}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              if (val > 0) setNumCameras(val);
+                            }}
+                          />
+                      </div>
+                      <div className="text-sm text-gray-500 italic mt-6">
+                        Define names for your {numCameras} camera(s) below.
+                      </div>
+                    </div>
+
+                    {/* DYNAMIC NAME INPUTS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                      {cameraNames.map((name, idx) => (
+                        <div key={idx} className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-400 uppercase">Camera {idx + 1} Name</label>
+                          <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => handleCameraNameChange(idx, e.target.value)}
+                            placeholder={`e.g. Entrance Cam ${idx+1}`}
+                            className="w-full p-3 bg-blue-50/50 border border-blue-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleConnect}
+                      disabled={!mqttClient || !mqttClient.connected || isLoading}
+                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl font-bold hover:shadow-lg hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? "Connecting..." : `Connect & Initialize ${numCameras} Stream(s)`}
+                    </button>
                 </div>
               </div>
-            )}
 
-            {cameraOptions.length > 0 && (
-              <div className="p-8 font-inter">
-                <h3 className="text-2xl font-semibold text-slate-800 mb-6 tracking-tight">
-                  Available Camera Systems
-                </h3>
-                <div className="flex flex-wrap gap-4">
+              {/* Zone Configuration Section - Only show if cameras are active */}
+              {cameraOptions.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                     ✏️ Zone Configuration
+                  </h3>
+                  <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                     <div className="flex flex-col">
+                        <span className="text-sm text-gray-600 mb-2">Select Camera to Configure:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {cameraOptions.map((camId) => (
+                            <button
+                              key={camId}
+                              onClick={() => setSelectedCamera(camId)}
+                              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                selectedCamera === camId
+                                  ? "bg-slate-800 text-white shadow-md"
+                                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+                              }`}
+                            >
+                              {camId}
+                            </button>
+                          ))}
+                        </div>
+                     </div>
+                     <button
+                        onClick={handleSnapshot}
+                        disabled={!selectedCamera || !mqttClient || isLoading}
+                        className="px-6 py-3 bg-white border border-blue-200 text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-all shadow-sm disabled:opacity-50 whitespace-nowrap"
+                      >
+                        📸 Take Snapshot & Draw Zones
+                     </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIEW: ANALYTICS */}
+          {activeTab === "analytics" && (
+            <div className="space-y-8">
+              {/* Camera Selector for Viewing */}
+              {cameraOptions.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-gray-200">
+                  <span className="text-sm font-medium text-gray-500">Viewing Camera:</span>
                   {cameraOptions.map((camId) => (
                     <button
                       key={camId}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleCameraSwitch(camId);
-                      }}
-                      className={`px-8 py-4 rounded-lg font-medium text-sm tracking-wide transition-all duration-200 border ${
+                      onClick={() => setActiveCamera(camId)}
+                      className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
                         activeCamera === camId
-                          ? "bg-slate-800 text-white border-slate-800 shadow-md"
-                          : "bg-white hover:bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-400"
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                       }`}
                     >
                       {camId}
                     </button>
                   ))}
+                  {lastUpdateTime && (
+                    <span className="ml-auto text-xs text-gray-400">Updated: {lastUpdateTime}</span>
+                  )}
                 </div>
-              </div>
-            )}
-
-            {selectedCamera && (
-              <div className="px-8 pb-8">
-                <div className="flex flex-wrap gap-4 mb-8">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleSnapshot();
-                    }}
-                    disabled={!mqttClient || !mqttClient.connected || isLoading}
-                    className="bg-slate-800 text-white px-10 py-4 rounded-lg font-medium text-sm tracking-wide hover:bg-slate-700 transition-all duration-200 shadow-sm hover:shadow-md border border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Capture Frame & Configure Zones
-                  </button>
-                </div>
-
-                {Object.keys(zoneCounts).length > 0 && (
-                  <div className="mt-8">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-6">
-                        <h3 className="text-2xl font-semibold text-slate-800 tracking-tight">
-                          Real-Time Zone Monitoring
-                        </h3>
-                        {mqttClient?.connected && (
-                          <div className="flex items-center text-emerald-600">
-                            <div className="animate-pulse w-2 h-2 bg-emerald-500 rounded-full mr-3"></div>
-                            <span className="text-sm font-medium tracking-wide">
-                              Live Monitoring Active
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      {lastUpdateTime && (
-                        <span className="text-sm text-slate-500 font-medium tracking-wide">
-                          Last Update: {lastUpdateTime}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 mb-6">
-                      {Object.keys(zoneCounts).map((cameraId) => (
-                        <button
-                          key={cameraId}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleCameraSwitch(cameraId);
-                          }}
-                          className={`px-6 py-3 rounded-lg font-medium text-sm tracking-wide transition-all duration-200 border ${
-                            activeCamera === cameraId
-                              ? "bg-slate-800 text-white border-slate-800 shadow-md"
-                              : "bg-white hover:bg-slate-50 text-slate-700 border-slate-300 hover:border-slate-400"
-                          }`}
-                        >
-                          {cameraId}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {activeCamera &&
-                        zoneCounts[activeCamera] &&
-                        Object.entries(zoneCounts[activeCamera]).map(
-                          ([zoneOrLineId, counts]) => {
-                            const isLine = zoneOrLineId
-                              .toLowerCase()
-                              .includes("line");
-                            const netCount = counts.in - counts.out;
-
-                            // Get database counts
-                            const dbCounts =
-                              dbZoneCounts[activeCamera]?.[zoneOrLineId];
-                            const totalIn =
-                              (dbCounts?.totalIn || 0) + counts.in;
-                            const totalOut =
-                              (dbCounts?.totalOut || 0) + counts.out;
-
-                            return (
-                              <div
-                                key={`${activeCamera}-${zoneOrLineId}`}
-                                className="relative bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 border-2"
-                                style={{
-                                  borderColor:
-                                    !isLine && netCount > 5
-                                      ? "rgb(220, 38, 38)"
-                                      : "rgb(148, 163, 184)",
-                                  borderWidth:
-                                    !isLine && netCount > 5 ? "2px" : "1px",
-                                }}
-                              >
-                                <div className="flex items-center justify-between mb-6">
-                                  <h4 className="text-lg font-semibold text-slate-800 tracking-tight">
-                                    {isLine ? "Line" : "Zone"}: {zoneOrLineId}
-                                  </h4>
-                                  <div
-                                    className="w-3 h-3 rounded-full"
-                                    style={{
-                                      backgroundColor:
-                                        !isLine && netCount > 5
-                                          ? "rgb(220, 38, 38)"
-                                          : "rgb(148, 163, 184)",
-                                    }}
-                                  ></div>
-                                </div>
-                                <div className="space-y-4">
-                                  
-                                 
-                                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                    <span className="text-blue-700 font-medium text-sm tracking-wide">
-                                      Total Entries:
-                                    </span>
-                                    <span className="text-xl font-bold text-blue-700 font-mono">
-                                      {totalIn}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                                    <span className="text-orange-700 font-medium text-sm tracking-wide">
-                                      Total Exits:
-                                    </span>
-                                    <span className="text-xl font-bold text-orange-700 font-mono">
-                                      {totalOut}
-                                    </span>
-                                  </div>
-                               
-                                  {!isLine && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleDeleteZone(zoneOrLineId);
-                                      }}
-                                      className="mt-4 w-full px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-all"
-                                    >
-                                      Delete Zone
-                                    </button>
-                                  )}
-                                  {!isLine && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleResetZoneCounts(zoneOrLineId);
-                                      }}
-                                      className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all"
-                                    >
-                                      Reset Counts
-                                    </button>
-                                  )}
-                                  {isLine && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        handleResetLineCounts(zoneOrLineId);
-                                      }}
-                                      className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all"
-                                    >
-                                      Reset Counts
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          }
-                        )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {showModal && snapshotUrl && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-3xl z-10">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-2xl font-semibold text-gray-800">
-                  🎯 Draw Detection Zones
-                </h3>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowModal(false);
-                    setZones([]);
-                    setLines([]);
-                    setCurrentDrawing(null);
-                    setCurrentLine(null);
-                    setIsDrawing(false);
-                    setIsDrawingLine(false);
-                    setActiveZoneId(null);
-                    setActiveLineName(null);
-                  }}
-                  className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-gray-600 mb-3">
-                  Select zone number to draw (1-5):
-                </p>
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5].map((zoneNum) => (
-                    <button
-                      key={zoneNum}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setActiveZoneId(zoneNum);
-                        setActiveLineName(null);
-                      }}
-                      disabled={zones.some((zone) => zone.id === zoneNum)}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                        activeZoneId === zoneNum
-                          ? "bg-blue-500 text-white"
-                          : zones.some((zone) => zone.id === zoneNum)
-                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                      }`}
-                    >
-                      Zone {zoneNum}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {zones.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-gray-600 mb-2">Current zones:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {zones.map((zone) => (
-                      <div
-                        key={zone.id}
-                        className="flex items-center gap-2 bg-blue-100 px-3 py-1 rounded-lg"
-                      >
-                        <span className="text-blue-800 font-medium">
-                          Zone {zone.id}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            removeZone(zone.id);
-                          }}
-                          className="text-red-500 hover:text-red-700 font-bold"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              ) : (
+                <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+                  <div className="text-gray-300 text-6xl mb-4">📷</div>
+                  <h3 className="text-xl font-medium text-gray-600">No Active Cameras</h3>
+                  <p className="text-gray-400 mt-2">Go to "Camera Setup" to connect your streams.</p>
+                  <button onClick={() => setActiveTab("setup")} className="mt-4 text-blue-600 font-medium hover:underline">Go to Setup &rarr;</button>
                 </div>
               )}
 
-              <div className="bg-blue-50 p-4 rounded-xl mb-4">
-                <p className="text-blue-800 font-medium">
-                  📝 Instructions: Select a zone number, then click and drag on
-                  the image to draw a detection area.
-                </p>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-gray-600 mb-3">
-                  Draw Line (Horizontal/Vertical):
-                </p>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    placeholder="Line name (e.g. line1)"
-                    value={activeLineName || ""}
-                    onChange={(e) => setActiveLineName(e.target.value)}
-                    onFocus={() => setActiveZoneId(null)}
-                    className="px-3 py-2 rounded-lg border border-gray-300"
-                    disabled={isDrawingLine}
-                  />
-                </div>
-                {lines.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {lines.map((line) => (
-                      <div
-                        key={line.name}
-                        className="flex items-center gap-2 bg-green-100 px-3 py-1 rounded-lg"
-                      >
-                        <span className="text-green-800 font-medium">
-                          {line.name}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleDeleteLine(line.name);
-                          }}
-                          className="text-red-500 hover:text-red-700 font-bold"
+              {/* Data Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {activeCamera &&
+                  zoneCounts[activeCamera] &&
+                  Object.entries(zoneCounts[activeCamera]).map(
+                    ([zoneOrLineId, counts]) => {
+                      const isLine = zoneOrLineId.toLowerCase().includes("line");
+                      const dbCounts = dbZoneCounts[activeCamera]?.[zoneOrLineId];
+                      const totalIn = (dbCounts?.totalIn || 0) + counts.in;
+                      const totalOut = (dbCounts?.totalOut || 0) + counts.out;
+                      const netCount = counts.in - counts.out;
+                      
+                      return (
+                        <div
+                          key={`${activeCamera}-${zoneOrLineId}`}
+                          className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100 relative overflow-hidden group"
                         >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          <div className={`absolute top-0 left-0 w-1 h-full ${!isLine && netCount > 5 ? "bg-red-500" : "bg-blue-500"}`}></div>
+                          
+                          <div className="flex justify-between items-start mb-4 pl-2">
+                             <div>
+                               <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider">{isLine ? "Tripwire Line" : "Detection Zone"}</h4>
+                               <h3 className="text-xl font-bold text-gray-800 mt-1">{zoneOrLineId}</h3>
+                             </div>
+                             {!isLine && netCount > 5 && (
+                               <span className="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full font-bold animate-pulse">High Traffic</span>
+                             )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4 pl-2">
+                              <div className="bg-blue-50 p-3 rounded-xl">
+                                <span className="text-xs text-blue-600 font-bold block mb-1">ENTERED</span>
+                                <span className="text-2xl font-mono font-bold text-blue-800">{totalIn}</span>
+                              </div>
+                              <div className="bg-orange-50 p-3 rounded-xl">
+                                <span className="text-xs text-orange-600 font-bold block mb-1">EXITED</span>
+                                <span className="text-2xl font-mono font-bold text-orange-800">{totalOut}</span>
+                              </div>
+                          </div>
+
+                          <div className="pl-2 pt-2 border-t border-gray-100 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <button
+                               onClick={(e) => { e.preventDefault(); isLine ? handleResetLineCounts(zoneOrLineId) : handleResetZoneCounts(zoneOrLineId); }}
+                               className="flex-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg font-medium"
+                             >
+                               Reset
+                             </button>
+                             <button
+                               onClick={(e) => { e.preventDefault(); isLine ? handleDeleteLine(zoneOrLineId) : handleDeleteZone(zoneOrLineId); }}
+                               className="flex-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-lg font-medium"
+                             >
+                               Delete
+                             </button>
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
               </div>
             </div>
+          )}
 
-            <div className="p-6">
-              <div
-                ref={containerRef}
-                className="relative border-2 border-dashed border-gray-300 rounded-2xl overflow-hidden bg-gray-50"
-                style={{
-                  cursor:
-                    isDrawingLine || activeLineName || isDrawing || activeZoneId
-                      ? "crosshair"
-                      : "default",
-                }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
-              >
-                <img
-                  ref={imageRef}
-                  src={snapshotUrl}
-                  alt="Camera snapshot"
-                  className="max-w-full h-auto block"
-                  onLoad={handleImageLoad}
-                  draggable={false}
-                  style={{ userSelect: "none" }}
-                />
+          {/* VIEW: FLOOR PLAN */}
+          {activeTab === "floorplan" && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 h-full">
+               <FloorPlanUploader />
+            </div>
+          )}
 
-                {zones.map((zone) => {
-                  const colorIndex = (zone.id - 1) % zoneColors.length;
-                  return (
-                    <div
-                      key={zone.id}
-                      className="absolute border-2 pointer-events-none"
-                      style={{
-                        left: zone.x1,
-                        top: zone.y1,
-                        width: zone.x2 - zone.x1,
-                        height: zone.y2 - zone.y1,
-                        backgroundColor: zoneColors[colorIndex],
-                        borderColor: zoneBorderColors[colorIndex],
-                      }}
-                    >
-                      <div
-                        className="absolute -top-8 left-0 px-2 py-1 text-white text-sm font-bold rounded"
-                        style={{
-                          backgroundColor: zoneBorderColors[colorIndex],
-                        }}
-                      >
-                        Zone {zone.id}
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* VIEW: HEATMAP */}
+          {activeTab === "heatmap" && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 h-full">
+               <HeatmapViewer />
+            </div>
+          )}
 
-                {isDrawing && currentDrawing && (
-                  <div
-                    className="absolute border-2 border-dashed border-blue-500 bg-blue-200 bg-opacity-30 pointer-events-none"
-                    style={{
-                      left: currentDrawing.x1,
-                      top: currentDrawing.y1,
-                      width: currentDrawing.x2 - currentDrawing.x1,
-                      height: currentDrawing.y2 - currentDrawing.y1,
-                    }}
-                  />
-                )}
+        </main>
+      </div>
 
-                {lines.map((line) => (
-                  <svg
-                    key={line.name}
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: 0,
-                      top: 0,
-                      width: "100%",
-                      height: "100%",
-                      zIndex: 10,
-                    }}
-                  >
-                    <line
-                      x1={line.start.x}
-                      y1={line.start.y}
-                      x2={line.end.x}
-                      y2={line.end.y}
-                      stroke="green"
-                      strokeWidth="4"
-                    />
-                    <text
-                      x={(line.start.x + line.end.x) / 2}
-                      y={(line.start.y + line.end.y) / 2 - 10}
-                      fill="green"
-                      fontSize="16"
-                      fontWeight="bold"
-                      textAnchor="middle"
-                    >
-                      {line.name}
-                    </text>
-                  </svg>
-                ))}
-
-                {isDrawingLine && currentLine && (
-                  <svg
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: 0,
-                      top: 0,
-                      width: "100%",
-                      height: "100%",
-                      zIndex: 10,
-                    }}
-                  >
-                    <line
-                      x1={currentLine.start.x}
-                      y1={currentLine.start.y}
-                      x2={currentLine.end.x}
-                      y2={currentLine.end.y}
-                      stroke="blue"
-                      strokeWidth="4"
-                      strokeDasharray="8"
-                    />
-                  </svg>
-                )}
+      {/* MODAL FOR DRAWING */}
+      {showModal && snapshotUrl && (
+        <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col shadow-2xl">
+            {/* Modal Header */}
+            <div className="bg-white border-b border-gray-200 p-5 flex justify-between items-center z-10">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">Zone Configuration Editor</h3>
+                <p className="text-sm text-gray-500">Draw boxes for zones or lines for tripwires</p>
               </div>
-
-              <div className="flex justify-end gap-4 mt-6">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
+              <div className="flex gap-3">
+                 <button
+                  onClick={() => {
                     setShowModal(false);
-                    setZones([]);
-                    setLines([]);
-                    setCurrentDrawing(null);
-                    setCurrentLine(null);
-                    setIsDrawing(false);
-                    setIsDrawingLine(false);
+                    // Reset drawing states
+                    setZones([]); setLines([]); setCurrentDrawing(null); setCurrentLine(null);
+                    setIsDrawing(false); setIsDrawingLine(false);
                   }}
-                  className="px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-all"
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleZoneSubmit();
-                  }}
+                  onClick={handleZoneSubmit}
                   disabled={zones.length === 0 || isLoading}
-                  className="px-8 py-3 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                 >
-                  ✅ Submit Zones ({zones.length})
+                  Save Zones ({zones.length})
                 </button>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleLineSubmit();
-                  }}
+                  onClick={handleLineSubmit}
                   disabled={lines.length === 0 || isLoading}
-                  className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50"
                 >
-                  ➖ Submit Lines ({lines.length})
+                  Save Lines ({lines.length})
                 </button>
               </div>
+            </div>
+
+            <div className="flex flex-1 overflow-hidden">
+               {/* Toolbox Sidebar inside Modal */}
+               <div className="w-64 bg-gray-50 border-r border-gray-200 p-5 overflow-y-auto">
+                  <div className="mb-6">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Detection Zones</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[1, 2, 3, 4, 5].map((zoneNum) => (
+                        <button
+                          key={zoneNum}
+                          onClick={() => { setActiveZoneId(zoneNum); setActiveLineName(null); }}
+                          disabled={zones.some((z) => z.id === zoneNum)}
+                          className={`py-2 px-1 rounded-md text-sm font-semibold transition-all ${
+                            activeZoneId === zoneNum ? "bg-blue-500 text-white ring-2 ring-blue-300" :
+                            zones.some((z) => z.id === zoneNum) ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-white text-gray-700 border hover:border-blue-400"
+                          }`}
+                        >
+                          Zone {zoneNum}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Tripwire Lines</h4>
+                    <input
+                      type="text"
+                      placeholder="Line Name (e.g. Entry)"
+                      value={activeLineName || ""}
+                      onChange={(e) => setActiveLineName(e.target.value)}
+                      onFocus={() => setActiveZoneId(null)}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm mb-2"
+                    />
+                    <p className="text-xs text-gray-500">Type a name, then draw a line on the image.</p>
+                  </div>
+
+                  <div className="mt-auto pt-6 border-t border-gray-200">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Active Items</h4>
+                    <div className="flex flex-col gap-2">
+                       {zones.map(z => (
+                         <div key={z.id} className="flex justify-between items-center bg-blue-50 px-3 py-2 rounded text-sm text-blue-800">
+                           <span>Zone {z.id}</span>
+                           <button onClick={() => removeZone(z.id)} className="text-red-500 hover:text-red-700">×</button>
+                         </div>
+                       ))}
+                       {lines.map(l => (
+                         <div key={l.name} className="flex justify-between items-center bg-green-50 px-3 py-2 rounded text-sm text-green-800">
+                           <span>{l.name}</span>
+                           <button onClick={() => handleDeleteLine(l.name)} className="text-red-500 hover:text-red-700">×</button>
+                         </div>
+                       ))}
+                       {zones.length === 0 && lines.length === 0 && <span className="text-gray-400 text-sm italic">No zones drawn yet</span>}
+                    </div>
+                  </div>
+               </div>
+
+               {/* Image Canvas */}
+               <div className="flex-1 bg-gray-100 overflow-auto p-4 flex items-center justify-center relative">
+                  <div
+                    ref={containerRef}
+                    className="relative shadow-xl rounded-lg overflow-hidden cursor-crosshair inline-block"
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseLeave}
+                  >
+                    <img
+                      ref={imageRef}
+                      src={snapshotUrl}
+                      alt="Snapshot"
+                      onLoad={handleImageLoad}
+                      draggable={false}
+                      className="max-w-none" 
+                    />
+                    
+                    {/* Render Zones Overlays */}
+                    {zones.map((zone) => {
+                      const colorIndex = (zone.id - 1) % zoneColors.length;
+                      return (
+                        <div
+                          key={zone.id}
+                          className="absolute border-2 pointer-events-none"
+                          style={{
+                            left: zone.x1, top: zone.y1,
+                            width: zone.x2 - zone.x1, height: zone.y2 - zone.y1,
+                            backgroundColor: zoneColors[colorIndex],
+                            borderColor: zoneBorderColors[colorIndex],
+                          }}
+                        >
+                          <span className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded"
+                            style={{ backgroundColor: zoneBorderColors[colorIndex] }}>
+                            Z{zone.id}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Drawing Box Preview */}
+                    {isDrawing && currentDrawing && (
+                      <div className="absolute border-2 border-dashed border-blue-500 bg-blue-200/30 pointer-events-none"
+                        style={{
+                          left: currentDrawing.x1, top: currentDrawing.y1,
+                          width: currentDrawing.x2 - currentDrawing.x1, height: currentDrawing.y2 - currentDrawing.y1,
+                        }}
+                      />
+                    )}
+
+                    {/* Render Lines */}
+                    {lines.map((line) => (
+                      <svg key={line.name} className="absolute inset-0 pointer-events-none w-full h-full">
+                        <line x1={line.start.x} y1={line.start.y} x2={line.end.x} y2={line.end.y} stroke="#10b981" strokeWidth="4" />
+                        <text x={(line.start.x + line.end.x) / 2} y={(line.start.y + line.end.y) / 2 - 10} fill="#10b981" fontSize="14" fontWeight="bold" textAnchor="middle">{line.name}</text>
+                      </svg>
+                    ))}
+
+                     {/* Drawing Line Preview */}
+                     {isDrawingLine && currentLine && (
+                      <svg className="absolute inset-0 pointer-events-none w-full h-full">
+                        <line x1={currentLine.start.x} y1={currentLine.start.y} x2={currentLine.end.x} y2={currentLine.end.y} stroke="#3b82f6" strokeWidth="4" strokeDasharray="5,5" />
+                      </svg>
+                    )}
+                  </div>
+               </div>
             </div>
           </div>
         </div>

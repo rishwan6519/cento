@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
 
     if (!apiResponse.ok) {
       const errorData = await apiResponse.json();
+      console.log(errorData,"error from gemini tts")
       return NextResponse.json(
         { error: errorData.error?.message || "Failed to generate audio" },
         { status: apiResponse.status }
