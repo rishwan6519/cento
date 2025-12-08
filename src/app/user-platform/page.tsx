@@ -183,9 +183,11 @@ const [slides, setSlides] = useState<Slide[]>([]);
     const fetchSliderData = async () => {
       try {
         const response = await fetch(
-          "https://iot.centelon.com/api/get-slider?userId=688c8989c3f5fa5504dfb2f6"
+          "/api/get-slider?userId=688c8989c3f5fa5504dfb2f6"
         );
         const result = await response.json();
+        console.log(result,"result")
+       
 
         if (result.success && result.data?.length > 0) {
           const sliderItems = result.data[0].sliderId?.sliders || [];
@@ -1433,7 +1435,7 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
   if (selectedMenu !== "dashboard") {
     // Render original content pages if not dashboard to keep existing functionality
     switch (selectedMenu) {
-      case "createPlaylist":
+      case "createMedia":
         return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
       case "mediaLibrary":
         return <ShowMedia  />;

@@ -7,6 +7,7 @@ export async function POST(req: NextRequest) {
  try {
     const body = await req.json();
     const { cameraId, x, y, width, height, floorMapId } = body;
+    
 
     // --- Basic Validation ---
     if (!cameraId || x == null || y == null || width == null || height == null || !floorMapId) {
