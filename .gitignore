@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+/uploads
+
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,7 +11,6 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-/uploads
 
 # testing
 /coverage
