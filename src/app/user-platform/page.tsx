@@ -1435,7 +1435,7 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
   if (selectedMenu !== "dashboard") {
     // Render original content pages if not dashboard to keep existing functionality
     switch (selectedMenu) {
-      case "createMedia":
+      case "createPlaylist":
         return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
       case "mediaLibrary":
         return <ShowMedia  />;
