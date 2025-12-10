@@ -1,19 +1,30 @@
 export const config = {
   api: {
     bodyParser: false,
-    sizeLimit: '1000mb', // Increase as needed
+    sizeLimit: "1000mb",
   },
 };
 
-import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
-import { connectToDatabase } from '@/lib/db';
-import MediaItemModel from '@/models/MediaItems';
-import sanitize from 'sanitize-filename';
-import { v4 as uuidv4 } from 'uuid';
-import mongoose from 'mongoose';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/db";
+import MediaItemModel from "@/models/MediaItems";
+import sanitize from "sanitize-filename";
+import { v4 as uuidv4 } from "uuid";
+import mongoose from "mongoose";
+
+// AWS S3 SDK
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  // Uncomment ONLY if NOT using IAM role:
+  // credentials: {
+  //   accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+  //   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  // },
+});
+
+const BUCKET_NAME = "iot-robotics"; // Your bucket name
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +33,7 @@ export async function POST(req: NextRequest) {
     const fileNames: string[] = [];
     let idx = 0;
 
-    // Collect all files and filenames from formData
+    // Collect files + names
     while (true) {
       const file = formData.get(`files[${idx}]`);
       const name = formData.get(`fileNames[${idx}]`);
@@ -32,52 +43,59 @@ export async function POST(req: NextRequest) {
       idx++;
     }
 
-    const userId = formData.get('userId') as string;
+    const userId = formData.get("userId") as string;
 
     if (!userId) {
-      return NextResponse.json({ success: false, message: 'User ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: "User ID is required" },
+        { status: 400 }
+      );
     }
 
-    if (!files.length || !fileNames.length || files.length !== fileNames.length) {
-      return NextResponse.json({ success: false, message: 'Invalid or mismatched file data' }, { status: 400 });
-    }
-
-    const baseUploadPath = join(process.cwd(), 'uploads', userId);
-    const directories = ['video', 'audio', 'image'];
-
-    // Ensure directories exist
-    for (const dir of directories) {
-      const dirPath = join(baseUploadPath, dir);
-      if (!existsSync(dirPath)) {
-        await mkdir(dirPath, { recursive: true });
-      }
+    if (!files.length || files.length !== fileNames.length) {
+      return NextResponse.json(
+        { success: false, message: "Invalid or mismatched file data" },
+        { status: 400 }
+      );
     }
 
     await connectToDatabase();
 
     const uploadedFiles = await Promise.all(
       files.map(async (file: File, index) => {
-        const originalFileName = sanitize(fileNames[index]).replace(/\s+/g, '_');
-        const fileType = file.type?.split('/')?.[0] || 'unknown';
+        const originalFileName = sanitize(fileNames[index]).replace(/\s+/g, "_");
 
-        if (!['audio', 'video', 'image'].includes(fileType)) {
+        const fileType = file.type?.split("/")?.[0] || "unknown";
+        if (!["audio", "video", "image"].includes(fileType)) {
           throw new Error(`Unsupported file type: ${file.type}`);
         }
 
         const uniqueFileName = `${uuidv4()}-${originalFileName}`;
-        const filePath = join(baseUploadPath, fileType, uniqueFileName);
+        const key = `${userId}/${fileType}/${uniqueFileName}`;
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
-        await writeFile(filePath, buffer);
 
-        // ✅ Save only "audio", "video", or "image" in database
+        // Upload to S3
+        await s3.send(
+          new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+            Body: buffer,
+            ContentType: file.type,
+          })
+        );
+
+        // File public URL
+        const fileUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+
+        // Save in DB
         const mediaItem = new MediaItemModel({
           userId: new mongoose.Types.ObjectId(userId),
           name: originalFileName,
-          type: fileType, // <-- simplified type
-          url: `/uploads/${userId}/${fileType}/${uniqueFileName}`,
-          createdAt: new Date()
+          type: fileType,
+          url: fileUrl,
+          createdAt: new Date(),
         });
 
         await mediaItem.save();
@@ -87,16 +105,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Files uploaded and saved to database',
-      files: uploadedFiles
+      message: "Files uploaded to S3 and saved to database",
+      files: uploadedFiles,
     });
   } catch (error) {
-    console.error('Error uploading files:', error);
+    console.error("Upload error:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to upload files',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        message: "Upload failed",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
