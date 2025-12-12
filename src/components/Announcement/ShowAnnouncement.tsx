@@ -593,6 +593,7 @@ const ShowAnnouncement: React.FC<ShowAnnouncementProps> = ({ onCancel }) => {
         throw new Error(errorData.message || "Failed to fetch announcement files");
       }
       const data = await response.json();
+      console.log(data,"daa is thiere  ")
       const files = data || data || [];
       setAnnouncementFiles(files);
       setFilteredFiles(files);
@@ -604,6 +605,16 @@ const ShowAnnouncement: React.FC<ShowAnnouncementProps> = ({ onCancel }) => {
       setIsLoading(false);
     }
   };
+
+
+// ...existing code...
+const getFullPath = (path: string) => {
+  if (!path.startsWith("http")) {
+    return `https://iot.centelon.com${path.startsWith("/") ? "" : "/"}${path}`;
+  }
+  return path;
+};
+// ...existing code...
 
   const handleDeleteAnnouncement = async (fileId: string): Promise<void> => {
     if (!confirm("Are you sure you want to delete this announcement file?")) {
@@ -962,7 +973,7 @@ useEffect(() => {
 
     <audio
       id={`audio-${file._id}`}
-      src={file.path}
+      src={getFullPath(file.path)}
       onEnded={() => setPlayingId(null)}
       style={{ display: "none" }}
     />
@@ -977,7 +988,7 @@ useEffect(() => {
     </button>
 
     <button
-      onClick={() => downloadAnnouncement(file.path, file.name)}
+      onClick={() => downloadAnnouncement(getFullPath(file.path), file.name)}
       className="p-2 rounded-[9px] bg-white shadow-md"
       style={{ boxShadow: "0px 3px 15px 0px #00000026" }}
       aria-label="Download"
@@ -1080,7 +1091,7 @@ useEffect(() => {
                   </div> */}
                   <div className="flex items-center gap-2">
   <button
-    onClick={() => downloadAnnouncement(file.path, file.name)}
+    onClick={() => downloadAnnouncement(getFullPath(file.path), file.name)}
     className="p-2 bg-white rounded-[9px]"
     style={{ boxShadow: "0px 3px 15px 0px #00000026" }}
     aria-label="Download"
@@ -1112,7 +1123,7 @@ useEffect(() => {
 
   <audio
     id={`audio-${file._id}`}
-    src={file.path}
+    src={getFullPath(file.path)}
     onEnded={() => setPlayingId(null)}
     style={{ display: "none" }}
   />

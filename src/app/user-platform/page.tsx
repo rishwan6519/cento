@@ -1430,13 +1430,14 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
       case "connectPlaylist":
         return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
       case "createAnnouncement":
-        return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
+        return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("announcementLibrary")} />;
       case "scheduleAnnouncement":
         return <Announcement />;
       case "announcementPlaylist":
          return <AnnouncementList />;
          case "InstantaneousAnnouncement":
-          return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
+          return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("announcementLibrary")} />;
+          
         // return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showAnnouncement")} />;
       case "announcementLibrary":
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
