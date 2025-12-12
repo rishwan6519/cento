@@ -37,7 +37,7 @@ import {
   FaCalendarAlt,
   FaDesktop
 } from "react-icons/fa";
-import { FaBolt, FaDisplay } from "react-icons/fa6";
+import { FaBolt, FaDisplay, FaUpload } from "react-icons/fa6";
 import { RiArrowDropDownLine, RiDashboardLine } from "react-icons/ri";
 import { MdOutlinePlaylistPlay, MdAnnouncement } from "react-icons/md";
 import { Device, MenuKey } from "@/components/Platform/types";
@@ -47,7 +47,11 @@ import Button from "@/components/Platform/Button";
 import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
 import PlaylistSetup from "@/components/PlaylistSetup/PlaylistSetup";
-import CreateMedia from "@/components/CreateMedia/createMedia";
+import CreateVideo from "@/components/CreateMedia/createMedia";
+import CreateImage from "@/components/UploadImage/UploadImage";
+import CreateAudio from "@/components/UploadAudio/UploadAudio";
+
+
 import ShowMedia from "@/components/ShowMedia/showMedia";
 import ConnectPlaylist from "@/components/ConnectPlaylist/connectPlaylist";
 import LoadingState from "@/components/Platform/LoadingState";
@@ -106,7 +110,9 @@ type ExtendedMenuKey =
   // Media
   | "mediaManagement"
   | "mediaLibrary"
-  | "createPlaylist"
+  | "uploadVideo"
+  |"uploadImage"
+  |"uploadAudio"
   | "showPlaylist"
   | "connectPlaylist"
   | "playlistTemplates"
@@ -382,7 +388,9 @@ const menuSections: MenuSection[] = [
     icon: <FaMusic size={20} />,
     items: [
       // { key: "mediaManagement", label: "Media management", icon: <FaMusic /> },
-      { key: "createPlaylist", label: "Create playlist", icon: <FaListAlt /> },
+      { key: "uploadVideo", label: "Upload Video", icon: <FaListAlt /> },
+      {key:"uploadAudio",label:"Upload Audio",icon:<FaUpload/>},
+      {key:"uploadImage",label:"Upload Image",icon:<FaUpload/>},
       { key: "mediaLibrary", label: "Media library", icon: <FaRegFileAudio /> },
 
         { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
@@ -925,9 +933,9 @@ useEffect(() => {
           }));
 
           // Toast per device when offline
-          if (currentStatus === "offline") {
-            toast.error(`The device ${serial} is offline.`);
-          }
+          // if (currentStatus === "offline") {
+          //   toast.error(`The device ${serial} is offline.`);
+          // }
         }
       } catch (error) {
         console.error("Error fetching device status:", error);
@@ -1059,6 +1067,9 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
   );
 };
 
+
+
+
 // const DeviceCard = ({ device }: { device: Device }) => {
   
 
@@ -1170,100 +1181,69 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
      
   <div className="flex flex-col lg:flex-row gap-8">
       {/* Left: Slider */}
-      <div className="relative flex-1 min-w-[320px] rounded-2xl overflow-hidden shadow-lg">
-        {/* Slides container */}
-        {/* <div
-  className="flex transition-transform duration-700 ease-in-out"
-  style={{ transform: `translateX(-${current * 100}%)` }}
->
-  {sliderData.map((slide) => (
-    <img
-      key={slide._id}
-      src={slide.url}
-      alt={slide.description}
-      className="w-full object-cover max-h-[22rem] flex-shrink-0"
-    />
-  ))}
-</div> */}
-{slides.length > 0 && (
- <div className="relative w-full overflow-hidden rounded-2xl shadow-lg">
-      <img
-        src={slides[currentIndex].src}
-        alt={slides[currentIndex].alt}
-        className="w-full h-[450px] object-fit transition-all duration-700 ease-in-out"
-      />
+  {/* Left: Enhanced Slider */}
+<div className="relative flex-1 min-w-[320px] h-[450px] rounded-2xl overflow-hidden shadow-2xl group bg-gray-900">
+  {slides.length > 0 ? (
+    <>
+      {slides.map((slide, index) => (
+        <div
+          key={slide.id}
+          className={`absolute inset-0 w-full h-full transition-all duration-1000 ease-in-out transform ${
+            index === currentIndex
+              ? "opacity-100 scale-100 z-10"
+              : "opacity-0 scale-110 z-0"
+          }`}
+        >
+          <img
+            src={slide.src}
+            alt={slide.alt}
+            className="w-full h-full object-cover"
+          />
+          {/* Stylish Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+        </div>
+      ))}
 
-      {/* Description overlay */}
-      
-      {/* <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 text-white text-sm text-center">
- {slides[currentIndex].description}
-</div>
-
-      
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-        {slides.map((slide, index) => (
-          <button
-            key={slide.id}
-            className={`w-3 h-3 rounded-full ${
-              index === currentIndex ? "bg-white" : "bg-gray-400"
-            }`}
-            onClick={() => setCurrentIndex(index)}
-          ></button>
-        ))}
-      </div> */}
-      {/* Description + Dots overlay */}
-<div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 text-white text-center flex flex-col items-center gap-2">
-  {/* Description */}
-  <div className="text-sm">
-    {slides[currentIndex].description}
-  </div>
-
-  {/* Dots navigation */}
-  <div className="flex gap-2">
-    {slides.map((slide, index) => (
-      <button
-        key={slide.id}
-        className={`w-3 h-3 rounded-full ${
-          index === currentIndex ? "bg-white" : "bg-gray-400"
-        }`}
-        onClick={() => setCurrentIndex(index)}
-      ></button>
-    ))}
-  </div>
-</div>
-
-    </div>
-    )}
-{/* <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 text-white text-sm">
-  {sliderData[current]?.description || ""}
-</div>
-
-<div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
-  {sliderData.map((_, index) => (
-    <span
-      key={index}
-      onClick={() => setCurrent(index)}
-      className={`h-2.5 w-2.5 rounded-full cursor-pointer ${
-        index === current ? "bg-white" : "bg-gray-400"
-      }`}
-    />
-  ))}
-</div> */}
-
-
-        {/* Dots */}
-        {/* <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
-          {slides.map((_, index) => (
-            <span
-              key={index}
-              onClick={() => setCurrent(index)}
-              className={`h-2.5 w-2.5 rounded-full cursor-pointer ${
-                index === current ? "bg-white" : "bg-gray-400"
-              }`}
-            />
-          ))}
-        </div> */}
+      {/* Content Overlay (Text) */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 p-8 text-white">
+        <div 
+          className="transform transition-all duration-700 ease-out translate-y-0 opacity-100"
+          key={currentIndex} // Key change triggers animation reset
+        >
+          <h3 className="text-lg md:text-xl font-bold mb-2 drop-shadow-md">
+             {/* Fallback title if description is empty, or show description */}
+            {slides[currentIndex]?.description || "Featured Highlight"}
+          </h3>
+        </div>
       </div>
+
+      {/* Navigation Indicators (Pill Style) */}
+      <div className="absolute bottom-6 right-6 z-20 flex gap-2">
+        {slides.map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setCurrentIndex(idx)}
+            className={`h-2 rounded-full transition-all duration-500 ${
+              idx === currentIndex
+                ? "w-8 bg-orange-500"
+                : "w-2 bg-white/50 hover:bg-white"
+            }`}
+            aria-label={`Go to slide ${idx + 1}`}
+          />
+        ))}
+      </div>
+    </>
+  ) : (
+    // Loading Skeleton if no slides
+    <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center text-gray-400">
+      Loading visuals...
+    </div>
+  )}
+</div>
+
+
+
+
 
       {/* Right: Recently Played */}
       <aside className="w-full lg:w-80 flex flex-col space-y-4">
@@ -1435,8 +1415,12 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
   if (selectedMenu !== "dashboard") {
     // Render original content pages if not dashboard to keep existing functionality
     switch (selectedMenu) {
-      case "createPlaylist":
-        return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
+      case "uploadVideo":
+        return <CreateVideo onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
+        case "uploadImage":
+        return <CreateImage onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
+         case "uploadAudio":
+        return <CreateAudio onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
       case "mediaLibrary":
         return <ShowMedia  />;
       case "setupPlaylist":
@@ -1567,6 +1551,28 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
         {/* Main content */}
         <main className="flex-1 overflow-y-auto p-6">{renderContent()}</main>
       </div>
+
+{/* Floating Action Button - Instant Announcement */}
+      <button
+        onClick={() => {
+            setSelectedMenu("InstantaneousAnnouncement");
+            setIsMobileMenuOpen(false); // Close mobile menu if open
+        }}
+        className="fixed bottom-6 right-6 z-[60] flex items-center justify-center bg-orange-600 hover:bg-orange-700 text-white rounded-full p-4 shadow-[0_4px_20px_rgba(234,88,12,0.5)] transition-all duration-300 hover:scale-110 hover:-translate-y-1 active:scale-95 group"
+        title="Make Instant Announcement"
+      >
+        <div className="relative">
+          <FaBolt className="text-2xl animate-pulse" />
+        </div>
+        
+        {/* Expandable Text (Visible on hover or make static if preferred) */}
+        <span className="max-w-0 overflow-hidden group-hover:max-w-[150px] group-hover:ml-3 transition-all duration-500 ease-in-out whitespace-nowrap font-bold text-sm">
+          Instant Trigger
+        </span>
+      </button>
+
+      {/* End of Main Wrapper */}
     </div>
   );
 }
+  

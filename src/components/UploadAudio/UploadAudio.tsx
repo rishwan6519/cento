@@ -192,14 +192,14 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
                 Click to upload or drag & drop it here
               </p>
               <p className="text-gray-400 text-xs mt-1">
-                Supports  video files
+                Supports  audio  files
               </p>
               <input
                 id="media-upload"
                 type="file"
                 multiple
                 hidden
-                accept="video/*"
+                accept="audio/*"
                 onChange={handleFileSelection}
               />
             </div>

@@ -1,12 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import toast, { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from "react-hot-toast";
 import {
   FaEye,
   FaCode,
-  FaComments,
-  FaUsers,
   FaUpload,
   FaArrowLeft,
 } from "react-icons/fa";
@@ -29,86 +27,11 @@ const DummyUI = ({ title, onBack }: { title: string; onBack: () => void }) => (
   </div>
 );
 
-// People Detection Options UI
-const PeopleDetectionOptions = ({ onBack, onUploadFloorPlan, onGoToPlatform }: { 
-  onBack: () => void; 
-  onUploadFloorPlan: () => void;
-  onGoToPlatform: () => void;
-}) => (
-  <div className="min-h-screen bg-gradient-to-br from-white to-blue-100 flex flex-col items-center px-4 py-10">
-    <motion.div
-      className="w-full max-w-4xl flex items-center justify-between mb-8"
-      initial={{ opacity: 0, y: -30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-    >
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-      >
-        <FaArrowLeft />
-        Back to Home
-      </button>
-      
-      <div className="flex items-center gap-4">
-        <Image
-          src="/assets/logo.png"
-          alt="Centelon Logo"
-          width={40}
-          height={40}
-          className="rounded-xl"
-        />
-        <h1 className="text-2xl md:text-3xl font-bold text-blue-800 font-sans tracking-tight">
-          People Detection Options
-        </h1>
-      </div>
-      
-      <div></div> {/* Spacer for centering */}
-    </motion.div>
-
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-4xl w-full">
-      {/* Upload Floor Plan Option */}
-      <motion.button
-        className="bg-white rounded-2xl shadow-md p-8 flex flex-col items-center gap-4 hover:shadow-xl transition-all border border-gray-200 hover:scale-105"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.97 }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        onClick={onUploadFloorPlan}
-      >
-        <FaUpload className="text-4xl text-red-600" />
-        <span className="text-xl font-medium text-gray-700">Upload Floor Plan</span>
-        <p className="text-sm text-gray-500 text-center">
-          Upload your building's floor plan for precise location mapping
-        </p>
-      </motion.button>
-
-      {/* Go to People Detection Platform Option */}
-      <motion.button
-        className="bg-white rounded-2xl shadow-md p-8 flex flex-col items-center gap-4 hover:shadow-xl transition-all border border-gray-200 hover:scale-105"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.97 }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        onClick={onGoToPlatform}
-      >
-        <FaEye className="text-4xl text-green-600" />
-        <span className="text-xl font-medium text-gray-700">Go to Detection Platform</span>
-        <p className="text-sm text-gray-500 text-center">
-          Access the main people detection interface and analytics
-        </p>
-      </motion.button>
-    </div>
-  </div>
-);
-
 const cardList = [
   {
     id: "customer interaction",
     label: "Ambience",
-    icon: <IoPeopleSharp  className="text-4xl text-purple-600" />,
+    icon: <IoPeopleSharp className="text-4xl text-purple-600" />,
     route: "/user-platform",
     apiKey: "platform",
   },
@@ -119,14 +42,13 @@ const cardList = [
     route: "/block-code",
     apiKey: "blockCoding",
   },
-  
   {
     id: "detection",
     label: "Analytics",
     icon: <FaEye className="text-4xl text-green-600" />,
-    route: "/people-detection",
+    route: "/retail-analytics",
     apiKey: "peopleDetection",
-    hasOptions: true, // Special flag to show options instead of direct navigation
+    // removed hasOptions: true — analytics will navigate directly
   },
 ];
 
@@ -134,7 +56,6 @@ const CustomerEngagementPlatform = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [dummyCard, setDummyCard] = useState<string | null>(null);
-  const [showPeopleDetectionOptions, setShowPeopleDetectionOptions] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -144,25 +65,25 @@ const CustomerEngagementPlatform = () => {
       try {
         const id = localStorage.getItem("userId");
         const role = localStorage.getItem("userRole");
-        
+
         if (!id || !role) {
           toast.error("Authentication required. Please log in.");
-          router.push("/login"); // Redirect to login page
+          router.push("/login");
           return;
         }
 
         if (role !== "user") {
           toast.error("You are unauthorized to access this page", {
             duration: 4000,
-            position: 'top-right',
+            position: "top-right",
             style: {
-              background: '#ef4444',
-              color: '#ffffff',
-              fontWeight: 'bold',
+              background: "#ef4444",
+              color: "#ffffff",
+              fontWeight: "bold",
             },
-            icon: '🚫',
+            icon: "🚫",
           });
-          router.push("/login"); // Redirect to home or appropriate page
+          router.push("/login");
           return;
         }
 
@@ -191,17 +112,13 @@ const CustomerEngagementPlatform = () => {
       const data = await res.json();
 
       if (data[card.apiKey]) {
-        // If it's the People Detection card and has options, show options instead of navigating
-        if (card.hasOptions && card.id === "detection") {
-          setShowPeopleDetectionOptions(true);
-        } else {
-          router.push(card.route);
-        }
+        // Always navigate to the card's route when user has access
+        router.push(card.route);
       } else {
         setDummyCard(card.label);
         toast.error(`You don't have access to ${card.label}`, {
           duration: 3000,
-          position: 'top-right',
+          position: "top-right",
         });
       }
     } catch (error) {
@@ -211,16 +128,11 @@ const CustomerEngagementPlatform = () => {
     }
   };
 
-  const handleGoToPlatform = () => {
-    router.push("/people-detection");
-  };
-
   const handleUploadFloorPlan = () => {
     setShowUploader(true);
   };
 
   const handleBackToHome = () => {
-    setShowPeopleDetectionOptions(false);
     setShowUploader(false);
     setDummyCard(null);
   };
@@ -261,19 +173,6 @@ const CustomerEngagementPlatform = () => {
             </button>
           </div>
         </div>
-      </>
-    );
-  }
-
-  if (showPeopleDetectionOptions) {
-    return (
-      <>
-        <Toaster />
-        <PeopleDetectionOptions
-          onBack={handleBackToHome}
-          onUploadFloorPlan={handleUploadFloorPlan}
-          onGoToPlatform={handleGoToPlatform}
-        />
       </>
     );
   }

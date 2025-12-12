@@ -381,12 +381,7 @@ export default function PeopleDetectionPage() {
           const data = JSON.parse(payload.toString());
           const camera_id = topic.split("/")[2];
 
-          setCameraOptions((prev) => {
-            if (!prev.includes(camera_id)) {
-              return [...prev, camera_id];
-            }
-            return prev;
-          });
+      
 
           setZoneCounts((prev) => ({
             ...prev,
