@@ -668,13 +668,13 @@
 // };
 
 // export default ShowMedia;
+
+
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Trash2,
-  Play,
-  Pause,
   Music,
   Video,
   ImageIcon,
@@ -684,30 +684,26 @@ import {
   X,
   Maximize2,
   Download,
-  Heart,
-  RotateCcw,
+  AlertCircle,
+  Play,
+  FileAudio
 } from "lucide-react";
 import toast from "react-hot-toast";
-/**
- * Media Library UI
- * - Recreated to match the uploaded design closely (colors, spacing, actions)
- * - Contains working Search, "All media" filter dropdown, List/Grid toggle
- * - Action buttons: Play/Pause (audio), Loop toggle, Favorite, Download, Delete
- * - Preview modal for image/video/audio
- *
- * NOTE: This component uses demo data. Replace the demo data with your API
- * fetch and wire the `url` fields to real media URLs.
- */
 
-let audioPlayer: HTMLAudioElement | null = null; // single audio player to control audio playback
+/**
+ * Configuration
+ */
+const BASE_URL = "https://iot.centelon.com";
+
+let audioPlayer: HTMLAudioElement | null = null; // Single audio player instance
 
 interface MediaFile {
   _id: string;
   name: string;
-  type: "audio" | "video" | "image" | string; // simplified for demo
-  mime?: string; // optional real mime (e.g. "audio/mp3")
+  type: "audio" | "video" | "image" | string;
+  mime?: string;
   url: string;
-  createdAt?: string; // ISO date or display-friendly
+  createdAt?: string;
   size?: number;
 }
 
@@ -717,37 +713,22 @@ export default function ShowMedia() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "audio" | "video" | "image">("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const [loops, setLoops] = useState<Record<string, boolean>>({});
   const [preview, setPreview] = useState<MediaFile | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Demo data (use real API in production)
-  // useEffect(() => {
-  //   const demo: MediaFile[] = [
-  //     { _id: "m1", name: "Morning Chill", type: "audio", url: "/demo/morning-chill.mp3", createdAt: "2025-09-11" },
-  //     { _id: "m2", name: "Afternoon vibe", type: "audio", url: "/demo/afternoon-vibe.mp3", createdAt: "2025-09-11" },
-  //     { _id: "m3", name: "Slow evening", type: "video", url: "/demo/slow-evening.mp4", createdAt: "2025-09-11" },
-  //     { _id: "m4", name: "Relaxing song", type: "video", url: "/demo/relaxing-song.mp4", createdAt: "2025-09-11" },
-  //     { _id: "m5", name: "Soothing melody for relaxation", type: "video", url: "/demo/soothing.mp4", createdAt: "2025-09-09" },
-  //     { _id: "m6", name: "Relaxing song", type: "audio", url: "/demo/relaxing-2.mp3", createdAt: "2025-09-11" },
-  //   ];
+  // Close dropdown if clicked outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  //   setMedia(demo);
-  //   setFiltered(demo);
-  // }, []);
-
-  // // Apply search + filter
-  // useEffect(() => {
-  //   const q = search.trim().toLowerCase();
-  //   const out = media.filter((m) => {
-  //     const matchesType = filterType === "all" ? true : m.type === filterType;
-  //     const matchesSearch = q === "" ? true : m.name.toLowerCase().includes(q);
-  //     return matchesType && matchesSearch;
-  //   });
-  //   setFiltered(out);
-  // }, [search, filterType, media]);
+  // Fetch Media
   useEffect(() => {
     const fetchMedia = async () => {
       try {
@@ -757,18 +738,15 @@ export default function ShowMedia() {
 
         const data = await res.json();
         const rawList: any[] = data.media || data || [];
-        console.log("Fetched media:", rawList);
 
-        // Normalize types to base categories and keep original mime
         const mediaList: MediaFile[] = rawList.map((item) => {
           const originalType: string = item.type || "";
-          const category = originalType.startsWith("image/")
-            ? "image"
-            : originalType.startsWith("video/")
-            ? "video"
-            : originalType.startsWith("audio/")
-            ? "audio"
-            : (item.type as string) || "";
+          // Robust type detection
+          let category = "file";
+          if (originalType.startsWith("image") || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(item.url)) category = "image";
+          else if (originalType.startsWith("video") || /\.(mp4|webm|mov|mkv)$/i.test(item.url)) category = "video";
+          else if (originalType.startsWith("audio") || /\.(mp3|wav|ogg|m4a)$/i.test(item.url)) category = "audio";
+
           return {
             _id: item._id,
             name: item.name,
@@ -793,7 +771,7 @@ export default function ShowMedia() {
     fetchMedia();
   }, []);
 
-  // Search + type filter
+  // Filter Logic
   useEffect(() => {
     const q = search.trim().toLowerCase();
     const out = media.filter((m) => {
@@ -803,146 +781,78 @@ export default function ShowMedia() {
     });
     setFiltered(out);
   }, [search, filterType, media]);
-  // Play / Pause for audio using a single audioPlayer instance
-  const togglePlay = (m: MediaFile) => {
-    if (m.type !== "audio") return; // we only handle audio with this player
 
-    // If currently playing same id -> pause
-    if (playingId === m._id && audioPlayer) {
-      audioPlayer.pause();
-      audioPlayer = null;
-      setPlayingId(null);
-      return;
-    }
+  // --- Helper Functions ---
 
-    // If another audio was playing, stop it first
-    if (audioPlayer) {
-      audioPlayer.pause();
-      audioPlayer = null;
-      setPlayingId(null);
-    }
+  const normalizeUrl = (url?: string): string => {
+    if (!url) return "";
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    
+    // Remove leading slash to ensure clean concatenation
+    const cleanPath = url.startsWith("/") ? url.slice(1) : url;
+    return `${BASE_URL}/${cleanPath}`;
+  };
 
-    // start new audio
+  const formatDate = (d?: string) => {
+    if (!d) return "Unknown";
     try {
-      audioPlayer = new Audio(m.url);
-      audioPlayer.loop = !!loops[m._id];
-      audioPlayer.play().catch((err) => {
-        console.error("audio play failed", err);
-        setPlayingId(null);
+      return new Date(d).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
       });
-      audioPlayer.onended = () => setPlayingId(null);
-      setPlayingId(m._id);
-    } catch (err) {
-      console.error(err);
-      setPlayingId(null);
+    } catch {
+      return d;
     }
   };
 
-  const toggleLoop = (m: MediaFile) => {
-    setLoops((prev) => {
-      const next = { ...prev, [m._id]: !prev[m._id] };
-      if (audioPlayer && playingId === m._id) {
-        audioPlayer.loop = !!next[m._id];
-      }
-      return next;
-    });
-  };
-
-  const toggleFavorite = (m: MediaFile) => {
-    setFavorites((prev) => ({ ...prev, [m._id]: !prev[m._id] }));
-  };
+  // --- Actions ---
 
   const downloadFile = (m: MediaFile) => {
-    // If real URL, this will trigger download. For demo URLs (like "/demo/..."), browser may not download.
+    const fullUrl = normalizeUrl(m.url);
     const link = document.createElement("a");
-    link.href = m.url.startsWith("/") || m.url.startsWith("http") ? m.url : `/${m.url}`;
+    link.href = fullUrl;
+    link.target = "_blank";
     link.download = m.name;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const normalizeUrl = (url?: string): string => {
-    if (!url) return "";
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    return url.startsWith("/") ? url : `/${url}`;
-  };
-
-  const inferMimeFromUrl = (url?: string): string | undefined => {
-    if (!url) return undefined;
-    const lower = url.toLowerCase();
-    if (lower.endsWith(".mp4")) return "video/mp4";
-    if (lower.endsWith(".webm")) return "video/webm";
-    if (lower.endsWith(".mov")) return "video/quicktime";
-    if (lower.endsWith(".mp3")) return "audio/mpeg";
-    if (lower.endsWith(".wav")) return "audio/wav";
-    if (lower.endsWith(".ogg")) return "audio/ogg";
-    return undefined;
-  };
-
-  // const deleteFile = (m: MediaFile) => {
-  //   if (!confirm(`Delete "${m.name}" permanently?`)) return;
-  //   setMedia((prev) => prev.filter((x) => x._id !== m._id));
-  // };
- const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string) => {
+    if(!confirm("Are you sure you want to delete this file?")) return;
+    
     try {
-const res = await fetch(`/api/media/?userId=${id}`, { method: "DELETE" });
+      const userId = localStorage.getItem("userId");
+      const res = await fetch(`/api/media/?userId=${userId}&mediaId=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
-      setMedia(media.filter((m) => m._id !== id));
+      
+      const newMedia = media.filter((m) => m._id !== id);
+      setMedia(newMedia);
+      // Re-filter immediately
+      const q = search.trim().toLowerCase();
+      setFiltered(newMedia.filter(m => {
+          const matchesType = filterType === "all" ? true : m.type === filterType;
+          const matchesSearch = q === "" ? true : m.name.toLowerCase().includes(q);
+          return matchesType && matchesSearch;
+      }));
       toast.success("Media deleted");
     } catch (err) {
       console.error(err);
       toast.error("Delete failed");
     }
   };
-  const isUrlReachable = async (url: string): Promise<boolean> => {
-    try {
-      const res = await fetch(url, { method: "HEAD" });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  };
-  const extractFilename = (url: string): string => {
-    try {
-      const parts = url.split("/");
-      return parts[parts.length - 1] || url;
-    } catch {
-      return url;
-    }
-  };
 
-  const openPreview = async (m: MediaFile) => {
-    // Stop list audio if playing to avoid conflicts
+  const openPreview = (m: MediaFile) => {
     if (audioPlayer) {
-      try { audioPlayer.pause(); } catch {}
+      audioPlayer.pause();
       audioPlayer = null;
-      setPlayingId(null);
     }
-
-    const primaryUrl = m.url.startsWith("http") || m.url.startsWith("/") ? m.url : `/${m.url}`;
-    let resolvedUrl = primaryUrl;
-    if (m.type === "video" || m.type === "audio") {
-      const ok = await isUrlReachable(primaryUrl);
-      if (!ok) {
-        // Fallback: try flat uploads root with just the filename
-        const filename = extractFilename(primaryUrl);
-        const flatUrl = `/uploads/${filename}`;
-        const okFlat = await isUrlReachable(flatUrl);
-        if (okFlat) {
-          resolvedUrl = flatUrl;
-        } else {
-          toast.error(`File not found at ${primaryUrl}`);
-          return;
-        }
-      }
-    }
-    setPreview({ ...m, url: resolvedUrl });
+    setPreview(m);
   };
 
   const closePreview = () => {
     setPreview(null);
-    // pause any playing audio inside preview
     document.querySelectorAll<HTMLMediaElement>("audio,video").forEach((el) => el.pause());
   };
 
@@ -954,509 +864,346 @@ const res = await fetch(`/api/media/?userId=${id}`, { method: "DELETE" });
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const formatDate = (d?: string) => {
-    if (!d) return "Unknown";
-    try {
-      const dt = new Date(d);
-      return dt.toLocaleDateString();
-    } catch {
-      return d;
-    }
-  };
-
   return (
-    // <div className="min-h-screen bg-[#EAF9FB] p-8">
-    //   <div className="max-w-7xl mx-auto">
-    //     <div className="bg-white rounded-2xl shadow-xl p-6">
-    //       {/* Header */}
-    //       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-    //         <div>
-    //           <h1 className="text-slate-900 text-2xl font-semibold">Media Library</h1>
-    //         </div>
-
-    //         <div className="flex-1">
-    //           {/* search + all media + view toggles */}
-    //           <div className="flex items-center gap-3">
-    //             {/* Search container */}
-    //             <div className="flex items-center bg-white border rounded-full px-3 shadow-sm flex-1 sm:flex-none w-full sm:w-[520px]">
-    //               <Search size={16} className="text-slate-400 mr-3" />
-    //               <input
-    //                 value={search}
-    //                 onChange={(e) => setSearch(e.target.value)}
-    //                 placeholder="Search media"
-    //                 className="outline-none py-3 w-full text-sm"
-    //               />
-    //             </div>
-
-    //             {/* All Media dropdown */}
-    //             <div className="relative">
-    //               <button
-    //                 onClick={() => setShowFilterDropdown((s) => !s)}
-    //                 className="flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-sm text-sm"
-    //               >
-    //                 {filterType === "all"
-    //                   ? "All media"
-    //                   : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
-    //                 <svg
-    //                   className="w-3 h-3 text-slate-600"
-    //                   viewBox="0 0 20 20"
-    //                   fill="currentColor"
-    //                 >
-    //                   <path
-    //                     fillRule="evenodd"
-    //                     d="M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 011.12 1L10.53 13.03a.75.75 0 01-1.06 0L5.2 8.27a.75.75 0 01.03-1.06z"
-    //                     clipRule="evenodd"
-    //                   />
-    //                 </svg>
-    //               </button>
-
-    //               {showFilterDropdown && (
-    //                 <div className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-20">
-    //                   <button
-    //                     onClick={() => {
-    //                       setFilterType("all");
-    //                       setShowFilterDropdown(false);
-    //                     }}
-    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "all" ? "bg-slate-50" : ""}`}
-    //                   >
-    //                     All media
-    //                   </button>
-    //                   <button
-    //                     onClick={() => {
-    //                       setFilterType("audio");
-    //                       setShowFilterDropdown(false);
-    //                     }}
-    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "audio" ? "bg-slate-50" : ""}`}
-    //                   >
-    //                     Audio
-    //                   </button>
-    //                   <button
-    //                     onClick={() => {
-    //                       setFilterType("video");
-    //                       setShowFilterDropdown(false);
-    //                     }}
-    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "video" ? "bg-slate-50" : ""}`}
-    //                   >
-    //                     Video
-    //                   </button>
-    //                   <button
-    //                     onClick={() => {
-    //                       setFilterType("image");
-    //                       setShowFilterDropdown(false);
-    //                     }}
-    //                     className={`w-full text-left px-3 py-2 text-sm ${filterType === "image" ? "bg-slate-50" : ""}`}
-    //                   >
-    //                     Image
-    //                   </button>
-    //                 </div>
-    //               )}
-    //             </div>
-
-    //             {/* View toggles */}
-    //             <div className="ml-auto sm:ml-0 flex items-center gap-2">
-    //               <button
-    //                 onClick={() => setViewMode("list")}
-    //                 title="List view"
-    //                 className={`p-2 rounded-lg ${viewMode === "list" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}
-    //               >
-    //                 <List size={18} />
-    //               </button>
-    //               <button
-    //                 onClick={() => setViewMode("grid")}
-    //                 title="Grid view"
-    //                 className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}
-    //               >
-    //                 <Grid size={18} />
-    //               </button>
-    //             </div>
-    //           </div>
-    //         </div>
-    //       </div>
-
-    //       {/* Content area */}
-    //       <div className="mt-4">
-    //         {/* List layout (rows with pill background) */}
-    //         {viewMode === "list" ? (
-    //           <div className="space-y-3">
-    //             {filtered.map((m) => (
-    //               <div key={m._id} className="flex items-center gap-4 bg-[#E9FBFD] rounded-xl px-4 py-3 shadow-sm">
-    //                 <div className="flex items-center gap-3 w-1/3 min-w-[220px]">
-    //                   <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
-    //                     {/* file icon inside dark teal square */}
-    //                     {m.type === "audio" && <Music size={18} />}
-    //                     {m.type === "video" && <Video size={18} />}
-    //                     {m.type === "image" && <ImageIcon size={18} />}
-    //                   </div>
-    //                   <div className="min-w-0">
-    //                     <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
-    //                   </div>
-    //                 </div>
-
-    //                 <div className="flex-1 flex justify-center text-sm text-slate-700">{m.type.charAt(0).toUpperCase() + m.type.slice(1)}</div>
-
-    //                 <div className="w-40 text-center text-sm text-slate-700">{formatDate(m.createdAt)}</div>
-
-    //                 <div className="flex items-center gap-2 ml-auto">
-    //                   {/* Play / Pause for audio */}
-    //                   {/* <button
-    //                     onClick={() => togglePlay(m)}
-    //                     title={playingId === m._id ? "Pause" : "Play"}
-    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:scale-95 transition"
-    //                   >
-    //                     {m.type === "audio" && playingId === m._id ? (
-    //                       <Pause size={14} className="text-orange-500" />
-    //                     ) : (
-    //                       <Play size={14} className="text-orange-500" />
-    //                     )}
-    //                   </button> */}
-
-    //                   {/* Loop/Repeat */}
-    //                   {/* <button
-    //                     onClick={() => toggleLoop(m)}
-    //                     title={loops[m._id] ? "Loop on" : "Loop off"}
-    //                     className={`h-8 w-8 rounded-full bg-white shadow flex items-center justify-center ${loops[m._id] ? "ring-2 ring-orange-100" : ""}`}
-    //                   >
-    //                     <RotateCcw size={14} className="text-orange-500" />
-    //                   </button> */}
-
-    //                   {/* Favorite */}
-    //                   {/* <button
-    //                     onClick={() => toggleFavorite(m)}
-    //                     title={favorites[m._id] ? "Remove favourite" : "Add favourite"}
-    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
-    //                   >
-    //                     <Heart size={14} className={favorites[m._id] ? "text-orange-500" : "text-slate-400"} />
-    //                   </button> */}
-
-    //                   {/* Download */}
-    //                   <button
-    //                     onClick={() => downloadFile(m)}
-    //                     title="Download"
-    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
-    //                   >
-    //                     <Download size={14} className="text-orange-500" />
-    //                   </button>
-
-    //                   {/* Delete */}
-    //                   <button
-    //                    onClick={() => handleDelete(m._id)}
-    //                     title="Delete"
-    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50"
-    //                   >
-    //                     <Trash2 size={14} className="text-red-500" />
-    //                   </button>
-
-    //                   {/* Preview / Expand */}
-    //                   <button
-    //                     onClick={() => openPreview(m)}
-    //                     title="Preview"
-    //                     className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center"
-    //                   >
-    //                     <Maximize2 size={14} className="text-orange-500" />
-    //                   </button>
-    //                 </div>
-    //               </div>
-    //             ))}
-    //           </div>
-    //         ) : (
-    //           // Grid view - card like
-    //           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    //             {filtered.map((m) => (
-    //               <div key={m._id} className="bg-[#E9FBFD] rounded-xl p-4 shadow-sm">
-    //                 <div className="flex items-center gap-3 mb-3">
-    //                   <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
-    //                     {m.type === "audio" && <Music size={18} />}
-    //                     {m.type === "video" && <Video size={18} />}
-    //                     {m.type === "image" && <ImageIcon size={18} />}
-    //                   </div>
-    //                   <div>
-    //                     <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
-    //                     <div className="text-xs text-slate-600">{formatDate(m.createdAt)}</div>
-    //                   </div>
-    //                 </div>
-
-    //                 <div className="flex items-center gap-2 mt-2">
-    //                   {/* <button
-    //                     onClick={() => togglePlay(m)}
-    //                     className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center"
-    //                   >
-    //                     {m.type === "audio" && playingId === m._id ? (
-    //                       <Pause size={16} className="text-orange-500" />
-    //                     ) : (
-    //                       <Play size={16} className="text-orange-500" />
-    //                     )}
-    //                   </button> */}
-
-    //                   {/* <button onClick={() => toggleLoop(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-    //                     <RotateCcw size={16} className={`text-orange-500 ${loops[m._id] ? "opacity-100" : "opacity-80"}`} />
-    //                   </button> */}
-
-    //                   {/* <button onClick={() => toggleFavorite(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-    //                     <Heart size={16} className={favorites[m._id] ? "text-orange-500" : "text-slate-400"} />
-    //                   </button> */}
-
-    //                   <button onClick={() => downloadFile(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-    //                     <Download size={16} className="text-orange-500" />
-    //                   </button>
-
-    //                   <button onClick={() => handleDelete(m._id)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50">
-    //                     <Trash2 size={16} className="text-red-500" />
-    //                   </button>
-
-    //                   <button onClick={() => openPreview(m)} className="ml-auto h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-    //                     <Maximize2 size={16} className="text-orange-500" />
-    //                   </button>
-    //                 </div>
-    //               </div>
-    //             ))}
-    //           </div>
-    //         )}
-
-    //         {/* Footer count */}
-    //         <div className="mt-6 text-sm text-slate-600">{filtered.length} {filtered.length === 1 ? "item" : "items"}</div>
-    //       </div>
-    //     </div>
-    //   </div>
-
-    //   {/* Preview Modal */}
-    //   {preview && (
-    //     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
-    //       <div className="bg-white rounded-lg max-w-4xl w-full overflow-hidden">
-    //         <div className="flex items-center justify-between p-4 border-b">
-    //           <div className="text-sm font-medium truncate max-w-[70%]">{preview.name}</div>
-    //           <div className="flex items-center gap-2">
-    //             <button onClick={() => downloadFile(preview)} className="p-2 rounded hover:bg-slate-50">
-    //               <Download size={18} className="text-orange-500" />
-    //             </button>
-    //             <button onClick={closePreview} className="p-2 rounded hover:bg-slate-50">
-    //               <X size={18} />
-    //             </button>
-    //           </div>
-    //         </div>
-
-    //         <div className="bg-black flex items-center justify-center" style={{ height: "60vh" }}>
-    //           {(() => {
-    //             const url = normalizeUrl(preview.url);
-    //             const mime = preview.mime || inferMimeFromUrl(url);
-    //             if (preview.type === "image") {
-    //               return (
-    //                 <img src={url} alt={preview.name} className="max-w-full max-h-full object-contain" />
-    //               );
-    //             }
-    //             if (preview.type === "video") {
-    //               return (
-    //                 <video controls playsInline preload="metadata" className="max-w-full max-h-full pointer-events-auto" onError={() => toast.error("Unable to load or play this video")}>
-    //                   <source src={url} type={mime || "video/mp4"} />
-    //                 </video>
-    //               );
-    //             }
-    //             if (preview.type === "audio") {
-    //               return (
-    //                 <div className="p-6 w-full max-w-2xl bg-white rounded-md">
-    //                   <audio controls preload="metadata" className="w-full pointer-events-auto" onError={() => toast.error("Unable to load or play this audio")}>
-    //                     <source src={url} type={mime || "audio/mpeg"} />
-    //                   </audio>
-    //                 </div>
-    //               );
-    //             }
-    //             return null;
-    //           })()}
-    //         </div>
-
-    //         <div className="p-3 border-t flex items-center justify-between">
-    //           <div className="text-xs text-slate-600">{preview.type} • {formatDate(preview.createdAt)}</div>
-    //           <div>
-    //             <button onClick={closePreview} className="px-4 py-2 bg-slate-100 rounded">Close</button>
-    //           </div>
-    //         </div>
-    //       </div>
-    //     </div>
-    //   )}
-    // </div>
     <div className="min-h-screen bg-[#EAF9FB] p-4 sm:p-8">
-  <div className="max-w-7xl mx-auto">
-    <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
-        <h1 className="text-slate-900 text-xl sm:text-2xl font-semibold truncate">
-          Media Library
-        </h1>
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 min-h-[500px]">
+          
+          {/* --- Header Section --- */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+            <h1 className="text-slate-900 text-2xl font-semibold">
+              Media Library
+            </h1>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          {/* Search */}
-          <div className="flex items-center bg-white border rounded-full px-3 shadow-sm flex-1 sm:flex-none w-full sm:w-[320px]">
-            <Search size={16} className="text-slate-400 mr-2" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search media"
-              className="outline-none py-2 sm:py-3 w-full text-sm"
-            />
-          </div>
-
-          {/* Filter Dropdown */}
-          <div className="relative w-full sm:w-auto">
-            <button
-              onClick={() => setShowFilterDropdown((s) => !s)}
-              className="flex items-center justify-between gap-2 bg-white border rounded-full px-4 py-2 shadow-sm w-full sm:w-auto text-sm"
-            >
-              {filterType === "all" ? "All media" : filterType.charAt(0).toUpperCase() + filterType.slice(1)}
-              <svg className="w-3 h-3 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 011.12 1L10.53 13.03a.75.75 0 01-1.06 0L5.2 8.27a.75.75 0 01.03-1.06z" clipRule="evenodd"/>
-              </svg>
-            </button>
-            {showFilterDropdown && (
-              <div className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-20">
-                {["all", "audio", "video", "image"].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => { setFilterType(type as any); setShowFilterDropdown(false); }}
-                    className={`w-full text-left px-3 py-2 text-sm ${filterType === type ? "bg-slate-50" : ""}`}
-                  >
-                    {type === "all" ? "All media" : type.charAt(0).toUpperCase() + type.slice(1)}
-                  </button>
-                ))}
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <div className="flex items-center bg-white border border-slate-200 rounded-full px-4 shadow-sm flex-1 sm:w-80 transition-colors focus-within:border-orange-400">
+                <Search size={18} className="text-slate-400 mr-2" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="outline-none py-2.5 w-full text-sm text-slate-700 placeholder:text-slate-400"
+                />
               </div>
-            )}
+
+              <div className="flex items-center gap-2">
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setShowFilterDropdown((s) => !s)}
+                    className="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-full px-4 py-2.5 shadow-sm min-w-[140px] text-sm text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    <span className="capitalize">{filterType === "all" ? "All Media" : filterType}</span>
+                    <svg className={`w-4 h-4 text-slate-500 transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 011.12 1L10.53 13.03a.75.75 0 01-1.06 0L5.2 8.27a.75.75 0 01.03-1.06z" clipRule="evenodd"/>
+                    </svg>
+                  </button>
+                  
+                  {showFilterDropdown && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white border border-slate-100 rounded-xl shadow-lg z-20 overflow-hidden py-1">
+                      {["all", "audio", "video", "image"].map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => { setFilterType(type as any); setShowFilterDropdown(false); }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 hover:text-orange-600 transition ${filterType === type ? "bg-orange-50 text-orange-600 font-medium" : "text-slate-600"}`}
+                        >
+                          {type === "all" ? "All Media" : type.charAt(0).toUpperCase() + type.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex bg-slate-100 p-1 rounded-full">
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={`p-2 rounded-full transition ${viewMode === "list" ? "bg-white text-orange-500 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                  >
+                    <List size={18} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("grid")}
+                    className={`p-2 rounded-full transition ${viewMode === "grid" ? "bg-white text-orange-500 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                  >
+                    <Grid size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* View toggles */}
-          <div className="flex items-center gap-2 mt-2 sm:mt-0">
-            <button onClick={() => setViewMode("list")} title="List view" className={`p-2 rounded-lg ${viewMode === "list" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}>
-              <List size={18} />
-            </button>
-            <button onClick={() => setViewMode("grid")} title="Grid view" className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-orange-50 text-orange-500" : "bg-white text-slate-500"} shadow-sm`}>
-              <Grid size={18} />
-            </button>
+          {/* --- Content Area --- */}
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+               <div className="bg-slate-50 p-6 rounded-full mb-3">
+                 <Search size={32} className="opacity-50" />
+               </div>
+               <p>No media found</p>
+            </div>
+          ) : viewMode === "list" ? (
+            // LIST VIEW
+            <div className="space-y-3">
+              {filtered.map((m) => (
+                <div key={m._id} className="group flex flex-col sm:flex-row sm:items-center gap-3 bg-[#E9FBFD] hover:bg-[#dff6fa] transition rounded-xl px-3 py-3 shadow-sm border border-transparent hover:border-orange-100">
+                  
+                  {/* Media Thumbnail Area (Left) */}
+                  <div className="flex items-center gap-4 w-full sm:w-2/5">
+                    <div 
+                      className="h-16 w-24 shrink-0 rounded-lg bg-slate-200 overflow-hidden relative cursor-pointer"
+                      onClick={() => openPreview(m)}
+                    >
+                      <MediaThumbnail file={m} normalizeUrl={normalizeUrl} />
+                    </div>
+                    
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900 truncate" title={m.name}>{m.name}</div>
+                      <div className="text-xs text-slate-500 sm:hidden mt-1">{formatDate(m.createdAt)}</div>
+                    </div>
+                  </div>
+
+                  {/* Metadata */}
+                  <div className="flex items-center justify-between sm:justify-center w-full sm:w-1/5 text-sm text-slate-600">
+                    <span className="capitalize bg-white/50 px-2 py-0.5 rounded text-xs border border-slate-100">
+                        {m.type}
+                    </span>
+                  </div>
+                  <div className="hidden sm:block sm:w-1/5 text-center text-sm text-slate-600">
+                    {formatDate(m.createdAt)}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 mt-2 sm:mt-0 ml-auto">
+                    {/* Play Button for Video/Audio */}
+                    {(m.type === "video" || m.type === "audio") && (
+                       <button onClick={() => openPreview(m)} title="Play" className="h-8 w-8 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-500 hover:text-green-600 hover:scale-105 transition">
+                        <Play size={14} className="ml-0.5 fill-current" />
+                      </button>
+                    )}
+                    
+                    <button onClick={() => downloadFile(m)} title="Download" className="h-8 w-8 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-500 hover:text-orange-500 hover:scale-105 transition">
+                      <Download size={15} />
+                    </button>
+                    <button onClick={() => handleDelete(m._id)} title="Delete" className="h-8 w-8 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-50 hover:scale-105 transition">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // GRID VIEW
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {filtered.map((m) => (
+                <div key={m._id} className="group bg-[#E9FBFD] hover:bg-[#dff6fa] rounded-xl overflow-hidden shadow-sm border border-transparent hover:border-orange-100 flex flex-col transition h-full">
+                  
+                  {/* Media Thumbnail Area (Top of Card) */}
+                  <div 
+                    className="aspect-video w-full bg-slate-200 relative cursor-pointer overflow-hidden"
+                    onClick={() => openPreview(m)}
+                  >
+                    <MediaThumbnail file={m} normalizeUrl={normalizeUrl} />
+                  </div>
+
+                  <div className="p-3 flex flex-col flex-1">
+                    <div className="mb-2">
+                      <div className="text-sm font-semibold text-slate-900 truncate" title={m.name}>{m.name}</div>
+                      <div className="text-xs text-slate-500 mt-0.5 flex justify-between">
+                        <span>{formatDate(m.createdAt)}</span>
+                        <span className="uppercase text-[10px] bg-slate-200/50 px-1.5 rounded">{m.type}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-auto pt-2 flex items-center justify-end gap-2 border-t border-slate-200/50">
+                       {(m.type === "video" || m.type === "audio") && (
+                         <button onClick={() => openPreview(m)} className="h-8 w-8 rounded-full bg-white hover:bg-green-50 shadow-sm flex items-center justify-center text-slate-500 hover:text-green-600 transition">
+                          <Play size={14} className="ml-0.5 fill-current" />
+                        </button>
+                       )}
+                       <button onClick={() => downloadFile(m)} className="h-8 w-8 rounded-full bg-white hover:bg-orange-50 shadow-sm flex items-center justify-center text-slate-500 hover:text-orange-500 transition">
+                        <Download size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(m._id)} className="h-8 w-8 rounded-full bg-white hover:bg-red-50 shadow-sm flex items-center justify-center text-slate-500 hover:text-red-500 transition">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-6 text-sm text-slate-500 text-center sm:text-left">
+            Showing {filtered.length} {filtered.length === 1 ? "item" : "items"}
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      {viewMode === "list" ? (
-        <div className="space-y-3">
-          {filtered.map((m) => (
-            <div key={m._id} className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 bg-[#E9FBFD] rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-sm">
-              <div className="flex items-center gap-2 w-full sm:w-1/3 min-w-[180px]">
-                <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
-                  {m.type === "audio" && <Music size={18} />}
-                  {m.type === "video" && <Video size={18} />}
-                  {m.type === "image" && <ImageIcon size={18} />}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
-                </div>
-              </div>
-              <div className="flex-1 flex justify-between sm:justify-center text-sm text-slate-700 w-full">
-                <div className="truncate">{m.type.charAt(0).toUpperCase() + m.type.slice(1)}</div>
-                <div className="hidden sm:block w-40 text-center">{formatDate(m.createdAt)}</div>
-              </div>
-
-              <div className="flex gap-2 ml-auto flex-wrap mt-2 sm:mt-0">
-                <button onClick={() => downloadFile(m)} title="Download" className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center">
-                  <Download size={14} className="text-orange-500" />
-                </button>
-                <button onClick={() => handleDelete(m._id)} title="Delete" className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50">
-                  <Trash2 size={14} className="text-red-500" />
-                </button>
-                <button onClick={() => openPreview(m)} title="Preview" className="h-8 w-8 rounded-full bg-white shadow flex items-center justify-center">
-                  <Maximize2 size={14} className="text-orange-500" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((m) => (
-            <div key={m._id} className="bg-[#E9FBFD] rounded-xl p-3 sm:p-4 shadow-sm flex flex-col">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-10 w-10 rounded-2xl bg-[#00343A] flex items-center justify-center text-white shadow">
-                  {m.type === "audio" && <Music size={18} />}
-                  {m.type === "video" && <Video size={18} />}
-                  {m.type === "image" && <ImageIcon size={18} />}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 truncate">{m.name}</div>
-                  <div className="text-xs text-slate-600">{formatDate(m.createdAt)}</div>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-auto flex-wrap">
-                <button onClick={() => downloadFile(m)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-                  <Download size={16} className="text-orange-500" />
-                </button>
-                <button onClick={() => handleDelete(m._id)} className="h-9 w-9 rounded-full bg-white shadow flex items-center justify-center hover:bg-red-50">
-                  <Trash2 size={16} className="text-red-500" />
-                </button>
-                <button onClick={() => openPreview(m)} className="ml-auto h-9 w-9 rounded-full bg-white shadow flex items-center justify-center">
-                  <Maximize2 size={16} className="text-orange-500" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* --- Preview Modal --- */}
+      {preview && (
+        <PreviewModal 
+          file={preview} 
+          onClose={closePreview} 
+          onDownload={() => downloadFile(preview)}
+          normalizeUrl={normalizeUrl}
+        />
       )}
-
-      {/* Footer count */}
-      <div className="mt-4 text-sm text-slate-600">{filtered.length} {filtered.length === 1 ? "item" : "items"}</div>
     </div>
-  </div>
+  );
+}
 
- {/* Preview Modal */}
-       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div className="text-sm font-medium truncate max-w-[70%]">{preview.name}</div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => downloadFile(preview)} className="p-2 rounded hover:bg-slate-50">
-                  <Download size={18} className="text-orange-500" />
-                </button>
-                <button onClick={closePreview} className="p-2 rounded hover:bg-slate-50">
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
+// --- Thumbnail Component for Grid/List ---
+function MediaThumbnail({ file, normalizeUrl }: { file: MediaFile, normalizeUrl: (s: string) => string }) {
+  const fullUrl = normalizeUrl(file.url);
 
-            <div className="bg-black flex items-center justify-center" style={{ height: "60vh" }}>
-              {(() => {
-                const url = normalizeUrl(preview.url);
-                const mime = preview.mime || inferMimeFromUrl(url);
-                if (preview.type === "image") {
-                  return (
-                    <img src={url} alt={preview.name} className="max-w-full max-h-full object-contain" />
-                  );
-                }
-                if (preview.type === "video") {
-                  return (
-                    <video controls playsInline preload="metadata" className="max-w-full max-h-full pointer-events-auto" onError={() => toast.error("Unable to load or play this video")}>
-                      <source src={url} type={mime || "video/mp4"} />
-                    </video>
-                  );
-                }
-                if (preview.type === "audio") {
-                  return (
-                    <div className="p-6 w-full max-w-2xl bg-white rounded-md">
-                      <audio controls preload="metadata" className="w-full pointer-events-auto" onError={() => toast.error("Unable to load or play this audio")}>
-                        <source src={url} type={mime || "audio/mpeg"} />
-                      </audio>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
+  if (file.type === "image") {
+    return (
+      <img 
+        src={fullUrl} 
+        alt={file.name} 
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        crossOrigin="anonymous" 
+        loading="lazy"
+      />
+    );
+  }
 
-            <div className="p-3 border-t flex items-center justify-between">
-              <div className="text-xs text-slate-600">{preview.type} • {formatDate(preview.createdAt)}</div>
-              <div>
-                <button onClick={closePreview} className="px-4 py-2 bg-slate-100 rounded">Close</button>
-              </div>
+  if (file.type === "video") {
+    return (
+      <div className="w-full h-full relative bg-black flex items-center justify-center group/video">
+        <video 
+          src={fullUrl} 
+          className="w-full h-full object-cover opacity-80"
+          muted 
+          preload="metadata"
+          crossOrigin="anonymous"
+        />
+        {/* Play Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 flex items-center justify-center group-hover/video:scale-110 transition">
+              <Play size={18} className="text-white fill-white ml-1" />
             </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Audio Fallback
+  if (file.type === "audio") {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-orange-100 to-orange-50 flex flex-col items-center justify-center text-orange-400">
+         <FileAudio size={28} />
+      </div>
+    );
+  }
+
+  // Generic
+  return (
+    <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
+      <AlertCircle size={24} />
+    </div>
+  );
+}
+
+// --- Preview Modal ---
+function PreviewModal({ 
+  file, 
+  onClose, 
+  onDownload, 
+  normalizeUrl 
+}: { 
+  file: MediaFile, 
+  onClose: () => void, 
+  onDownload: () => void,
+  normalizeUrl: (url: string) => string
+}) {
+  const fullUrl = normalizeUrl(file.url);
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+          <h3 className="text-base font-semibold text-slate-800 truncate pr-4">{file.name}</h3>
+          <div className="flex items-center gap-2 shrink-0">
+            <button 
+              onClick={onDownload} 
+              className="p-2 rounded-full hover:bg-slate-100 text-slate-600 hover:text-orange-600 transition"
+              title="Download"
+            >
+              <Download size={20} />
+            </button>
+            <button 
+              onClick={onClose} 
+              className="p-2 rounded-full hover:bg-red-50 text-slate-600 hover:text-red-600 transition"
+              title="Close"
+            >
+              <X size={24} />
+            </button>
           </div>
         </div>
-      )}
-</div>
 
+        {/* Content */}
+        <div className="bg-black/95 flex items-center justify-center flex-1 overflow-hidden p-4 relative min-h-[400px]">
+          {error ? (
+            <div className="text-center text-slate-400">
+              <AlertCircle size={48} className="mx-auto mb-2 text-red-400" />
+              <p>Failed to load media.</p>
+              <p className="text-xs mt-1 opacity-60 break-all">{fullUrl}</p>
+            </div>
+          ) : (
+            <>
+              {file.type === "image" && (
+                <img 
+                  key={file._id}
+                  src={fullUrl} 
+                  alt={file.name} 
+                  className="max-w-full max-h-[70vh] object-contain rounded-md" 
+                  crossOrigin="anonymous"
+                  onError={() => setError(true)}
+                />
+              )}
+              {file.type === "video" && (
+                <video 
+                  key={file._id}
+                  controls 
+                  playsInline 
+                  autoPlay 
+                  className="max-w-full max-h-[70vh] rounded-md focus:outline-none"
+                  crossOrigin="anonymous"
+                  onError={() => setError(true)}
+                >
+                  <source src={fullUrl} />
+                  Your browser does not support the video tag.
+                </video>
+              )}
+              {file.type === "audio" && (
+                <div className="w-full max-w-md bg-white/10 p-8 rounded-2xl backdrop-blur-md flex flex-col items-center">
+                    <div className="w-20 h-20 bg-orange-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-orange-500/30 animate-pulse">
+                        <Music size={40} className="text-white" />
+                    </div>
+                    <audio 
+                      key={file._id}
+                      controls 
+                      autoPlay 
+                      className="w-full"
+                      crossOrigin="anonymous"
+                      onError={() => setError(true)}
+                    >
+                        <source src={fullUrl} />
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500">
+            <span>Type: <span className="uppercase">{file.type}</span></span>
+        </div>
+      </div>
+    </div>
   );
 }
