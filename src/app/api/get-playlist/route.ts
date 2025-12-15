@@ -49,7 +49,9 @@ export async function GET(req: Request) {
         versionId: playlist.updatedAt.getTime().toString(),
         shuffle: playlist.shuffle,
         files: playlist.files.map((file: any) => ({
-          path: `https://iot.centelon.com${file.path}`,
+        path: file.path?.startsWith("http")
+          ? file.path
+         : `https://iot.centelon.com${file.path.startsWith("/") ? "" : "/"}${file.path}`,
           displayOrder: file.displayOrder,
           type: normalizeType(file.type), // ← ONLY CHANGE
           delay: file.delay,
