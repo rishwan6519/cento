@@ -7,6 +7,8 @@ import Playlist from '@/models/PlaylistConfig';
 import ConnectedAnnouncement from '@/models/AnnouncementConnection';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 import Announcement from '@/models/AnnouncementFiles';
+import MediaGroup from '@/models/MediaGroups';
+import MediaItem from '@/models/MediaItems';
 
 export async function GET(req: NextRequest) {
   try {
@@ -128,7 +130,39 @@ export async function GET(req: NextRequest) {
       }));
     }
 
-    // 4️⃣ Response
+    // 4️⃣ Fetch group information for the device
+    const deviceObjectId = new mongoose.Types.ObjectId(device._id);
+    const groups = await MediaGroup.find({ deviceIds: deviceObjectId });
+    
+    // 5️⃣ Fetch media files for each group
+    const groupDetails = await Promise.all(groups.map(async (group) => {
+      // Populate media files for the group
+      const populatedGroup = await MediaGroup.findById(group._id)
+        .populate('mediaIds')
+        .populate('deviceIds');
+      
+      // Extract media file URLs
+      const mediaUrls = populatedGroup?.mediaIds.map((media: any) => ({
+        id: media._id,
+        name: media.name,
+        url: `https://iot.centelon.com${media.url}`,
+        type: media.type,
+        createdAt: media.createdAt
+      })) || [];
+      
+      return {
+        id: group._id,
+        name: group.name,
+        description: group.description,
+        mediaCount: group.mediaIds.length,
+        deviceCount: group.deviceIds.length,
+        mediaUrls: mediaUrls, // Include the actual media file URLs
+        createdAt: group.createdAt,
+        updatedAt: group.updatedAt
+      };
+    }));
+
+    // 6️⃣ Response
     return NextResponse.json({
       success: true,
       device: {
@@ -144,6 +178,7 @@ export async function GET(req: NextRequest) {
       },
       playlists: playlistDetails,
       announcements: announcementDetails,
+      groups: groupDetails, // Added group information with media URLs
     });
 
   } catch (error) {

@@ -84,11 +84,7 @@ import sanitize from 'sanitize-filename';
 import { v4 as uuidv4 } from 'uuid';
 import mongoose from 'mongoose';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+
 
 export async function POST(req: NextRequest) {
   try {

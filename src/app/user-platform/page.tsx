@@ -42,7 +42,7 @@ import { RiArrowDropDownLine, RiDashboardLine } from "react-icons/ri";
 import { MdOutlinePlaylistPlay, MdAnnouncement } from "react-icons/md";
 import { Device, MenuKey } from "@/components/Platform/types";
 import Image from "next/image";
-import { Search, Bell, User } from "lucide-react";
+import { Search, Bell, User, Clock, PlayCircle, Music, FileText } from "lucide-react";
 import Button from "@/components/Platform/Button";
 import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
@@ -64,6 +64,10 @@ import AnnouncementList from "@/components/Announcement/AnnouncementList";
 import ConnectAnnouncement from "@/components/Announcement/ConnectAnnouncement";
 import TTSCreator from "@/components/Announcement/AnnouncementTts";
 import Scheduler from "@/components/Scheduler/Scheduler";
+import ViewGroups from "@/components/ViewGroups/ViewGroups";
+import DeviceDetails from "@/components/DeviceDetails/DeviceDetails";
+import { Play } from "next/font/google";
+
 // import RobotIcon from "@/components/icons/centelon-logo.svg";
 
 interface DeviceStatuses {
@@ -76,6 +80,7 @@ interface DeviceStatuses {
 interface DeviceCardProps {
   device: Device;
   deviceStatuses: DeviceStatuses;
+  onClick: () => void; // Add onClick prop
 }
 // Define interfaces
 interface UserData {
@@ -116,6 +121,7 @@ type ExtendedMenuKey =
   | "showPlaylist"
   | "connectPlaylist"
   | "playlistTemplates"
+  |"viewGroups"
 
   // Device
   | "storeDeviceList"
@@ -138,15 +144,11 @@ type ExtendedMenuKey =
   | "zoneSetup"
   | "notificationPreferences";
 
-interface MenuSection {
+interface MenuItem {
   key: string;
   label: string;
   icon: React.ReactNode;
-  items?: {
-    key: ExtendedMenuKey;
-    label: string;
-    icon: React.ReactNode;
-  }[];
+  items?: MenuItem[];
 }
 
 
@@ -182,8 +184,12 @@ const recentPlayed = [
 export default function UserPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<ExtendedMenuKey>("dashboard");
   const [sliderData, setSliderData] = useState<{ url: string; description: string; _id: string }[]>([]);
+  // State for selected device
+const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 const [slides, setSlides] = useState<Slide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  
 
   useEffect(() => {
     const fetchSliderData = async () => {
@@ -256,6 +262,7 @@ const [slides, setSlides] = useState<Slide[]>([]);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["playlist", "announcement"])
   );
+
 const [current, setCurrent] = useState(0);
 
   // Autoplay every 3 seconds
@@ -264,7 +271,7 @@ const [current, setCurrent] = useState(0);
       setCurrent((prev) => (prev + 1) % slides.length);
     }, 3000);
     return () => clearInterval(timer);
-  }, []);
+  }, [slides]);
   useEffect(() => {
     const userRole = localStorage.getItem("userRole");
     if (userRole !== "user") {
@@ -380,24 +387,42 @@ const [current, setCurrent] = useState(0);
     }
   };
 
-const menuSections: MenuSection[] = [
+const menuSections: MenuItem[] = [
   { key: "dashboard", label: "Dashboard", icon: <FaThLarge size={15} /> },
   {
-    key: "media",
+    key: "mediaManagement",
     label: "Media Management",
     icon: <FaMusic size={20} />,
     items: [
-      // { key: "mediaManagement", label: "Media management", icon: <FaMusic /> },
-      { key: "uploadVideo", label: "Upload Video", icon: <FaListAlt /> },
-      {key:"uploadAudio",label:"Upload Audio",icon:<FaUpload/>},
-      {key:"uploadImage",label:"Upload Image",icon:<FaUpload/>},
-      { key: "mediaLibrary", label: "Media library", icon: <FaRegFileAudio /> },
-
-        { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
-
-      { key: "showPlaylist", label: "Show playlist", icon: <MdOutlinePlaylistPlay /> },
-      { key: "connectPlaylist", label: "Connect playlist to store", icon: <FaPlug /> },
-      // { key: "playlistTemplates", label: "Playlist templates", icon: <FaListAlt /> },
+      {
+        key: "upload",
+        label: "Upload",
+        icon: <FaUpload size={15} />,
+        items: [
+          { key: "uploadVideo", label: "Upload Video", icon: <FaListAlt /> },
+          { key: "uploadAudio", label: "Upload Audio", icon: <FaMusic /> },
+          { key: "uploadImage", label: "Upload Image", icon: <FaRegFileAudio /> },
+        ],
+      },
+      {
+        key: "media",
+        label: "Media",
+        icon: <FaMusic size={15} />,
+        items: [
+          { key: "mediaLibrary", label: "Media Library", icon: <FaRegFileAudio /> },
+        ],
+      },
+      {
+        key: "playlist",
+        label: "Playlist",
+        icon: <MdOutlinePlaylistPlay size={15} />,
+        items: [
+          { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
+          { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
+          { key: "viewGroups", label: "Quick PLaylist", icon: <FaThLarge /> },
+          { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
+        ],
+      },
     ],
   },
   {
@@ -411,26 +436,30 @@ const menuSections: MenuSection[] = [
       { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
       { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
       { key: "InstantaneousAnnouncement", label: "Instantaneous Announcement", icon: <FaBolt /> },
-      
     ],
   },
-  
   {
     key: "scheduler",
-    label: "Scheduler",
+    label: "Scheduler", 
     icon: <FaCalendarAlt size={20} />,
     items: [
       { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
-      
     ],
   },
- 
 ];
 
-const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
 
-const handleMenuToggle = (key: string) => {
-  setExpandedMenu((prev) => (prev === key ? null : key));
+const toggleMenu = (key: string) => {
+  setExpandedMenus((prev) => {
+    const newSet = new Set(prev);
+    if (newSet.has(key)) {
+      newSet.delete(key);
+    } else {
+      newSet.add(key);
+    }
+    return newSet;
+  });
 };
   const toggleSection = (sectionKey: string) => {
     setExpandedSections((prev) => {
@@ -815,7 +844,8 @@ const handleMenuToggle = (key: string) => {
 //             {device.deviceId.name || "Device Name"}
 //           </h3>
 //           <p className="text-xs text-gray-600 mt-1">
-//             Type : {device.deviceId?._id } <span className="mx-1">|</span> Zone : {device.deviceId?.serialNumber}
+//             Type : {device.deviceId?._id} <span className="mx-1">|</span> Zone :{" "}
+//             {device.deviceId?.serialNumber}
 //           </p>
 
 //           <div className="mt-2 space-y-1 text-sm">
@@ -827,10 +857,12 @@ const handleMenuToggle = (key: string) => {
 //               />
 //               {isOnline ? "Online" : "Offline"}
 //             </p>
+
 //             <p className="flex items-center gap-2">
 //               <FaSyncAlt className="inline" />
 //               Last connection - {lastSync || "Fetching..."}
 //             </p>
+
 //             <p className="flex items-center gap-2 truncate">
 //               {isOnline && playingPlaylist ? (
 //                 <>
@@ -890,6 +922,8 @@ const [deviceStatus, setDeviceStatus] = useState<"online" | "offline" | null>(nu
   const previousStatus = useRef<"online" | "offline" | null>(null);
   const previousLastSync = useRef<string>("");
   const [deviceStatuses, setDeviceStatuses] = useState({});
+    const [recentPlaylists, setRecentPlaylists] = useState<any[]>([]);
+
 
 useEffect(() => {
   if (!devices?.length) return;
@@ -951,6 +985,38 @@ useEffect(() => {
   return () => clearInterval(intervalId);
 }, [devices]);
 
+
+
+ useEffect(() => {
+    const fetchRecentPlaylists = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) return;
+
+        // Fetch all playlists for the user
+        const response = await fetch(`/api/playlists?userId=${userId}`);
+        if (!response.ok) throw new Error("Failed to fetch playlists");
+        
+        const data = await response.json();
+        // Get the 4 most recently created/updated playlists
+        const recent = data
+          .sort((a: any, b: any) => 
+            new Date(b.createdAt || b.updatedAt).getTime() - 
+            new Date(a.createdAt || a.updatedAt).getTime()
+          )
+          .slice(0, 3);
+        
+        setRecentPlaylists(recent);
+      } catch (error) {
+        console.error("Error fetching recent playlists:", error);
+      }
+    };
+
+    if (localStorage.getItem("userId")) {
+      fetchRecentPlaylists();
+    }
+  }, []);
+
 // useEffect(() => {
 //   if (!devices?.length) return;
 
@@ -994,19 +1060,13 @@ useEffect(() => {
 
 // }, [devices]);
 // const DeviceCard = ({ device, deviceStatuses }) => {
-const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
+const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
   const serial = device.deviceId.serialNumber;
-
   const deviceState = deviceStatuses[serial] || {};
   const isOnline = deviceState.status === "online";
   const lastSync = deviceState.lastSync || "None";
+    const imageUrl = device.deviceId.imageUrl || "/default-device-image.png"; // fallback
 
-  const playingPlaylist =
-    device.connectedPlaylists?.length
-      ? device.connectedPlaylists[0].name
-      : isOnline
-      ? "Soft Playlist"
-      : null;
 
   const remainingTime = isOnline ? device.deviceId.status : null;
 
@@ -1017,7 +1077,18 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
           ? "bg-gradient-to-tr from-blue-200 to-blue-100"
           : "bg-gray-100"
       }`}
+      onClick={onClick} // Add click handler
     >
+
+      {/* device image section .*/}
+       {/* <div className="relative h-44 w-full overflow-hidden rounded-t-xl">
+        <img
+          src={imageUrl}
+          alt={device.deviceId.name || "Device"}
+          loading="lazy"
+          className="w-full h-full object-cover"
+        />
+      </div> */}
       <div className="flex-1 p-4 flex flex-col justify-between">
         <div>
           <h3 className="font-semibold text-lg text-gray-900">
@@ -1044,21 +1115,9 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
               <FaSyncAlt className="inline" />
               Last connection - {lastSync}
             </p>
-            
-
 
             <p className="flex items-center gap-2 truncate">
-              {isOnline && playingPlaylist ? (
-                <>
-                  <FaPlay className="inline text-orange-600" />
-                  Playing {playingPlaylist} | {remainingTime}
-                </>
-              ) : (
-                <>
-                  <FaPauseCircle className="inline text-red-600" />
-                  Playlist is not connected
-                </>
-              )}
+             
             </p>
           </div>
         </div>
@@ -1246,35 +1305,66 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
 
 
       {/* Right: Recently Played */}
-      <aside className="w-full lg:w-80 flex flex-col space-y-4">
-        <h2 className="text-lg font-bold text-gray-900 font-sans">Recently played</h2>
-        <div className="space-y-4">
-          {recentPlayed.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-3 bg-white rounded-2xl shadow-md p-3 hover:shadow-lg transition cursor-pointer"
-            >
-              <img
-                src={item.image}
-                alt={item.playlistName}
-                className="h-14 w-14 rounded-xl object-cover"
-                loading="lazy"
-              />
-              <div className="flex flex-col flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{item.playlistName}</p>
-                <p className="text-xs text-gray-600 truncate">{item.creator}</p>
-                <p className="text-xs text-gray-500">{item.duration}</p>
-              </div>
-              <button
-                aria-label="Cast Icon"
-                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <FaChromecast  className="text-orange-500 w-5 h-5" />
-              </button>
-            </div>
-          ))}
+  <aside className="w-full lg:w-80 flex flex-col space-y-6">
+  <div className="flex items-center gap-2">
+    <div className="h-8 w-1 bg-gradient-to-b bg-orange-600 rounded-full"></div>
+    <h2 className="text-xl font-bold text-gray-900">Recently Connected PLaylist</h2>
+  </div>
+  
+  <div className="space-y-3">
+    {recentPlaylists.length === 0 ? (
+      <div className="text-center py-12 px-4">
+        <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Music className="text-blue-500" size={28} />
         </div>
-      </aside>
+        <p className="text-gray-600 font-medium mb-1">No playlists yet</p>
+        <p className="text-gray-400 text-sm">Connect your first playlist to get started</p>
+      </div>
+    ) : (
+      recentPlaylists.map((playlist) => (
+        <div
+          key={playlist._id}
+          className="group relative bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 p-4 cursor-pointer border border-gray-100 hover:border-blue-200 overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          
+          <div className="relative flex items-start gap-3">
+            <div className="bg-gradient-to-br from-blue-500 to-orange-600 p-2.5 rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
+              <Music className="text-white" size={20} />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-gray-900 truncate mb-2 group-hover:text-blue-600 transition-colors">
+                {playlist.name}
+              </h3>
+              
+              <div className="flex items-center text-xs text-gray-500 mb-3">
+                <Clock size={12} className="mr-1.5 flex-shrink-0" />
+                <span className="truncate">
+                  {playlist.createdAt 
+                    ? new Date(playlist.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : playlist.updatedAt 
+                    ? new Date(playlist.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : "Unknown date"}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center text-xs px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg font-medium">
+                  <FileText size={12} className="mr-1" />
+                  {playlist.files?.length || 0}
+                </span>
+                <span className="text-xs px-2.5 py-1 bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 rounded-lg font-medium">
+                  {playlist.contentType}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))
+    )}
+  </div>
+</aside>
     </div>
       {/* Devices Section */}
       <section>
@@ -1295,6 +1385,7 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
       key={d.deviceId.serialNumber}
       device={d}
       deviceStatuses={deviceStatuses}
+      onClick={() => setSelectedDevice(d)} // Pass click handler
     />
   ))}
 </div>
@@ -1324,66 +1415,66 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
       <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
         
         
-{menuSections.map((section) => (
-  <div key={section.key}>
-    {section.items ? (
-      <>
-        {/* Main menu button */}
-        <button
-          onClick={() => handleMenuToggle(section.key)}
-          className={`flex items-center justify-between w-full py-3 px-4 rounded-lg font-semibold transition-colors text-[12px] ${
-            expandedMenu === section.key
-              ? "bg-custom-cyan text-white shadow-lg"
-              : "text-[#9898A6] hover:bg-[#041C22]"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            {section.icon}
-            <span>{section.label}</span>
-          </div>
-          <RiArrowDropDownLine
-            className={`transition-transform duration-200 ${
-              expandedMenu === section.key ? "rotate-180" : ""
-            }`}
-            size={20}
-          />
-        </button>
+        {menuSections.map((section) => {
+          const renderMenuItem = (item: MenuItem, depth = 0) => {
+            const hasChildren = item.items && item.items.length > 0;
+            const isExpanded = expandedMenus.has(item.key);
+            const isSelected = selectedMenu === item.key;
+            const paddingLeft = 16 + depth * 12;
 
-        {/* Sub-items */}
-        {expandedMenu === section.key && (
-          <div className="space-y-1 ml-6 mt-2">
-            {section.items.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => handleMenuClick(item.key)}
-                className={`flex items-center gap-3 w-full py-2 px-3 rounded-md text-[12px] font-medium transition-colors ${
-                  selectedMenu === item.key
-                    ? "bg-custom-cyan text-white"
-                    : "text-custom-white hover:bg-[#041C22]"
-                }`}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </>
-    ) : (
-      <button
-        onClick={() => handleMenuClick(section.key as ExtendedMenuKey)}
-        className={`flex items-center gap-3 w-full py-3 px-4 rounded-lg font-semibold text-[14px] transition-colors ${
-          expandedMenu === section.key
-            ? "bg-custom-cyan text-white shadow-lg"
-            : "text-[#9898A6] hover:bg-[#041C22]"
-        }`}
-      >
-        {section.icon}
-        <span>{section.label}</span>
-      </button>
-    )}
-  </div>
-))}
+            // Professional styles for sub-menu items
+            const baseClass =
+              "flex items-center justify-between w-full py-3 pr-4 rounded-lg transition-colors";
+            const mainMenuClass =
+              "font-semibold text-[13px]";
+            const subMenuClass =
+              "font-normal text-[12px] pl-3 border-l-2 border-transparent hover:border-cyan-400";
+            const selectedClass =
+              "bg-custom-cyan text-white shadow-lg";
+            const unselectedClass =
+              "text-[#9898A6] hover:bg-[#041C22]";
+
+            return (
+              <div key={item.key}>
+                <button
+                  onClick={() => {
+                    if (hasChildren) {
+                      toggleMenu(item.key);
+                    } else {
+                      handleMenuClick(item.key as ExtendedMenuKey);
+                    }
+                  }}
+                  className={[
+                    baseClass,
+                    depth === 0 ? mainMenuClass : subMenuClass,
+                    isSelected ? selectedClass : unselectedClass,
+                  ].join(" ")}
+                  style={{ paddingLeft: `${paddingLeft}px` }}
+                >
+                  <div className="flex items-center gap-3">
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </div>
+                  {hasChildren && (
+                    <RiArrowDropDownLine
+                      className={`transition-transform duration-200 ${
+                        isExpanded ? "rotate-180" : ""
+                      }`}
+                      size={20}
+                    />
+                  )}
+                </button>
+                {hasChildren && isExpanded && (
+                  <div className="mt-1 space-y-1">
+                    {item.items!.map((subItem) => renderMenuItem(subItem, depth + 1))}
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          return renderMenuItem(section);
+        })}
 
        
       </nav>
@@ -1412,6 +1503,11 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
   );
 
   const renderContent = (): React.ReactElement => {
+  if (selectedDevice) {
+    // Render device details if a device is selected
+    return <DeviceDetails device={selectedDevice} onBack={() => setSelectedDevice(null)} />;
+  }
+
   if (selectedMenu !== "dashboard") {
     // Render original content pages if not dashboard to keep existing functionality
     switch (selectedMenu) {
@@ -1423,6 +1519,8 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
         return <CreateAudio onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
       case "mediaLibrary":
         return <ShowMedia  />;
+         case "viewGroups":
+        return <ViewGroups />;
       case "setupPlaylist":
         return <PlaylistSetup onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
       case "showPlaylist":
@@ -1550,7 +1648,13 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
         </header>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6">{renderContent()}</main>
+        <main className="flex-1 overflow-y-auto p-6">
+          {selectedDevice ? (
+            <DeviceDetails device={selectedDevice} onBack={() => setSelectedDevice(null)} />
+          ) : (
+            renderContent()
+          )}
+        </main>
       </div>
 
 {/* Floating Action Button - Instant Announcement */}
@@ -1568,12 +1672,12 @@ const DeviceCard = ({ device, deviceStatuses }: DeviceCardProps) => {
         
         {/* Expandable Text (Visible on hover or make static if preferred) */}
         <span className="max-w-0 overflow-hidden group-hover:max-w-[150px] group-hover:ml-3 transition-all duration-500 ease-in-out whitespace-nowrap font-bold text-sm">
-          Instant Trigger
-        </span>
+              Instant Announcement        </span>
       </button>
 
-      {/* End of Main Wrapper */}
+      {/* End of Main Wrapper. */}
     </div>
   );
 }
-  
+
+

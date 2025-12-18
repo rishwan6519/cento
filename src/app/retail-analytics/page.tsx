@@ -1597,7 +1597,7 @@ export default function PeopleDetectionPage() {
                       alt="Snapshot"
                       onLoad={handleImageLoad}
                       draggable={false}
-                      className="max-w-none" 
+                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-lg"
                     />
                     
                     {/* Render Zones Overlays */}
