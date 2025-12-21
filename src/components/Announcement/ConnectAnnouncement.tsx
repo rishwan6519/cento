@@ -236,9 +236,7 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
                   ) : (
                     <Database size={40} className="text-white" />
                   )}
-                  {device.deviceId.status === "active" && (
-                    <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full border border-white"></span>
-                  )}
+               
                 </div>
 
                 {/* Device Info */}
@@ -247,12 +245,7 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
                   <p className="text-xs text-gray-300 truncate">
                     Serial: {device.deviceId?.serialNumber || "N/A"}
                   </p>
-                  <div className="flex flex-col gap-1 text-sm">
-                    <span className="flex items-center gap-2 text-green-400">
-                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      {device.deviceId.status || "Online"}
-                    </span>
-                  </div>
+                
                 </div>
 
                 {/* Action Buttons */}
@@ -306,7 +299,7 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
               <div className="flex justify-center items-center gap-3 text-xs mb-4">
                 <span className="flex items-center gap-1 text-green-600">
                   <span className="w-2 h-2 bg-green-600 rounded-full"></span>
-                  {selectedDevice.deviceId.status}
+                  {selectedDevice.deviceId.status === "active" ? "Online" : selectedDevice.deviceId.status}
                 </span>
               </div>
               <button

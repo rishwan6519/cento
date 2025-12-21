@@ -65,6 +65,8 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
   const [disconnectingPlaylistId, setDisconnectingPlaylistId] = useState<string | null>(null);
   const [disconnectingAnnouncementId, setDisconnectingAnnouncementId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [storeLocation, setStoreLocation] = useState<string | null>(null); // Add store location state
+
 
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
@@ -76,8 +78,21 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
   useEffect(() => {
     if (userId && device?.deviceId?._id) {
       fetchConnectedDetails();
+            fetchUserDetails(); 
     }
   }, [userId, device]);
+
+
+    const fetchUserDetails = async () => {
+    try {
+      const response = await fetch(`/api/user/users?userId=${userId}`);
+      if (!response.ok) throw new Error("Failed to fetch user details");
+      const userData = await response.json();
+      setStoreLocation(userData.storeLocation || null);
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+    }
+  };
 
   const fetchConnectedDetails = async () => {
     setIsLoading(true);
@@ -313,6 +328,12 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                 <span className="text-gray-500 w-32">Assigned:</span>
                 <span className="font-medium">User Account</span>
               </div>
+                {storeLocation && ( 
+                <div className="flex items-center">
+                  <span className="text-gray-500 w-32">Store Location:</span>
+                  <span className="font-medium">{storeLocation}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

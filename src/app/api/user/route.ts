@@ -8,7 +8,17 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
 
-    const { username, password, role, controllerId , blockCoding,peopleDetection,platform} = await req.json();
+    const { 
+      username, 
+      password, 
+      role, 
+      controllerId, 
+      blockCoding, 
+      peopleDetection, 
+      platform,
+      storeName,      // Added storeName field
+      storeLocation   // Added storeLocation field
+    } = await req.json();
     
     if (!username?.trim() || !password) {
       return NextResponse.json(
@@ -34,10 +44,12 @@ export async function POST(req: NextRequest) {
       username: normalizedUsername,
       password: hashedPassword,
       role: role || UserRole.User,
-      blockCoding: blockCoding || false, // Default to false if not provided
-      peopleDetection: peopleDetection || false, // Default to false if not provided
-      controllerId: controllerId ?  mongoose.Types.ObjectId.createFromHexString(controllerId) : undefined,
-      platform: platform || false // Default to 'web' if not provided
+      blockCoding: blockCoding || false,
+      peopleDetection: peopleDetection || false,
+      platform: platform || false,
+      storeName: storeName || undefined,      // Added storeName field
+      storeLocation: storeLocation || undefined,  // Added storeLocation field
+      controllerId: controllerId ? mongoose.Types.ObjectId.createFromHexString(controllerId) : undefined,
     });
 
     try {
@@ -130,9 +142,14 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const { username, password } = await req.json();
+    const { username, password, storeName, storeLocation } = await req.json(); // Added new fields
 
     const updateData: any = { username };
+    
+    // Add new fields to update data
+    if (storeName !== undefined) updateData.storeName = storeName;
+    if (storeLocation !== undefined) updateData.storeLocation = storeLocation;
+    
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
     }

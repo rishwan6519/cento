@@ -195,7 +195,7 @@ const [slides, setSlides] = useState<Slide[]>([]);
     const fetchSliderData = async () => {
       try {
         const response = await fetch(
-          "/api/get-slider?userId=688c8989c3f5fa5504dfb2f6"
+          "https://iot.centelon.com/api/get-slider?userId=688c8989c3f5fa5504dfb2f6"
         );
         const result = await response.json();
         console.log(result,"result")
@@ -224,14 +224,14 @@ const [slides, setSlides] = useState<Slide[]>([]);
   }, []);
 
   // Auto slide every 4 seconds
-  useEffect(() => {
-    if (slides.length > 0) {
-      const interval = setInterval(() => {
-        setCurrentIndex((prev) => (prev + 1) % slides.length);
-      }, 4000);
-      return () => clearInterval(interval);
-    }
-  }, [slides]);
+  // useEffect(() => {
+  //   if (slides.length > 0) {
+  //     const interval = setInterval(() => {
+  //       setCurrentIndex((prev) => (prev + 1) % slides.length);
+  //     }, 4000);
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [slides]);
  useEffect(() => {
   const fetchSliderData = async () => {
     try {
@@ -263,15 +263,10 @@ const [slides, setSlides] = useState<Slide[]>([]);
     new Set(["playlist", "announcement"])
   );
 
-const [current, setCurrent] = useState(0);
+
 
   // Autoplay every 3 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % slides.length);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [slides]);
+
   useEffect(() => {
     const userRole = localStorage.getItem("userRole");
     if (userRole !== "user") {
@@ -475,6 +470,8 @@ const toggleMenu = (key: string) => {
 
   const handleMenuClick = (key: ExtendedMenuKey) => {
     setSelectedMenu(key);
+      setSelectedDevice(null); // Add this line to clear selected device when menu is clicked
+
     if (isMobileMenuOpen) {
       setIsMobileMenuOpen(false);
     }
@@ -929,58 +926,38 @@ useEffect(() => {
   if (!devices?.length) return;
 
   const fetchStatuses = async () => {
+    const statuses: any = {};
     for (const d of devices) {
       const serial = d?.deviceId?.serialNumber;
       if (!serial) continue;
-
       try {
         const response = await fetch(
           `https://iot.centelon.com/api/status-check?serialNumber=${serial}`
         );
-
         const data = await response.json();
-        // console.log("status data -->", data);
-
         if (data.success) {
-          const currentStatus = data.status; // online | offline
-          // const currentLastSync = data.lastConnection
-          //   ? new Date(data.lastConnection).toLocaleString()
-          //   : "";
-          const currentLastSync = data.lastConnection
-  ? new Date(data.lastConnection).toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).replace("AM", "am").replace("PM", "pm")
-  : "";
-
-
-          setDeviceStatuses((prev) => ({
-            ...prev,
-            [serial]: {
-              status: currentStatus,
-              lastSync: currentLastSync,
-            },
-          }));
-
-          // Toast per device when offline
-          // if (currentStatus === "offline") {
-          //   toast.error(`The device ${serial} is offline.`);
-          // }
+          statuses[serial] = {
+            status: data.status,
+            lastSync: data.lastConnection
+              ? new Date(data.lastConnection).toLocaleString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                }).replace("AM", "am").replace("PM", "pm")
+              : "",
+          };
         }
       } catch (error) {
         console.error("Error fetching device status:", error);
       }
     }
+    setDeviceStatuses(statuses); // Update once per interval
   };
 
-  // Fetch all statuses once on load
   fetchStatuses();
-
-  // Repeat every 10s
   const intervalId = setInterval(fetchStatuses, 10000);
   return () => clearInterval(intervalId);
 }, [devices]);
@@ -1648,13 +1625,9 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
         </header>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {selectedDevice ? (
-            <DeviceDetails device={selectedDevice} onBack={() => setSelectedDevice(null)} />
-          ) : (
-            renderContent()
-          )}
-        </main>
+      <main className="flex-1 overflow-y-auto p-6">
+  {renderContent()}
+</main>
       </div>
 
 {/* Floating Action Button - Instant Announcement */}

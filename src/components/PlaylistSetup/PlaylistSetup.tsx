@@ -1778,9 +1778,6 @@
 
 
 
-
-
-
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -1814,17 +1811,6 @@ interface MediaFile {
 }
 
 interface PlaylistConfigFile {
-  // path: string;
-  // name: string;
-  // type: string;
-  // displayOrder: number;
-  // delay: number;
-  // backgroundImageEnabled?: boolean;
-  // backgroundImage?: string | null;
-  // backgroundImageName?: string | null;
-  //  minVolume: number; // Added minVolume
-  // maxVolume: number; // Added maxVolume
-
    _id?: string; // Added _id to track media item
   path: string;
   name: string;
@@ -1839,16 +1825,6 @@ interface PlaylistConfigFile {
 }
 
 interface PlaylistConfiguration {
-  // id?: string;
-  // name: string;
-  // type?: string;
-  // serialNumber?: string;
-  // startTime?: string;
-  // endTime?: string;
-  // files: PlaylistConfigFile[];
-  // startDate?: string;
-  // endDate?: string;
-  // daysOfWeek?: string[];
    id: string;
   name: string;
   type: string;
@@ -1860,13 +1836,16 @@ interface PlaylistConfiguration {
   endDate?: string;
   daysOfWeek?: string[];
   shuffle?: boolean; // Added shuffle property
-  
+  globalMinVolume?: number; // Added global min volume
+  globalMaxVolume?: number; // Added global max volume
 }
+
 interface UserData {
   _id: string;
   username: string;
   role: string;
 }
+
 interface Playlist {
   daysOfWeek: string;
   _id?: string;
@@ -1874,35 +1853,23 @@ interface Playlist {
   files: any[];
   contentType: string;
 }
+
 interface ConnectPlaylistProps {
   onCancel: () => void;
   onSuccess: () => void;
 }
-// export default function PlaylistSetup() {
-  const  PlaylistSetup: React.FC<ConnectPlaylistProps> = ({
-    onCancel,
-    onSuccess,
-  }) => {
+
+const PlaylistSetup: React.FC<ConnectPlaylistProps> = ({
+  onCancel,
+  onSuccess,
+}) => {
   // UI & data state
   const [userId, setUserId] = useState<string | null>(null);
   const userIds = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
-  
 
-  // playlist config
-  // const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
-  //   id: "",
-  //   name: "",
-  //   type: "mixed",
-  //   startTime: "00:00:00",
-  //   endTime: "00:10:00",
-  //   files: [],
-  //   startDate: "",
-  //   endDate: "",
-  //   daysOfWeek: [],
-  // });
-const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
+  const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
     id: "",
     name: "",
     type: "mixed",
@@ -1914,7 +1881,10 @@ const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
     endDate: "",
     daysOfWeek: [],
     shuffle: false, // Default shuffle to false
+    globalMinVolume: 0, // Default global min volume
+    globalMaxVolume: 100, // Default global max volume
   });
+
   // UI controls
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [
@@ -1943,6 +1913,7 @@ const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
     const [error, setError] = useState<string | null>(null);
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
       const [userData, setUserData] = useState<UserData | null>(null);
+      
         const handleDisconnect = async (playlistId: string) => {
           if (!selectedDeviceForPlaylist?.deviceId._id) {
             toast.error("No device selected.");
@@ -1983,6 +1954,7 @@ const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
             setIsDisconnecting(null);
           }
         };
+        
           const fetchConnectedPlaylists = async (deviceId: string) => {
             try {
               const response = await fetch(
@@ -1999,11 +1971,13 @@ const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
               toast.error("Failed to fetch connected playlists");
             }
           };
+          
         useEffect(() => {
             if (selectedDeviceForPlaylist?.deviceId._id) {
               fetchConnectedPlaylists(selectedDeviceForPlaylist.deviceId._id);
             }
           }, [selectedDeviceForPlaylist]);
+          
    useEffect(() => {
       const userRole = localStorage.getItem("userRole");
       if (userRole !== "user") {
@@ -2109,7 +2083,8 @@ const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfiguration>({
       setUserId(null);
     }
   }, []);
-const handleConnect = async () => {
+  
+  const handleConnect = async () => {
     if (!selectedDeviceForPlaylist) {
       toast.error("Select a device first");
       return;
@@ -2144,6 +2119,7 @@ const handleConnect = async () => {
       setIsLoading(false);
     }
   };
+  
   // Fetch media files when userId is available
   useEffect(() => {
     const fetchMedia = async () => {
@@ -2216,8 +2192,8 @@ const handleConnect = async () => {
         backgroundImageEnabled: false,
         backgroundImage: null,
         backgroundImageName: null,
-        minVolume: 0,
-        maxVolume: 0
+        minVolume: playlistConfig.globalMinVolume || 0, // Initialize with global min volume
+        maxVolume: playlistConfig.globalMaxVolume || 100 // Initialize with global max volume
       };
       setPlaylistConfig((prev) => ({
         ...prev,
@@ -2236,6 +2212,7 @@ const handleConnect = async () => {
       return { ...prev, files: arr.map((f, i) => ({ ...f, displayOrder: i + 1 })) };
     });
   };
+  
   const moveDown = (index: number) => {
     setPlaylistConfig((prev) => {
       const arr = [...prev.files];
@@ -2286,6 +2263,7 @@ const handleConnect = async () => {
       });
     }
   };
+  
  const openBgImageSelector = (audioPath: string) => {
     const modalContainer = document.createElement("div");
     modalContainer.className =
@@ -2412,6 +2390,7 @@ const handleConnect = async () => {
       });
     }
   };
+  
   // when choosing image from modal
   const chooseBgImage = (image: MediaFile) => {
     if (!bgModalFor) return;
@@ -2475,6 +2454,7 @@ const handleConnect = async () => {
      fetchDevices();
      fetchPlaylists();
    }, [userIds]);
+   
   // Save playlist (same endpoint approach as your original)
    const handleSavePlaylistConfig = async () => {
     if (
@@ -2501,6 +2481,8 @@ const handleConnect = async () => {
         endDate: playlistConfig.endDate,
         daysOfWeek: playlistConfig.daysOfWeek,
         shuffle: playlistConfig.shuffle, // Include shuffle in the payload
+        globalMinVolume: playlistConfig.globalMinVolume, // Include global min volume
+        globalMaxVolume: playlistConfig.globalMaxVolume, // Include global max volume
         files: playlistConfig.files.map((file, index) => ({
           mediaId:file._id,
           name: file.name,
@@ -2573,6 +2555,8 @@ const handleConnect = async () => {
                   startDate: "",
                   endDate: "",
                   daysOfWeek: [],
+                  globalMinVolume: 0,
+                  globalMaxVolume: 100,
                 });
               }}
               className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
@@ -2632,6 +2616,7 @@ const handleConnect = async () => {
         toast.error(err instanceof Error ? err.message : "Failed to update device status.");
       }
     };
+    
  const DeviceCard = ({ device }: { device: Device }) => {
     // Dummy placeholders for last sync and playlist playing info
     const isConnected = device.status === "Connected" ||  "Online";
@@ -2766,6 +2751,7 @@ const handleConnect = async () => {
       </div>
     );
   };
+  
   return (
     <div className="p-6 bg-[#E9FBFF]-50 min-h-screen">
       <div className="max-w-[1200px] mx-auto space-y-6">
@@ -2851,134 +2837,7 @@ const handleConnect = async () => {
               ) : filteredMedia.length === 0 ? (
                 <div className="text-center py-6 text-sm text-gray-500">No media files available</div>
               ) : (
-                // <div className="space-y-2">
-                //   {filteredMedia.map((m) => {
-                //     const ext = m.name.split(".").pop()?.toLowerCase() || "";
-                //     const checked = isSelected(m);
-                //     return (
-                //       <div key={filePath(m)} className="flex items-center justify-between gap-3 p-3 rounded-lg  hover:bg-slate-50">
-                //         <div className="flex items-center gap-3">
-                //           < type="checkbox" checked={checked} onChange={() => toggleSelect(m)} />
-                //           <div className="w-10 h-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-700">
-                //             {m.type.startsWith("audio") ? <Music /> : <Video />}
-                //           </div>
-                //           <div>
-                //             <div className="font-medium text-slate-800">{m.name.replace(/\.\w+$/, "")}</div>
-                //             <div className="text-xs text-gray-400">{ext}</div>
-                //           </div>
-                //         </div>
-                //         <div className="flex items-center gap-2">
-                //           {/* Show BG label state if selected & bg enabled */}
-                //           {playlistConfig.files.some((f) => f.path === filePath(m) && f.backgroundImageEnabled) && (
-                //             <div className="text-xs px-2 py-1 bg-teal-50 text-teal-700 rounded">BG</div>
-                //           )}
-                //           <button
-                //             onClick={() => {
-                //               // if not selected, select first then open BG modal after a tick
-                //               if (!checked) {
-                //                 toggleSelect(m);
-                //                 // open modal for this file after selection
-                //                 setTimeout(() => setBgModalFor(filePath(m)), 100);
-                //               } else {
-                //                 // find index and toggle bg for that index
-                //                 const idx = playlistConfig.files.findIndex((f) => f.path === filePath(m));
-                //                 if (idx >= 0) toggleBgEnabled(idx);
-                //               }
-                //             }}
-                //             className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700"
-                //           >
-                //             BG Image
-                //           </button>
-                //         </div>
-                //       </div>
-                //     );
-                //   })}
-                // </div>
-//                 <div className="space-y-2">
-//   {filteredMedia.map((m) => {
-//     const ext = m.name.split(".").pop()?.toLowerCase() || "";
-//     const checked = isSelected(m);
-
-//     // Find file config in playlist
-//     const fileConfig = playlistConfig.files.find((f) => f.path === filePath(m));
-//     const bgEnabled = fileConfig?.backgroundImageEnabled || false;
-
-//     return (
-//       <div
-//         key={filePath(m)}
-//         className={`flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-slate-50 ${
-//           checked ? "" : ""
-//         }`}
-//       >
-//         <div className="flex items-center gap-3">
-//           {/* Checkbox */}
-//           <input
-//             type="checkbox"
-//             checked={checked}
-//             onChange={() => toggleSelect(m)}
-//             className="accent-[#FF4500] w-5 h-5"
-//           />
-
-//           <div className="w-10 h-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-700">
-//             {m.type.startsWith("audio") ? <Music /> : <Video />}
-//           </div>
-
-//           <div>
-//             <div className="font-medium">{m.name.replace(/\.\w+$/, "")}</div>
-//             <div className="text-xs text-gray-400">{ext}</div>
-//           </div>
-//         </div>
-
-//         <div className="flex items-center gap-2">
-//           {/* BG Image Label */}
-//           <span className="text-xs font-medium">{`BG Image`}</span>
-
-//           {/* BG Switch */}
-//          <label className="relative inline-flex items-center cursor-pointer">
-//   <input
-//     type="checkbox"
-//     checked={bgEnabled}
-//     onChange={() => {
-//       if (!fileConfig) {
-//         const newFile: PlaylistConfigFile = {
-//           path: filePath(m),
-//           name: m.name,
-//           type: m.type,
-//           displayOrder: playlistConfig.files.length,
-//           delay: 0,
-//           backgroundImageEnabled: true,
-//         };
-//         playlistConfig.files.push(newFile);
-//       } else {
-//         fileConfig.backgroundImageEnabled = !fileConfig.backgroundImageEnabled;
-//       }
-//       setPlaylistConfig({ ...playlistConfig }); // re-render
-//     }}
-//     className="sr-only"
-//     disabled={!checked} // disabled if checkbox not selected
-//   />
-
-//   {/* Switch Track */}
-//   <div
-//     className={`w-12 h-6 rounded-full transition-colors duration-300 ${
-//       checked && bgEnabled ? "bg-[#E24429]" : "bg-gray-300"
-//     }`}
-//   />
-
-//   {/* Switch Knob */}
-//   <span
-//     className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transform transition-transform duration-300 ${
-//       checked && bgEnabled ? "translate-x-6" : "translate-x-0"
-//     }`}
-//   />
-// </label>
-
-//         </div>
-//       </div>
-//     );
-//   })}
-// </div>
-<div className="space-y-0">
+                <div className="space-y-0">
   {filteredMedia.map((m, idx) => {
     const ext = m.name.split(".").pop()?.toLowerCase() || "";
     const checked = isSelected(m);
@@ -3112,105 +2971,6 @@ const handleConnect = async () => {
               {playlistConfig.files.length === 0 ? (
                 <div className="text-center text-sm text-gray-400 py-21">No media selected</div>
               ) : (
-//                 playlistConfig.files.map((f, i) => (
-//                   <div key={f.path} className="bg-[#E9FBFF] rounded-lg p-3 flex items-start gap-3">
-//                     {/* <div className="w-8 text-slate-500">{i + 1}</div> */}
-//                     <div className="flex-1">
-//                       <div className="flex items-center justify-between gap-3">
-//                         <div className="font-medium text-slate-800 truncate">{f.name}</div>
-//                         <div className="flex items-center gap-2">
-//                           {/* <button onClick={() => moveUp(i)} title="Move up" className="p-1 rounded hover:bg-white/60"><ChevronUp /></button>
-//                           <button onClick={() => moveDown(i)} title="Move down" className="p-1 rounded hover:bg-white/60"><ChevronDown /></button> */}
-//                           <button onClick={() => removeSelected(i)} title="Remove" className="p-1 rounded hover:bg-white/60 text-red-600"><Trash2 size={16} /></button>
-//                         </div>
-//                       </div>
-//                       <div className="mt-2 text-xs text-gray-400"> Date range : {playlistConfig.startDate || "Not set"} | Days :  {playlistConfig.endDate || "Not selected"}</div>
-//  <div className="mt-3 space-y-2">
-//                         <div>
-//                           <label className="text-xs text-gray-600">
-//                             Min Volume: {file.minVolume}
-//                           </label>
-//                           <input
-//                             type="range"
-//                             min="0"
-//                             max="100"
-//                             value={file.minVolume}
-//                             onChange={(e) => {
-//                               const newFiles = [...playlistConfig.files];
-//                               newFiles[index].minVolume = parseInt(
-//                                 e.target.value
-//                               );
-//                               setPlaylistConfig({
-//                                 ...playlistConfig,
-//                                 files: newFiles,
-//                               });
-//                             }}
-//                             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-//                           />
-//                         </div>
-//                         <div>
-//                           <label className="text-xs text-gray-600">
-//                             Max Volume: {f.maxVolume}
-//                           </label>
-//                           <input
-//                             type="range"
-//                             min="0"
-//                             max="100"
-//                             value={f.maxVolume}
-//                             onChange={(e) => {
-//                               const newFiles = [...playlistConfig.files];
-//                               newFiles[i].maxVolume = parseInt(
-//                                 e.target.value
-//                               );
-//                               setPlaylistConfig({
-//                                 ...playlistConfig,
-//                                 files: newFiles,
-//                               });
-//                             }}
-//                             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-//                           />
-//                         </div>
-//                       </div>
-//                       <div className="mt-2 flex items-center gap-3">
-//                         <label className="text-xs text-gray-600">Delay (sec)</label>
-//                         <input
-//                           type="number"
-//                           className="w-10 p-1 border rounded text-sm"
-//                           min={0}
-//                           value={f.delay}
-//                           onChange={(e) => updateDelay(i, parseInt(e.target.value || "0"))}
-//                         />
-
-//                         <label className="ml-3 flex items-center gap-2 text-xs">
-//                           <input
-//                             type="checkbox"
-//                             checked={!!f.backgroundImageEnabled}
-//                             onChange={() => toggleBgEnabled(i)}
-//                           />
-//                           BG Image
-//                         </label>
-
-//                         {f.backgroundImage ? (
-//                           <div className="flex items-center gap-2 ml-3">
-//                             <img src={f.backgroundImage || undefined} alt={f.backgroundImageName || ""} className="w-12 h-8 object-cover rounded" />
-//                             <button
-//                               onClick={() =>
-//                                 setPlaylistConfig((prev) => ({
-//                                   ...prev,
-//                                   files: prev.files.map((x) => (x.path === f.path ? { ...x, backgroundImage: null, backgroundImageName: null, backgroundImageEnabled: false } : x)),
-//                                 }))
-//                               }
-//                               className="p-1 rounded bg-white"
-//                             >
-//                               <X />
-//                             </button>
-//                           </div>
-//                         ) : null}
-//                       </div>
-
-//                     </div>
-//                   </div>
-//                 ))
 playlistConfig.files.map((file, index) => (
                   <div
                     key={file.path}
@@ -3289,7 +3049,7 @@ playlistConfig.files.map((file, index) => (
                       <div className="mt-3 space-y-2">
                         <div>
                           <label className="text-xs text-gray-600">
-                            Min Volume: {file.minVolume}
+                            Min Volume: {file.minVolume}%
                           </label>
                           <input
                             type="range"
@@ -3311,7 +3071,7 @@ playlistConfig.files.map((file, index) => (
                         </div>
                         <div>
                           <label className="text-xs text-gray-600">
-                            Max Volume: {file.maxVolume}
+                            Max Volume: {file.maxVolume}%
                           </label>
                           <input
                             type="range"
@@ -3343,90 +3103,6 @@ playlistConfig.files.map((file, index) => (
         {/* MIDDLE ROW: Let's setup your playlist (left) & Your Schedules (right) */}
         <div className="grid grid-cols-12 gap-6">
           {/* Playlist Setup */}
-          {/* <div className="col-span-7 ">
-            <h3 className="text-lg font-bold text-slate-800 mb-3">Let's setup your playlist</h3>
-          <div className=" bg-white rounded-2xl shadow p-6">
-
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Playlist Name</label>
-                <input
-                  type="text"
-                  value={playlistConfig.name}
-                  onChange={(e) => setPlaylistConfig((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full p-2 border rounded text-sm"
-                  placeholder="Enter playlist name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Type</label>
-                <select
-                  value={playlistConfig.type}
-                  onChange={(e) => setPlaylistConfig((prev) => ({ ...prev, type: e.target.value }))}
-                  className="w-full p-2 border rounded text-sm"
-                >
-                  <option value="mixed">Mixed</option>
-                  <option value="audio">Audio</option>
-                  <option value="video">Video</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Start Date</label>
-                <input type="date" value={playlistConfig.startDate} onChange={(e) => setPlaylistConfig((prev) => ({ ...prev, startDate: e.target.value }))} className="w-full p-2 border rounded text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">End Date</label>
-                <input type="date" value={playlistConfig.endDate} onChange={(e) => setPlaylistConfig((prev) => ({ ...prev, endDate: e.target.value }))} className="w-full p-2 border rounded text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Time Range</label>
-                <div className="flex gap-2">
-                  <input type="time" value={playlistConfig.startTime} onChange={(e) => setPlaylistConfig((prev) => ({ ...prev, startTime: e.target.value }))} className="w-full p-2 border rounded text-sm" />
-                  <input type="time" value={playlistConfig.endTime} onChange={(e) => setPlaylistConfig((prev) => ({ ...prev, endTime: e.target.value }))} className="w-full p-2 border rounded text-sm" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Days of Week</label>
-              <div className="flex gap-2 flex-wrap">
-                {daysList.map((d) => (
-                  <label key={d.value} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={playlistConfig.daysOfWeek?.includes(d.value)} onChange={() => handleDayToggle(d.value)} />
-                    <span className="text-xs">{d.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-              <button onClick={() => {
-                // reset
-                setPlaylistConfig({
-                  id: "",
-                  name: "",
-                  type: "mixed",
-                  serialNumber: "",
-                  startTime: "00:00:00",
-                  endTime: "00:10:00",
-                  files: [],
-                  startDate: "",
-                  endDate: "",
-                  daysOfWeek: [],
-                });
-                toast("Reset playlist");
-              }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Reset</button>
-
-              <button onClick={handleSavePlaylistConfig} disabled={!playlistConfig.name || playlistConfig.files.length === 0} className={`px-4 py-2 text-sm rounded ${!playlistConfig.name || playlistConfig.files.length === 0 ? "bg-gray-400 cursor-not-allowed" : "bg-teal-600 hover:bg-teal-700"} text-white`}>
-                {isLoadingSave ? "Saving..." : "Save Playlist"}
-              </button>
-            </div>
-          </div></div> */}
           <div className="col-span-7">
   <h3 className="text-lg font-bold text-slate-800 mb-3">Let's setup your playlist</h3>
 
@@ -3488,27 +3164,6 @@ playlistConfig.files.map((file, index) => (
         />
       </div>
 
-      {/* <div>
-        <label className="block text-sm font-medium mb-1">Time Range</label>
-        <div className="flex gap-2 flex-wrap">
-          <input
-            type="time"
-            value={playlistConfig.startTime}
-            onChange={(e) =>
-              setPlaylistConfig((prev) => ({ ...prev, startTime: e.target.value }))
-            }
-            className="w-full sm:w-1/2 p-2 rounded text-sm bg-[#E9FBFF] shadow-inner focus:outline-none"
-          />
-          <input
-            type="time"
-            value={playlistConfig.endTime}
-            onChange={(e) =>
-              setPlaylistConfig((prev) => ({ ...prev, endTime: e.target.value }))
-            }
-            className="w-full sm:w-1/2 p-2 rounded text-sm bg-[#E9FBFF] shadow-inner focus:outline-none"
-          />
-        </div>
-      </div> */}
       <div>
   <label className="block text-sm font-medium mb-1">Time Range</label>
   <div className="flex flex-col sm:flex-row gap-2">
@@ -3549,6 +3204,7 @@ playlistConfig.files.map((file, index) => (
         ))}
       </div>
     </div>
+    
     <div className="flex items-center justify-between">
     <span className="text-sm font-medium text-gray-700">
       Shuffle Playlist
@@ -3573,6 +3229,88 @@ playlistConfig.files.map((file, index) => (
     </label>
   </div>
 
+  {/* Global Volume Controls */}
+  <div className="mt-4 pt-4 border-t border-gray-200">
+    <h4 className="text-md font-medium text-gray-800 mb-3">Global Volume Settings</h4>
+    
+    {/* Global Min Volume Control */}
+    <div className="mb-4">
+      <div className="flex justify-between mb-1">
+        <label className="text-sm text-gray-600">
+          Global Min Volume: {playlistConfig.globalMinVolume}%
+        </label>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={playlistConfig.globalMinVolume}
+        onChange={(e) => {
+          const newGlobalMin = parseInt(e.target.value);
+          setPlaylistConfig(prev => ({
+            ...prev,
+            globalMinVolume: newGlobalMin,
+            // Update all files with the new global min if they're using default values
+            files: prev.files.map(file => ({
+              ...file,
+              minVolume: file.minVolume === prev.globalMinVolume ? newGlobalMin : file.minVolume
+            }))
+          }));
+        }}
+        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+      />
+    </div>
+    
+    {/* Global Max Volume Control */}
+    <div className="mb-4">
+      <div className="flex justify-between mb-1">
+        <label className="text-sm text-gray-600">
+          Global Max Volume: {playlistConfig.globalMaxVolume}%
+        </label>
+      </div>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={playlistConfig.globalMaxVolume}
+        onChange={(e) => {
+          const newGlobalMax = parseInt(e.target.value);
+          setPlaylistConfig(prev => ({
+            ...prev,
+            globalMaxVolume: newGlobalMax,
+            // Update all files with the new global max if they're using default values
+            files: prev.files.map(file => ({
+              ...file,
+              maxVolume: file.maxVolume === prev.globalMaxVolume ? newGlobalMax : file.maxVolume
+            }))
+          }));
+        }}
+        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+      />
+    </div>
+    
+    {/* Apply Global Volumes Button */}
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => {
+          setPlaylistConfig(prev => ({
+            ...prev,
+            files: prev.files.map(file => ({
+              ...file,
+              minVolume: prev.globalMinVolume!,
+              maxVolume: prev.globalMaxVolume!
+            }))
+          }));
+          toast.success("Global volumes applied to all files");
+        }}
+        className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+      >
+        Apply Global Volumes to All Files
+      </button>
+    </div>
+  </div>
+
     {/* Actions */}
     <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-4 border-t">
       <button
@@ -3588,6 +3326,8 @@ playlistConfig.files.map((file, index) => (
             startDate: "",
             endDate: "",
             daysOfWeek: [],
+            globalMinVolume: 0,
+            globalMaxVolume: 100,
           });
           toast("Reset playlist");
         }}
@@ -3635,35 +3375,6 @@ playlistConfig.files.map((file, index) => (
         </div></div>
 
         {/* BOTTOM ROW: Available Devices (full width) */}
-        {/* <div className="bg-white rounded-2xl shadow p-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">Available Devices</h3>
-          <div className="grid grid-cols-3 gap-4">
-            {devicesSample.map((d) => (
-              <div key={d.id} className="rounded-xl overflow-hidden border">
-                <div className="p-4 bg-teal-800 text-white flex items-center justify-center">
-                  <div className="rounded-full p-2 bg-white/10">
-                    {d.type === "video" ? <Monitor /> : <Music />}
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="font-medium">{d.name}</div>
-                  <div className="text-xs text-gray-500">Zone: {d.zone} • Type: {d.type}</div>
-                  <div className="flex items-center gap-3 mt-3 text-sm">
-                    <span className="flex items-center gap-2 text-xs"><span className={`w-2 h-2 rounded-full ${d.status === "online" ? "bg-emerald-500" : "bg-red-500"}`} /> {d.status}</span>
-                    <span className="text-xs text-gray-400">Last sync: {d.lastSync}</span>
-                  </div>
-                  <div className="text-xs text-red-500 mt-2">{d.playlist}</div>
-
-                  <div className="flex gap-2 mt-4">
-                    <button className="flex-1 py-2 rounded border text-sm">Connect</button>
-                    <button className="flex-1 py-2 rounded border text-sm">Restart</button>
-                    <button className="flex-1 py-2 rounded border text-sm">Reassign</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div> */}
           <section>
         {/* <h2 className="text-lg font-semibold font-sans mb-5">Available Devices</h2> */}
         {/* {isLoading ? (
@@ -3684,53 +3395,6 @@ playlistConfig.files.map((file, index) => (
       ) : availableDevices.length === 0 ? (
         <p>No devices available.</p>
       ) : (
-        // <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        //   {availableDevices.map((device) => (
-        //     <div
-        //       key={device._id}
-        //       className={`bg-[#0d2d39] text-white rounded-xl p-4 flex flex-col shadow-md cursor-pointer ${
-        //         selectedDevice?._id === device._id ? "ring-2 ring-blue-400" : ""
-        //       }`}
-        //       onClick={() => setSelectedDevice(device)}
-        //     >
-        //       <div className="flex-1">
-        //         <div className="text-center mb-4">
-        //           <img
-        //             src={device.deviceId.imageUrl}
-        //             alt={device.deviceId.name}
-        //             className="mx-auto w-12 h-12"
-        //           />
-        //         </div>
-        //         <h4 className="font-bold text-lg">{device.name}</h4>
-        //         <p className="text-xs opacity-80">
-        //           {/* Type: {device.typeId.name} | Zone: Entrance */}
-        //         </p>
-        //         <div className="mt-3 space-y-1 text-sm">
-        //           <p className="flex items-center gap-2">
-        //             <span className="w-2 h-2 bg-green-500 rounded-full"></span>{" "}
-        //             Online
-        //           </p>
-        //           <p className="flex items-center gap-2">
-        //             <FaSyncAlt className="w-3 h-3" /> Last sync - 5 min ago
-        //           </p>
-        //           <p className="flex items-center gap-2 text-red-400">
-        //             <FaPauseCircle className="w-4 h-4" /> Playlist is not connected
-        //           </p>
-        //         </div>
-        //       </div>
-        //       <div className="flex justify-between mt-4 border-t border-gray-700 pt-2 text-sm">
-        //         <button
-        //           className="hover:underline"
-        //           onClick={() => setSelectedDevice(device)}
-        //         >
-        //           Select
-        //         </button>
-        //         <button className="hover:underline">Restart</button>
-        //         <button className="hover:underline">Reassign</button>
-        //       </div>
-        //     </div>
-        //   ))}
-        // </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
   {availableDevices.map((device) => {
     const imageUrl = device.deviceId?.imageUrl || "/placeholder.jpg";
@@ -3745,12 +3409,6 @@ playlistConfig.files.map((file, index) => (
         onClick={() => setSelectedDeviceForPlaylist(device)}
       >
         {/* Device Image */}
-        {/* <div className="relative h-40 w-full bg-gray-800">
-          <img
-            src={imageUrl}
-            alt={deviceName}
-            className="h-full w-full object-cover"
-          /> */}
          <div className="relative w-full overflow-hidden rounded-t-xl">
   <img
     src={device.deviceId.imageUrl ?? "/default-device-image.png"}
@@ -3771,12 +3429,6 @@ playlistConfig.files.map((file, index) => (
             Serial: {device.deviceId?.serialNumber || "N/A"}
           </p>
           <div className="flex flex-col gap-1 text-sm">
-            {/* <p className="flex items-center gap-2 text-green-400">
-              <FaSyncAlt className="w-3 h-3" /> Last sync - 5 min ago
-            </p>
-            <p className="flex items-center gap-2 text-red-400">
-              <FaPauseCircle className="w-4 h-4" /> Playlist not connected
-            </p> */}
           </div>
         </div>
 
@@ -3807,36 +3459,9 @@ playlistConfig.files.map((file, index) => (
       {selectedDeviceForPlaylist && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white rounded-xl p-6 shadow">
           {/* Selected Device */}
-          {/* <div className="border border-dashed border-gray-300 rounded-lg p-4">
-            <h4 className="font-semibold mb-3">Your selected device</h4>
-            <div className="flex items-center gap-3">
-              <img
-                src={selectedDevice.deviceId.imageUrl}
-                alt={selectedDevice.deviceId.name}
-                className="w-12 h-12"
-              />
-              <div>
-                <p className="font-medium">{selectedDevice.name}</p>
-                
-                <p className="text-xs text-green-600">● Online</p>
-                <p className="text-xs text-red-600">
-                  ⚠ Playlist is not connected
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedDevice(null)}
-              className="mt-4 px-3 py-1 border rounded-lg text-sm text-gray-600 hover:bg-gray-100"
-            >
-              Switch device
-            </button>
-          </div> */}
           <div className="flex flex-col ">
   {/* Title outside the border */}
-  {/* <h3 className="font-bold text-[#00353E] mb-2 text-sm self-start"> */}
      <h3 className="font-semibold mb-3">Your selected device</h3>
-    {/* Your selected device
-  </h3> */}
 
   {/* Device card box */}
   <div className="border-2 border-dashed border-[#FFB6A3] mt-6 rounded-xl p-6 text-center w-[300px] bg-white">
@@ -3856,7 +3481,6 @@ playlistConfig.files.map((file, index) => (
 
     {/* Device Type & Zone */}
     <p className="text-xs text-gray-500 mb-3">
-      {/* Type: {selectedDevice.typeId.name} | Zone: Entrance */}
     </p>
 
     {/* Status Info */}
@@ -3865,12 +3489,8 @@ playlistConfig.files.map((file, index) => (
         <span className="w-2 h-2 bg-green-600 rounded-full"></span>  {selectedDeviceForPlaylist.deviceId.status}
       </span>
       <span className="flex items-center gap-1 text-orange-500">
-        {/* ⟳ */}
          {selectedDeviceForPlaylist.deviceId.serialNumber}
       </span>
-      {/* <span className="flex items-center gap-1 text-red-500">
-        ⚠ Nothing is connected
-      </span> */}
     </div>
 
     {/* Switch Button */}
@@ -3893,7 +3513,6 @@ playlistConfig.files.map((file, index) => (
               <p>No playlists available.</p>
             ) : (
               <div className="space-y-3">
-                {/* {playlists.map((pl) => ( */}
                {playlists.map((playlist) => {
                   const isConnected = connectedPlaylists[
                     selectedDeviceForPlaylist?.deviceId._id || ""
@@ -3911,27 +3530,11 @@ playlistConfig.files.map((file, index) => (
                       <p className="text-xs text-gray-500">
                          {playlist.files.length} Tracks
                       </p>
-                      {/* <p className="text-xs text-gray-500">
-                         Schedule : {pl.daysOfWeek} 
-                      </p> */}
                       <p className="text-xs text-gray-500">
   Schedule: {Array.isArray(playlist.daysOfWeek) ? playlist.daysOfWeek.join(" | ") : playlist.daysOfWeek}
 </p>
 
                     </div>
-                    {/* <input
-                      type="checkbox"
-                      checked={selectedPlaylistsForDevice.includes(pl._id!)}
-                      onChange={() => {
-                        setSelectedPlaylistsForDevice((prev) =>
-                          prev.includes(pl._id!)
-                            ? prev.filter((id) => id !== pl._id)
-                            : [...prev, pl._id!]
-                        );
-                      }}
-                      // className="h-4 w-4"
-                       className="accent-[#FF4500] w-5 h-5"
-                    /> */}
                     {isConnected ? (
                             <button
                               onClick={() => handleDisconnect(playlist._id!)}
@@ -3954,16 +3557,13 @@ playlistConfig.files.map((file, index) => (
                                     : [...prev, playlistId]
                                 );
                               }}
-                              // className="h-5 w-5 text-blue-600 rounded"
                                className="accent-[#FF4500] w-5 h-5 rounded"
                             />
                           )}
                     
-
                   </div>
                   );
                 })}
-                {/* ))} */}
               </div>
             )}
           </div>
@@ -4020,4 +3620,5 @@ playlistConfig.files.map((file, index) => (
     </div>
   );
 }
+
 export default PlaylistSetup;

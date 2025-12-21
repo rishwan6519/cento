@@ -5,6 +5,8 @@ import Device from "@/models/Device";
 import { DeviceType } from "@/models/DeviceTypes";
 import DevicePlaylist from "@/models/ConectPlaylist";
 import "@/models/User";
+import AssignedDevice from "@/models/AssignDevice";
+
 
 import { connectToDatabase } from "@/lib/db";
 
@@ -62,7 +64,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-import AssignedDevice from "@/models/AssignDevice";
 // ...existing code...
 
 export async function GET(req: NextRequest) {
@@ -172,6 +173,8 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+// ... existing code ...
+// ... existing code ...
 
 export async function DELETE(req: NextRequest) {
   await connectToDatabase();
@@ -188,29 +191,57 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const result = await OnboardedDevice.findByIdAndDelete(deviceId);
-    await DevicePlaylist.deleteMany({
-      deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId),
-    });
-    await AssignedDevice.deleteMany({
-      deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId),
-    });
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(deviceId)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid device ID format" },
+        { status: 400 }
+      );
+    }
 
-    if (!result) {
+    const deviceObjectId = new mongoose.Types.ObjectId(deviceId);
+
+    // First, find the device to get the actual device ID from the main Device collection
+    const onboardedDevice = await OnboardedDevice.findById(deviceId);
+    
+    if (!onboardedDevice) {
       return NextResponse.json(
         { success: false, message: "Device not found" },
         { status: 404 }
       );
     }
 
+    // Delete from all related collections
+    const deleteResults = await Promise.all([
+      // Delete from OnboardedDevice collection
+      OnboardedDevice.findByIdAndDelete(deviceId),
+      
+      // Delete from DevicePlaylist connections
+      DevicePlaylist.deleteMany({ deviceId: deviceObjectId }),
+      
+      // Delete from AssignedDevice connections
+      AssignedDevice.deleteMany({ deviceId: onboardedDevice.deviceId }),
+      
+      // Delete from main Device collection
+      Device.findByIdAndDelete(onboardedDevice.deviceId)
+    ]);
+
+    // Check if the main deletion was successful
+    if (!deleteResults[0]) {
+      return NextResponse.json(
+        { success: false, message: "Device not found or already deleted" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
-      { success: true, message: "Device removed successfully" },
+      { success: true, message: "Device removed successfully from all collections" },
       { status: 200 }
     );
   } catch (error) {
     console.error("Error removing device:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to remove device" },
+      { success: false, message: "Failed to remove device: " + (error instanceof Error ? error.message : "Unknown error") },
       { status: 500 }
     );
   }

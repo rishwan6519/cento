@@ -106,17 +106,17 @@ export default function RobotAdminDashboard() {
           description: "View all registered devices",
         },
       ],
-    },
-    {
-      category: "AI Features",
-      items: [
-        {
-          id: "gptAi",
-          label: "AI Assistant",
-          icon: <FcDataConfiguration size={20} className="text-violet-500" />,
-          description: "Access AI-powered features and assistance",
-        },
-      ],
+    // },
+    // {
+    //   category: "AI Features",
+    //   items: [
+    //     {
+    //       id: "gptAi",
+    //       label: "AI Assistant",
+    //       icon: <FcDataConfiguration size={20} className="text-violet-500" />,
+    //       description: "Access AI-powered features and assistance",
+    //     },
+    //   ],
     },
   ];
 

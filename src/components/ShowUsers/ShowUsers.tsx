@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaEdit, FaTrash, FaUser, FaTimes } from "react-icons/fa";
+import { FaEdit, FaTrash, FaUser, FaTimes, FaStore } from "react-icons/fa";
 import Card from "@/components/Platform/Card";
 import Button from "@/components/Platform/Button";
 import toast from "react-hot-toast";
@@ -12,6 +12,8 @@ interface User {
   role: string;
   controllerId: string;
   createdAt: string;
+  storeName?: string;      // Added storeName field
+  storeLocation?: string;  // Added storeLocation field
 }
 
 interface UpdateModalProps {
@@ -25,6 +27,8 @@ const UpdateUserModal: React.FC<UpdateModalProps> = ({ user, onClose, onUpdate }
     username: user.username,
     password: "",
     confirmPassword: "",
+    storeName: user.storeName || "",      // Added storeName field
+    storeLocation: user.storeLocation || ""  // Added storeLocation field
   });
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +46,8 @@ const UpdateUserModal: React.FC<UpdateModalProps> = ({ user, onClose, onUpdate }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: formData.username,
+          storeName: formData.storeName,      // Added storeName field
+          storeLocation: formData.storeLocation,  // Added storeLocation field
           ...(formData.password && { password: formData.password }),
         }),
       });
@@ -92,6 +98,44 @@ const UpdateUserModal: React.FC<UpdateModalProps> = ({ user, onClose, onUpdate }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               required
             />
+          </div>
+
+          {/* Store Name Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Store Name
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaStore className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={formData.storeName}
+                onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
+                className="w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Enter store name"
+              />
+            </div>
+          </div>
+
+          {/* Store Location Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Store Location
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaStore className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={formData.storeLocation}
+                onChange={(e) => setFormData({ ...formData, storeLocation: e.target.value })}
+                className="w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Enter store location"
+              />
+            </div>
           </div>
 
           <div>
@@ -199,6 +243,12 @@ const ShowUsers: React.FC = () => {
                   Username
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Store Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Store Location
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -217,6 +267,12 @@ const ShowUsers: React.FC = () => {
                       <FaUser className="text-gray-400 mr-2" />
                       <span>{user.username}</span>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {user.storeName || "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {user.storeLocation || "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">

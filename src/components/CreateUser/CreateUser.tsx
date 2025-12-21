@@ -1,12 +1,13 @@
 "use client";
 import React, { useState } from "react";
-import { FaUser, FaLock, FaUserPlus, FaCode, FaCamera, FaCogs } from "react-icons/fa";
+import { FaUser, FaLock, FaUserPlus, FaCode, FaCamera, FaCogs, FaStore } from "react-icons/fa";
 import Card from "@/components/Platform/Card";
 import Button from "@/components/Platform/Button";
 import toast from "react-hot-toast";
 
 const CreateUser = () => {
   const [formData, setFormData] = useState({
+    storeName: "",
     username: "",
     password: "",
     confirmPassword: "",
@@ -14,7 +15,9 @@ const CreateUser = () => {
     blockCoding: false, // new field for blocking coding
     peopleDetection: false, // new field for people detection camera
     platform: false, // new field for platform access
+    storeLocation: "" // new field for store location
   });
+  const [useStoreAsUsername, setUseStoreAsUsername] = useState(true); // new state for checkbox
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,6 +25,11 @@ const CreateUser = () => {
 
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
+      return;
+    }
+
+    if (!formData.storeName.trim()) {
+      toast.error("Store name is required");
       return;
     }
 
@@ -45,6 +53,7 @@ const CreateUser = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          storeName: formData.storeName, // send store name
           username: formData.username.trim(),
           password: formData.password,
           controllerId: id,
@@ -52,6 +61,7 @@ const CreateUser = () => {
           blockCoding: formData.blockCoding, // send block coding status
           peopleDetection: formData.peopleDetection, // send people detection status
           platform: formData.platform, // send platform access status
+          storeLocation: formData.storeLocation // send store location
         }),
       });
 
@@ -63,18 +73,50 @@ const CreateUser = () => {
 
       toast.success("User created successfully!");
       setFormData({ 
+        storeName: "",
         username: "", 
         password: "", 
         confirmPassword: "", 
         role: "user",
         blockCoding: false,
         peopleDetection: false,
-        platform: false
+        platform: false,
+        storeLocation: "" // reset store location
       });
+      setUseStoreAsUsername(true); // reset checkbox
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create user");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle store name change and optionally update username
+  const handleStoreNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const storeName = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      storeName,
+      username: useStoreAsUsername ? storeName : prev.username
+    }));
+  };
+
+  // Handle username change
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, username: e.target.value });
+  };
+
+  // Handle checkbox toggle
+  const handleCheckboxToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = e.target.checked;
+    setUseStoreAsUsername(isChecked);
+    
+    // If checkbox is checked, sync username with store name
+    if (isChecked) {
+      setFormData(prev => ({
+        ...prev,
+        username: prev.storeName
+      }));
     }
   };
 
@@ -89,6 +131,41 @@ const CreateUser = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Store Name Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Store Name
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaStore className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={formData.storeName}
+                onChange={handleStoreNameChange}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Enter store name"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Use Store Name as Username Checkbox */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="useStoreAsUsername"
+              checked={useStoreAsUsername}
+              onChange={handleCheckboxToggle}
+              className="form-checkbox h-4 w-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
+            />
+            <label htmlFor="useStoreAsUsername" className="ml-2 text-sm text-gray-700">
+              Use store name as username
+            </label>
+          </div>
+
+          {/* Username Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Username
@@ -100,9 +177,11 @@ const CreateUser = () => {
               <input
                 type="text"
                 value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                onChange={handleUsernameChange}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Enter username"
                 required
+                disabled={useStoreAsUsername} // Disable when using store name as username
               />
             </div>
           </div>
@@ -169,6 +248,25 @@ const CreateUser = () => {
                 />
                 <span className="ml-2">Developer</span>
               </label>
+            </div>
+          </div>
+
+          {/* Store Location Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Store Location
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FaStore className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={formData.storeLocation}
+                onChange={(e) => setFormData({ ...formData, storeLocation: e.target.value })}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Enter store location"
+              />
             </div>
           </div>
 
