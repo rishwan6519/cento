@@ -1601,7 +1601,7 @@ export default function PeopleDetectionPage() {
                     />
                     
                     {/* Render Zones Overlays */}
-                    {zones.map((zone) => {
+                     {zones.map((zone) => {
                       const colorIndex = (zone.id - 1) % zoneColors.length;
                       return (
                         <div
@@ -1616,7 +1616,7 @@ export default function PeopleDetectionPage() {
                         >
                           <span className="absolute -top-6 left-0 px-2 py-0.5 text-xs text-white font-bold rounded"
                             style={{ backgroundColor: zoneBorderColors[colorIndex] }}>
-                            Z{zone.id}
+                            Zone {zone.id}
                           </span>
                         </div>
                       );
