@@ -108,3 +108,20 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+
+
+export async function PATCH(request: NextRequest) {
+  await connectToDatabase();
+  const { name, id } = await request.json();
+
+  if (!name || !id) {
+    return NextResponse.json({ success: false, message: "Device name and ID required" }, { status: 400 });
+  }
+
+  const updatedDevice = await Device.findByIdAndUpdate(id, { name }, { new: true });
+  if (!updatedDevice) {
+    return NextResponse.json({ success: false, message: "Device not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, device: updatedDevice });
+}

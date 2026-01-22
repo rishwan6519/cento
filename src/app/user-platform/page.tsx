@@ -67,6 +67,7 @@ import Scheduler from "@/components/Scheduler/Scheduler";
 import ViewGroups from "@/components/ViewGroups/ViewGroups";
 import DeviceDetails from "@/components/DeviceDetails/DeviceDetails";
 import { Play } from "next/font/google";
+import CreatePresentation from "@/components/Presentation/Presentation";
 
 // import RobotIcon from "@/components/icons/centelon-logo.svg";
 
@@ -122,6 +123,7 @@ type ExtendedMenuKey =
   | "connectPlaylist"
   | "playlistTemplates"
   |"viewGroups"
+  |"presentation"
 
   // Device
   | "storeDeviceList"
@@ -152,29 +154,7 @@ interface MenuItem {
 }
 
 
-const recentPlayed = [
-  {
-    id: 1,
-    playlistName: "Playlist name",
-    creator: "Sean swadder",
-    duration: "2:34:45",
-    image: "/assets/service_robot.jpg",
-  },
-  {
-    id: 2,
-    playlistName: "Playlist name",
-    creator: "Dj YK mule",
-    duration: "1:02:42",
-    image: "/assets/service_robot.jpg",
-  },
-  {
-    id: 3,
-    playlistName: "Playlist name",
-    creator: "Obi Datti",
-    duration: "2:01:25",
-    image: "/assets/service_robot.jpg",
-  },
-];
+
 // const slides = [
 //   { id: 1, src: "/assets/slider1home.jpg", alt: "Robot 1" },
 //   { id: 2, src: "/assets/engagement_robot.jpg", alt: "Robot 2" },
@@ -405,6 +385,7 @@ const menuSections: MenuItem[] = [
         icon: <FaMusic size={15} />,
         items: [
           { key: "mediaLibrary", label: "Media Library", icon: <FaRegFileAudio /> },
+          // {key:"presentation", label:"Presentation", icon:<FaDesktop />}
         ],
       },
       {
@@ -1182,10 +1163,10 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
         <header className="px-6 pt-4 pb-3 border-b border-gray-200 bg-[#E6F9FD] flex items-center justify-between">
       {/* Left Content */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 font-sans mb-1">
-          Welcome Back, {userData?.username || "John"}!
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+          Welcome Back, {userData?.username }!
         </h1>
-        <p className="text-gray-700 font-sans text-sm max-w-xl">
+        <p className="text-gray-700  text-sm max-w-xl">
           Here’s what’s happening with your store today.
         </p>
       </div>
@@ -1494,6 +1475,8 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
         return <CreateImage onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
          case "uploadAudio":
         return <CreateAudio onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
+      //    case "presentation":
+      // return <CreatePresentation onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("mediaLibrary")} />;
       case "mediaLibrary":
         return <ShowMedia  />;
          case "viewGroups":

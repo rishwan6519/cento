@@ -29,6 +29,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   const connectedCount = devices.filter((d) => d.status === "Connected").length;
   const offlineCount = devices.filter((d) => d.status === "Disconnected").length;
   const totalCount = devices.length;
+  const handleDeviceEdit = (updatedDevice: Device) => {
+    setDevices((prevDevices) =>
+      prevDevices.map((d) =>
+        d.deviceId._id === updatedDevice.deviceId._id ? updatedDevice : d
+      )
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -88,7 +95,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
             <DeviceCard
               key={device._id}
               device={device}
-              onEdit={onEditDevice}
+              onEdit={handleDeviceEdit}
               onManagePlaylists={onManagePlaylists}
               onRemoveDevice={async (deviceId) => {
                 try {

@@ -6,6 +6,8 @@ import Image from "next/image";
 import { BsMusicNoteList } from "react-icons/bs";
 import { IoMdTrash } from "react-icons/io";
 import { MdAddCircleOutline } from "react-icons/md";
+import { FiEdit2, FiCheck, FiX } from "react-icons/fi"; // Add edit icons
+import toast from "react-hot-toast";
 
 // RemoveDeviceModal component
 const RemoveDeviceModal = ({
@@ -115,6 +117,11 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
 
+  // Rename state
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState(device.deviceId.name);
+  const [renameLoading, setRenameLoading] = useState(false);
+
   const { deviceId, typeId, connectedPlaylists } = device;
 
   useEffect(() => {
@@ -132,6 +139,35 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
     if (onRemoveDevice) {
       onRemoveDevice(device._id);
       setShowRemoveModal(false);
+    }
+  };
+
+  // Rename handler
+  const handleRename = async () => {
+    if (!newName.trim()) {
+      toast.error("Device name cannot be empty");
+      return;
+    }
+    setRenameLoading(true);
+    try {
+      const res = await fetch(`/api/devices`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: deviceId._id, name: newName }),
+      });
+      const result = await res.json();
+      if (res.ok && result.device) {
+        toast.success("Device renamed!");
+        setIsRenaming(false);
+        // Fetch updated device data from backend
+        if (onEdit) onEdit({ ...device, deviceId: result.device });
+      } else {
+        toast.error(result.message || "Rename failed");
+      }
+    } catch {
+      toast.error("Rename failed");
+    } finally {
+      setRenameLoading(false);
     }
   };
 
@@ -158,10 +194,51 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         </div>
         <div className="flex-grow">
           <div className="flex justify-between items-start">
-            <h4 className="font-semibold text-gray-900">{deviceId.name}</h4>
-            
+            {isRenaming ? (
+              <div className="flex items-center gap-2">
+                <input
+                  className="border rounded px-2 py-1 text-gray-800 text-sm"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  disabled={renameLoading}
+                  autoFocus
+                />
+                <button
+                  className="text-green-600 hover:text-green-800"
+                  onClick={handleRename}
+                  disabled={renameLoading}
+                  title="Save"
+                >
+                  <FiCheck size={18} />
+                </button>
+                <button
+                  className="text-gray-400 hover:text-red-500"
+                  onClick={() => {
+                    setIsRenaming(false);
+                    setNewName(deviceId.name);
+                  }}
+                  disabled={renameLoading}
+                  title="Cancel"
+                >
+                  <FiX size={18} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h4 className="font-semibold text-gray-900">{deviceId.name}</h4>
+                {userRole === "superUser" && (
+                  <button
+                    className="text-gray-400 hover:text-blue-500"
+                    onClick={() => setIsRenaming(true)}
+                    title="Rename Device"
+                  >
+                    <FiEdit2 size={16} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm"> 
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
             <div>
               <p className="text-gray-500">Type</p>
               <p className="text-gray-800 font-medium">{typeId.name}</p>
@@ -202,26 +279,25 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             </div>
           </div>
         )}
-  {userRole === "superUser" && (
-        <div className="flex justify-between">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowPlaylists(!showPlaylists);
-              if (onManagePlaylists) onManagePlaylists(device);
-            }}
-            className="text-sm"
-            icon={<BsMusicNoteList />}
-          >
-            {showPlaylists ? "Hide Playlists" : "Playlists"}
-            {connectedPlaylists && connectedPlaylists.length > 0 && (
-              <span className="ml-1 text-xs text-gray-500">
-                ({connectedPlaylists.length})
-              </span>
-            )}
-          </Button>
-          <div className="flex space-x-2">
-           
+        {userRole === "superUser" && (
+          <div className="flex justify-between">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowPlaylists(!showPlaylists);
+                if (onManagePlaylists) onManagePlaylists(device);
+              }}
+              className="text-sm"
+              icon={<BsMusicNoteList />}
+            >
+              {showPlaylists ? "Hide Playlists" : "Playlists"}
+              {connectedPlaylists && connectedPlaylists.length > 0 && (
+                <span className="ml-1 text-xs text-gray-500">
+                  ({connectedPlaylists.length})
+                </span>
+              )}
+            </Button>
+            <div className="flex space-x-2">
               <Button
                 variant="secondary"
                 onClick={() => setShowRemoveModal(true)}
@@ -230,13 +306,10 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
               >
                 Remove
               </Button>
+            </div>
           </div>
-        </div>
-            )}
-
-
+        )}
       </div>
-
       <RemoveDeviceModal
         isOpen={showRemoveModal}
         onClose={() => setShowRemoveModal(false)}

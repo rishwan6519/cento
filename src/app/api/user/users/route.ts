@@ -7,6 +7,8 @@ export async function GET(req: NextRequest, ) {
     await connectToDatabase();
 
     const userId = req.nextUrl.searchParams.get('userId');
+    console.log(userId,"test done ✅")
+
     
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });

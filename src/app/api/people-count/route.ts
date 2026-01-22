@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
-
-const uri =
-  "mongodb+srv://retail_admin:LCQ3b6kYRiN6wUEl@retailanalytics.kznhbji.mongodb.net/?retryWrites=true&w=majority&appName=RetailAnalytics";
-const dbName = "retail_analytics_test";
-
-let client: MongoClient | null = null;
-
-async function connectToDatabase() {
-  if (!client) {
-    client = new MongoClient(uri);
-    await client.connect();
-    console.log("[MongoDB] Connected successfully");
-  }
-  return client.db(dbName);
-}
+import { connectToDatabase } from "@/lib/db";
+import { ZoneEvent } from "@/models/ZoneEvent";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,18 +16,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = await connectToDatabase();
-    const collection = db.collection("zone_events");
+    await connectToDatabase();
 
-    // 🔍 Query by camera only
-    const query = { "metadata.camera_id": cameraId };
-    console.log("[API] MongoDB query:", query);
-
-    const documents = await collection.find(query).toArray();
+    // 🔍 Query by camera only using Mongoose
+    const documents = await ZoneEvent.find({ "metadata.camera_id":`camera`+ cameraId }).lean();
     console.log(`[API] Found ${documents.length} documents for camera ${cameraId}`);
 
-    // 🧮 Aggregate IN/OUT counts per zone
-    const zoneCounts: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
+    // 🧮 Aggregate UNIQUE IN/OUT counts per zone
+    const zoneUniqueIds: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
 
     documents.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
@@ -50,33 +32,33 @@ export async function GET(request: NextRequest) {
 
       if (!zoneName || !action || personId === undefined) return;
 
-      if (!zoneCounts[zoneName]) {
-        zoneCounts[zoneName] = { in_ids: new Set(), out_ids: new Set() };
+      if (!zoneUniqueIds[zoneName]) {
+        zoneUniqueIds[zoneName] = { in_ids: new Set(), out_ids: new Set() };
       }
 
       if (action === "Entered") {
-        zoneCounts[zoneName].in_ids.add(personId);
+        zoneUniqueIds[zoneName].in_ids.add(personId);
       } else if (action === "Exited") {
-        zoneCounts[zoneName].out_ids.add(personId);
+        zoneUniqueIds[zoneName].out_ids.add(personId);
       }
     });
 
     // 🧾 Convert to response format
-    const zones = Object.keys(zoneCounts).map((zoneName) => {
+    const zones = Object.keys(zoneUniqueIds).map((zoneName) => {
       const zoneIdMatch = zoneName.match(/\d+/);
       const zoneId = zoneIdMatch ? parseInt(zoneIdMatch[0]) : 0;
 
       return {
         id: zoneId,
         zone_name: zoneName,
-        total_in_count: zoneCounts[zoneName].in_ids.size,
-        total_out_count: zoneCounts[zoneName].out_ids.size,
+        total_in_count: zoneUniqueIds[zoneName].in_ids.size,
+        total_out_count: zoneUniqueIds[zoneName].out_ids.size,
       };
     });
 
     zones.sort((a, b) => a.id - b.id);
 
-    console.log("[API] Final zone counts:", zones);
+    console.log("[API] Final UNIQUE zone counts:", zones);
 
     return NextResponse.json({
       success: true,
@@ -91,6 +73,55 @@ export async function GET(request: NextRequest) {
         error: "Failed to fetch zone data",
         details: error.message,
       },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    console.log("[API POST] Received count event:", body);
+
+    const { camera_id, zone_name, action, person_id, pi_id, timestamp } = body;
+
+    // Validate required fields
+    if (!camera_id || !zone_name || !action || person_id === undefined) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields (camera_id, zone_name, action, person_id)" },
+        { status: 400 }
+      );
+    }
+
+    await connectToDatabase();
+
+    // Construct event document matching the schema expected by GET
+    const newEvent = {
+        metadata: {
+            camera_id,
+            zone_name,
+            pi_id: pi_id || "unknown"
+        },
+        action, 
+        person_id,
+        timestamp: timestamp || new Date().toISOString(),
+        created_at: new Date()
+    };
+
+    console.log("[API POST] Saving new event:", newEvent);
+    const result = await ZoneEvent.create(newEvent);
+
+    return NextResponse.json({
+        success: true,
+        message: "Event saved successfully",
+        id: result._id,
+        event: result
+    });
+
+  } catch (error: any) {
+    console.error("[API POST ERROR]", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to save event", details: error.message },
       { status: 500 }
     );
   }

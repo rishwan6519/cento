@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
-import InstantAnnouncement from '@/models/InstantAnnouncement'; // ✅ renamed for clarity
+import InstantAnnouncement from '@/models/InstantAnnouncement';
 
 export async function POST(req: NextRequest) {
   try {

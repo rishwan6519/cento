@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import AssignedDevice from '@/models/AssignDevice';
 import Device from '@/models/Device';
@@ -121,13 +121,15 @@ export async function POST(request: Request) {
     }, { status: 500 });
   }
 }
-export async function DELETE(request: Request) {
+
+
+export async function DELETE(request: NextRequest) {
   try {
     await connectToDatabase();
-    const { searchParams } = new URL(request.url);
-    const assignedId = searchParams.get('id'); // AssignedDevice._id
+   const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
 
-    if (!assignedId) {
+    if (!userId) {
       return NextResponse.json({
         success: false,
         message: 'Assigned device ID is required'
@@ -135,7 +137,7 @@ export async function DELETE(request: Request) {
     }
 
     // Attempt to delete the assignment
-    const deletedAssignment = await AssignedDevice.findByIdAndDelete(assignedId);
+    const deletedAssignment = await AssignedDevice.findByIdAndDelete(userId);
 
     if (!deletedAssignment) {
       return NextResponse.json({
@@ -146,13 +148,13 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Assigned device deleted successfully'
+      message: 'Device disconnected successfully'
     });
   } catch (error) {
     console.error('Error in DELETE assigned device:', error);
     return NextResponse.json({
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to delete assigned device'
+      message: error instanceof Error ? error.message : 'Failed to disconnect assigned device'
     }, { status: 500 });
   }
 }

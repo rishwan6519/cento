@@ -83,3 +83,59 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "Missing floorMapId" },
+        { status: 400 }
+      );
+    }
+
+    await connectToDatabase();
+    
+    // 1. Find the map to get the image URL
+    const map = await FloorMap.findById(id);
+    if (!map) {
+      return NextResponse.json(
+        { success: false, message: "Floor map not found" },
+        { status: 404 }
+      );
+    }
+
+    // 2. Delete the physical file
+    try {
+      if (map.imageUrl) {
+        // Construct the full file path. 
+        // Note: imageUrl is typically something like "/uploads/123/floormaps/image.png"
+        const filePath = path.join(process.cwd(), map.imageUrl);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`[API] Deleted file: ${filePath}`);
+        }
+      }
+    } catch (fsError) {
+      console.error("[API] File system deletion error:", fsError);
+      // We continue even if file delete fails (maybe it was manually moved)
+    }
+
+    // 3. Delete associated Camera Markers
+    // Importing CameraMarker model here to handle cascading delete
+    const CameraMarker = (await import("@/models/CameraMarker")).default;
+    const markerResult = await CameraMarker.deleteMany({ floorMapId: id });
+    console.log(`[API] Deleted ${markerResult.deletedCount} associated markers.`);
+
+    // 4. Delete the floor map record
+    await FloorMap.findByIdAndDelete(id);
+
+    return NextResponse.json({ success: true, message: "Floor map and assets deleted successfully" });
+  } catch (error: any) {
+    console.error("[API] DELETE error:", error);
+    return NextResponse.json(
+      { success: false, message: error.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

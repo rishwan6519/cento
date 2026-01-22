@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Upload, Trash2, X } from "lucide-react";
+import { Upload, Trash2, X, Clock, CheckCircle2, AlertCircle } from "lucide-react"; // Added AlertCircle
 import toast from "react-hot-toast";
 import { FaFolder, FaFolderPlus, FaSpinner, FaCheck, FaPlus } from "react-icons/fa";
 
@@ -14,6 +14,10 @@ interface SelectedFile {
   status: "uploading" | "completed" | "failed" | "pending";
   progress: number;
   uploadedMediaId?: string;
+  // Verification fields
+  listenedTime: number;
+  isVerified: boolean;
+  isCorrupted?: boolean; // New field to track corrupted files
 }
 
 interface MediaGroup {
@@ -28,11 +32,15 @@ interface CreateMediaProps {
   onSuccess: () => void;
 }
 
+const MAX_FILES = 15;
+const MIN_PLAY_TIME = 5; // 5 seconds verification
+
 const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Group States
   const [groups, setGroups] = useState<MediaGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -45,12 +53,8 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
 
   useEffect(() => {
-    if (userId) {
-      fetchGroups();
-    }
-    return () => {
-      files.forEach((f) => URL.revokeObjectURL(f.previewUrl));
-    };
+    if (userId) fetchGroups();
+    return () => files.forEach((f) => URL.revokeObjectURL(f.previewUrl));
   }, []);
 
   const fetchGroups = async () => {
@@ -73,7 +77,6 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
       toast.error("Group name is required");
       return;
     }
-
     setCreatingGroup(true);
     try {
       const response = await fetch("/api/media-groups", {
@@ -86,248 +89,120 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
           mediaIds: [],
         }),
       });
-
-      if (!response.ok) {
+      if (response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to create group");
+        setGroups((prev) => [data.group, ...prev]);
+        setSelectedGroupId(data.group._id);
+        setShowCreateGroup(false);
+        setNewGroupName("");
+        setNewGroupDescription("");
+        toast.success("Group created");
       }
-
-      const data = await response.json();
-      toast.success("Group created successfully");
-
-      setGroups((prev) => [data.group, ...prev]);
-      setSelectedGroupId(data.group._id);
-      setShowCreateGroup(false);
-      setNewGroupName("");
-      setNewGroupDescription("");
     } catch (error) {
-      console.error("Error creating group:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create group");
+      toast.error("Failed to create group");
     } finally {
       setCreatingGroup(false);
     }
   };
 
-  const generateUniqueId = () => Math.random().toString(36).substring(2, 11);
-
-  const getFileType = (fileName: string) => {
-    const ext = fileName.split(".").pop()?.toLowerCase();
-    if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext || "")) return "image/jpeg";
-    if (["mp4", "webm", "mov"].includes(ext || "")) return "video/mp4";
-    if (["mp3", "wav", "ogg"].includes(ext || "")) return "audio/mpeg";
-    return "application/octet-stream";
-  };
-
   const processFiles = (incomingFiles: File[]) => {
+    if (files.length + incomingFiles.length > MAX_FILES) {
+      toast.error(`You can only upload a maximum of ${MAX_FILES} files.`);
+      return;
+    }
+
     const newFiles: SelectedFile[] = incomingFiles.map((file) => ({
-      id: generateUniqueId(),
+      id: Math.random().toString(36).substring(2, 11),
       name: file.name,
-      type: file.type || getFileType(file.name),
+      type: file.type || "audio/mpeg",
       file,
       previewUrl: URL.createObjectURL(file),
       status: "pending",
       progress: 0,
+      listenedTime: 0,
+      isVerified: false,
+      isCorrupted: false, // Initialize as not corrupted
     }));
     setFiles((prev) => [...prev, ...newFiles]);
   };
 
-  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) processFiles(Array.from(e.target.files));
+  // Tracking playback time for verification
+  const handleTimeUpdate = (id: string, currentTime: number) => {
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id === id && !f.isVerified) {
+          if (currentTime >= MIN_PLAY_TIME) {
+            return { ...f, isVerified: true, listenedTime: MIN_PLAY_TIME };
+          }
+          return { ...f, listenedTime: currentTime };
+        }
+        return f;
+      })
+    );
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files) processFiles(Array.from(e.dataTransfer.files));
+  // Handle Audio Error (Corrupted file)
+  const handleAudioError = (id: string) => {
+    setFiles((prev) => 
+      prev.map((f) => (f.id === id ? { ...f, isCorrupted: true } : f))
+    );
   };
 
-  const handleFileDelete = (id: string) => {
-    setFiles((prev) => prev.filter((file) => file.id !== id));
-  };
+  const allVerified = files.length > 0 && files.every((f) => f.isVerified);
+  const hasCorruptedFiles = files.some((f) => f.isCorrupted); // Check if any file is corrupted
 
-  const uploadFileWithProgress = (fileObj: SelectedFile, userId: string): Promise<string | null> => {
-    return new Promise((resolve, reject) => {
+  const uploadFile = (fileObj: SelectedFile, userId: string): Promise<string | null> => {
+    return new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
-
       formData.append("files[0]", fileObj.file);
       formData.append("fileNames[0]", fileObj.name);
       formData.append("userId", userId);
 
       xhr.open("POST", "/api/media/upload", true);
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileObj.id ? { ...f, status: "uploading", progress: percent } : f
-            )
-          );
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const progress = Math.round((e.loaded / e.total) * 100);
+          setFiles((prev) => prev.map((f) => (f.id === fileObj.id ? { ...f, status: "uploading", progress } : f)));
         }
       };
-
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const resp = JSON.parse(xhr.responseText);
-            console.log("Upload response:", resp);
-            
-            // Try to get media ID from various possible response structures
-            let uploadedMediaId: string | null = null;
-            
-            if (resp.mediaIds && resp.mediaIds.length > 0) {
-              uploadedMediaId = resp.mediaIds[0];
-            } else if (resp.media && resp.media.length > 0) {
-              uploadedMediaId = resp.media[0]._id || resp.media[0].id;
-            } else if (resp.data && resp.data._id) {
-              uploadedMediaId = resp.data._id;
-            } else if (resp._id) {
-              uploadedMediaId = resp._id;
-            } else if (resp.id) {
-              uploadedMediaId = resp.id;
-            }
-
-            console.log("Extracted media ID:", uploadedMediaId);
-
-            setFiles((prev) =>
-              prev.map((f) =>
-                f.id === fileObj.id
-                  ? { ...f, status: "completed", progress: 100, uploadedMediaId: uploadedMediaId || undefined }
-                  : f
-              )
-            );
-            resolve(uploadedMediaId);
-          } catch (parseError) {
-            console.error("Error parsing response:", parseError);
-            setFiles((prev) =>
-              prev.map((f) => (f.id === fileObj.id ? { ...f, status: "completed", progress: 100 } : f))
-            );
-            resolve(null);
-          }
+          const resp = JSON.parse(xhr.responseText);
+          const mediaId = resp.mediaIds?.[0] || resp.id || resp._id;
+          setFiles((prev) => prev.map((f) => (f.id === fileObj.id ? { ...f, status: "completed", progress: 100, uploadedMediaId: mediaId } : f)));
+          resolve(mediaId);
         } else {
-          setFiles((prev) =>
-            prev.map((f) => (f.id === fileObj.id ? { ...f, status: "failed" } : f))
-          );
-          reject(new Error("Upload failed"));
+          resolve(null);
         }
       };
-
-      xhr.onerror = () => {
-        setFiles((prev) =>
-          prev.map((f) => (f.id === fileObj.id ? { ...f, status: "failed" } : f))
-        );
-        reject(new Error("Network error"));
-      };
-
       xhr.send(formData);
     });
   };
 
-  const addMediaToGroup = async (mediaIds: string[], groupId: string): Promise<boolean> => {
-    try {
-      console.log("Adding media to group:", { mediaIds, groupId });
-      
-      // First get the current group to get existing mediaIds
-      const getResponse = await fetch(`/api/media-groups?userId=${userId}`);
-      if (!getResponse.ok) {
-        throw new Error("Failed to fetch groups");
-      }
-      
-      const groupsData = await getResponse.json();
-      const currentGroup = groupsData.groups?.find((g: MediaGroup) => g._id === groupId);
-      
-      // Get existing media IDs from the group
-      const existingMediaIds = currentGroup?.mediaIds?.map((m: any) => 
-        typeof m === 'string' ? m : m._id
-      ) || [];
-      
-      // Combine existing and new media IDs (avoiding duplicates)
-      const allMediaIds = [...new Set([...existingMediaIds, ...mediaIds])];
-      
-      console.log("Updating group with mediaIds:", allMediaIds);
-
-      // Update the group with all media IDs
-      const response = await fetch("/api/media-groups", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          groupId,
-          mediaIds: allMediaIds,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Failed to add media to group:", errorData);
-        throw new Error(errorData.error || "Failed to add media to group");
-      }
-
-      console.log("Successfully added media to group");
-      return true;
-    } catch (error) {
-      console.error("Error adding media to group:", error);
-      return false;
-    }
-  };
-
   const handleSubmit = async () => {
-    if (files.length === 0) {
-      toast.error("Please select at least one file");
-      return;
-    }
-
-    if (assignToGroup && !selectedGroupId) {
-      toast.error("Please select a group or create a new one");
-      return;
-    }
-
-    if (!userId) {
-      toast.error("User not authenticated");
-      return;
-    }
-
+    if (!allVerified || hasCorruptedFiles) return;
     setIsLoading(true);
-    const loadingToast = toast.loading("Uploading media files...");
+    const loadingToast = toast.loading("Uploading files...");
 
     try {
-      const filesToUpload = files.filter((f) => f.status !== "completed");
-      const uploadedMediaIds: string[] = [];
-
-      // Step 1: Upload all files to media library
-      for (const fileObj of filesToUpload) {
-        try {
-          const mediaId = await uploadFileWithProgress(fileObj, userId);
-          if (mediaId) {
-            uploadedMediaIds.push(mediaId);
-          }
-        } catch (err) {
-          // handle error
-        }
+      const uploadedIds: string[] = [];
+      for (const f of files) {
+        const id = await uploadFile(f, userId!);
+        if (id) uploadedIds.push(id);
       }
 
-      const anyFailed = files.some((f) => f.status === "failed");
-      if (anyFailed) {
-        toast.error("Some files failed to upload", { id: loadingToast });
-        setIsLoading(false);
-        return;
+      if (assignToGroup && selectedGroupId && uploadedIds.length > 0) {
+        await fetch("/api/media-groups", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId: selectedGroupId, mediaIds: uploadedIds }),
+        });
       }
-
-      // Only now add to group
-      if (assignToGroup && selectedGroupId && uploadedMediaIds.length > 0) {
-        await addMediaToGroup(uploadedMediaIds, selectedGroupId);
-      }
-
-      // Success message
-      toast.success(`${uploadedMediaIds.length} file(s) uploaded successfully!`, { id: loadingToast });
-
-      // Clear files and trigger success callback
-      setFiles([]);
+      toast.success("Successfully uploaded", { id: loadingToast });
       onSuccess();
-      
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("Unexpected error occurred", { id: loadingToast });
+    } catch (err) {
+      toast.error("Upload failed", { id: loadingToast });
     } finally {
       setIsLoading(false);
     }
@@ -335,160 +210,77 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
 
   return (
     <div className="bg-[#DFF4F7] min-h-screen flex justify-center items-center p-6">
-      <div className="bg-white rounded-2xl shadow-md w-full max-w-7xl p-6 min-h-[500px]">
-        <h2 className="text-lg font-semibold mb-6">Let's create new media</h2>
+      <div className="bg-white rounded-2xl shadow-md w-full max-w-7xl p-6 min-h-[600px]">
+        <h2 className="text-lg font-semibold mb-6 flex justify-between">
+          <span>Let's create new media</span>
+          <span className="text-sm font-normal text-slate-500">
+            {files.length} / {MAX_FILES} files
+          </span>
+        </h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Upload Section */}
-          <div>
-            <h3 className="font-semibold mb-3">Upload Media</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* LEFT COLUMN: UPLOAD & GROUPS */}
+          <div className="space-y-6">
             <div
-              className={`border-2 border-dashed rounded-lg h-64 flex flex-col items-center justify-center cursor-pointer transition ${
+              className={`border-2 border-dashed rounded-lg h-56 flex flex-col items-center justify-center cursor-pointer transition ${
                 isDragging ? "border-teal-500 bg-teal-50" : "border-gray-300"
               }`}
               onClick={() => document.getElementById("media-upload")?.click()}
-              onDragEnter={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                setIsDragging(false);
-              }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setIsDragging(false); processFiles(Array.from(e.dataTransfer.files)); }}
             >
               <Upload className="h-12 w-12 text-orange-500" />
-              <p className="mt-2 text-gray-600 text-sm font-medium">
-                Click to upload or drag & drop it here
-              </p>
-              <p className="text-gray-400 text-xs mt-1">Supports Audio files</p>
-              <input
-                id="media-upload"
-                type="file"
-                multiple
-                hidden
-                accept="audio/*"
-                onChange={handleFileSelection}
-              />
+              <p className="mt-2 text-gray-600 text-sm font-medium">Click or drag & drop (Max 15)</p>
+              <p className="text-gray-400 text-xs mt-1">Audio files only</p>
+              <input id="media-upload" type="file" multiple hidden accept="audio/*" onChange={(e) => e.target.files && processFiles(Array.from(e.target.files))} />
             </div>
 
-            {/* Group Assignment Section */}
-            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <div className="flex items-center justify-between mb-3">
+            {/* GROUP ASSIGNMENT SECTION */}
+            {/* ... (Same as before) */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
                 <h4 className="font-medium text-slate-700 flex items-center gap-2">
-                  <FaFolder className="text-orange-500" />
-                  Assign to Group (Optional)
+                  <FaFolder className="text-orange-500" /> Assign to Group
                 </h4>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={assignToGroup}
-                    onChange={(e) => {
-                      setAssignToGroup(e.target.checked);
-                      if (!e.target.checked) {
-                        setSelectedGroupId(null);
-                      }
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                  <input type="checkbox" checked={assignToGroup} onChange={(e) => setAssignToGroup(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
                 </label>
               </div>
 
-              <p className="text-xs text-slate-500 mb-3">
-                Files will be uploaded to media library. Enable this to also add them to a group.
-              </p>
-
               {assignToGroup && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {loadingGroups ? (
-                    <div className="flex items-center justify-center py-4">
-                      <FaSpinner className="animate-spin text-orange-500" />
-                    </div>
+                    <div className="flex justify-center py-4"><FaSpinner className="animate-spin text-orange-500" /></div>
                   ) : (
                     <>
-                      {/* Group Selection */}
-                      {groups.length > 0 ? (
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {groups.map((group) => (
-                            <div
-                              key={group._id}
-                              onClick={() => setSelectedGroupId(group._id)}
-                              className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                                selectedGroupId === group._id
-                                  ? "border-orange-500 bg-orange-50"
-                                  : "border-slate-200 hover:border-slate-300 bg-white"
-                              }`}
-                            >
-                              <div
-                                className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                                  selectedGroupId === group._id
-                                    ? "bg-orange-500 text-white"
-                                    : "border-2 border-slate-300"
-                                }`}
-                              >
-                                {selectedGroupId === group._id && <FaCheck size={10} />}
-                              </div>
-                              <FaFolder className="text-orange-400" />
-                              <div className="flex-1">
-                                <p className="font-medium text-slate-800 text-sm">{group.name}</p>
-                                <p className="text-xs text-slate-500">{group.mediaCount} files</p>
-                              </div>
+                      <div className="max-h-48 overflow-y-auto space-y-2">
+                        {groups.map((group) => (
+                          <div
+                            key={group._id}
+                            onClick={() => setSelectedGroupId(group._id)}
+                            className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
+                              selectedGroupId === group._id ? "border-orange-500 bg-orange-50" : "border-slate-200 bg-white"
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedGroupId === group._id ? "bg-orange-500 border-orange-500 text-white" : "border-slate-300"}`}>
+                              {selectedGroupId === group._id && <FaCheck size={10} />}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-slate-500 text-sm">
-                          No groups available. Create one below.
-                        </div>
-                      )}
+                            <span className="text-sm font-medium">{group.name}</span>
+                          </div>
+                        ))}
+                      </div>
 
-                      {/* Create New Group */}
                       {!showCreateGroup ? (
-                        <button
-                          onClick={() => setShowCreateGroup(true)}
-                          className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-orange-400 hover:text-orange-500 transition-colors"
-                        >
-                          <FaFolderPlus />
-                          Create New Group
+                        <button onClick={() => setShowCreateGroup(true)} className="w-full flex items-center justify-center gap-2 p-2 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:text-orange-500">
+                          <FaFolderPlus /> Create New Group
                         </button>
                       ) : (
                         <div className="p-4 bg-white rounded-lg border border-slate-200 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h5 className="font-medium text-slate-700">New Group</h5>
-                            <button
-                              onClick={() => {
-                                setShowCreateGroup(false);
-                                setNewGroupName("");
-                                setNewGroupDescription("");
-                              }}
-                              className="text-slate-400 hover:text-slate-600"
-                            >
-                              <X size={18} />
-                            </button>
-                          </div>
-                          <input
-                            type="text"
-                            value={newGroupName}
-                            onChange={(e) => setNewGroupName(e.target.value)}
-                            placeholder="Group name *"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-400"
-                          />
-                          <input
-                            type="text"
-                            value={newGroupDescription}
-                            onChange={(e) => setNewGroupDescription(e.target.value)}
-                            placeholder="Description (optional)"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-400"
-                          />
-                          <button
-                            onClick={handleCreateGroup}
-                            disabled={creatingGroup || !newGroupName.trim()}
-                            className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            {creatingGroup ? <FaSpinner className="animate-spin" /> : <FaPlus />}
-                            Create & Select
+                          <input type="text" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="New group name" className="w-full p-2 border rounded-md text-sm outline-none focus:border-orange-500" />
+                          <button onClick={handleCreateGroup} disabled={creatingGroup} className="w-full bg-orange-500 text-white p-2 rounded-md text-sm font-medium flex justify-center items-center gap-2">
+                            {creatingGroup ? <FaSpinner className="animate-spin" /> : <FaPlus />} Create & Select
                           </button>
                         </div>
                       )}
@@ -499,129 +291,102 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
             </div>
           </div>
 
-          {/* Preview Section */}
-          <div>
-            <h3 className="font-semibold mb-3">Media Preview</h3>
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+          {/* RIGHT COLUMN: PREVIEW & VERIFICATION */}
+          <div className="flex flex-col">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              Verification <span className="text-xs font-normal text-slate-500">(Play each file for 5s)</span>
+            </h3>
+            <div className="flex-1 space-y-4 max-h-[500px] overflow-y-auto pr-2">
               {files.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">No files selected yet</div>
+                <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed rounded-lg py-12">
+                   <p>No files selected for upload</p>
+                </div>
               ) : (
                 files.map((file) => (
-                  <div
-                    key={file.id}
-                    className="bg-[#EAF8FC] rounded-lg p-4 shadow flex justify-between items-center"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-800">{file.name}</p>
-
-                      {file.type.startsWith("audio/") && (
-                        <audio controls className="w-full mt-2" src={file.previewUrl} />
-                      )}
-                      {file.type.startsWith("video/") && (
-                        <video
-                          controls
-                          className="w-full mt-2 h-20 rounded object-cover"
-                          src={file.previewUrl}
-                        />
-                      )}
-                      {file.type.startsWith("image/") && (
-                        <img
-                          src={file.previewUrl}
-                          alt={file.name}
-                          className="mt-2 h-20 w-20 object-cover rounded"
-                        />
-                      )}
-
-                      {/* Progress Bar */}
-                      <div className="w-full h-1.5 bg-gray-200 rounded mt-2 overflow-hidden">
-                        <div
-                          className={`h-full rounded transition-all duration-200 ease-out ${
-                            file.status === "failed"
-                              ? "bg-red-500"
-                              : file.status === "completed"
-                              ? "bg-green-500"
-                              : "bg-orange-500"
-                          }`}
-                          style={{ width: `${Math.max(file.progress, 0)}%` }}
-                        ></div>
+                  <div key={file.id} className={`rounded-lg p-4 border shadow-sm transition-colors ${file.isCorrupted ? 'bg-red-50 border-red-200' : 'bg-[#EAF8FC] border-blue-100'}`}>
+                    
+                    {/* NEW: Corrupted file warning shown at the top of the file card */}
+                    {file.isCorrupted && (
+                      <div className="flex items-center gap-2 text-red-600 text-xs font-bold mb-3 p-2 bg-red-100 rounded-md">
+                        <AlertCircle size={14} />
+                        <span>File is corrupted or unplayable. Please remove this file to continue.</span>
                       </div>
+                    )}
 
-                      <div className="flex justify-between mt-1">
-                        <p className="text-xs text-gray-500">
-                          {file.status === "pending" && "Ready to upload"}
-                          {file.status === "uploading" && `Uploading... ${file.progress}%`}
-                          {file.status === "completed" && "✓ Uploaded to library"}
-                          {file.status === "failed" && "✗ Upload failed"}
-                        </p>
+                    <div className="flex justify-between mb-2">
+                      <div className="truncate flex-1 pr-4">
+                        <p className={`text-sm font-bold truncate ${file.isCorrupted ? 'text-red-700' : 'text-slate-800'}`}>{file.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {file.isCorrupted ? (
+                             <span className="text-xs text-red-500 font-medium">Error: Invalid Audio</span>
+                          ) : file.isVerified ? (
+                            <span className="text-xs text-green-600 font-bold flex items-center gap-1"><CheckCircle2 size={14} /> Verified</span>
+                          ) : (
+                            <span className="text-xs text-orange-600 flex items-center gap-1">
+                              <Clock size={14} /> Play {Math.max(0, Math.ceil(MIN_PLAY_TIME - file.listenedTime))}s more
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <button onClick={() => setFiles(prev => prev.filter(f => f.id !== file.id))} className="text-slate-400 hover:text-red-500">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
 
-                    <button
-                      onClick={() => handleFileDelete(file.id)}
-                      className="text-red-500 hover:text-red-700 ml-4 p-2"
-                      disabled={isLoading}
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <audio
+                      src={file.previewUrl}
+                      controls
+                      className="w-full h-8"
+                      onTimeUpdate={(e) => handleTimeUpdate(file.id, e.currentTarget.currentTime)}
+                      onError={() => handleAudioError(file.id)} // Detect corrupted files
+                    />
+
+                    {/* Progress indicator */}
+                    <div className="w-full h-1.5 bg-slate-200 rounded-full mt-3 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          file.isCorrupted ? 'bg-red-400' : file.status === 'uploading' ? 'bg-blue-500' : file.isVerified ? 'bg-green-500' : 'bg-orange-400'
+                        }`}
+                        style={{ width: file.isCorrupted ? '100%' : file.status === 'uploading' ? `${file.progress}%` : `${(file.listenedTime / MIN_PLAY_TIME) * 100}%` }}
+                      />
+                    </div>
                   </div>
                 ))
-              )}
-            </div>
-
-            {/* Summary Section */}
-            <div className="mt-4 space-y-2">
-              {/* Files Count */}
-              {files.length > 0 && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
-                  <span className="text-sm text-blue-700">
-                    <strong>{files.length}</strong> file(s) will be uploaded to Media Library
-                  </span>
-                </div>
-              )}
-
-              {/* Selected Group Badge */}
-              {assignToGroup && selectedGroupId && (
-                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-2">
-                  <FaFolder className="text-orange-500" />
-                  <span className="text-sm text-orange-700">
-                    Also adding to group:{" "}
-                    <strong>{groups.find((g) => g._id === selectedGroupId)?.name}</strong>
-                  </span>
-                </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-center gap-4 mt-12">
-          <button
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-6 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || files.length === 0 || (assignToGroup && !selectedGroupId)}
-            className={`px-6 py-2 rounded-md text-white transition-colors ${
-              isLoading || files.length === 0 || (assignToGroup && !selectedGroupId)
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-teal-700 hover:bg-teal-800"
-            }`}
-          >
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                <span>Processing...</span>
-              </div>
-            ) : assignToGroup && selectedGroupId ? (
-              "Upload & Add to Group"
-            ) : (
-              "Upload Media"
-            )}
-          </button>
+        {/* FOOTER ACTIONS */}
+        <div className="mt-10 border-t pt-6 flex flex-col items-center gap-4">
+          {/* UPDATED: Message for corrupted files */}
+          {hasCorruptedFiles ? (
+            <p className="text-sm text-red-600 font-bold flex items-center gap-2 animate-pulse">
+              <AlertCircle size={16} /> One or more files are corrupted. Please remove them to enable upload.
+            </p>
+          ) : !allVerified && files.length > 0 && (
+            <p className="text-sm text-red-500 font-medium animate-pulse">
+              * Play all files for at least 5 seconds to unlock the upload button
+            </p>
+          )}
+
+          <div className="flex gap-4">
+            <button onClick={onCancel} disabled={isLoading} className="px-8 py-2 border rounded-lg hover:bg-slate-50 disabled:opacity-50">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              // UPDATED: Added !hasCorruptedFiles to the disable logic
+              disabled={isLoading || !allVerified || hasCorruptedFiles || (assignToGroup && !selectedGroupId)}
+              className={`px-10 py-2 rounded-lg text-white font-semibold transition-all shadow-md ${
+                allVerified && !hasCorruptedFiles && !isLoading && (!assignToGroup || selectedGroupId)
+                  ? "bg-teal-700 hover:bg-teal-800"
+                  : "bg-slate-400 cursor-not-allowed"
+              }`}
+            >
+              {isLoading ? "Uploading..." : assignToGroup ? "Upload & Add to Group" : "Upload to Library"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

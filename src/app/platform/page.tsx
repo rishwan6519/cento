@@ -1,37 +1,43 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import toast, { Toaster } from "react-hot-toast";
+
+// Icons
+import { 
+  HiOutlineChevronDown, 
+  HiOutlineChevronRight, 
+  HiOutlineLogout, 
+  HiOutlineMenuAlt2, 
+  HiOutlineSearch, 
+  HiOutlineBell 
+} from "react-icons/hi";
+import { 
+  FaRobot, 
+  FaRegFileAudio, 
+  FaListAlt, 
+  FaPlug, 
+  FaMobileAlt, 
+  FaUser, 
+  FaChevronRight, 
+  FaTachometerAlt,
+  FaMobile
+} from "react-icons/fa";
+import { RiDashboardLine } from "react-icons/ri";
+import { BsMusicNoteList } from "react-icons/bs";
+import { IoMdSettings } from "react-icons/io";
+import { MdOutlinePlaylistPlay } from "react-icons/md";
+import { FaRegFileImage } from "react-icons/fa6";
+
+// Components
 import Button from "@/components/Platform/Button";
 import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
 import ManageDevicesView from "@/components/Platform/views/ManageDevicesView";
 import ConnectedPlaylistsView from "@/components/Platform/modals/ConnectedPlaylistsView";
 import AddPlaylistModal from "@/components/Platform/modals/AddPlaylistModal";
-import { HiOutlineChevronDown, HiOutlineChevronRight } from "react-icons/hi";
-import { dummyPlaylists } from "@/components/Platform/DummyData";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  FaRobot,
-  FaRegFileAudio,
-  FaListAlt,
-  FaPlug,
-  FaMobileAlt,
-  FaTachometerAlt,
-  FaUser,
-  FaMobile,
-} from "react-icons/fa";
-import { RiDashboardLine } from "react-icons/ri";
-import { BsMusicNoteList } from "react-icons/bs";
-import { IoMdSettings } from "react-icons/io";
 import PlaylistManager from "@/components/ShowPlaylist/showPlaylist";
-import {
-  Device,
-  Playlist,
-  MenuKey,
-  DeviceFormData,
-  DeviceReference,
-} from "@/components/Platform/types";
 import PlaylistSetup from "@/components/PlaylistSetup/PlaylistSetup";
-import { MdOutlinePlaylistPlay } from "react-icons/md";
 import CreateMedia from "@/components/CreateMedia/createMedia";
 import ShowMedia from "@/components/ShowMedia/showMedia";
 import ConnectPlaylist from "@/components/ConnectPlaylist/connectPlaylist";
@@ -40,17 +46,25 @@ import CreateUser from "@/components/CreateUser/CreateUser";
 import LoadingState from "@/components/Platform/LoadingState";
 import ShowUsers from "@/components/ShowUsers/ShowUsers";
 import AssignDevice from "@/components/AssignDevice/AssignDevice";
-import toast from "react-hot-toast";
 import Announcement from "@/components/Announcement/Announcement";
 import CreateAnnouncement from "@/components/CreateAnnouncement/CreateAnnouncement";
 import ShowAnnouncement from "@/components/Announcement/ShowAnnouncement";
 import AssignApiKey from "@/components/AssignApiKey/AssignApiKey";
-import { FaRegFileImage } from "react-icons/fa6";
 import CreateSlider from "@/components/CreatSlider/CreateSlider";
 import SliderManager from "@/components/showSlider/showSlider";
 import AssignSlider from "@/components/AssignSlider/AssignSlider";
 
+// Types
+import { 
+  Device, 
+  Playlist, 
+  MenuKey, 
+  DeviceFormData, 
+  DeviceReference 
+} from "@/components/Platform/types";
+
 export default function RoboticPlatform(): React.ReactElement {
+  // --- State Management (Fully Restored) ---
   const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
   const [devices, setDevices] = useState<Device[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -59,24 +73,28 @@ export default function RoboticPlatform(): React.ReactElement {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [menuExpanded, setMenuExpanded] = useState<Record<string, boolean>>({
     devices: false,
+    media: true,
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // --- Auth & Initial Fetch (Fully Restored) ---
   useEffect(() => {
     const userRole = localStorage.getItem("userRole");
     if (userRole === "superUser") {
-      toast.success("Welcome Super User!");
+      toast.success("Welcome Super User!", {
+        style: { background: "#1e293b", color: "#fff" },
+      });
     } else {
       toast.error("You are not authorized to access this page.");
-      window.location.href = "/login"; // Redirect to login page
+      window.location.href = "/login";
     }
 
     const fetchDevices = async () => {
       try {
         setIsLoading(true);
-        setError(null); // Reset error state
+        setError(null);
 
         const userId = localStorage.getItem("userId");
         if (!userId) {
@@ -84,15 +102,10 @@ export default function RoboticPlatform(): React.ReactElement {
           return;
         }
 
-        const response = await fetch(
-          `/api/onboarded-devices?userId=${userId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const response = await fetch(`/api/onboarded-devices?userId=${userId}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
 
         if (!response.ok) {
           const errorData = await response.json();
@@ -100,21 +113,12 @@ export default function RoboticPlatform(): React.ReactElement {
         }
 
         const data = await response.json();
-        console.log("Fetched devices:", data);
-
         if (data.success && Array.isArray(data.data)) {
-          console.log(
-            "Devices data:",
-            data.data.map((device: any) => device.deviceId.status)
-          );
           setDevices(
             data.data.map((device: any) => ({
               ...device,
               lastActive: new Date(device.updatedAt).toLocaleString(),
-              status:
-                device.deviceId.status === "active"
-                  ? "Connected"
-                  : "Disconnected",
+              status: device.deviceId.status === "active" ? "Connected" : "Disconnected",
             }))
           );
         } else {
@@ -123,120 +127,41 @@ export default function RoboticPlatform(): React.ReactElement {
       } catch (err) {
         console.error("Error fetching devices:", err);
         setError(err instanceof Error ? err.message : "Failed to load devices");
-        setDevices([]); // Reset devices on error
+        setDevices([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDevices();
-  }, []); // Empty dependency array
+  }, []);
 
-  const devicesWithPlaylistInfo = devices.map((device) => ({
-    ...device,
-    connectedPlaylists: playlists.filter((p) =>
-      p.deviceIds.some((deviceRef) => deviceRef.id === device._id)
-    ),
-  }));
+  // --- Derived Data ---
+  const devicesWithPlaylistInfo = useMemo(() => 
+    devices.map((device) => ({
+      ...device,
+      connectedPlaylists: playlists.filter((p) =>
+        p.deviceIds.some((deviceRef) => deviceRef.id === device._id)
+      ),
+    })), [devices, playlists]);
 
-  const menuItems = [
-    {
-      key: "dashboard" as MenuKey,
-      label: "Dashboard",
-      icon: <RiDashboardLine />,
-    },
-    {
-      key: "onboardDevice" as MenuKey,
-      label: "Onboard Devices",
-      icon: <FaMobileAlt />,
-    },
-    {
-      key: "createMedia" as MenuKey,
-      label: "Create Media",
-      icon: <FaRegFileAudio />,
-    },
-    {
-      key: "showMedia" as MenuKey,
-      label: "Show Media",
-      icon: <FaRegFileAudio />,
-    },
-    {
-      key: "setupPlaylist" as MenuKey,
-      label: "Setup Playlist",
-      icon: <FaListAlt />,
-    },
-    {key:"createAnnouncement" as MenuKey, label: "Create Announcement", icon: <IoMdSettings />},
-    {
-      key: "setupAnnouncement" as MenuKey,
-      label: "Setup Announcement",
-      icon: <IoMdSettings />,
-    },
-    { key: "createUser" as MenuKey, label: "Create User ", icon: <FaUser /> },
-    { key: "showUser" as MenuKey, label: "Show User", icon: <FaUser /> },
-    {
-      key: "assignDevice" as MenuKey,
-      label: "Assign Device",
-      icon: <FaRobot />,
-    },
-    {
-      key: "assignApi" as MenuKey,
-      label: "Assign via API",
-      icon: <FaRobot />,
-    },
-    {
-      key: "showPlaylist" as MenuKey,
-      label: "Show Playlist",
-      icon: <MdOutlinePlaylistPlay />,
-    },
-    {
-      key: "connectPlaylist" as MenuKey,
-      label: "Connect Playlist",
-      icon: <FaPlug />,
-    },
-    {
-      key: "ManageDevice" as MenuKey,
-      label: "Manage Devices",
-      icon: <FaMobileAlt />,
-      subItems: [
-        {
-          key: "connectedPlaylists" as MenuKey,
-          label: "Connected Playlists",
-          icon: <BsMusicNoteList />,
-        },
-      ],
-      expanded: menuExpanded.devices,
-    },
-  ];
-
+  // --- Handlers (Fully Restored) ---
   const toggleMenuExpansion = (menuSection: string) => {
-    setMenuExpanded((prev) => ({
-      ...prev,
-      [menuSection]: !prev[menuSection],
-    }));
+    setMenuExpanded((prev) => ({ ...prev, [menuSection]: !prev[menuSection] }));
   };
 
   const addNewDevice = async (deviceData: DeviceFormData): Promise<void> => {
     try {
       const userId = localStorage.getItem("userId");
-      if (!userId) {
-        throw new Error("User ID not found in localStorage");
-      }
+      if (!userId) throw new Error("User ID not found");
 
       const response = await fetch("/api/onboarded-devices", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...deviceData,
-          userId,
-          status: "active",
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...deviceData, userId, status: "active" }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to add device");
-      }
+      if (!response.ok) throw new Error("Failed to add device");
 
       const data = await response.json();
       if (data.success) {
@@ -250,18 +175,16 @@ export default function RoboticPlatform(): React.ReactElement {
         };
         setDevices([...devices, newDevice]);
         setShowOnboardModal(false);
-      } else {
-        throw new Error(data.message || "Failed to add device");
+        toast.success("Device onboarded successfully");
       }
     } catch (err) {
-      console.error("Error adding device:", err);
-      setError(err instanceof Error ? err.message : "Failed to add device");
+      toast.error(err instanceof Error ? err.message : "Failed to add device");
     }
   };
 
   const addNewPlaylist = (name: string): void => {
     const newPlaylist: Playlist = {
-      id: String(Date.now()), // Generate string ID
+      id: String(Date.now()),
       name,
       type: "default",
       contentType: "audio",
@@ -274,66 +197,49 @@ export default function RoboticPlatform(): React.ReactElement {
     };
     setPlaylists([...playlists, newPlaylist]);
     setShowPlaylistModal(false);
+    toast.success("Playlist created");
   };
 
   const connectPlaylist = (playlistId: string, deviceId: string): void => {
     const deviceToConnect = devices.find((d) => d._id === deviceId);
     if (!deviceToConnect) return;
 
-    const deviceReference: DeviceReference = {
-      id: deviceId,
-      name: deviceToConnect.name,
-    };
+    const deviceReference: DeviceReference = { id: deviceId, name: deviceToConnect.name };
 
-    setPlaylists((prevPlaylists) =>
-      prevPlaylists.map((playlist) =>
-        playlist.id === playlistId
-          ? {
-              ...playlist,
-              deviceIds: [...playlist.deviceIds, deviceReference],
-            }
-          : playlist
+    setPlaylists((prev) =>
+      prev.map((p) =>
+        p.id === playlistId ? { ...p, deviceIds: [...p.deviceIds, deviceReference] } : p
       )
     );
+    toast.success("Playlist connected to device");
   };
 
   const handleEditDevice = async (device: Device): Promise<void> => {
     try {
-      const newStatus =
-        device.status === "Connected" ? "Disconnected" : "Connected";
+      const newStatus = device.status === "Connected" ? "Disconnected" : "Connected";
       const apiStatus = newStatus === "Connected" ? "active" : "inactive";
 
       const response = await fetch(`/api/onboarded-devices/${device._id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: apiStatus }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to update device");
-      }
+      if (!response.ok) throw new Error("Failed to update device");
 
       const data = await response.json();
       if (data.success) {
         setDevices(
           devices.map((d) =>
             d._id === device._id
-              ? {
-                  ...d,
-                  status: newStatus,
-                  lastActive: new Date().toLocaleString(),
-                }
+              ? { ...d, status: newStatus, lastActive: new Date().toLocaleString() }
               : d
           )
         );
-      } else {
-        throw new Error(data.message || "Failed to update device");
+        toast.success(`Device ${newStatus}`);
       }
     } catch (err) {
-      console.error("Error updating device:", err);
-      setError(err instanceof Error ? err.message : "Failed to update device");
+      toast.error("Failed to update device");
     }
   };
 
@@ -342,34 +248,94 @@ export default function RoboticPlatform(): React.ReactElement {
     setSelectedMenu("connectedPlaylists");
   };
 
-  const renderContent = (): React.ReactElement => {
-    if (isLoading) {
-      return <LoadingState />;
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.href = "/login";
+  };
+
+  // --- Sidebar Navigation Structure (Grouped) ---
+  const menuSections = [
+    {
+      title: "General",
+      items: [
+        { key: "dashboard" as MenuKey, label: "Dashboard", icon: <RiDashboardLine /> },
+      ],
+    },
+    {
+      title: "Device Management",
+      items: [
+        { key: "onboardDevice" as MenuKey, label: "Onboard Devices", icon: <FaMobileAlt /> },
+        { key: "assignDevice" as MenuKey, label: "Assign Device", icon: <FaRobot /> },
+        { key: "assignApi" as MenuKey, label: "Assign via API", icon: <IoMdSettings /> },
+        { key: "assignSlider" as MenuKey, label: "Assign Slider", icon: <FaRegFileImage /> },
+        {
+          key: "ManageDevice" as MenuKey,
+          label: "Manage Devices",
+          icon: <FaMobileAlt />,
+          subItems: [
+            { key: "connectedPlaylists" as MenuKey, label: "Connected Playlists", icon: <BsMusicNoteList /> },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Media Management",
+      items: [
+        { key: "createMedia" as MenuKey, label: "Create Media", icon: <FaRegFileAudio /> },
+        { key: "showMedia" as MenuKey, label: "Show Media", icon: <FaRegFileAudio /> },
+        { key: "createSlider" as MenuKey, label: "Create Slider", icon: <FaRegFileImage /> },
+        { key: "showSlider" as MenuKey, label: "Show Slider", icon: <FaRegFileImage /> },
+        { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
+        { key: "showPlaylist" as MenuKey, label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
+        { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
+      ],
+    },
+    {
+      title: "Announcements",
+      items: [
+        { key: "createAnnouncement" as MenuKey, label: "Create New", icon: <IoMdSettings /> },
+        { key: "setupAnnouncement" as MenuKey, label: "Setup Builder", icon: <IoMdSettings /> },
+        { key: "showAnnouncement" as MenuKey, label: "Show All", icon: <IoMdSettings /> },
+      ]
+    },
+    {
+      title: "User Management",
+      items: [
+        { key: "createUser" as MenuKey, label: "Create User", icon: <FaUser /> },
+        { key: "showUser" as MenuKey, label: "Show User", icon: <FaUser /> },
+      ],
+    },
+  ];
+
+  // Helper to find label for Breadcrumbs
+  const getActiveLabel = () => {
+    for (const section of menuSections) {
+      for (const item of section.items) {
+        if (item.key === selectedMenu) return item.label;
+        if (item.subItems) {
+          const sub = item.subItems.find(s => s.key === selectedMenu);
+          if (sub) return sub.label;
+        }
+      }
     }
+    return "Platform";
+  };
+
+  // --- Render Content Switch Case (Full restoration) ---
+  const renderContent = (): React.ReactElement => {
+    if (isLoading) return <LoadingState />;
 
     if (error) {
       return (
-        <Card className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
-            <svg
-              className="w-8 h-8 text-red-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
+        <Card className="flex flex-col items-center justify-center py-16 text-center border-none shadow-xl bg-white/80 backdrop-blur-md">
+          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Error Loading Devices
-          </h3>
-          <p className="text-gray-500 max-w-md mb-6">{error}</p>
-          <Button variant="primary" onClick={() => window.location.reload()}>
+          <h3 className="text-2xl font-bold text-slate-900 mb-2">Error Loading Data</h3>
+          <p className="text-slate-500 max-w-md mb-8">{error}</p>
+          <Button variant="primary" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-xl" onClick={() => window.location.reload()}>
             Try Again
           </Button>
         </Card>
@@ -382,19 +348,13 @@ export default function RoboticPlatform(): React.ReactElement {
           <DashboardView
             devices={devices}
             setDevices={setDevices}
-            onAddNew={() => setShowOnboardModal(true)}
+            onAddNew={() => setSelectedMenu("onboardDevice")}
             onEditDevice={handleEditDevice}
             onManagePlaylists={handleManagePlaylists}
           />
         );
       case "onboardDevice":
-        return (
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col items-center justify-center py-8">
-              <OnboardingPage />
-            </div>
-          </div>
-        );
+        return <OnboardingPage />;
       case "connectedPlaylists":
         return (
           <ConnectedPlaylistsView
@@ -405,479 +365,279 @@ export default function RoboticPlatform(): React.ReactElement {
             onConnectPlaylist={connectPlaylist}
             onBackToDevices={() => {
               setSelectedDevice(null);
-              setSelectedMenu("onboardDevice");
+              setSelectedMenu("dashboard");
             }}
           />
         );
-
       case "setupPlaylist":
-        return <PlaylistSetup onCancel={()=>setSelectedMenu("dashboard")} onSuccess={()=>setSelectedMenu("showPlaylist")} />;
-    // In your renderContent function
-    case "setupAnnouncement":
-      return <Announcement />;
-
-    case "createAnnouncement":
-      return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("setupAnnouncement")} />;
+        return <PlaylistSetup onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
+      case "setupAnnouncement":
+        return <Announcement />;
+      case "createAnnouncement":
+        return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("setupAnnouncement")} />;
       case "showAnnouncement":
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
-    case "assignDevice":
-      return <AssignDevice />;
+      case "assignDevice":
+        return <AssignDevice />;
       case "assignApi":
         return <AssignApiKey />;
-
       case "showUser":
         return <ShowUsers />;
       case "showPlaylist":
         return <PlaylistManager />;
-//create slider case
       case "createSlider":
         return <CreateSlider onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showSlider")} />;
-
-        // show slider
-        case "showSlider":
-          return <SliderManager/>;  
-
-          //assign slider to device
-          case "assignSlider":
-            return <AssignSlider />;
-
+      case "showSlider":
+        return <SliderManager />;
+      case "assignSlider":
+        return <AssignSlider />;
       case "createMedia":
-        return (
-          <CreateMedia
-            onCancel={() => setSelectedMenu("dashboard")}
-            onSuccess={() => setSelectedMenu("showMedia")}
-          />
-        );
-
+        return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showMedia")} />;
       case "showMedia":
         return <ShowMedia />;
       case "connectPlaylist":
-        return (
-          <ConnectPlaylist
-            onCancel={() => setSelectedMenu("dashboard")}
-            onSuccess={() => setSelectedMenu("showPlaylist")}
-          />
-        );
+        return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
       case "createUser":
         return <CreateUser />;
-
-        return (
-          <Card className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
-              {menuItems.find((item) => item.key === selectedMenu)?.icon}
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {menuItems.find((item) => item.key === selectedMenu)?.label}
-            </h3>
-            <p className="text-gray-500 max-w-md mb-6">
-              This feature is currently under development. We're working hard to
-              bring you the best experience.
-            </p>
-            <Button
-              variant="secondary"
-              onClick={() => setSelectedMenu("dashboard")}
-            >
-              Back to Dashboard
-            </Button>
-          </Card>
-        );
       default:
         return (
-          <div className="flex items-center justify-center h-64">
-            <p className="text-gray-500">Select a menu item from the sidebar</p>
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl shadow-sm border border-slate-100">
+             <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
+                <FaRobot size={32} />
+             </div>
+             <p className="text-slate-500 font-medium">Please select a menu item to continue.</p>
           </div>
         );
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    window.location.href = "/login";
-  };
-
-  const menuSections = [
-    {
-      title: "General",
-      items: [
-        {
-          key: "dashboard" as MenuKey,
-          label: "Dashboard",
-          icon: <RiDashboardLine />,
-        },
-      ],
-    },
-    {
-      title: "Device Management",
-      items: [
-        {
-          key: "onboardDevice" as MenuKey,
-          label: "Onboard Devices",
-          icon: <FaMobileAlt />,
-        },
-        {
-          key: "assignDevice" as MenuKey,
-          label: "Assign Device",
-          icon: <FaRobot />,
-        },
-        {
-          key:"assignApi" as MenuKey, label: "Assign via API", icon: <FaRobot />
-        },
-
-        {key:"assignSlider" as MenuKey, label: "Assign Slider", icon: <FaRegFileImage />},
-        {
-          key: "ManageDevice" as MenuKey,
-          label: "Manage Devices",
-          icon: <FaMobileAlt />,
-          subItems: [
-            {
-              key: "connectedPlaylists" as MenuKey,
-              label: "Connected Playlists",
-              icon: <BsMusicNoteList />,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      title: "Media Management",
-      items: [
-        {
-          key: "createMedia" as MenuKey,
-          label: "Create Media",
-          icon: <FaRegFileAudio />,
-        },
-        {key: "createSlider" as MenuKey, label: "Create Slider", icon: <FaRegFileImage />},
-        {
-          key: "showSlider" as MenuKey,
-          label: "Show Slider",
-          icon: <FaRegFileImage />,
-        },
-        {
-          key: "showMedia" as MenuKey,
-          label: "Show Media",
-          icon: <FaRegFileAudio />,
-        },
-        {
-          key: "setupPlaylist" as MenuKey,
-          label: "Setup Playlist",
-          icon: <FaListAlt />,
-        },
-        {key: "setupAnnouncement" as MenuKey, label: "Setup Announcement", icon: <IoMdSettings />},
-        {key: "createAnnouncement" as MenuKey, label: "Create Announcement", icon: <IoMdSettings />},
-        { key: "showAnnouncement" as MenuKey, label: "Show Announcement", icon: <IoMdSettings /> },
-        {
-          key: "showPlaylist" as MenuKey,
-          label: "Show Playlist",
-          icon: <MdOutlinePlaylistPlay />,
-        },
-        {
-          key: "connectPlaylist" as MenuKey,
-          label: "Connect Playlist",
-          icon: <FaPlug />,
-        },
-      ],
-    },
-    {
-      title: "User Management",
-      items: [
-        {
-          key: "createUser" as MenuKey,
-          label: "Create User",
-          icon: <FaUser />,
-        },
-        { key: "showUser" as MenuKey, label: "Show User", icon: <FaUser /> },
-      ],
-    },
-  ];
-
   return (
-    <>
-      {/* Mobile Menu Button at the very top */}
-      <div className="lg:hidden p-4 bg-white border-b border-gray-200 flex items-center justify-between text-black">
-        <h2 className="text-xl font-bold text-primary-600 flex items-center gap-2">
-          <FaRobot className="text-primary-500" />
-          Robotic Platform
-        </h2>
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 rounded-lg hover:bg-gray-100"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
-          </svg>
-        </button>
-      </div>
+    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      <Toaster position="top-right" />
 
-      {/* Main layout */}
-      <div className="flex flex-col lg:flex-row min-h-screen bg-gray-50 text-black">
-        {/* Sidebar */}
-        <aside
-          className={`w-full lg:w-64 bg-white shadow-md border-r border-gray-200 transition-all duration-300 z-30
-      ${
-        isMobileMenuOpen ? "fixed inset-0 overflow-auto" : "hidden"
-      } lg:relative lg:block
-      h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300`}
-          style={{
-            position: isMobileMenuOpen ? "fixed" : "sticky",
-            top: 0,
-            height: "100vh",
-            overflowY: "auto",
-          }}
-        >
-          <div className="sticky top-0 bg-white z-10">
-            <div className="p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-primary-600 flex items-center gap-2">
-                <FaRobot className="text-primary-500" />
-                Robotic Platform
-              </h2>
-              <button
-                className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div className="px-4 pb-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full pl-8 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
-                />
-                <svg
-                  className="w-4 h-4 text-gray-400 absolute left-3 top-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+      {/* --- SIDEBAR --- */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-slate-300 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 
+        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Logo */}
+          <div className="p-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30">
+                <FaRobot className="text-white text-2xl" />
               </div>
+              <span className="text-xl font-bold text-white tracking-tight">Admin</span>
             </div>
+            <button className="lg:hidden text-slate-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
+              <HiOutlineMenuAlt2 size={24} />
+            </button>
           </div>
-          <nav className="mt-2 px-2 pb-16">
+
+          {/* Nav Links */}
+          <nav className="flex-1 px-4 overflow-y-auto space-y-8 scrollbar-hide pb-10">
             {menuSections.map((section) => (
-              <div key={section.title} className="mb-4">
-                <h5 className="text-xs uppercase text-gray-500 font-medium mb-2">
+              <div key={section.title}>
+                <h5 className="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-[0.15em] mb-3">
                   {section.title}
                 </h5>
-                {section.items.map((item) => (
-                  <div key={item.key}>
-                    {item.subItems ? (
-                      <>
-                        <div
-                          className={`flex items-center justify-between px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 ${
-                            selectedMenu === item.key ||
-                            (item.subItems &&
-                              item.subItems.some(
-                                (sub) => sub.key === selectedMenu
-                              ))
-                              ? "bg-blue-50 text-blue-600 font-semibold"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                          onClick={() => toggleMenuExpansion("devices")}
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    const isActive = selectedMenu === item.key || item.subItems?.some(s => s.key === selectedMenu);
+                    
+                    return (
+                      <div key={item.key}>
+                        <button
+                          onClick={() => item.subItems ? toggleMenuExpansion("devices") : (setSelectedMenu(item.key), setIsMobileMenuOpen(false))}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group
+                          ${isActive ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "hover:bg-slate-800 hover:text-white"}`}
                         >
                           <div className="flex items-center gap-3">
-                            <span
-                              className={`text-lg ${
-                                selectedMenu === item.key ||
-                                (item.subItems &&
-                                  item.subItems.some(
-                                    (sub) => sub.key === selectedMenu
-                                  ))
-                                  ? "text-blue-500"
-                                  : "text-gray-500"
-                              }`}
-                            >
+                            <span className={`${isActive ? "text-white" : "text-slate-500 group-hover:text-indigo-400"} transition-colors`}>
                               {item.icon}
                             </span>
-                            <span>{item.label}</span>
+                            <span className="font-medium text-[14px]">{item.label}</span>
                           </div>
-                          <span>
-                            {menuExpanded.devices ? (
-                              <HiOutlineChevronDown className="text-gray-500" />
-                            ) : (
-                              <HiOutlineChevronRight className="text-gray-500" />
-                            )}
-                          </span>
-                        </div>
+                          {item.subItems && (
+                            <HiOutlineChevronDown className={`transition-transform duration-200 ${menuExpanded.devices ? "rotate-180" : ""}`} />
+                          )}
+                        </button>
+                        
+                        {/* Nested Items */}
                         <AnimatePresence>
-                          {menuExpanded.devices && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="overflow-hidden"
+                          {item.subItems && menuExpanded.devices && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden mt-1 ml-4 pl-4 border-l border-slate-800 space-y-1"
                             >
-                              {item.subItems.map((subItem) => (
-                                <div
-                                  key={subItem.key}
-                                  className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer rounded-lg transition-all ml-6 text-sm mb-1 ${
-                                    selectedMenu === subItem.key
-                                      ? "bg-blue-50 text-blue-600 font-medium"
-                                      : "text-gray-600 hover:bg-gray-100"
-                                  }`}
-                                  onClick={() => {
-                                    setSelectedMenu(subItem.key);
-                                    setIsMobileMenuOpen(false);
-                                  }}
+                              {item.subItems.map(sub => (
+                                <button
+                                  key={sub.key}
+                                  onClick={() => { setSelectedMenu(sub.key); setIsMobileMenuOpen(false); }}
+                                  className={`w-full text-left px-4 py-2 rounded-lg text-sm transition-colors 
+                                  ${selectedMenu === sub.key ? "text-indigo-400 font-semibold" : "text-slate-500 hover:text-slate-300"}`}
                                 >
-                                  <span
-                                    className={`text-base ${
-                                      selectedMenu === subItem.key
-                                        ? "text-blue-500"
-                                        : "text-gray-500"
-                                    }`}
-                                  >
-                                    {subItem.icon}
-                                  </span>
-                                  <span>{subItem.label}</span>
-                                </div>
+                                  {sub.label}
+                                </button>
                               ))}
                             </motion.div>
                           )}
                         </AnimatePresence>
-                      </>
-                    ) : (
-                      <motion.div
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                      >
-                        <div
-                          className={`flex items-center gap-3 px-4 py-3 cursor-pointer rounded-lg transition-all mb-1 ${
-                            selectedMenu === item.key
-                              ? "bg-blue-50 text-blue-600 font-semibold"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            setSelectedMenu(item.key);
-                            setIsMobileMenuOpen(false);
-                          }}
-                        >
-                          <span
-                            className={`text-lg ${
-                              selectedMenu === item.key
-                                ? "text-blue-500"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            {item.icon}
-                          </span>
-                          <span>{item.label}</span>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
-                ))}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))}
-            {/* Bottom section - device stats */}
-            <div className="mt-8 px-4">
-              <h5 className="text-xs uppercase text-gray-500 font-medium mb-2">
-                Device Stats
-              </h5>
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs text-gray-600">Active</span>
-                  <span className="text-xs font-medium text-gray-800">
-                    {devices.filter((d) => d.status === "Connected").length} /{" "}
-                    {devices.length}
-                  </span>
+
+            {/* Device Stats Visualizer */}
+            <div className="px-4 mt-6">
+               <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-slate-400 font-medium">Live Nodes</span>
+                    <span className="text-xs text-indigo-400 font-bold">
+                      {devices.filter(d => d.status === "Connected").length}/{devices.length}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(devices.filter(d => d.status === "Connected").length / (devices.length || 1)) * 100}%` }}
+                      className="h-full bg-indigo-500"
+                    />
+                  </div>
+               </div>
+            </div>
+          </nav>
+
+          {/* Logout Section */}
+          <div className="p-4 border-t border-slate-800">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 w-full px-4 py-3.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all duration-200 group"
+            >
+              <HiOutlineLogout className="text-lg group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-sm">Sign Out System</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* --- MAIN CONTENT AREA --- */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <header className="h-20 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between px-6 md:px-10 z-40 sticky top-0">
+          <div className="flex items-center gap-4">
+            <button className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors" onClick={() => setIsMobileMenuOpen(true)}>
+              <HiOutlineMenuAlt2 size={24} />
+            </button>
+            <div className="hidden md:flex items-center gap-3 text-sm font-medium">
+              <span className="text-slate-400">Platform</span>
+              <FaChevronRight size={10} className="text-slate-300" />
+              <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase text-[11px] font-bold tracking-wider">
+                {getActiveLabel()}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 md:gap-8">
+            {/* Search Bar */}
+            <div className="hidden lg:flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-2xl border border-transparent focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all w-72">
+              <HiOutlineSearch className="text-slate-400 text-lg" />
+              <input 
+                type="text" 
+                placeholder="Search nodes, media..." 
+                className="bg-transparent border-none text-sm outline-none text-slate-700 w-full placeholder:text-slate-400" 
+              />
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all relative">
+                <HiOutlineBell size={22} />
+                <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+              </button>
+              <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
+              <div className="flex items-center gap-3 pl-2">
+                <div className="hidden sm:block text-right">
+                  <p className="text-sm font-bold text-slate-800 leading-none">Super User</p>
+                  <p className="text-[11px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">Administrator</p>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-3">
-                  <div
-                    className="h-1.5 rounded-full bg-green-500"
-                    style={{
-                      width: `${
-                        (devices.filter((d) => d.status === "Connected")
-                          .length /
-                          devices.length) *
-                        100
-                      }%`,
-                    }}
-                  ></div>
-                </div>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs text-gray-600">Playlists</span>
-                  <span className="text-xs font-medium text-gray-800">
-                    {playlists.length}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                  <div
-                    className="h-1.5 rounded-full bg-blue-500"
-                    style={{
-                      width: `${Math.min(playlists.length / 10, 1) * 100}%`,
-                    }}
-                  ></div>
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200 overflow-hidden font-bold">
+                  SU
                 </div>
               </div>
             </div>
-            {/* User profile section */}
-            <div className="mt-8 px-4">
-              <button
-                onClick={handleLogout}
-                className="w-full py-2 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition"
-              >
-                Logout
-              </button>
+          </div>
+        </header>
+
+        {/* Viewport Content */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
+          <div className="max-w-[1600px] mx-auto">
+            {/* Page Title & Intro */}
+            <div className="mb-10">
+                <motion.h1 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight"
+                >
+                  {getActiveLabel()}
+                </motion.h1>
+                <motion.p 
+                   initial={{ opacity: 0, x: -20 }}
+                   animate={{ opacity: 1, x: 0 }}
+                   transition={{ delay: 0.1 }}
+                   className="text-slate-500 mt-2 font-medium"
+                >
+                  Configure and monitor your automated robotics network.
+                </motion.p>
             </div>
-          </nav>
-        </aside>
 
-        {/* Content */}
-        <main className="flex-1 p-4 md:p-6 overflow-auto h-screen scrollbar-thin scrollbar-thumb-gray-300">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={selectedMenu}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
+            {/* View Switching Logic with Animations */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedMenu}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </main>
-
-        {/* Modals */}
-
-        <AnimatePresence>
-          {showPlaylistModal && (
-            <AddPlaylistModal
-              onClose={() => setShowPlaylistModal(false)}
-              onSave={addNewPlaylist}
-            />
-          )}
-        </AnimatePresence>
       </div>
-    </>
+
+      {/* --- GLOBAL MODALS (Restored) --- */}
+      <AnimatePresence>
+        {showPlaylistModal && (
+          <AddPlaylistModal
+            onClose={() => setShowPlaylistModal(false)}
+            onSave={addNewPlaylist}
+          />
+        )}
+      </AnimatePresence>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1;
+        }
+      `}</style>
+    </div>
   );
 }

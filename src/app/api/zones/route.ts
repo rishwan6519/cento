@@ -1,49 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
+import { connectToDatabase } from "@/lib/db";
+import { ZoneEvent } from "@/models/ZoneEvent";
 import { ZoneCount } from "@/models/Camera/SaveCount";
-
-// MongoDB connection details
-const uri =
-  "mongodb+srv://retail_admin:LCQ3b6kYRiN6wUEl@retailanalytics.kznhbji.mongodb.net/?retryWrites=true&w=majority&appName=RetailAnalytics";
-const dbName = "retail_analytics_test";
-
-let client: MongoClient | null = null;
-
-async function connectToDatabase() {
-  if (!client) {
-    client = new MongoClient(uri);
-    await client.connect();
-    console.log("[MongoDB] Connected successfully");
-  }
-  return client.db(dbName);
-}
+import { CameraConfig } from "@/models/Camera/CameraConfig";
+import CameraMarker from "@/models/CameraMarker";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const cameraId = searchParams.get("cameraId");
+    const cameraIdParam = searchParams.get("cameraId"); // This might be the Name
     const startDate = searchParams.get("startDate");
     const startTime = searchParams.get("startTime");
     const endDate = searchParams.get("endDate");
     const endTime = searchParams.get("endTime");
 
     console.log("[API] Received params:", {
-      cameraId,
+      cameraIdParam,
       startDate,
       startTime,
       endDate,
       endTime,
     });
 
-    if (!cameraId || !startDate || !endDate) {
+    if (!cameraIdParam || !startDate || !endDate) {
       return NextResponse.json(
         { error: "Missing required parameters: cameraId, startDate, endDate" },
         { status: 400 }
       );
     }
 
-    const db = await connectToDatabase();
-    const collection = db.collection("zone_events");
+    // Connect to database
+    await connectToDatabase();
+
+    // ✅ Resolve actual Camera ID from CameraConfig (if the param is a Name)
+    // First, try to find by Name
+    let actualCameraId = cameraIdParam;
+    const configByName = await CameraConfig.findOne({ name: cameraIdParam }).lean();
+    
+    if (configByName) {
+      actualCameraId = configByName.id;
+      console.log(`[API] Resolved name "${cameraIdParam}" to ID "${actualCameraId}"`);
+    } else {
+      // If not found by name, check if it's already a valid ID
+      const configById = await CameraConfig.findOne({ id: cameraIdParam }).lean();
+      if (configById) {
+        actualCameraId = configById.id;
+        console.log(`[API] Using provided ID "${actualCameraId}"`);
+      } else {
+        console.warn(`[API] No CameraConfig found for "${cameraIdParam}". Proceeding with original value.`);
+      }
+    }
 
     // Build date range
     const startDateTime = new Date(`${startDate}T${startTime || "00:00"}:00.000Z`);
@@ -54,23 +60,19 @@ export async function GET(request: NextRequest) {
       endDateTime: endDateTime.toISOString(),
     });
 
-    // ✅ Query for the given camera and time range
+    // ✅ Query for the resolved camera ID and time range
     const query = {
-      "metadata.camera_id": cameraId,
+      "metadata.camera_id":`camera`+ actualCameraId,
       timestamp: {
         $gte: startDateTime,
         $lte: endDateTime,
       },
     };
 
-    console.log("[API] MongoDB query:", JSON.stringify(query, null, 2));
+    console.log("[API] Querying ZoneEvents for camera_id:", actualCameraId);
 
-    const documents = await collection.find(query).toArray();
+    const documents = await ZoneEvent.find(query).lean();
     console.log(`[API] Found ${documents.length} documents`);
-
-    if (documents.length > 0) {
-      console.log("[API] Sample document:", JSON.stringify(documents[0], null, 2));
-    }
 
     // ✅ Count unique person_ids for Entered and Exited actions
     const zoneCounts: Record<
@@ -111,8 +113,6 @@ export async function GET(request: NextRequest) {
 
     zones.sort((a, b) => a.zone_id - b.zone_id);
 
-    console.log(`[API] Final zone summary (${zones.length} zones):`, zones);
-
     return NextResponse.json({
       zones,
       summary: {
@@ -121,7 +121,8 @@ export async function GET(request: NextRequest) {
           start: startDateTime.toISOString(),
           end: endDateTime.toISOString(),
         },
-        camera_id: cameraId,
+        camera_id: actualCameraId,
+        requested_param: cameraIdParam
       },
     });
   } catch (error: any) {
@@ -137,8 +138,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-
-
 export async function POST(request: Request) {
   try {
     await connectToDatabase();
@@ -150,14 +149,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing camera_id or zones' }, { status: 400 });
     }
 
-    // Save each zone for the camera  
     for (const zone of zones) {
       await ZoneCount.updateOne(
         { camera_id, zone_id: zone.id },
         {
           $setOnInsert: { camera_id, zone_id: zone.id },
           $set: {
-            // Optionally save coordinates
             coordinates: {
               x1: zone.x1,
               y1: zone.y1,
@@ -171,8 +168,73 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving zones:', error);
-    return NextResponse.json({ success: false, error: 'Failed to save zones' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Failed to save zones', details: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const cameraId = searchParams.get("cameraId");
+    const zoneName = searchParams.get("zoneName");
+
+    if (!cameraId || !zoneName) {
+      return NextResponse.json(
+        { error: "Missing required parameters: cameraId, zoneName" },
+        { status: 400 }
+      );
+    }
+
+    await connectToDatabase();
+
+    // Resolve actual Camera ID if name was provided
+    let actualCameraId = cameraId;
+    const configByName = await CameraConfig.findOne({ name: cameraId }).lean();
+    if (configByName) actualCameraId = configByName.id;
+
+    // 1. Delete events from ZoneEvent
+    const deleteEvents = await ZoneEvent.deleteMany({
+      $or: [
+        { "metadata.camera_id": actualCameraId, "metadata.zone_name": zoneName },
+        { "metadata.camera_id": `camera${actualCameraId}`, "metadata.zone_name": zoneName }
+      ]
+    });
+
+    // 2. Delete counts from ZoneCount
+    const zoneIdMatch = zoneName.match(/\d+/);
+    if (zoneIdMatch) {
+      const zoneId = parseInt(zoneIdMatch[0]);
+      await ZoneCount.deleteMany({
+        camera_id: actualCameraId,
+        zone_id: zoneId
+      });
+      await ZoneCount.deleteMany({
+        camera_id: `camera${actualCameraId}`,
+        zone_id: zoneId
+      });
+    }
+
+    // 3. Remove from CameraMarker (Floor Plan)
+    await CameraMarker.updateMany(
+      { cameraId: actualCameraId },
+      { $pull: { zones: { name: zoneName } } }
+    );
+
+    // 4. Remove from CameraConfig (Device Config)
+    await CameraConfig.updateOne(
+      { id: actualCameraId },
+      { $pull: { zones: { name: zoneName } } }
+    );
+
+    return NextResponse.json({ 
+      success: true, 
+      message: `Deleted data and floor markings for zone ${zoneName}`,
+      eventsDeleted: deleteEvents.deletedCount
+    });
+  } catch (error: any) {
+    console.error("[API ERROR] Delete failed:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

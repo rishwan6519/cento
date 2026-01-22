@@ -94,6 +94,6 @@ html {
 .text-custom-white {
   color: white !important;
 }
-h1, h2, h3 {
+/* h1, h2, h3 {
   font-family: var(--font-orbitron), sans-serif;
-}
+} */

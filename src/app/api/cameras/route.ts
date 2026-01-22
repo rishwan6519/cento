@@ -1,61 +1,51 @@
+
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/db'; // Make sure you connect to MongoDB
-import { ZoneCount } from '@/models/Camera/SaveCount'; // Path to your model
+import { connectToDatabase } from '@/lib/db';
+import { CameraConfig } from '@/models/Camera/CameraConfig';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
+    await connectToDatabase();
+    const cameras = await CameraConfig.find({}).sort({ createdAt: 1 });
+    return NextResponse.json(cameras);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch cameras' }, { status: 500 });
+  }
+}
 
-    const startDate = searchParams.get('startDate'); // e.g., '2025-06-17'
-    const startTime = searchParams.get('startTime'); // e.g., '09:00'
-    const endDate = searchParams.get('endDate');     // e.g., '2025-06-18'
-    const endTime = searchParams.get('endTime');     // e.g., '17:30'
-
-    // ✅ Validate inputs
-    if (!startDate || !startTime || !endDate || !endTime) {
-      return NextResponse.json(
-        { error: 'Missing one or more date/time parameters' },
-        { status: 400 }
-      );
-    }
-
-    // ✅ Combine date and time into full Date objects
-    const startDateTime = new Date(`${startDate}T${startTime}:00`);
-    const endDateTime = new Date(`${endDate}T${endTime}:00`);
-
-    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-      return NextResponse.json({ error: 'Invalid date/time format' }, { status: 400 });
-    }
-
-    // ✅ Ensure DB connection
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
     await connectToDatabase();
 
-    // ✅ Aggregate documents with counts.timestamp in range
-    const cameras = await ZoneCount.aggregate([
-      {
-        $match: {
-          'counts.timestamp': {
-            $gte: startDateTime,
-            $lte: endDateTime
-          }
-        }
-      },
-      {
-        $group: {
-          _id: '$camera_id'
-        }
-      }
-    ]);
+    let nextId = body.id;
 
-    // ✅ Extract camera IDs
-    const cameraIds = cameras.map(doc => doc._id);
+    if (!nextId) {
+        // Auto-generate ID logic only if not provided
+        // Find the latest camera to determine next ID
+        const lastCamera = await CameraConfig.findOne({}).sort({ createdAt: -1 });
+        
+        let nextIdNumber = 1;
+        if (lastCamera && lastCamera.id) {
+            // extract number from "CAM-XX"
+            const match = lastCamera.id.match(/CAM-(\d+)/);
+            if (match && match[1]) {
+                nextIdNumber = parseInt(match[1]) + 1;
+            }
+        }
+        nextId = `CAM-${nextIdNumber.toString().padStart(2, '0')}`;
+    }
 
-    return NextResponse.json({ cameras: cameraIds });
+    const newCamera = new CameraConfig({
+        ...body,
+        id: nextId
+    });
+
+    await newCamera.save();
+
+    return NextResponse.json(newCamera);
   } catch (error) {
-    console.error('Error fetching cameras:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch cameras' },
-      { status: 500 }
-    );
+    console.error("Error creating camera:", error);
+    return NextResponse.json({ error: 'Failed to create camera' }, { status: 500 });
   }
 }
