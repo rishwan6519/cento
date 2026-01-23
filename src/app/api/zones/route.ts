@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const documents = await ZoneEvent.find(query).lean();
     console.log(`[API] Found ${documents.length} documents`);
 
-    // ✅ Count unique person_ids for Entered and Exited actions
+    // ✅ Aggregate counts (Unique Person IDs)
     const zoneCounts: Record<
       string,
       { in_ids: Set<number>; out_ids: Set<number> }
@@ -106,8 +106,8 @@ export async function GET(request: NextRequest) {
       return {
         zone_id: zoneId,
         zone_name: zoneName,
-        total_in_count: zoneCounts[zoneName].in_ids.size, // unique entered persons
-        total_out_count: zoneCounts[zoneName].out_ids.size, // unique exited persons
+        total_in_count: zoneCounts[zoneName].in_ids.size,
+        total_out_count: zoneCounts[zoneName].out_ids.size,
       };
     });
 
@@ -115,6 +115,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       zones,
+      events: documents.map((d: any) => ({
+        person_id: d.person_id,
+        timestamp: d.timestamp,
+        action: d.action,
+        zone_id: d.metadata?.zone_id,
+        zone_name: d.metadata?.zone_name
+      })),
       summary: {
         total_documents: documents.length,
         date_range: {

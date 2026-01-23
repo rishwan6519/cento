@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import mqtt from "mqtt";
+import { motion, AnimatePresence } from "framer-motion";
 import FloorMapUploader from "@/components/FloorMapUploader/FloorMapUploader";
 import FloorPlanUploader from "@/components/FloorPlanUPloader/FloorPlanUploader";
 import HeatmapViewer from "@/components/ShowHeatmap/ShowHeatmap";
@@ -10,7 +11,6 @@ import HeatmapViewer from "@/components/ShowHeatmap/ShowHeatmap";
 const MQTT_BROKER_URL = "wss://b04df1c6a94d4dc5a7d1772b53665d8e.s1.eu.hivemq.cloud:8884/mqtt";
 const MQTT_USERNAME = "PeopleCounter";
 const MQTT_PASSWORD = "Counter123";
-const PI_ID = "rtx5070ti";
 
 // --- TYPES ---
 interface Camera {
@@ -38,8 +38,10 @@ interface Line {
 }
 
 interface ZoneCount {
-  in: number;
-  out: number;
+  todayIn: number;
+  todayOut: number;
+  allIn: number;
+  allOut: number;
 }
 
 // --- ICONS ---
@@ -55,6 +57,7 @@ const Icons = {
   X: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>,
   Refresh: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
   Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+  Home: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
 };
 
 
@@ -74,7 +77,7 @@ const LoadingOverlay = ({ message }: { message: string }) => (
 
 export default function PeopleDetectionPage() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<"setup" | "analytics" | "floorplan" | "heatmap">("setup");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "setup" | "analytics" | "floorplan-upload" | "floorplan-config" | "heatmap" | "zone-config">("dashboard");
 
   // MQTT & System State
   const [mqttClient, setMqttClient] = useState<mqtt.MqttClient | null>(null);
@@ -84,7 +87,10 @@ export default function PeopleDetectionPage() {
   const [systemMessage, setSystemMessage] = useState<string | null>(null);
   const [systemStatus, setSystemStatus] = useState<"ok" | "error" | "warning">("ok");
   
-  // Camera State
+  // PI Settings
+  const [piId, setPiId] = useState("rtx5070ti");
+  const [isEditingPiId, setIsEditingPiId] = useState(false);
+  const [tempPiId, setTempPiId] = useState("");
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [zoneCounts, setZoneCounts] = useState<Record<string, Record<string, ZoneCount>>>({});
 
@@ -92,10 +98,11 @@ export default function PeopleDetectionPage() {
   // const [newCamId, setNewCamId] = useState(""); // ID is now auto-generated
   const [newCamName, setNewCamName] = useState("");
   const [newCamIp, setNewCamIp] = useState("");
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" as "success" | "error" });
   const [newCamUser, setNewCamUser] = useState("admin");
   const [newCamPass, setNewCamPass] = useState("");
   const [newCamBrand, setNewCamBrand] = useState<"dahua" | "hikvision">("dahua");
-  const [newCamChannel, setNewCamChannel] = useState<number>(1);
+  const [newCamChannel, setNewCamChannel] = useState<number>(101);
 
   // Editor State
   const [editingCameraId, setEditingCameraId] = useState<string | number | null>(null);
@@ -112,41 +119,105 @@ export default function PeopleDetectionPage() {
   const [startPos, setStartPos] = useState<{x: number, y: number} | null>(null);
   const [currentPos, setCurrentPos] = useState<{x: number, y: number} | null>(null);
 
+  // Analytics Detailed State
+  const [analyticsFilter, setAnalyticsFilter] = useState({
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    startTime: "00:00",
+    endTime: "23:59",
+    cameraId: "all"
+  });
+  const [eventHistory, setEventHistory] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [visibleHistoryCount, setVisibleHistoryCount] = useState(50);
+  const [hourlyStats, setHourlyStats] = useState<{hour: number, in: number, out: number, occupancy: number}[]>(Array.from({length: 24}, (_, i) => ({hour: i, in: 0, out: 0, occupancy: 0})));
+  const [todayUniqueIn, setTodayUniqueIn] = useState(0);
+  const [todayUniqueOut, setTodayUniqueOut] = useState(0);
+
   // --- DERIVED RTSP URL (LIVE PREVIEW OF STRING) ---
   const getGeneratedRtspUrl = () => {
-      const channel = newCamChannel || 1;
+      const channel = newCamChannel || 101;
       if (newCamBrand === "hikvision") {
-          // Logic: Channel 1 -> 101, Channel 2 -> 201
-          const hikChannel = channel * 100 + 1;
-          return `rtsp://${newCamUser || 'user'}:${newCamPass || 'pass'}@${newCamIp || '192.168.1.x'}:554/Streaming/Channels/${hikChannel}`;
+          return `rtsp://${newCamUser || 'user'}:${newCamPass || 'pass'}@${newCamIp || '192.168.1.x'}:554/Streaming/Channels/${channel}`;
       } else {
-          // Logic: Channel 1 -> channel=1, Channel 2 -> channel=2
           return `rtsp://${newCamUser || 'user'}:${newCamPass || 'pass'}@${newCamIp || '192.168.1.x'}:554/cam/realmonitor?channel=${channel}&subtype=0`;
       }
   };
 
+  // --- FETCH HOURLY STATS ---
+  const fetchHourlyStats = async () => {
+    try {
+      const res = await fetch("/api/stats/hourly");
+      const data = await res.json();
+      if (data.success) {
+        setHourlyStats(data.data);
+        setTodayUniqueIn(data.todayIn || 0);
+        setTodayUniqueOut(data.todayOut || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch hourly stats:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "dashboard") {
+      fetchHourlyStats();
+    }
+  }, [activeTab]);
+
+  // --- LOAD SETTINGS ---
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      if (data.success && data.data.pi_id) {
+        setPiId(data.data.pi_id);
+        setTempPiId(data.data.pi_id);
+      }
+    } catch (err) {
+      console.error("Failed to fetch settings", err);
+    }
+  };
+
+  const savePiId = async () => {
+    if (!tempPiId.trim()) return;
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'pi_id', value: tempPiId })
+      });
+      if (res.ok) {
+        setPiId(tempPiId);
+        setIsEditingPiId(false);
+        setToast({ show: true, message: "PI ID updated successfully!", type: "success" });
+        setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to save PI ID", err);
+    }
+  };
+
   // --- LOAD CAMERAS FROM DB ---
   useEffect(() => {
+    fetchSettings();
     fetch('/api/cameras')
       .then(res => res.json())
       .then(data => {
         console.log("Raw DB Response:", data);
-        // Handle various API response structures
         let validData = [];
         if (Array.isArray(data)) validData = data;
         else if (data && Array.isArray(data.data)) validData = data.data;
         else if (data && Array.isArray(data.cameras)) validData = data.cameras;
         
-        // Map and sanitize
         const sanitized = validData.map((c: any) => ({
             ...c,
-            // If it's in the DB, it's effectively "active/connected" for our UI purposes until proven otherwise
             status: c.status || 'active', 
-            // Ensure ID is preserved. Note: Interface now supports string | number
             id: c.id 
         }));
         
         setCameras(sanitized);
+        // Also fetch stats on mount
+        fetchHourlyStats();
       })
       .catch(err => console.error("Failed to load cameras", err));
   }, []);
@@ -159,14 +230,35 @@ export default function PeopleDetectionPage() {
       fetch(`/api/people-count?cameraId=${cam.id}`)
         .then(res => res.json())
         .then(data => {
-          if (data.success && Array.isArray(data.zones)) {
+          if (data.success && data.today) {
              const mappedZones: Record<string, ZoneCount> = {};
-             data.zones.forEach((z: any) => {
+             
+             // First map today
+             data.today.forEach((z: any) => {
                  mappedZones[z.zone_name] = {
-                     in: z.total_in_count || 0,
-                     out: z.total_out_count || 0
+                     todayIn: z.in || 0,
+                     todayOut: z.out || 0,
+                     allIn: 0,
+                     allOut: 0
                  };
              });
+
+             // Then map all time
+             if (data.allTime) {
+                data.allTime.forEach((z: any) => {
+                    if (mappedZones[z.zone_name]) {
+                        mappedZones[z.zone_name].allIn = z.in || 0;
+                        mappedZones[z.zone_name].allOut = z.out || 0;
+                    } else {
+                        mappedZones[z.zone_name] = {
+                            todayIn: 0,
+                            todayOut: 0,
+                            allIn: z.in || 0,
+                            allOut: z.out || 0
+                        };
+                    }
+                });
+             }
              
              setZoneCounts(prev => ({
                  ...prev,
@@ -183,6 +275,40 @@ export default function PeopleDetectionPage() {
     const interval = setInterval(fetchCounts, 5000);
     return () => clearInterval(interval);
   }, [activeTab, cameras]);
+
+  const fetchHistoricalData = async () => {
+    if (activeTab !== "analytics" || cameras.length === 0) return;
+    setIsHistoryLoading(true);
+    
+    try {
+        const targetCams = analyticsFilter.cameraId === 'all' ? cameras : cameras.filter(c => c.id == analyticsFilter.cameraId);
+        let allEvents: any[] = [];
+        
+        for (const cam of targetCams) {
+            const url = `/api/zones?cameraId=${cam.id}&startDate=${analyticsFilter.startDate}&endDate=${analyticsFilter.endDate}&startTime=${analyticsFilter.startTime}&endTime=${analyticsFilter.endTime}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.events) {
+                const annotated = data.events.map((e: any) => ({ ...e, cameraName: cam.name }));
+                allEvents = [...allEvents, ...annotated];
+            }
+        }
+        
+        allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setEventHistory(allEvents);
+        setVisibleHistoryCount(50); // Reset count on new fetch
+    } catch (e) {
+        console.error("Failed to fetch history", e);
+    } finally {
+        setIsHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'analytics') {
+        fetchHistoricalData();
+    }
+  }, [activeTab, analyticsFilter, cameras]);
 
   // --- MQTT CONNECTION ---
   useEffect(() => {
@@ -204,17 +330,17 @@ export default function PeopleDetectionPage() {
       setSystemStatus("ok");
 
       // Subscribe to all relevant topics
-      client.subscribe(`vision/${PI_ID}/+/camera_add_response`);
-      client.subscribe(`vision/${PI_ID}/+/camera_remove_response`);
-      client.subscribe(`vision/${PI_ID}/+/snapshot`);
-      client.subscribe(`vision/${PI_ID}/+/counts/update`);
-      client.subscribe(`vision/${PI_ID}/+/lines/full_data`);
+      client.subscribe(`vision/${piId}/+/camera_add_response`);
+      client.subscribe(`vision/${piId}/+/camera_remove_response`);
+      client.subscribe(`vision/${piId}/+/snapshot`);
+      client.subscribe(`vision/${piId}/+/counts/update`);
+      client.subscribe(`vision/${piId}/+/lines/full_data`);
     });
 
     client.on("message", (topic, payload) => {
       const msgStr = payload.toString();
       const topicParts = topic.split("/");
-      // Structure: vision/PI_ID/CAMERA_ID/ACTION
+      // Structure: vision/node_id/CAMERA_ID/ACTION
       if (topicParts.length < 4) return;
       const camId = topicParts[2];
       const action = topicParts[3];
@@ -228,6 +354,8 @@ export default function PeopleDetectionPage() {
             if (response.status === "success") {
               setSystemMessage("CONNECTED SUCCESS");
               setSystemStatus("ok");
+              setToast({ show: true, message: "Camera connected successfully!", type: "success" });
+              setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
               
               // 1. MQTT Success -> Now Save to Database
               // Handle potential type mismatch: camId is string from topic, c.id might be number or string
@@ -300,7 +428,7 @@ export default function PeopleDetectionPage() {
 
     setMqttClient(client);
     return () => { client.end(); };
-  }, []);
+  }, [piId]);
 
   // --- ACTIONS ---
 
@@ -378,7 +506,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
 
     // alert(JSON.stringify(payload));
     mqttClient?.publish(
-      `vision/${PI_ID}/${nextId}/camera_add`,
+      `vision/${piId}/${nextId}/camera_add`,
       JSON.stringify(payload),
       { qos: 1 }
     );
@@ -402,7 +530,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
     
     // 1. MQTT Remove
     mqttClient?.publish(
-      `vision/${PI_ID}/${camId}/camera_remove`,
+      `vision/${piId}/${camId}/camera_remove`,
       JSON.stringify({ camera_id: `${camId}` }),
       { qos: 1 }
     );
@@ -435,7 +563,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
     
     setIsSnapshotLoading(true);
     mqttClient?.publish(
-      `vision/${PI_ID}/${camId}/snapshot_request`,
+      `vision/${piId}/${camId}/snapshot_request`,
       JSON.stringify({ camera_id: camId }),
       { qos: 1 }
     );
@@ -468,7 +596,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
              }))
          };
          mqttClient?.publish(
-            `vision/${PI_ID}/${editingCameraId}/zone_config`,
+            `vision/${piId}/${editingCameraId}/zone_config`,
             JSON.stringify(zonePayload),
             { qos: 1 }
          );
@@ -488,7 +616,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
              }))
          };
          mqttClient?.publish(
-            `vision/${PI_ID}/${editingCameraId}/line_config`,
+            `vision/${piId}/${editingCameraId}/line_config`,
             JSON.stringify(linePayload),
             { qos: 1 }
          );
@@ -504,7 +632,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
     
     // 1. MQTT Signal
     mqttClient?.publish(
-      `vision/${PI_ID}/${camId}/zone_remove`,
+      `vision/${piId}/${camId}/zone_remove`,
       JSON.stringify({ name }),
       { qos: 1 }
     );
@@ -531,7 +659,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
     
     // 1. MQTT Signal
     mqttClient?.publish(
-      `vision/${PI_ID}/${camId}/line_remove`,
+      `vision/${piId}/${camId}/line_remove`,
       JSON.stringify({ name }),
       { qos: 1 }
     );
@@ -613,7 +741,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
       
       {/* SIDEBAR */}
       <aside className="w-72 bg-white border-r border-gray-200 flex flex-col z-20">
-         <div className="p-8 pb-4">
+         <div className="p-6 pb-2">
              <div className="flex items-center gap-3">
                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -627,10 +755,13 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
 
          <nav className="flex-1 px-4 py-6 space-y-2">
             {[
-                { id: "setup", label: "Stream Config", icon: Icons.Camera },
-                { id: "analytics", label: "Live Intelligence", icon: Icons.Analytics },
-                { id: "floorplan", label: "Floor Plan Upload", icon: Icons.Map },
-                { id: "heatmap", label: "HeatMap", icon: Icons.Heatmap },
+                { id: "dashboard", label: "Dashboard", icon: Icons.Home },
+                { id: "floorplan-upload", label: "Upload Map", icon: Icons.Plus },
+                { id: "floorplan-config", label: "Map Config", icon: Icons.Map },
+                { id: "analytics", label: "Analytics", icon: Icons.Analytics },
+                { id: "setup", label: "Devices", icon: Icons.Camera },
+                { id: "zone-config", label: "Zone Config", icon: Icons.Settings },
+                { id: "heatmap", label: "Heatmap", icon: Icons.Heatmap },
             ].map(item => (
                 <button key={item.id} onClick={() => setActiveTab(item.id as any)}
                     className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-200 group relative overflow-hidden
@@ -645,11 +776,33 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
          <div className="p-6">
              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 relative overflow-hidden">
                  <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-transparent to-white/40 rounded-bl-full pointer-events-none`} />
-                 <div className="flex items-center gap-3 mb-2">
-                     <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-rose-500 shadow-sm animate-pulse"}`} />
-                     <span className={`text-[10px] font-bold tracking-widest uppercase ${isConnected ? "text-emerald-600" : "text-rose-600"}`}>{isConnected ? "ONLINE" : "OFFLINE"}</span>
+                 <div className="flex items-center justify-between mb-2">
+                     <div className="flex items-center gap-3">
+                         <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-rose-500 shadow-sm animate-pulse"}`} />
+                         <span className={`text-[10px] font-bold tracking-widest uppercase ${isConnected ? "text-emerald-600" : "text-rose-600"}`}>{isConnected ? "ONLINE" : "OFFLINE"}</span>
+                     </div>
+                     <button onClick={() => setIsEditingPiId(!isEditingPiId)} className="text-gray-400 hover:text-indigo-600 transition-colors">
+                         <Icons.Edit />
+                     </button>
                  </div>
-                 <div className="text-xs text-gray-500 font-mono">NODE: {PI_ID}</div>
+                 {isEditingPiId ? (
+                     <div className="flex flex-col gap-2">
+                         <input 
+                             type="text" 
+                             value={tempPiId} 
+                             onChange={(e) => setTempPiId(e.target.value)}
+                             className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-[10px] font-mono focus:ring-1 focus:ring-indigo-500 outline-none"
+                             placeholder="Enter PI ID"
+                             autoFocus
+                         />
+                         <div className="flex gap-2">
+                             <button onClick={savePiId} className="flex-1 bg-indigo-600 text-white text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Save</button>
+                             <button onClick={() => setIsEditingPiId(false)} className="flex-1 bg-gray-200 text-gray-600 text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Cancel</button>
+                         </div>
+                     </div>
+                 ) : (
+                     <div className="text-xs text-gray-500 font-mono">NODE: {piId}</div>
+                 )}
              </div>
          </div>
       </aside>
@@ -657,7 +810,7 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50 relative">
           {/* Header */}
-          <header className="h-20 px-8 flex items-center justify-between border-b border-gray-200 bg-white/80 backdrop-blur-sm z-10">
+          <header className="h-16 px-8 flex items-center justify-between border-b border-gray-200 bg-white/80 backdrop-blur-sm z-10">
               <div>
                   <h2 className="text-2xl font-bold text-gray-900 tracking-tight uppercase">{activeTab.replace("-", " ")}</h2>
                   {systemMessage && <p className={`text-[10px] font-mono mt-1 ${systemStatus === "error" ? "text-rose-600" : systemStatus === "warning" ? "text-amber-600" : "text-indigo-600"}`}>{systemMessage}</p>}
@@ -669,8 +822,92 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
               </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-8 relative">
+          <div className={`flex-1 relative ${activeTab === "dashboard" ? "overflow-y-auto p-4" : "overflow-y-auto p-8"}`}>
               {isLoading && <LoadingOverlay message={loadingMessage} />}
+
+              {/* DASHBOARD TAB */}
+              {activeTab === "dashboard" && (
+                   <div className="w-full max-w-7xl mx-auto space-y-6">
+                      {/* Dashboard Header */}
+                      <div className="flex justify-between items-end border-b border-gray-200 pb-4">
+                          <div>
+                              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">System <span className="text-indigo-600">Overview</span></h1>
+                              <p className="text-sm text-gray-500 font-medium">Monitoring Node: {piId}</p>
+                          </div>
+                          <div className="text-right">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Today's Total Traffic</span>
+                              <div className="flex gap-4">
+                                  <div className="bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
+                                      <span className="text-xs font-bold text-indigo-600">IN: {todayUniqueIn}</span>
+                                  </div>
+                                  <div className="bg-violet-50 px-3 py-1 rounded-lg border border-violet-100">
+                                      <span className="text-xs font-bold text-violet-600">OUT: {todayUniqueOut}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Occupancy Trend Graph */}
+                      <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
+                           <div className="flex justify-between items-center mb-6">
+                               <div className="flex items-center gap-2">
+                                   <div className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
+                                   <span className="text-xs font-black text-gray-900 uppercase tracking-widest">In-Store Occupancy Trend (24H)</span>
+                               </div>
+                               {/* <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
+                                   LIVE: {hourlyStats[new Date().getHours()]?.occupancy || 0} PERSONS
+                               </div> */}
+                           </div>
+                           <div className="h-32 w-full bg-gray-50/50 rounded-2xl p-4">
+                               <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 240 100">
+                                   {/* Trend Area Fill */}
+                                   <path
+                                       d={`M 0 100 ${hourlyStats.map((s, i) => `L ${i * 10} ${100 - ((s.occupancy || 0) / Math.max(...hourlyStats.map(x=>x.occupancy||0), 1) * 80)}`).join(' ')} L 230 100 Z`}
+                                       fill="url(#gradient-occupancy)" fillOpacity="0.1"
+                                   />
+                                   <defs>
+                                       <linearGradient id="gradient-occupancy" x1="0" y1="0" x2="0" y2="1">
+                                           <stop offset="0%" stopColor="#4f46e5" />
+                                           <stop offset="100%" stopColor="#818cf8" />
+                                       </linearGradient>
+                                   </defs>
+                                   {/* Sharp Trend Line */}
+                                   <polyline
+                                       points={hourlyStats.map((s, i) => `${i * 10},${100 - ((s.occupancy || 0) / Math.max(...hourlyStats.map(x=>x.occupancy||0), 1) * 80)}`).join(' ')}
+                                       fill="none" stroke="#4f46e5" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" 
+                                   />
+                               </svg>
+                           </div>
+                           <div className="flex justify-between mt-4 text-[8px] font-bold text-gray-400 uppercase tracking-tighter px-2">
+                               {['12 AM', '6 AM', '12 PM', '6 PM', '11 PM'].map(t => <span key={t}>{t}</span>)}
+                           </div>
+                      </div>
+
+                       {/* Module Grid */}
+                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                           {[
+                               { id: "floorplan-upload", icon: <Icons.Plus />, label: "Upload Floor Plan", desc: "Import new store layouts.", color: "emerald" },
+                               { id: "floorplan-config", icon: <Icons.Map />, label: "Config Floor Plan", desc: "Map devices to layout.", color: "teal" },
+                               { id: "analytics", icon: <Icons.Analytics />, label: "Footfall Analytics", desc: "Monitor real-time traffic.", color: "indigo" },
+                               { id: "setup", icon: <Icons.Camera />, label: "Device Setup", desc: "Manage camera hardware.", color: "violet" },
+                               { id: "zone-config", icon: <Icons.Settings />, label: "Zone Config", desc: "Calibrate detection areas.", color: "sky" },
+                               { id: "heatmap", icon: <Icons.Heatmap />, label: "Heatmap View", desc: "Analyze dwell patterns.", color: "amber" },
+                           ].map((mod) => (
+                               <div key={mod.id} onClick={() => setActiveTab(mod.id as any)} 
+                                   className="group bg-white border-2 border-gray-100 rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl hover:border-indigo-500/20 transition-all cursor-pointer relative overflow-hidden flex flex-col items-center text-center">
+                                   <div className={`w-16 h-16 bg-${mod.color}-100 text-${mod.color}-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
+                                       {mod.icon}
+                                   </div>
+                                   <h3 className="text-xl font-bold text-gray-900 mb-2">{mod.label}</h3>
+                                   <p className="text-gray-500 text-xs px-4">{mod.desc}</p>
+                                   <div className="mt-6 flex items-center gap-2 text-indigo-600 font-bold text-[10px] tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity">
+                                       Launch Module &rarr;
+                                   </div>
+                               </div>
+                           ))}
+                       </div>
+                  </div>
+              )}
 
               {/* SETUP TAB */}
               {activeTab === "setup" && (
@@ -766,9 +1003,6 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
                                       <div className="text-[10px] text-gray-400 mt-1 font-mono truncate max-w-md">{cam.rtsp_url}</div>
                                   </div>
                                   <div className="flex gap-3">
-                                      <button onClick={() => handleConfigure(cam.id)} className="px-6 py-3 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 font-bold text-xs tracking-wider transition-colors">
-                                          CONFIG
-                                      </button>
                                       <button onClick={() => handleRemoveCamera(cam.id)} className="p-3 rounded-xl bg-gray-100 text-gray-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
                                           <Icons.Trash />
                                       </button>
@@ -788,66 +1022,108 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
               {/* ANALYTICS TAB */}
               {activeTab === "analytics" && (
                   <div className="space-y-6">
-                      {/* Global Removal Controls */}
-                      <div className="flex flex-wrap gap-4 bg-white p-4 rounded-3xl border border-gray-200 shadow-sm">
-                          <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center px-2">Quick Actions:</div>
-                          <button onClick={() => {
-                              const name = prompt("Enter Zone Name to remove from all cameras:");
-                              if(name) cameras.forEach(c => handleRemoveZone(c.id, name));
-                          }} className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors border border-rose-100">
-                              <Icons.Trash /> REMOVE ZONE
-                          </button>
-                          <button onClick={() => {
-                              const name = prompt("Enter Line Name to remove from all cameras:");
-                              if(name) cameras.forEach(c => handleRemoveLine(c.id, name));
-                          }} className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors border border-rose-100">
-                              <Icons.Trash /> REMOVE LINE
-                          </button>
+                      {/* Detailed Filters */}
+                      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm space-y-6">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                                  <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                                  </span>
+                                  Advanced Filters
+                              </h3>
+                              <div className="flex items-center gap-2">
+                                  <button onClick={() => {
+                                      const today = new Date().toISOString().split('T')[0];
+                                      setAnalyticsFilter(p => ({ ...p, startDate: today, endDate: today, startTime: "00:00", endTime: "23:59" }));
+                                  }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors uppercase tracking-widest">Today</button>
+                                  <button onClick={fetchHistoricalData} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-indigo-600 transition-colors uppercase tracking-widest flex items-center gap-2">
+                                      <Icons.Refresh /> Refresh
+                                  </button>
+                              </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                              <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-1">Camera Node</label>
+                                  <select className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-indigo-500 outline-none"
+                                      value={analyticsFilter.cameraId} onChange={e => setAnalyticsFilter(p => ({ ...p, cameraId: e.target.value }))}>
+                                      <option value="all">ALL CAMERAS</option>
+                                      {cameras.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                  </select>
+                              </div>
+                              <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-1">Start Date</label>
+                                  <input type="date" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-indigo-500 outline-none"
+                                      value={analyticsFilter.startDate} onChange={e => setAnalyticsFilter(p => ({ ...p, startDate: e.target.value }))} />
+                              </div>
+                              <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-1">End Date</label>
+                                  <input type="date" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-indigo-500 outline-none"
+                                      value={analyticsFilter.endDate} onChange={e => setAnalyticsFilter(p => ({ ...p, endDate: e.target.value }))} />
+                              </div>
+                              <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-1">Start Time</label>
+                                  <input type="time" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-indigo-500 outline-none"
+                                      value={analyticsFilter.startTime} onChange={e => setAnalyticsFilter(p => ({ ...p, startTime: e.target.value }))} />
+                              </div>
+                              <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-1">End Time</label>
+                                  <input type="time" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold focus:border-indigo-500 outline-none"
+                                      value={analyticsFilter.endTime} onChange={e => setAnalyticsFilter(p => ({ ...p, endTime: e.target.value }))} />
+                              </div>
+                          </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {/* Summary Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                           {Object.values(zoneCounts).every(z => Object.keys(z).length === 0) ? (
-                               <div className="col-span-full h-96 flex items-center justify-center flex-col text-gray-400">
+                               <div className="col-span-full h-48 flex items-center justify-center flex-col text-gray-400 bg-white border border-gray-200 rounded-[2.5rem]">
                                    <Icons.Analytics />
-                                   <span className="mt-4 text-sm font-mono uppercase tracking-widest">Awaiting Telemetry Data...</span>
-                                   <span className="mt-2 text-xs text-gray-300">Active Monitors: {cameras.map(c => c.name).join(', ')}</span>
-                                   <span className="text-[10px] text-gray-300 font-mono">IDs: {cameras.map(c => c.id).join(', ')}</span>
+                                   <span className="mt-4 text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Live Stream...</span>
                                </div>
                           ) : (
                               Object.entries(zoneCounts).map(([camId, zones]) => (
                                    Object.entries(zones).map(([zoneName, count]: [string, any]) => (
-                                       <div key={`${camId}-${zoneName}`} className="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500 opacity-50" />
-                                           
-                                           {/* Individual Remove Button */}
-                                           <button 
-                                              onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  if(confirm(`Remove "${zoneName}"?`)) {
-                                                      handleRemoveZone(camId, zoneName);
-                                                      handleRemoveLine(camId, zoneName); // Try both to be safe
-                                                  }
-                                              }}
-                                              className="absolute top-4 right-4 p-2 rounded-xl bg-gray-50 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-rose-600 hover:bg-rose-50 transition-all z-10"
-                                           >
-                                               <Icons.Trash />
-                                           </button>
-
-                                           <div className="flex justify-between items-start mb-6">
+                                       <div key={`${camId}-${zoneName}`} className="bg-white border border-gray-200 p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group hover:shadow-xl transition-all duration-500">
+                                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+                                           <div className="flex justify-between items-start mb-8">
                                                <div>
-                                                   <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">{cameras.find(c => c.id == camId)?.name || camId}</div>
-                                                   <div className="text-xl font-bold text-gray-900">{zoneName}</div>
+                                                   <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em] mb-1">{cameras.find(c => c.id == camId)?.name || camId}</div>
+                                                   <div className="text-xl font-black text-gray-900 tracking-tight">{zoneName}</div>
                                                </div>
-                                               <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 opacity-80 group-hover:opacity-100 transition-opacity"><Icons.Analytics /></div>
+                                               <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Icons.Analytics /></div>
                                            </div>
-                                           <div className="grid grid-cols-2 gap-4">
-                                               <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl text-center">
-                                                   <div className="text-3xl font-black text-emerald-600 mb-1">{count.in || count.in_count || 0}</div>
-                                                   <div className="text-[10px] uppercase font-bold text-emerald-600/60 tracking-wider">Inflow</div>
+                                           <div className="flex flex-col gap-4">
+                                               {/* Today Section */}
+                                               <div className="bg-slate-50 border border-slate-100 p-4 rounded-3xl">
+                                                   <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Live Stats (Today)</div>
+                                                   <div className="flex gap-3">
+                                                       <div className="flex-1 text-center">
+                                                           <div className="text-2xl font-black text-emerald-600">{count.todayIn}</div>
+                                                           <div className="text-[7px] uppercase font-black text-emerald-600/40">In</div>
+                                                       </div>
+                                                       <div className="w-px h-8 bg-slate-200 self-center" />
+                                                       <div className="flex-1 text-center">
+                                                           <div className="text-2xl font-black text-rose-600">{count.todayOut}</div>
+                                                           <div className="text-[7px] uppercase font-black text-rose-600/40">Out</div>
+                                                       </div>
+                                                   </div>
                                                </div>
-                                               <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl text-center">
-                                                   <div className="text-3xl font-black text-rose-600 mb-1">{count.out || count.out_count || 0}</div>
-                                                   <div className="text-[10px] uppercase font-bold text-rose-600/60 tracking-wider">Outflow</div>
+
+                                               {/* All Time Section */}
+                                               <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-500/20">
+                                                   <div className="text-[8px] font-black text-indigo-200 uppercase tracking-widest mb-3 text-center">Life-Time Yield</div>
+                                                   <div className="flex gap-3">
+                                                       <div className="flex-1 text-center">
+                                                           <div className="text-2xl font-black">{count.allIn}</div>
+                                                           <div className="text-[7px] uppercase font-black text-indigo-300">Total In</div>
+                                                       </div>
+                                                       <div className="w-px h-8 bg-indigo-500/50 self-center" />
+                                                       <div className="flex-1 text-center">
+                                                           <div className="text-2xl font-black">{count.allOut}</div>
+                                                           <div className="text-[7px] uppercase font-black text-indigo-300">Total Out</div>
+                                                       </div>
+                                                   </div>
                                                </div>
                                            </div>
                                        </div>
@@ -855,10 +1131,131 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
                               ))
                           )}
                       </div>
+
+                      {/* Event History Table */}
+                      <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden">
+                          <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                              <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight flex items-center gap-3">
+                                  <span className="p-2 rounded-lg bg-indigo-600 text-white"><Icons.Map /></span>
+                                  Detailed Event Log
+                              </h3>
+                              <span className="px-4 py-1.5 rounded-full bg-white text-[10px] font-black text-gray-500 border border-gray-200 shadow-sm uppercase tracking-widest">
+                                  {eventHistory.length} Records Found
+                              </span>
+                          </div>
+                          <div className="overflow-x-auto min-h-[400px]">
+                              {isHistoryLoading ? (
+                                  <div className="h-64 flex flex-col items-center justify-center space-y-4">
+                                      <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Decoding Event Stream...</p>
+                                  </div>
+                              ) : eventHistory.length === 0 ? (
+                                  <div className="h-64 flex flex-col items-center justify-center text-gray-400 grayscale opacity-40">
+                                      <Icons.Analytics />
+                                      <p className="mt-4 text-sm font-bold uppercase tracking-widest">No movement clusters detected</p>
+                                  </div>
+                              ) : (
+                                  <table className="w-full text-left">
+                                      <thead>
+                                          <tr className="bg-gray-50/50 border-b border-gray-100">
+                                              <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Timestamp</th>
+                                              <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Camera Node</th>
+                                              <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Person ID</th>
+                                              <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Action</th>
+                                              <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Asset Name</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-50">
+                                          {eventHistory.slice(0, visibleHistoryCount).map((ev, i) => (
+                                              <tr key={i} className="hover:bg-indigo-50/30 transition-colors group">
+                                                  <td className="px-8 py-4">
+                                                      <div className="text-sm font-bold text-gray-900">{new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                                                      <div className="text-[10px] text-gray-400 font-medium">{new Date(ev.timestamp).toLocaleDateString()}</div>
+                                                  </td>
+                                                  <td className="px-8 py-4">
+                                                      <span className="px-3 py-1 rounded-lg bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest">{ev.cameraName}</span>
+                                                  </td>
+                                                  <td className="px-8 py-4">
+                                                      <div className="flex items-center gap-2">
+                                                          <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-black">#</div>
+                                                          <span className="text-sm font-mono font-black text-indigo-600">{ev.person_id}</span>
+                                                      </div>
+                                                  </td>
+                                                  <td className="px-8 py-4">
+                                                      <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${ev.action === 'Entered' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                          {ev.action}
+                                                      </span>
+                                                  </td>
+                                                  <td className="px-8 py-4">
+                                                      <span className="text-sm font-bold text-gray-700">{ev.zone_name}</span>
+                                                  </td>
+                                              </tr>
+                                          ))}
+                                      </tbody>
+                                  </table>
+                              )}
+                              {eventHistory.length > visibleHistoryCount && (
+                                  <div className="p-8 border-t border-gray-100 bg-gray-50/30 flex justify-center">
+                                      <button 
+                                          onClick={() => setVisibleHistoryCount(prev => prev + 50)}
+                                          className="px-8 py-3 bg-white border border-gray-200 text-indigo-600 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-sm hover:border-indigo-600 hover:shadow-indigo-500/10 transition-all flex items-center gap-3 group"
+                                      >
+                                          Next Batch 
+                                          <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                      </button>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
                   </div>
               )}
-              
-              {activeTab === "floorplan" && <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden"><FloorPlanUploader /></div>}
+
+               {activeTab === "zone-config" && (
+                   <div className="max-w-5xl mx-auto py-8">
+                       <div className="grid grid-cols-1 gap-6">
+                           <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-[2.5rem] text-white flex justify-between items-center mb-6">
+                               <div>
+                                   <h3 className="text-2xl font-black mb-2 uppercase tracking-tight">Zone Calibration</h3>
+                                   <p className="text-gray-400 text-sm max-w-md italic">Define your detection boundaries. Draw polygonal zones for occupancy and trip-wires for inflow tracking.</p>
+                               </div>
+                               <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                                   <Icons.Settings />
+                               </div>
+                           </div>
+                           
+                           {cameras.map(cam => (
+                               <div key={cam.id} className="bg-white border border-gray-200 rounded-3xl p-6 flex items-center justify-between group hover:border-sky-300 transition-all shadow-sm">
+                                   <div className="flex items-center gap-6">
+                                       <div className="w-14 h-14 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                                           <Icons.Camera />
+                                       </div>
+                                       <div>
+                                           <h4 className="text-lg font-black text-gray-900">{cam.name}</h4>
+                                           <div className="flex items-center gap-3 mt-1">
+                                               <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">{cam.ip}</span>
+                                               <span className="w-1 h-1 rounded-full bg-gray-300" />
+                                               <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Channel {cam.channel}</span>
+                                           </div>
+                                       </div>
+                                   </div>
+                                   <button onClick={() => handleConfigure(cam.id)} className="px-8 py-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-600 transition-all shadow-lg shadow-gray-900/10 hover:shadow-sky-500/20 active:scale-95">
+                                       Configure Zones
+                                   </button>
+                               </div>
+                           ))}
+                           
+                           {cameras.length === 0 && (
+                               <div className="h-64 rounded-[2.5rem] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50/50">
+                                   <div className="p-4 rounded-full bg-white shadow-sm mb-4 text-gray-300"><Icons.Camera /></div>
+                                   <p className="text-gray-400 font-bold text-xs uppercase tracking-widest text-center">No hardware nodes found.<br/>Link a camera in 'Devices' to begin.</p>
+                               </div>
+                           )}
+                       </div>
+                   </div>
+               )}
+               
+               {activeTab === "floorplan-upload" && <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden"><FloorPlanUploader initialStep="upload" /></div>}
+               {activeTab === "floorplan-config" && <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden"><FloorPlanUploader initialStep="list" /></div>}
               {activeTab === "heatmap" && <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden"><HeatmapViewer /></div>}
 
           </div>
@@ -969,6 +1366,17 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
                 </div>
             </div>
         </div>
+      )}
+      {/* Toast Notification Overlay */}
+      {toast.show && (
+          <div className="fixed bottom-10 right-10 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+              <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border-2 ${toast.type === "success" ? "bg-emerald-500 border-emerald-400 text-white" : "bg-rose-500 border-rose-400 text-white"}`}>
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                      {toast.type === "success" ? <Icons.Check /> : <Icons.X />}
+                  </div>
+                  <span className="font-bold tracking-wide uppercase text-xs">{toast.message}</span>
+              </div>
+          </div>
       )}
     </div>
   );

@@ -18,52 +18,56 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    // 🔍 Query by camera only using Mongoose
-    const documents = await ZoneEvent.find({ "metadata.camera_id":`camera`+ cameraId }).lean();
+    // 🔍 Fetch all documents for this camera
+    const documents = await ZoneEvent.find({ "metadata.camera_id": `camera` + cameraId }).lean();
     console.log(`[API] Found ${documents.length} documents for camera ${cameraId}`);
 
-    // 🧮 Aggregate UNIQUE IN/OUT counts per zone
-    const zoneUniqueIds: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
+    // Get Today's local date range
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    // 🧮 Aggregate sets for uniqueness
+    const allUnique: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
+    const todayUnique: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
 
     documents.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
       const action = doc.action;
       const personId = doc.person_id;
+      
+      const eventTime = new Date(doc.timestamp);
+      const isToday = eventTime >= startOfToday && eventTime < endOfToday;
 
       if (!zoneName || !action || personId === undefined) return;
 
-      if (!zoneUniqueIds[zoneName]) {
-        zoneUniqueIds[zoneName] = { in_ids: new Set(), out_ids: new Set() };
-      }
+      if (!allUnique[zoneName]) allUnique[zoneName] = { in_ids: new Set(), out_ids: new Set() };
+      if (!todayUnique[zoneName]) todayUnique[zoneName] = { in_ids: new Set(), out_ids: new Set() };
 
-      if (action === "Entered") {
-        zoneUniqueIds[zoneName].in_ids.add(personId);
-      } else if (action === "Exited") {
-        zoneUniqueIds[zoneName].out_ids.add(personId);
+      // All Time
+      if (action === "Entered") allUnique[zoneName].in_ids.add(personId);
+      else if (action === "Exited") allUnique[zoneName].out_ids.add(personId);
+
+      // Today
+      if (isToday) {
+        if (action === "Entered") todayUnique[zoneName].in_ids.add(personId);
+        else if (action === "Exited") todayUnique[zoneName].out_ids.add(personId);
       }
     });
 
-    // 🧾 Convert to response format
-    const zones = Object.keys(zoneUniqueIds).map((zoneName) => {
-      const zoneIdMatch = zoneName.match(/\d+/);
-      const zoneId = zoneIdMatch ? parseInt(zoneIdMatch[0]) : 0;
-
-      return {
-        id: zoneId,
-        zone_name: zoneName,
-        total_in_count: zoneUniqueIds[zoneName].in_ids.size,
-        total_out_count: zoneUniqueIds[zoneName].out_ids.size,
-      };
-    });
-
-    zones.sort((a, b) => a.id - b.id);
-
-    console.log("[API] Final UNIQUE zone counts:", zones);
+    const formatZones = (source: Record<string, { in_ids: Set<number>; out_ids: Set<number> }>) => {
+      return Object.keys(source).map(name => ({
+        zone_name: name,
+        in: source[name].in_ids.size,
+        out: source[name].out_ids.size
+      })).sort((a, b) => a.zone_name.localeCompare(b.zone_name));
+    };
 
     return NextResponse.json({
       success: true,
       cameraId,
-      zones,
+      today: formatZones(todayUnique),
+      allTime: formatZones(allUnique)
     });
   } catch (error: any) {
     console.error("[API ERROR] Failed to fetch zone data:", error);

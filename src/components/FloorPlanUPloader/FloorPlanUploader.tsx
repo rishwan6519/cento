@@ -10,6 +10,13 @@ interface CameraConfig {
   zones: any[];
 }
 
+interface FloorMap {
+  _id: string;
+  name: string;
+  imageUrl: string;
+  uploadedAt: string;
+}
+
 interface CameraMarker {
   id?: string;
   cameraId: string;
@@ -48,6 +55,27 @@ const fetchAvailableCameras = async (): Promise<CameraConfig[]> => {
   }
 };
 
+const fetchFloorMaps = async (): Promise<FloorMap[]> => {
+  try {
+    const userId = "686cc66d9c011d7c23ae8b64"; // Same as API
+    const res = await fetch(`/api/floor-map?userId=${userId}`);
+    const data = await res.json();
+    return data.success ? data.floorMaps : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const fetchExistingMarkers = async (floorMapId: string): Promise<CameraMarker[]> => {
+  try {
+    const res = await fetch(`/api/camera-marker?floorMapId=${floorMapId}`);
+    const data = await res.json();
+    return data.success ? data.data : [];
+  } catch (error) {
+    return [];
+  }
+};
+
 const saveMarker = async (marker: CameraMarker) => {
   try {
     const res = await fetch("/api/camera-marker", {
@@ -61,7 +89,7 @@ const saveMarker = async (marker: CameraMarker) => {
   }
 };
 
-const uploadFloorPlan = async (file: File, name: string): Promise<{ success: boolean; floorMapId?: string; error?: string }> => {
+const uploadFloorPlanFile = async (file: File, name: string): Promise<{ success: boolean; floorMapId?: string; error?: string }> => {
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -90,27 +118,32 @@ const fetchActiveZonesForCamera = async (cameraId: string): Promise<any[]> => {
 };
 
 // --- Main Component ---
-const FloorPlanUploader: React.FC = () => {
-  const [step, setStep] = useState<"setup" | "mark-camera" | "mark-zones" | "review" | "saving" | "done" | "error">("setup");
-  
-  // Floor Plan Data
-  const [floorPlanFile, setFloorPlanFile] = useState<File | null>(null);
-  const [floorPlanImageUrl, setFloorPlanImageUrl] = useState<string>("");
-  const [floorName, setFloorName] = useState<string>("");
+interface FloorPlanUploaderProps {
+  initialStep?: "list" | "upload" | "config" | "mark-camera" | "mark-zones" | "saving" | "done" | "error";
+}
 
-  // Selection Data
+const FloorPlanUploader: React.FC<FloorPlanUploaderProps> = ({ initialStep }) => {
+  const [step, setStep] = useState<"list" | "upload" | "config" | "mark-camera" | "mark-zones" | "saving" | "done" | "error">(initialStep || "list");
+  
+  // Floor Map Selection
+  const [floorMaps, setFloorMaps] = useState<FloorMap[]>([]);
+  const [selectedFloorMap, setSelectedFloorMap] = useState<FloorMap | null>(null);
+  
+  // New Upload State
+  const [newFloorName, setNewFloorName] = useState<string>("");
+  const [newFloorFile, setNewFloorFile] = useState<File | null>(null);
+
+  // Config State
   const [availableCameras, setAvailableCameras] = useState<CameraConfig[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [detectedZones, setDetectedZones] = useState<any[]>([]);
+  const [existingMarkers, setExistingMarkers] = useState<CameraMarker[]>([]);
   
   // Marking Data
   const [activeMarkingZone, setActiveMarkingZone] = useState<string | null>(null);
   const [tempCameraRect, setTempCameraRect] = useState<TempMarker | null>(null);
   const [tempZoneRects, setTempZoneRects] = useState<ZoneMarker[]>([]);
   
-  // Final Collection
-  const [completedMarkers, setCompletedMarkers] = useState<CameraMarker[]>([]);
-
   // UI State
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -120,14 +153,20 @@ const FloorPlanUploader: React.FC = () => {
   
   const floorPlanImageRef = useRef<HTMLImageElement>(null);
 
-  // Load cameras on mount
+  // Load floor maps on mount
   useEffect(() => {
-    loadCameras();
+    loadInitialData();
   }, []);
+
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    const maps = await fetchFloorMaps();
+    setFloorMaps(maps);
+    setIsLoading(false);
+  };
 
   const loadCameras = async () => {
     setIsLoading(true);
-    setErrorMessage("");
     try {
       const cameras = await fetchAvailableCameras();
       setAvailableCameras(cameras);
@@ -136,6 +175,44 @@ const FloorPlanUploader: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFloorSelect = async (map: FloorMap) => {
+    setSelectedFloorMap(map);
+    setIsLoading(true);
+    const markers = await fetchExistingMarkers(map._id);
+    setExistingMarkers(markers);
+    await loadCameras();
+    setStep("config");
+    setIsLoading(false);
+  };
+
+  const handleUploadClick = () => {
+    setStep("upload");
+    setNewFloorName("");
+    setNewFloorFile(null);
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setNewFloorFile(e.target.files[0]);
+    }
+  };
+
+  const handleUploadSubmit = async () => {
+    if (!newFloorFile || !newFloorName.trim()) {
+      setErrorMessage("Please provide a name and file.");
+      return;
+    }
+    setIsLoading(true);
+    const res = await uploadFloorPlanFile(newFloorFile, newFloorName);
+    if (res.success) {
+      await loadInitialData();
+      setStep("list");
+    } else {
+      setErrorMessage(res.error || "Upload failed");
+    }
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -153,22 +230,12 @@ const FloorPlanUploader: React.FC = () => {
     setIsLoading(false);
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setFloorPlanFile(file);
-      setFloorPlanImageUrl(URL.createObjectURL(file));
-      setErrorMessage("");
-    }
-  };
-
-  const handleSetupSubmit = () => {
-    if (!floorPlanFile || !floorName.trim() || !selectedCameraId) {
-      setErrorMessage("Please complete all fields and select a camera.");
+  const startMarkingCamera = () => {
+    if (!selectedCameraId) {
+      setErrorMessage("Please select a camera first.");
       return;
     }
     setStep("mark-camera");
-    setErrorMessage("");
   };
 
   const getRelativeCoordinates = (e: MouseEvent<HTMLDivElement>): { x: number; y: number } => {
@@ -203,7 +270,7 @@ const FloorPlanUploader: React.FC = () => {
   };
 
   const handleMouseUp = () => {
-    if (!isDrawing || !currentRect || currentRect.width < 5 || currentRect.height < 5) {
+    if (!isDrawing || !currentRect || currentRect.width < 1 || currentRect.height < 1) {
       setIsDrawing(false);
       setStartPoint(null);
       setCurrentRect(null);
@@ -229,51 +296,25 @@ const FloorPlanUploader: React.FC = () => {
     setCurrentRect(null);
   };
 
-  const confirmCameraMarking = () => {
-    if (!tempCameraRect) {
-      setErrorMessage("Please draw the camera coverage area first.");
-      return;
-    }
-    setStep("mark-zones");
-    setErrorMessage("");
-  };
+  const handleFinalSave = async () => {
+    if (!selectedFloorMap || !selectedCameraId || !tempCameraRect) return;
+    setIsLoading(true);
+    setStep("saving");
 
-  const finishAllMarking = () => {
-    if (!tempCameraRect) return;
-    
     const newMarker: CameraMarker = {
       cameraId: selectedCameraId,
       x: tempCameraRect.x,
       y: tempCameraRect.y,
       width: tempCameraRect.width,
       height: tempCameraRect.height,
-      floorMapId: "",
+      floorMapId: selectedFloorMap._id,
       zones: tempZoneRects
     };
-    setCompletedMarkers(prev => [...prev, newMarker]);
-    setStep("review");
-  };
-
-  const handleAddAnother = () => {
-    setSelectedCameraId("");
-    setDetectedZones([]);
-    setTempCameraRect(null);
-    setTempZoneRects([]);
-    setStep("setup");
-  };
-
-  const handleFinalSave = async () => {
-    if (!floorPlanFile || completedMarkers.length === 0) return;
-    setIsLoading(true);
-    setStep("saving");
 
     try {
-      const uploadRes = await uploadFloorPlan(floorPlanFile, floorName);
-      if (!uploadRes.success || !uploadRes.floorMapId) throw new Error(uploadRes.error);
-
-      for (const marker of completedMarkers) {
-        await saveMarker({ ...marker, floorMapId: uploadRes.floorMapId });
-      }
+      await saveMarker(newMarker);
+      const markers = await fetchExistingMarkers(selectedFloorMap._id);
+      setExistingMarkers(markers);
       setStep("done");
     } catch (error: any) {
       setErrorMessage(error.message);
@@ -283,18 +324,12 @@ const FloorPlanUploader: React.FC = () => {
     }
   };
 
-  const resetForm = () => {
-    setStep("setup");
-    setFloorPlanFile(null);
-    setFloorPlanImageUrl("");
-    setFloorName("");
-    setCompletedMarkers([]);
+  const resetToConfig = () => {
+    setStep("config");
     setSelectedCameraId("");
-    setDetectedZones([]);
     setTempCameraRect(null);
     setTempZoneRects([]);
-    setErrorMessage("");
-    setIsLoading(false);
+    setDetectedZones([]);
   };
 
   return (
@@ -304,9 +339,9 @@ const FloorPlanUploader: React.FC = () => {
         <div className="p-8 space-y-10">
           <div>
             <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Floor Setup
+              Spatial Manager
             </h1>
-            <p className="text-slate-500 text-sm mt-1 uppercase tracking-widest font-bold">Spatial Configuration</p>
+            <p className="text-slate-500 text-sm mt-1 uppercase tracking-widest font-bold">Floor & Device Sync</p>
           </div>
 
           {errorMessage && (
@@ -315,330 +350,239 @@ const FloorPlanUploader: React.FC = () => {
             </div>
           )}
 
-          {/* Stepper Visualization */}
-          <div className="flex items-center space-x-2">
-             {[
-               { id: 'setup', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
-               { id: 'mark-camera', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 00-2 2z' },
-               { id: 'mark-zones', icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' }
-             ].map((s, idx) => {
-               const isActive = step === s.id;
-               const isPast = (step === 'mark-camera' && s.id === 'setup') || 
-                              (step === 'mark-zones' && ['setup', 'mark-camera'].includes(s.id)) ||
-                              (step === 'review' && ['setup', 'mark-camera', 'mark-zones'].includes(s.id));
-               return (
-                 <React.Fragment key={s.id}>
-                    <div className={`p-2.5 rounded-xl transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg ring-4 ring-indigo-50' : isPast ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={s.icon} /></svg>
-                    </div>
-                    {idx < 2 && <div className={`h-1 w-6 rounded-full ${isPast ? 'bg-emerald-500' : 'bg-slate-100'}`} />}
-                 </React.Fragment>
-               );
-             })}
-          </div>
-
-          {/* Step 1: Combined Setup */}
-          {step === "setup" && (
+          {/* List View */}
+          {step === "list" && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-              <div className="space-y-6">
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">1. Environment & Device</h3>
-                
-                {/* Floor Name */}
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Floor / Building Name</label>
-                  <input
-                    type="text"
-                    value={floorName}
-                    onChange={(e) => setFloorName(e.target.value)}
-                    placeholder="e.g. 1st Floor Lobby"
-                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                  />
-                </div>
-
-                {/* File Upload */}
-                <div className="relative group cursor-pointer">
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" />
-                  <div className={`p-8 rounded-[32px] border-4 border-dashed text-center flex flex-col items-center space-y-4 transition-all ${floorPlanFile ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 bg-slate-50 hover:border-indigo-100 hover:bg-indigo-50/10'}`}>
-                     <div className={`p-4 rounded-3xl ${floorPlanFile ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-200' : 'bg-white text-indigo-600 shadow-xl shadow-indigo-50'}`}>
-                      {floorPlanFile ? (
-                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                      ) : (
-                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-black text-slate-800 text-sm">{floorPlanFile ? floorPlanFile.name : 'Choose Blueprint'}</p>
-                      <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase">JPG, PNG, WEBP (MAX 10MB)</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Camera Selection */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Select Target Device</label>
-                  {isLoading && availableCameras.length === 0 ? (
-                    <div className="p-10 text-center text-slate-300 font-bold uppercase text-[10px] tracking-widest animate-pulse border-2 border-slate-50 rounded-2xl">Detecting Devices...</div>
-                  ) : (
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                      {availableCameras.filter(cam => !completedMarkers.some(m => m.cameraId === (cam.id || cam._id))).map(cam => {
-                         const camId = (cam.id || cam._id) as string;
-                         return (
-                           <button 
-                              key={camId} 
-                              onClick={() => setSelectedCameraId(camId)}
-                              className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${selectedCameraId === camId ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
-                           >
-                              <div className="flex items-center space-x-3 text-left">
-                                <div className={`p-2 rounded-lg ${selectedCameraId === camId ? 'bg-indigo-600 text-white' : 'bg-white shadow-sm text-slate-400'}`}>
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 00-2 2z" /></svg>
-                                </div>
-                                <div>
-                                  <p className="font-black text-slate-800 text-xs">{cam.name}</p>
-                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">ID: {camId?.slice(-8)}</p>
-                                </div>
-                              </div>
-                              {selectedCameraId === camId && <div className="bg-indigo-600 rounded-full p-1"><svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg></div>}
-                           </button>
-                         );
-                      })}
-                    </div>
-                  )}
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Active Floors</h3>
+                <button onClick={handleUploadClick} className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg hover:bg-black transition-all">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                </button>
               </div>
-              <button 
-                onClick={handleSetupSubmit} 
-                disabled={!floorPlanFile || !floorName.trim() || !selectedCameraId} 
-                className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-lg shadow-2xl hover:bg-indigo-600 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-              >
-                Start Marking
+
+              <div className="space-y-3">
+                {floorMaps.length === 0 ? (
+                  <div className="p-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                    <p className="text-slate-400 font-bold text-xs uppercase">No floors active</p>
+                  </div>
+                ) : (
+                  floorMaps.map(map => (
+                    <button 
+                      key={map._id}
+                      onClick={() => handleFloorSelect(map)}
+                      className="w-full group relative bg-white border-2 border-slate-100 rounded-3xl p-5 text-left hover:border-indigo-600 transition-all hover:shadow-xl overflow-hidden"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-16 h-16 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0">
+                          <img src={map.imageUrl} alt={map.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-black text-slate-800 tracking-tight">{map.name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{new Date(map.uploadedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Upload View */}
+          {step === "upload" && (
+            <div className="space-y-6 animate-in slide-in-from-right-4">
+              <button onClick={() => setStep("list")} className="flex items-center space-x-2 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-indigo-600 transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
+                <span>Back to List</span>
               </button>
+              <h3 className="text-xl font-black text-slate-800">New Floor Layout</h3>
+              <div className="space-y-6">
+                <input
+                  type="text"
+                  value={newFloorName}
+                  onChange={(e) => setNewFloorName(e.target.value)}
+                  placeholder="Floor Name (ex: GF Lobby)"
+                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none font-bold focus:ring-4 focus:ring-indigo-500/10"
+                />
+                <div className="relative group p-12 border-4 border-dashed border-slate-100 bg-slate-50 rounded-[40px] text-center space-y-4 hover:border-indigo-100 transition-all">
+                  <input type="file" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <div className="w-16 h-16 bg-white text-indigo-600 rounded-3xl flex items-center justify-center mx-auto shadow-xl"><svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg></div>
+                  <p className="font-black text-slate-800 text-sm">{newFloorFile ? newFloorFile.name : 'Drop blueprint here'}</p>
+                </div>
+                <button onClick={handleUploadSubmit} className="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black text-xl shadow-2xl hover:bg-black transition-all">Publish Layout</button>
+              </div>
             </div>
           )}
 
-          {/* Step 2: Mark Camera */}
+          {/* Config View (Link Cameras and Zones) */}
+          {step === "config" && selectedFloorMap && (
+            <div className="space-y-8 animate-in slide-in-from-right-4">
+              <button onClick={() => setStep("list")} className="flex items-center space-x-2 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-indigo-600 transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
+                <span>Change Floor</span>
+              </button>
+              
+              <div className="p-6 bg-slate-900 rounded-[32px] text-white space-y-1 shadow-2xl">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Selected Space</p>
+                <h4 className="text-2xl font-black tracking-tight">{selectedFloorMap.name}</h4>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Connect Hardware</label>
+                <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                  {availableCameras.map(cam => {
+                     const camId = (cam.id || cam._id) as string;
+                     const isAssigned = existingMarkers.some(m => m.cameraId === camId);
+                     return (
+                       <button 
+                         key={camId}
+                         onClick={() => !isAssigned && setSelectedCameraId(camId)}
+                         className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${selectedCameraId === camId ? 'border-indigo-600 bg-indigo-50' : 'bg-slate-50 border-slate-100'} ${isAssigned ? 'opacity-40 grayscale cursor-not-allowed' : 'hover:border-slate-200'}`}
+                       >
+                         <div className="flex items-center space-x-3 text-left">
+                           <div className={`p-2 rounded-lg ${selectedCameraId === camId ? 'bg-indigo-600 text-white' : 'bg-white shadow-sm text-slate-400'}`}>
+                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14" /></svg>
+                           </div>
+                           <div>
+                             <p className="font-black text-slate-800 text-xs">{cam.name}</p>
+                             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{isAssigned ? 'Already Positioned' : `Channel ${cam.zones.length} Zones`}</p>
+                           </div>
+                         </div>
+                       </button>
+                     );
+                  })}
+                </div>
+                <button 
+                  onClick={startMarkingCamera}
+                  disabled={!selectedCameraId}
+                  className="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black text-xl shadow-2xl disabled:opacity-20"
+                >
+                  Configure Markers
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Mark Camera Step */}
           {step === "mark-camera" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-               <div className="flex items-center space-x-3">
-                 <button onClick={() => setStep("setup")} className="p-2.5 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
-                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
-                 </button>
-                 <h3 className="text-xl font-black text-slate-800">2. Device Field</h3>
-               </div>
-               
-               <div className="bg-indigo-600 p-8 rounded-[40px] text-center space-y-4 shadow-2xl shadow-indigo-100">
-                  <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center mx-auto text-white shadow-inner"><svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg></div>
-                  <p className="text-white font-black uppercase tracking-tight text-lg">Define View Scope</p>
-                  <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest leading-relaxed">Draw the rectangle representing the camera's coverage area on the map.</p>
-               </div>
-
-               <div className="space-y-4">
-                  {tempCameraRect ? (
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-between">
-                      <span className="text-emerald-700 font-bold text-xs uppercase tracking-widest">Scope Captured</span>
-                      <button onClick={() => setTempCameraRect(null)} className="text-[10px] font-black text-emerald-600 underline uppercase">Redraw</button>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-widest text-center animate-pulse">Waiting for drawing...</div>
-                  )}
-                  <button 
-                    onClick={confirmCameraMarking} 
-                    disabled={!tempCameraRect}
-                    className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-lg hover:bg-indigo-600 shadow-2xl transition-all disabled:opacity-50"
-                  >
-                    Confirm Scope
-                  </button>
-               </div>
+            <div className="space-y-8">
+              <h3 className="text-xl font-black text-slate-800">Draw Scope</h3>
+              <p className="text-slate-500 text-sm leading-relaxed font-medium">Draw a rectangle on the floor map to define the precise view coverage of the selected camera.</p>
+              <div className="p-6 bg-indigo-600 rounded-[32px] text-white text-center animate-pulse">
+                <p className="font-black uppercase text-xs">Ready to Paint Scope</p>
+              </div>
+              <div className="space-y-4">
+                <button onClick={() => setStep("mark-zones")} disabled={!tempCameraRect} className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xl hover:bg-indigo-600 transition-all disabled:opacity-20">Confirm Scope</button>
+                <button onClick={resetToConfig} className="w-full py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest">Discard & Reset</button>
+              </div>
             </div>
           )}
 
-          {/* Step 3: Mark Zones */}
+          {/* Mark Zones Step */}
           {step === "mark-zones" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-               <div className="flex items-center space-x-3">
-                 <button onClick={() => setStep("mark-camera")} className="p-2.5 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
-                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
-                 </button>
-                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">3. Zone Assets</h3>
-               </div>
-
-               <div className="space-y-6">
-                  <div className="p-6 bg-purple-900 rounded-[32px] text-center space-y-2 shadow-xl">
-                    <p className="text-white font-black uppercase text-sm tracking-widest">Calibration Phase</p>
-                    <p className="text-purple-300 text-[10px] font-bold uppercase tracking-widest">Identify detection areas (AI Zones)</p>
-                  </div>
-                  
-                  <div className="space-y-3">
-                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Detected AI Assets ({detectedZones.length})</h4>
-                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                        {detectedZones.length === 0 ? (
-                          <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                            <p className="text-slate-400 font-bold text-[10px] uppercase">No zones configured for this device</p>
-                          </div>
-                        ) : (
-                          detectedZones.map(z => {
-                             const isMarked = tempZoneRects.some(tz => tz.name === z.name);
-                             const isCurrent = activeMarkingZone === z.name;
-                             return (
-                               <button 
-                                 key={z.name} 
-                                 onClick={() => setActiveMarkingZone(z.name)} 
-                                 className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isCurrent ? 'border-purple-600 bg-purple-50 ring-4 ring-purple-50' : isMarked ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
-                               >
-                                  <span className={`font-black text-xs ${isMarked ? 'text-emerald-900' : isCurrent ? 'text-purple-900' : 'text-slate-600'}`}>{z.name}</span>
-                                  {isMarked ? (
-                                    <div className="bg-emerald-500 rounded-full p-1"><svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg></div>
-                                  ) : isCurrent ? (
-                                    <span className="text-[8px] font-black bg-purple-600 text-white px-2 py-0.5 rounded-md animate-pulse">DRAWING...</span>
-                                  ) : (
-                                    <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-                                  )}
-                               </button>
-                             );
-                          })
-                        )}
-                     </div>
-                  </div>
-
-                  <button 
-                    onClick={finishAllMarking} 
-                    className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-lg hover:bg-emerald-600 shadow-2xl transition-all"
-                  >
-                    Finish Device Setup
-                  </button>
-               </div>
+            <div className="space-y-8">
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">AI Zone Mapping</h3>
+              <div className="space-y-3">
+                 {detectedZones.length === 0 ? (
+                   <p className="text-slate-400 font-bold text-xs p-10 bg-slate-50 border-2 border-dashed rounded-3xl text-center uppercase tracking-widest">No AI zones found on device</p>
+                 ) : (
+                   detectedZones.map(z => (
+                     <button 
+                       key={z.name}
+                       onClick={() => setActiveMarkingZone(z.name)}
+                       className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${activeMarkingZone === z.name ? 'border-purple-600 bg-purple-50 ring-4 ring-purple-50' : tempZoneRects.some(tz => tz.name === z.name) ? 'border-emerald-500 bg-emerald-50' : 'bg-slate-50 border-slate-100'}`}
+                     >
+                       <span className="font-black text-xs text-slate-700">{z.name}</span>
+                       <div className={`p-1 rounded-md ${tempZoneRects.some(tz => tz.name === z.name) ? 'bg-emerald-500' : 'bg-slate-200'} text-white`}>
+                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
+                       </div>
+                     </button>
+                   ))
+                 )}
+              </div>
+              <button onClick={handleFinalSave} className="w-full py-5 bg-emerald-600 text-white rounded-3xl font-black text-xl shadow-2xl">Publish All Markers</button>
             </div>
           )}
 
-          {/* Review Step */}
-          {step === "review" && (
-            <div className="space-y-6 animate-in zoom-in-95 duration-500">
-               <div className="p-8 bg-slate-900 rounded-[40px] text-center space-y-4 shadow-2xl">
-                  <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/30 font-black text-2xl">
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
-                  </div>
-                  <h3 className="text-2xl font-black text-white tracking-tight">Setup Ready</h3>
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    <div className="bg-white/5 p-3 rounded-2xl"><p className="text-[9px] text-slate-500 font-bold uppercase">Devices</p><p className="text-xl font-black text-white">{completedMarkers.length}</p></div>
-                    <div className="bg-white/5 p-3 rounded-2xl"><p className="text-[9px] text-slate-500 font-bold uppercase">Zones</p><p className="text-xl font-black text-white">{completedMarkers.reduce((acc, m) => acc + m.zones.length, 0)}</p></div>
-                  </div>
-               </div>
-               <div className="space-y-4">
-                  <button onClick={handleAddAnother} className="w-full py-5 border-4 border-slate-100 text-slate-900 rounded-3xl font-black hover:border-indigo-600 hover:text-indigo-600 transition-all">+ Add Another Camera</button>
-                  <button onClick={handleFinalSave} className="w-full py-6 bg-indigo-600 text-white rounded-3xl font-black text-xl shadow-2xl hover:bg-black transition-all">Submit Deployment</button>
-               </div>
-            </div>
-          )}
-
-          {/* Status Steps */}
-          {step === "saving" && (
-            <div className="py-24 text-center space-y-6 animate-pulse">
-               <div className="relative w-20 h-20 mx-auto"><div className="absolute inset-0 bg-indigo-600 animate-ping rounded-full opacity-20" /><svg className="animate-spin h-full w-full text-indigo-600 relative" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>
-               <p className="text-xl font-black text-slate-800 uppercase tracking-tighter">Digitizing Space...</p>
-            </div>
-          )}
-
+          {/* Result View */}
           {step === "done" && (
-             <div className="space-y-10 animate-in zoom-in-95 py-12">
-               <div className="text-center space-y-4">
-                  <div className="w-24 h-24 bg-emerald-500 text-white rounded-[40px] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-100 rotate-6"><svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="5" d="M5 13l4 4L19 7" /></svg></div>
-                  <h3 className="text-3xl font-black text-slate-800 tracking-tighter leading-none">Map Published!</h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Deployment is now live and tracking.</p>
-               </div>
-               <button onClick={resetForm} className="w-full py-6 bg-slate-900 text-white rounded-[40px] font-black text-xl shadow-2xl hover:scale-[1.02] transition-all">Create New Setup</button>
-             </div>
+            <div className="py-20 text-center space-y-10 animate-in zoom-in-95">
+              <div className="w-24 h-24 bg-emerald-500 text-white rounded-[40px] flex items-center justify-center mx-auto shadow-2xl rotate-12"><svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="5" d="M5 13l4 4L19 7" /></svg></div>
+              <div className="space-y-2">
+                <h3 className="text-3xl font-black text-slate-800">Layout Updated!</h3>
+                <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Camera linkage successfully synchronized</p>
+              </div>
+              <button onClick={() => setStep("list")} className="w-full py-6 bg-slate-900 text-white rounded-[40px] font-black text-xl shadow-2xl">Return to Floor View</button>
+            </div>
           )}
         </div>
       </aside>
 
-      {/* Main Preview / Marking Area */}
-      <main className="flex-1 p-4 lg:p-8 flex items-center justify-center relative bg-slate-100 overflow-hidden">
-        {/* Background Grid */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#94a3b8 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }} />
+      {/* Preview Area */}
+      <main className="flex-1 p-4 lg:p-12 flex items-center justify-center relative bg-slate-100 overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#94a3b8 0.5px, transparent 0.5px)', backgroundSize: '32px 32px' }} />
         
-        {floorPlanImageUrl ? (
+        {selectedFloorMap ? (
           <div className="relative w-full h-full flex items-center justify-center p-4">
-            <div 
-              className="relative bg-white p-2 rounded-[32px] shadow-[0_64px_128px_-32px_rgba(0,0,0,0.15)] ring-1 ring-black/5 animate-in zoom-in-95 duration-700"
-            >
-              <div className="relative overflow-hidden rounded-[24px] bg-slate-50">
-                <img 
-                  ref={floorPlanImageRef} 
-                  src={floorPlanImageUrl} 
-                  alt="Spatial Workspace" 
-                  className="block max-w-full max-h-[80vh] w-auto h-auto select-none pointer-events-none" 
-                  draggable={false} 
-                />
-                
-                {/* Drawing & Indicators Overlay */}
-                <div 
-                  className="absolute inset-0 cursor-crosshair touch-none"
-                  onMouseDown={handleMouseDown} 
-                  onMouseMove={handleMouseMove} 
-                  onMouseUp={handleMouseUp}
-                >
-                  {/* Indicators Layer */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    {/* Completed Markers */}
-                    {completedMarkers.map((m, idx) => (
-                      <div key={idx}>
-                        <div className="absolute border-2 border-emerald-500 bg-emerald-500/10 backdrop-blur-[1px]" style={{ left: `${m.x}%`, top: `${m.y}%`, width: `${m.width}%`, height: `${m.height}%` }}>
-                          <div className="bg-emerald-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-sm absolute -top-5 left-0 uppercase shadow-lg">CALIBRATED DEVICE</div>
+             <div className="relative bg-white p-3 rounded-[3.5rem] shadow-2xl ring-1 ring-black/5 overflow-hidden animate-in zoom-in-95 duration-1000">
+                <div className="relative rounded-[2.8rem] overflow-hidden bg-slate-50">
+                  <img ref={floorPlanImageRef} src={selectedFloorMap.imageUrl} className="block max-w-full max-h-[85vh] w-auto h-auto select-none pointer-events-none" />
+                  
+                  <div className="absolute inset-0 cursor-crosshair touch-none" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+                    <div className="absolute inset-0 pointer-events-none">
+                      {/* Existing Historical Markers */}
+                      {existingMarkers.map((m, idx) => (
+                        <div key={idx}>
+                          <div className="absolute border-2 border-slate-400 bg-slate-500/10" style={{ left: `${m.x}%`, top: `${m.y}%`, width: `${m.width}%`, height: `${m.height}%` }} />
+                          {m.zones.map((z, zi) => (
+                             <div key={zi} className="absolute border border-slate-300 bg-slate-400/5" style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%` }} />
+                          ))}
                         </div>
-                        {m.zones.map((z, zi) => (
-                          <div key={zi} className="absolute border border-emerald-400/30 bg-emerald-400/5" style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%` }} />
-                        ))}
-                      </div>
-                    ))}
+                      ))}
 
-                    {/* Temporary Camera Marker */}
-                    {tempCameraRect && !isDrawing && (
-                      <div className="absolute border-4 border-indigo-600/40 bg-indigo-600/5 rounded-lg transition-all" style={{ left: `${tempCameraRect.x}%`, top: `${tempCameraRect.y}%`, width: `${tempCameraRect.width}%`, height: `${tempCameraRect.height}%` }}>
-                        <div className="absolute -top-6 left-0 bg-indigo-600 text-white text-[8px] font-black px-2 py-0.5 rounded-sm uppercase shadow-xl">CURRENT CAMERA AREA</div>
-                      </div>
-                    )}
+                      {/* Fresh/Active Working Markers */}
+                      {tempCameraRect && (
+                        <div className="absolute border-4 border-indigo-600 bg-indigo-600/10 shadow-[0_0_40px_rgba(79,70,229,0.3)] rounded-xl" style={{ left: `${tempCameraRect.x}%`, top: `${tempCameraRect.y}%`, width: `${tempCameraRect.width}%`, height: `${tempCameraRect.height}%` }}>
+                          <span className="absolute -top-6 left-0 bg-indigo-600 text-white text-[8px] font-black px-2 py-0.5 rounded-sm uppercase">NEW COVERAGE</span>
+                        </div>
+                      )}
 
-                    {/* Temporary Zones */}
-                    {tempZoneRects.map((z, i) => (
-                      <div key={i} className="absolute border-2 border-purple-600 bg-purple-600/10 rounded-sm" style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%` }}>
-                        <div className="absolute -top-5 left-0 bg-purple-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded-sm uppercase whitespace-nowrap">{z.name}</div>
-                      </div>
-                    ))}
+                      {tempZoneRects.map((z, i) => (
+                        <div key={i} className="absolute border-2 border-purple-600 bg-purple-600/15 rounded-lg" style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.width}%`, height: `${z.height}%` }}>
+                          <span className="absolute -top-5 left-0 bg-purple-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded-sm uppercase whitespace-nowrap">{z.name}</span>
+                        </div>
+                      ))}
 
-                    {/* Active Drawing Marker */}
-                    {currentRect && (
-                      <div className={`absolute border-4 ${step === 'mark-camera' ? 'border-indigo-600 bg-indigo-600/10 shadow-[0_0_30px_indigo]' : 'border-purple-600 bg-purple-600/10 shadow-[0_0_30px_purple]'}`} style={{ left: `${currentRect.x}%`, top: `${currentRect.y}%`, width: `${currentRect.width}%`, height: `${currentRect.height}%` }}>
-                         <div className={`absolute -top-10 left-1/2 -translate-x-1/2 px-4 py-2 font-black text-white text-[10px] rounded-2xl shadow-2xl whitespace-nowrap animate-bounce ${step === 'mark-camera' ? 'bg-indigo-600' : 'bg-purple-600'}`}>
-                            {step === 'mark-camera' ? 'DEFINE COVERAGE' : `ZONE: ${activeMarkingZone}`}
-                         </div>
-                      </div>
-                    )}
+                      {currentRect && (
+                        <div className={`absolute border-4 ${step === 'mark-camera' ? 'border-indigo-600 bg-indigo-600/20' : 'border-purple-600 bg-purple-600/20'} animate-pulse`} style={{ left: `${currentRect.x}%`, top: `${currentRect.y}%`, width: `${currentRect.width}%`, height: `${currentRect.height}%` }}>
+                          <div className={`absolute -top-10 left-1/2 -translate-x-1/2 px-4 py-2 font-black text-white text-[10px] rounded-2xl ${step === 'mark-camera' ? 'bg-indigo-600 shadow-[0_0_30px_indigo]' : 'bg-purple-600 shadow-[0_0_30px_purple]'}`}>
+                            {step === 'mark-camera' ? 'DEFINING COVERAGE' : `MAPPING: ${activeMarkingZone}`}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+             </div>
           </div>
         ) : (
-          <div className="max-w-xl text-center space-y-10 animate-in fade-in zoom-in-95 duration-700 bg-white p-20 rounded-[80px] shadow-2xl shadow-slate-200/50 border-4 border-dashed border-slate-100">
-             <div className="w-24 h-24 bg-slate-50 text-slate-200 rounded-[40px] flex items-center justify-center mx-auto shadow-inner">
-               <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-             </div>
+          <div className="max-w-xl text-center space-y-12 bg-white p-24 rounded-[100px] shadow-2xl border-4 border-dashed border-slate-100 animate-in fade-in zoom-in-95 duration-1000">
+             <div className="w-32 h-32 bg-slate-50 text-slate-200 rounded-[50px] flex items-center justify-center mx-auto shadow-inner"><svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg></div>
              <div className="space-y-4">
-                <h3 className="text-3xl font-black text-slate-800 tracking-tight">Spatial Canvas</h3>
-                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs leading-relaxed">Map your visual environment <br/>to unlock real-time analytics</p>
+                <h3 className="text-4xl font-black text-slate-800 tracking-tighter uppercase leading-none">Perspective Hub</h3>
+                <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-[10px]">Select a layout to begin synchronization</p>
              </div>
           </div>
         )}
       </main>
 
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}</style>
     </div>
   );
 };
 
 export default FloorPlanUploader;
-  

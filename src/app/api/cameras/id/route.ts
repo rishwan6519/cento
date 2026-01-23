@@ -22,30 +22,38 @@ export async function GET(req: NextRequest) {
        return NextResponse.json({ error: 'Camera not found' }, { status: 404 });
     }
 
-    // REAL DB FETCH: Get all events for this camera
-    // You can add { timestamp: { $gte: startOfDay } } here if you only want today's counts.
-    // For now, fetching all history as requested to "get the people count on database".
-    const documents = await ZoneEvent.find({ 'metadata.camera_id': id }).lean();
+    // Get Today's local date range
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
-    // 🧮 Aggregate IN/OUT counts per zone (Footfall Traffic)
-    const zoneCounts: Record<string, { in_count: number; out_count: number }> = {};
+    // REAL DB FETCH: Get all events for this camera for TODAY
+    const documents = await ZoneEvent.find({ 
+      'metadata.camera_id': id,
+      timestamp: {
+        $gte: startOfToday,
+        $lt: endOfToday
+      }
+    }).lean();
+
+    // 🧮 Aggregate IN/OUT counts per zone (Unique Person IDs)
+    const zoneCounts: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
 
     documents.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
       const action = doc.action;
-      // We still require personId to be valid to count it as a person event
       const personId = doc.person_id;
 
       if (!zoneName || !action || personId === undefined) return;
 
       if (!zoneCounts[zoneName]) {
-        zoneCounts[zoneName] = { in_count: 0, out_count: 0 };
+        zoneCounts[zoneName] = { in_ids: new Set(), out_ids: new Set() };
       }
 
       if (action === "Entered") {
-        zoneCounts[zoneName].in_count += 1;
+        zoneCounts[zoneName].in_ids.add(personId);
       } else if (action === "Exited") {
-        zoneCounts[zoneName].out_count += 1;
+        zoneCounts[zoneName].out_ids.add(personId);
       }
     });
 
@@ -57,14 +65,18 @@ export async function GET(req: NextRequest) {
       return {
         id: zoneId,
         zone_name: zoneName,
-        total_in_count: zoneCounts[zoneName].in_count,
-        total_out_count: zoneCounts[zoneName].out_count,
+        total_in_count: zoneCounts[zoneName].in_ids.size,
+        total_out_count: zoneCounts[zoneName].out_ids.size,
       };
     });
 
     return NextResponse.json({
       camera_id: id,
       zones_footfall: zones,
+      summary: {
+        total_unique_in: new Set(documents.filter(d => d.action === 'Entered').map(d => d.person_id)).size,
+        total_unique_out: new Set(documents.filter(d => d.action === 'Exited').map(d => d.person_id)).size
+      }
     });
 
   } catch (error) {
