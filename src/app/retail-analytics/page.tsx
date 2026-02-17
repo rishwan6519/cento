@@ -197,42 +197,30 @@ export default function PeopleDetectionPage() {
     }
   };
 
-  // --- LOAD CAMERAS FROM DB (filtered by piId) ---
-  const fetchCameras = async (targetPiId: string) => {
-    try {
-      const res = await fetch(`/api/cameras?pi_id=${encodeURIComponent(targetPiId)}`);
-      const data = await res.json();
-      console.log("Raw DB Response for PI", targetPiId, ":", data);
-      let validData: any[] = [];
-      if (Array.isArray(data)) validData = data;
-      else if (data && Array.isArray(data.data)) validData = data.data;
-      else if (data && Array.isArray(data.cameras)) validData = data.cameras;
-      
-      const sanitized = validData.map((c: any) => ({
-          ...c,
-          status: c.status || 'active', 
-          id: c.id 
-      }));
-      
-      setCameras(sanitized);
-    } catch (err) {
-      console.error("Failed to load cameras", err);
-    }
-  };
-
-  // Load settings on mount
+  // --- LOAD CAMERAS FROM DB ---
   useEffect(() => {
     fetchSettings();
-    fetchHourlyStats();
+    fetch('/api/cameras')
+      .then(res => res.json())
+      .then(data => {
+        console.log("Raw DB Response:", data);
+        let validData = [];
+        if (Array.isArray(data)) validData = data;
+        else if (data && Array.isArray(data.data)) validData = data.data;
+        else if (data && Array.isArray(data.cameras)) validData = data.cameras;
+        
+        const sanitized = validData.map((c: any) => ({
+            ...c,
+            status: c.status || 'active', 
+            id: c.id 
+        }));
+        
+        setCameras(sanitized);
+        // Also fetch stats on mount
+        fetchHourlyStats();
+      })
+      .catch(err => console.error("Failed to load cameras", err));
   }, []);
-
-  // Re-fetch cameras whenever piId changes
-  useEffect(() => {
-    if (piId) {
-      setCameras([]); // Clear old cameras while loading
-      fetchCameras(piId);
-    }
-  }, [piId]);
 
   // --- FETCH ANALYTICS DATA ---
   const fetchCounts = () => {
@@ -377,12 +365,11 @@ export default function PeopleDetectionPage() {
                       method: 'POST',
                       body: JSON.stringify({
                           ...pendingCam,
-                          pi_id: piId, // Associate camera with current PI ID
                           status: 'active'
                       })
                   }).then(res => {
                        if(res.ok) {
-                           console.log(`Camera persisted to DB under pi_id: ${piId}`);
+                           console.log("Camera persisted to DB");
                            // Mark active in UI
                            setCameras(prev => prev.map(c => c.id == camId ? { ...c, status: "active" } : c));
                            // Reset Form
@@ -861,145 +848,76 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
                       </div>
 
                       {/* Hourly Traffic Graph */}
-                      <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
+                      <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm">
                            {/* Header */}
-                           <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                           <div className="flex justify-between items-center mb-6">
                                <div className="flex items-center gap-3">
                                    <div className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
-                                   <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Hourly Traffic — Today</span>
+                                   <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Hourly Footfall — Today</span>
                                </div>
-                               <div className="flex items-center gap-5">
-                                   <div className="flex items-center gap-5 text-xs font-bold uppercase tracking-wider">
-                                       <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-indigo-500 inline-block" /> Entered</span>
-                                       <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-violet-400 inline-block" /> Exited</span>
-                                   </div>
-                                   <button onClick={fetchHourlyStats} className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-xl hover:bg-indigo-50" title="Refresh data">
-                                       <Icons.Refresh />
-                                   </button>
-                               </div>
+                               <button onClick={fetchHourlyStats} className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-xl hover:bg-indigo-50" title="Refresh">
+                                   <Icons.Refresh />
+                               </button>
                            </div>
 
-                           {/* Chart Container */}
+                           {/* Chart */}
                            {(() => {
-                               const maxVal = Math.max(...hourlyStats.map(s => Math.max(s.in || 0, s.out || 0)), 1);
-                               const chartHeight = 220; // px for the bar area
-
+                               const maxVal = Math.max(...hourlyStats.map(s => s.in || 0), 1);
                                return (
-                                   <div className="w-full overflow-x-auto pb-2">
-                                       <div style={{ minWidth: '900px' }}>
-                                           {/* Y-axis + bars area */}
-                                           <div className="flex">
-                                               {/* Y-axis labels */}
-                                               <div className="flex flex-col justify-between pr-3 py-1" style={{ height: chartHeight, minWidth: 40 }}>
-                                                   {[4, 3, 2, 1, 0].map(i => (
-                                                       <span key={i} className="text-[11px] font-semibold text-gray-400 text-right leading-none">
-                                                           {Math.round((maxVal / 4) * i)}
-                                                       </span>
-                                                   ))}
-                                               </div>
-
-                                               {/* Bars container */}
-                                               <div className="flex-1 relative border-l border-b border-gray-200">
-                                                   {/* Horizontal grid lines */}
-                                                   {[0, 1, 2, 3, 4].map(i => (
-                                                       <div key={`hgrid-${i}`} className="absolute left-0 right-0 border-t border-gray-100" style={{ bottom: `${(i / 4) * 100}%` }} />
-                                                   ))}
-
-                                                   {/* Bars */}
-                                                   <div className="flex h-full relative z-10" style={{ height: chartHeight }}>
-                                                       {hourlyStats.map((s, i) => {
-                                                           const inPct = Math.max(((s.in || 0) / maxVal) * 100, 0);
-                                                           const outPct = Math.max(((s.out || 0) / maxVal) * 100, 0);
-                                                           const hasData = (s.in || 0) > 0 || (s.out || 0) > 0;
-
-                                                           return (
-                                                               <div key={i} className="flex-1 flex flex-col items-center justify-end px-[2px] group relative" style={{ minWidth: 36 }}>
-                                                                   {/* Tooltip on hover */}
-                                                                   <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-lg">
-                                                                       <div>{i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i-12}:00 PM`}</div>
-                                                                       <div className="text-indigo-300">IN: {s.in || 0}</div>
-                                                                       <div className="text-violet-300">OUT: {s.out || 0}</div>
-                                                                       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
-                                                                   </div>
-
-                                                                   {/* Count labels above bars */}
-                                                                   {hasData && (
-                                                                       <div className="flex gap-1 mb-1 text-[10px] font-bold">
-                                                                           {(s.in || 0) > 0 && <span className="text-indigo-600">{s.in}</span>}
-                                                                           {(s.in || 0) > 0 && (s.out || 0) > 0 && <span className="text-gray-300">/</span>}
-                                                                           {(s.out || 0) > 0 && <span className="text-violet-500">{s.out}</span>}
-                                                                       </div>
-                                                                   )}
-
-                                                                   {/* Bar pair */}
-                                                                   <div className="flex items-end gap-[2px] w-full justify-center" style={{ height: `${chartHeight - 24}px` }}>
-                                                                       {/* IN bar */}
-                                                                       <div
-                                                                           className="rounded-t-md transition-all duration-300 group-hover:opacity-80"
-                                                                           style={{
-                                                                               width: '40%',
-                                                                               height: `${inPct}%`,
-                                                                               minHeight: (s.in || 0) > 0 ? 4 : 0,
-                                                                               background: 'linear-gradient(to top, #4f46e5, #6366f1)',
-                                                                           }}
-                                                                       />
-                                                                       {/* OUT bar */}
-                                                                       <div
-                                                                           className="rounded-t-md transition-all duration-300 group-hover:opacity-80"
-                                                                           style={{
-                                                                               width: '40%',
-                                                                               height: `${outPct}%`,
-                                                                               minHeight: (s.out || 0) > 0 ? 4 : 0,
-                                                                               background: 'linear-gradient(to top, #7c3aed, #a78bfa)',
-                                                                           }}
-                                                                       />
-                                                                   </div>
-                                                               </div>
-                                                           );
-                                                       })}
+                                   <div className="flex items-end gap-[3px]" style={{ height: 200 }}>
+                                       {hourlyStats.map((s, i) => {
+                                           const val = s.in || 0;
+                                           const pct = (val / maxVal) * 100;
+                                           return (
+                                               <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                                                   {/* Tooltip */}
+                                                   <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold rounded-lg px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-lg">
+                                                       {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i-12} PM`}: {val}
+                                                       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
                                                    </div>
+                                                   {/* Value label */}
+                                                   {val > 0 && (
+                                                       <span className="text-[9px] font-bold text-indigo-600 mb-1">{val}</span>
+                                                   )}
+                                                   {/* Bar */}
+                                                   <div
+                                                       className="w-full rounded-t-md transition-all duration-300 group-hover:opacity-75 cursor-pointer"
+                                                       style={{
+                                                           height: `${Math.max(pct, val > 0 ? 3 : 0)}%`,
+                                                           background: 'linear-gradient(to top, #4338ca, #6366f1)',
+                                                       }}
+                                                   />
                                                </div>
-                                           </div>
-
-                                           {/* X-axis hour labels */}
-                                           <div className="flex ml-[43px]">
-                                               {hourlyStats.map((_, i) => (
-                                                   <div key={`xlabel-${i}`} className="flex-1 text-center text-[11px] font-semibold text-gray-400 pt-2" style={{ minWidth: 36 }}>
-                                                       {i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i-12}p`}
-                                                   </div>
-                                               ))}
-                                           </div>
-                                       </div>
+                                           );
+                                       })}
                                    </div>
                                );
                            })()}
 
+                           {/* X-axis labels */}
+                           <div className="flex gap-[3px] mt-2 border-t border-gray-100 pt-2">
+                               {hourlyStats.map((_, i) => (
+                                   <div key={i} className="flex-1 text-center text-[9px] font-semibold text-gray-400">
+                                       {i % 3 === 0 ? (i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i-12}p`) : ''}
+                                   </div>
+                               ))}
+                           </div>
+
                            {/* Summary footer */}
-                           <div className="flex flex-wrap justify-between items-center mt-5 pt-4 border-t border-gray-100 gap-3">
+                           <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
                                <div className="flex gap-4">
                                    <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
                                        <span className="text-[10px] text-indigo-400 font-bold uppercase block">Total IN</span>
-                                       <span className="text-lg font-black text-indigo-600">{hourlyStats.reduce((sum, s) => sum + (s.in || 0), 0)}</span>
+                                       <span className="text-lg font-black text-indigo-600">{todayUniqueIn}</span>
                                    </div>
                                    <div className="bg-violet-50 px-4 py-2 rounded-xl border border-violet-100">
                                        <span className="text-[10px] text-violet-400 font-bold uppercase block">Total OUT</span>
-                                       <span className="text-lg font-black text-violet-600">{hourlyStats.reduce((sum, s) => sum + (s.out || 0), 0)}</span>
-                                   </div>
-                                   <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
-                                       <span className="text-[10px] text-emerald-400 font-bold uppercase block">Net Occupancy</span>
-                                       <span className="text-lg font-black text-emerald-600">
-                                           {Math.max(0, hourlyStats.reduce((sum, s) => sum + (s.in || 0), 0) - hourlyStats.reduce((sum, s) => sum + (s.out || 0), 0))}
-                                       </span>
+                                       <span className="text-lg font-black text-violet-600">{todayUniqueOut}</span>
                                    </div>
                                </div>
-                               <div className="text-right">
-                                   <span className="text-[10px] text-gray-400 font-medium block">
-                                       Peak Hour: {(() => { const peak = hourlyStats.reduce((max, s) => (s.in || 0) > (max.in || 0) ? s : max, hourlyStats[0]); return `${peak.hour === 0 ? '12' : peak.hour > 12 ? peak.hour - 12 : peak.hour}:00 ${peak.hour < 12 ? 'AM' : 'PM'} (${peak.in || 0} entries)`; })()}
-                                   </span>
-                                   <span className="text-[10px] text-gray-400 font-medium block">
-                                       Last updated: {new Date().toLocaleTimeString()}
-                                   </span>
-                               </div>
+                               <span className="text-[10px] text-gray-400 font-medium">
+                                   Peak: {(() => { const p = hourlyStats.reduce((m, s) => (s.in || 0) > (m.in || 0) ? s : m, hourlyStats[0]); return `${p.hour === 0 ? '12' : p.hour > 12 ? p.hour - 12 : p.hour}${p.hour < 12 ? 'AM' : 'PM'} (${p.in || 0})`; })()}
+                               </span>
                            </div>
                       </div>
 

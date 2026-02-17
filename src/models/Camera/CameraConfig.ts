@@ -2,7 +2,6 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface ICameraConfig {
   id: string; // e.g., "CAM-01"
-  pi_id: string; // The PI node this camera belongs to
   name: string;
   rtsp_url: string;
   ip: string;
@@ -22,11 +21,6 @@ const cameraConfigSchema = new Schema<ICameraConfig>({
     type: String, // e.g., "CAM-01"
     required: true,
     unique: true
-  },
-  pi_id: {
-    type: String,
-    default: 'default',
-    index: true
   },
   name: {
     type: String,
