@@ -21,6 +21,8 @@ interface Camera {
   type: "dahua" | "hikvision" | "other";
   ip?: string;
   channel?: number;
+  zones?: Zone[];
+  lines?: Line[];
 }
 
 interface Zone {
@@ -530,8 +532,17 @@ export default function PeopleDetectionPage() {
   const handleConfigure = (camId: string | number) => {
     setEditingCameraId(camId);
     setSnapshotUrl(null);
-    setCurrentZones([]);
-    setCurrentLines([]);
+    setSnapshotUrl(null);
+    
+    // Load existing config
+    const cam = cameras.find(c => c.id == camId);
+    if (cam) {
+        setCurrentZones(cam.zones || []);
+        setCurrentLines(cam.lines || []);
+    } else {
+        setCurrentZones([]);
+        setCurrentLines([]);
+    }
     
     setIsSnapshotLoading(true);
     mqttClient?.publish(
@@ -593,6 +604,35 @@ export default function PeopleDetectionPage() {
             { qos: 1 }
          );
      }
+
+     
+     // Save to Database (Persist Config)
+     const dbPayload = {
+         zones: currentZones.map(z => ({
+             name: z.name,
+             x1: Math.round(z.x1),
+             y1: Math.round(z.y1),
+             x2: Math.round(z.x2),
+             y2: Math.round(z.y2)
+         })),
+         lines: currentLines.map(l => ({
+             name: l.name,
+             start: { x: Math.round(l.start.x), y: Math.round(l.start.y) },
+             end: { x: Math.round(l.end.x), y: Math.round(l.end.y) }
+         }))
+     };
+
+     fetch(`/api/cameras/id?id=${editingCameraId}`, {
+         method: 'PUT',
+         body: JSON.stringify(dbPayload)
+     }).catch(err => console.error("Failed to save config to DB", err));
+
+     // Update local state so re-opening works immediately
+     setCameras(prev => prev.map(c => c.id == editingCameraId ? { 
+         ...c, 
+         zones: dbPayload.zones,
+         lines: dbPayload.lines
+     } : c));
 
      setSystemMessage("CONFIGURATION SYNCED");
      setSystemStatus("ok");
