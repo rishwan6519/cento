@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
       endDateTime: endDateTime.toISOString(),
     });
 
-    // ✅ Query for the resolved camera ID and time range
+    // ✅ Query for the resolved camera ID and time range (including legacy "camera" prefix)
     const query = {
-      "metadata.camera_id": actualCameraId,
+      "metadata.camera_id": { $in: [actualCameraId, `camera${actualCameraId}`] },
       timestamp: {
         $gte: startDateTime,
         $lte: endDateTime,
