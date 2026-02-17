@@ -441,38 +441,10 @@ export default function PeopleDetectionPage() {
 
     const finalUrl = getGeneratedRtspUrl(); 
 
-    // 1. Calculate Next ID (Check Database First)
-let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
-    let dbCameras = cameras;
-    
-    try {
-       const res = await fetch('/api/cameras');
-       if (res.ok) {
-           const data = await res.json();
-           if (Array.isArray(data)) dbCameras = data;
-       }
-    } catch(e) {
-       console.error("Error fetching cameras for ID generation", e);
-    }
 
-    if (dbCameras.length > 0) {
-        // Find max ID
-        const maxId = dbCameras.reduce((max: number, c: any) => {
-            let num = 0;
-            // Helper to extract number from ID
-            if (typeof c.id === 'number') {
-                num = c.id;
-            } else if (!isNaN(Number(c.id))) {
-                num = Number(c.id);
-            } else {
-                const match = c.id.toString().match(/CAM-(\d+)/);
-                if (match && match[1]) num = parseInt(match[1]);
-            }
-            return num > max ? num : max;
-        }, 0);
-        nextIdNumber = maxId + 1;
-    }
-    const nextId = nextIdNumber;
+    
+    // Generate Random 6-digit ID
+    const nextId = Math.floor(100000 + Math.random() * 900000).toString();
 
     setIsLoading(true);
     setLoadingMessage(`CONNECTING TO ${nextId}...`);
