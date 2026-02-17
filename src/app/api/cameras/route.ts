@@ -1,14 +1,26 @@
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { CameraConfig } from '@/models/Camera/CameraConfig';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    const cameras = await CameraConfig.find({}).sort({ createdAt: 1 });
+
+    // If pi_id is provided, filter cameras by it
+    const piId = req.nextUrl.searchParams.get("pi_id");
+
+    const query: any = {};
+    if (piId) {
+      query.pi_id = piId;
+    }
+
+    console.log("[Cameras API] GET with filter:", query);
+
+    const cameras = await CameraConfig.find(query).sort({ createdAt: 1 });
     return NextResponse.json(cameras);
   } catch (error) {
+    console.error("[Cameras API] Failed to fetch cameras:", error);
     return NextResponse.json({ error: 'Failed to fetch cameras' }, { status: 500 });
   }
 }
@@ -38,10 +50,13 @@ export async function POST(req: Request) {
 
     const newCamera = new CameraConfig({
         ...body,
-        id: nextId
+        id: nextId,
+        pi_id: body.pi_id || 'default'
     });
 
     await newCamera.save();
+
+    console.log(`[Cameras API] Created camera ${nextId} under pi_id: ${body.pi_id}`);
 
     return NextResponse.json(newCamera);
   } catch (error) {

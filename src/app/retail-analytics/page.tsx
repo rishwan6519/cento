@@ -197,30 +197,42 @@ export default function PeopleDetectionPage() {
     }
   };
 
-  // --- LOAD CAMERAS FROM DB ---
+  // --- LOAD CAMERAS FROM DB (filtered by piId) ---
+  const fetchCameras = async (targetPiId: string) => {
+    try {
+      const res = await fetch(`/api/cameras?pi_id=${encodeURIComponent(targetPiId)}`);
+      const data = await res.json();
+      console.log("Raw DB Response for PI", targetPiId, ":", data);
+      let validData: any[] = [];
+      if (Array.isArray(data)) validData = data;
+      else if (data && Array.isArray(data.data)) validData = data.data;
+      else if (data && Array.isArray(data.cameras)) validData = data.cameras;
+      
+      const sanitized = validData.map((c: any) => ({
+          ...c,
+          status: c.status || 'active', 
+          id: c.id 
+      }));
+      
+      setCameras(sanitized);
+    } catch (err) {
+      console.error("Failed to load cameras", err);
+    }
+  };
+
+  // Load settings on mount
   useEffect(() => {
     fetchSettings();
-    fetch('/api/cameras')
-      .then(res => res.json())
-      .then(data => {
-        console.log("Raw DB Response:", data);
-        let validData = [];
-        if (Array.isArray(data)) validData = data;
-        else if (data && Array.isArray(data.data)) validData = data.data;
-        else if (data && Array.isArray(data.cameras)) validData = data.cameras;
-        
-        const sanitized = validData.map((c: any) => ({
-            ...c,
-            status: c.status || 'active', 
-            id: c.id 
-        }));
-        
-        setCameras(sanitized);
-        // Also fetch stats on mount
-        fetchHourlyStats();
-      })
-      .catch(err => console.error("Failed to load cameras", err));
+    fetchHourlyStats();
   }, []);
+
+  // Re-fetch cameras whenever piId changes
+  useEffect(() => {
+    if (piId) {
+      setCameras([]); // Clear old cameras while loading
+      fetchCameras(piId);
+    }
+  }, [piId]);
 
   // --- FETCH ANALYTICS DATA ---
   const fetchCounts = () => {
@@ -365,11 +377,12 @@ export default function PeopleDetectionPage() {
                       method: 'POST',
                       body: JSON.stringify({
                           ...pendingCam,
+                          pi_id: piId, // Associate camera with current PI ID
                           status: 'active'
                       })
                   }).then(res => {
                        if(res.ok) {
-                           console.log("Camera persisted to DB");
+                           console.log(`Camera persisted to DB under pi_id: ${piId}`);
                            // Mark active in UI
                            setCameras(prev => prev.map(c => c.id == camId ? { ...c, status: "active" } : c));
                            // Reset Form
@@ -849,125 +862,144 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
 
                       {/* Hourly Traffic Graph */}
                       <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
-                           <div className="flex justify-between items-center mb-4">
+                           {/* Header */}
+                           <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
                                <div className="flex items-center gap-3">
                                    <div className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
-                                   <span className="text-xs font-black text-gray-900 uppercase tracking-widest">Hourly Traffic Today</span>
+                                   <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Hourly Traffic — Today</span>
                                </div>
-                               <div className="flex items-center gap-3">
-                                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
-                                       <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block" /> IN</span>
-                                       <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-violet-400 inline-block" /> OUT</span>
-                                       <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-emerald-500 inline-block" /> Occupancy</span>
+                               <div className="flex items-center gap-5">
+                                   <div className="flex items-center gap-5 text-xs font-bold uppercase tracking-wider">
+                                       <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-indigo-500 inline-block" /> Entered</span>
+                                       <span className="flex items-center gap-2"><span className="w-4 h-4 rounded bg-violet-400 inline-block" /> Exited</span>
                                    </div>
-                                   <button onClick={fetchHourlyStats} className="text-gray-400 hover:text-indigo-600 transition-colors p-1.5 rounded-lg hover:bg-indigo-50" title="Refresh">
+                                   <button onClick={fetchHourlyStats} className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-xl hover:bg-indigo-50" title="Refresh data">
                                        <Icons.Refresh />
                                    </button>
                                </div>
                            </div>
-                           {(() => {
-                               const maxVal = Math.max(...hourlyStats.map(s => Math.max(s.in || 0, s.out || 0, s.occupancy || 0)), 1);
-                               const chartW = 720;
-                               const chartH = 180;
-                               const padL = 35;
-                               const padR = 10;
-                               const padT = 15;
-                               const padB = 30;
-                               const plotW = chartW - padL - padR;
-                               const plotH = chartH - padT - padB;
-                               const barGroupW = plotW / 24;
-                               const barW = barGroupW * 0.3;
-                               const barGap = 2;
 
-                               // Y-axis grid lines
-                               const yTicks = 4;
-                               const yStep = Math.ceil(maxVal / yTicks);
+                           {/* Chart Container */}
+                           {(() => {
+                               const maxVal = Math.max(...hourlyStats.map(s => Math.max(s.in || 0, s.out || 0)), 1);
+                               const chartHeight = 220; // px for the bar area
 
                                return (
-                                   <div className="w-full overflow-x-auto">
-                                       <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} className="min-w-[600px]">
-                                           {/* Grid lines */}
-                                           {Array.from({ length: yTicks + 1 }, (_, i) => {
-                                               const yVal = i * yStep;
-                                               const yPos = padT + plotH - (yVal / (yStep * yTicks || 1)) * plotH;
-                                               return (
-                                                   <g key={`grid-${i}`}>
-                                                       <line x1={padL} y1={yPos} x2={chartW - padR} y2={yPos} stroke="#f1f5f9" strokeWidth="1" />
-                                                       <text x={padL - 5} y={yPos + 3} textAnchor="end" fontSize="8" fill="#94a3b8" fontWeight="600">{yVal}</text>
-                                                   </g>
-                                               );
-                                           })}
+                                   <div className="w-full overflow-x-auto pb-2">
+                                       <div style={{ minWidth: '900px' }}>
+                                           {/* Y-axis + bars area */}
+                                           <div className="flex">
+                                               {/* Y-axis labels */}
+                                               <div className="flex flex-col justify-between pr-3 py-1" style={{ height: chartHeight, minWidth: 40 }}>
+                                                   {[4, 3, 2, 1, 0].map(i => (
+                                                       <span key={i} className="text-[11px] font-semibold text-gray-400 text-right leading-none">
+                                                           {Math.round((maxVal / 4) * i)}
+                                                       </span>
+                                                   ))}
+                                               </div>
 
-                                           {/* Bars per hour */}
-                                           {hourlyStats.map((s, i) => {
-                                               const x = padL + i * barGroupW;
-                                               const inH = ((s.in || 0) / (yStep * yTicks || 1)) * plotH;
-                                               const outH = ((s.out || 0) / (yStep * yTicks || 1)) * plotH;
-                                               const inY = padT + plotH - inH;
-                                               const outY = padT + plotH - outH;
+                                               {/* Bars container */}
+                                               <div className="flex-1 relative border-l border-b border-gray-200">
+                                                   {/* Horizontal grid lines */}
+                                                   {[0, 1, 2, 3, 4].map(i => (
+                                                       <div key={`hgrid-${i}`} className="absolute left-0 right-0 border-t border-gray-100" style={{ bottom: `${(i / 4) * 100}%` }} />
+                                                   ))}
 
-                                               return (
-                                                   <g key={`bar-${i}`}>
-                                                       {/* IN bar */}
-                                                       <rect x={x + barGroupW * 0.1} y={inY} width={barW} height={Math.max(inH, 0)} rx="2" fill="#6366f1" opacity="0.9">
-                                                           <title>{`${i}:00 — IN: ${s.in || 0}`}</title>
-                                                       </rect>
-                                                       {/* OUT bar */}
-                                                       <rect x={x + barGroupW * 0.1 + barW + barGap} y={outY} width={barW} height={Math.max(outH, 0)} rx="2" fill="#a78bfa" opacity="0.8">
-                                                           <title>{`${i}:00 — OUT: ${s.out || 0}`}</title>
-                                                       </rect>
-                                                       {/* IN count on top */}
-                                                       {(s.in || 0) > 0 && (
-                                                           <text x={x + barGroupW * 0.1 + barW / 2} y={inY - 3} textAnchor="middle" fontSize="7" fill="#4f46e5" fontWeight="700">{s.in}</text>
-                                                       )}
-                                                       {/* OUT count on top */}
-                                                       {(s.out || 0) > 0 && (
-                                                           <text x={x + barGroupW * 0.1 + barW + barGap + barW / 2} y={outY - 3} textAnchor="middle" fontSize="7" fill="#7c3aed" fontWeight="700">{s.out}</text>
-                                                       )}
-                                                       {/* Hour label */}
-                                                       <text x={x + barGroupW / 2} y={chartH - 5} textAnchor="middle" fontSize="8" fill="#94a3b8" fontWeight="600">
-                                                           {i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i - 12}p`}
-                                                       </text>
-                                                   </g>
-                                               );
-                                           })}
+                                                   {/* Bars */}
+                                                   <div className="flex h-full relative z-10" style={{ height: chartHeight }}>
+                                                       {hourlyStats.map((s, i) => {
+                                                           const inPct = Math.max(((s.in || 0) / maxVal) * 100, 0);
+                                                           const outPct = Math.max(((s.out || 0) / maxVal) * 100, 0);
+                                                           const hasData = (s.in || 0) > 0 || (s.out || 0) > 0;
 
-                                           {/* Occupancy trend line */}
-                                           <polyline
-                                               points={hourlyStats.map((s, i) => {
-                                                   const x = padL + i * barGroupW + barGroupW / 2;
-                                                   const y = padT + plotH - ((s.occupancy || 0) / (yStep * yTicks || 1)) * plotH;
-                                                   return `${x},${y}`;
-                                               }).join(' ')}
-                                               fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 2"
-                                           />
-                                           {/* Occupancy dots */}
-                                           {hourlyStats.map((s, i) => {
-                                               if ((s.occupancy || 0) === 0 && (s.in || 0) === 0 && (s.out || 0) === 0) return null;
-                                               const x = padL + i * barGroupW + barGroupW / 2;
-                                               const y = padT + plotH - ((s.occupancy || 0) / (yStep * yTicks || 1)) * plotH;
-                                               return (
-                                                   <circle key={`occ-${i}`} cx={x} cy={y} r="3" fill="#10b981" stroke="white" strokeWidth="1.5">
-                                                       <title>{`${i}:00 — Occupancy: ${s.occupancy || 0}`}</title>
-                                                   </circle>
-                                               );
-                                           })}
+                                                           return (
+                                                               <div key={i} className="flex-1 flex flex-col items-center justify-end px-[2px] group relative" style={{ minWidth: 36 }}>
+                                                                   {/* Tooltip on hover */}
+                                                                   <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-lg">
+                                                                       <div>{i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i-12}:00 PM`}</div>
+                                                                       <div className="text-indigo-300">IN: {s.in || 0}</div>
+                                                                       <div className="text-violet-300">OUT: {s.out || 0}</div>
+                                                                       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                                                                   </div>
 
-                                           {/* Axes */}
-                                           <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#e2e8f0" strokeWidth="1" />
-                                           <line x1={padL} y1={padT + plotH} x2={chartW - padR} y2={padT + plotH} stroke="#e2e8f0" strokeWidth="1" />
-                                       </svg>
+                                                                   {/* Count labels above bars */}
+                                                                   {hasData && (
+                                                                       <div className="flex gap-1 mb-1 text-[10px] font-bold">
+                                                                           {(s.in || 0) > 0 && <span className="text-indigo-600">{s.in}</span>}
+                                                                           {(s.in || 0) > 0 && (s.out || 0) > 0 && <span className="text-gray-300">/</span>}
+                                                                           {(s.out || 0) > 0 && <span className="text-violet-500">{s.out}</span>}
+                                                                       </div>
+                                                                   )}
+
+                                                                   {/* Bar pair */}
+                                                                   <div className="flex items-end gap-[2px] w-full justify-center" style={{ height: `${chartHeight - 24}px` }}>
+                                                                       {/* IN bar */}
+                                                                       <div
+                                                                           className="rounded-t-md transition-all duration-300 group-hover:opacity-80"
+                                                                           style={{
+                                                                               width: '40%',
+                                                                               height: `${inPct}%`,
+                                                                               minHeight: (s.in || 0) > 0 ? 4 : 0,
+                                                                               background: 'linear-gradient(to top, #4f46e5, #6366f1)',
+                                                                           }}
+                                                                       />
+                                                                       {/* OUT bar */}
+                                                                       <div
+                                                                           className="rounded-t-md transition-all duration-300 group-hover:opacity-80"
+                                                                           style={{
+                                                                               width: '40%',
+                                                                               height: `${outPct}%`,
+                                                                               minHeight: (s.out || 0) > 0 ? 4 : 0,
+                                                                               background: 'linear-gradient(to top, #7c3aed, #a78bfa)',
+                                                                           }}
+                                                                       />
+                                                                   </div>
+                                                               </div>
+                                                           );
+                                                       })}
+                                                   </div>
+                                               </div>
+                                           </div>
+
+                                           {/* X-axis hour labels */}
+                                           <div className="flex ml-[43px]">
+                                               {hourlyStats.map((_, i) => (
+                                                   <div key={`xlabel-${i}`} className="flex-1 text-center text-[11px] font-semibold text-gray-400 pt-2" style={{ minWidth: 36 }}>
+                                                       {i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i-12}p`}
+                                                   </div>
+                                               ))}
+                                           </div>
+                                       </div>
                                    </div>
                                );
                            })()}
-                           <div className="flex justify-between items-center mt-3 px-2">
-                               <span className="text-[10px] text-gray-400 font-medium">
-                                   Total Events: {hourlyStats.reduce((sum, s) => sum + (s.in || 0) + (s.out || 0), 0)} | 
-                                   Peak Hour: {(() => { const peak = hourlyStats.reduce((max, s) => (s.in || 0) > (max.in || 0) ? s : max, hourlyStats[0]); return `${peak.hour}:00 (${peak.in || 0} IN)`; })()}
-                               </span>
-                               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
-                                   Current Occupancy: {hourlyStats[new Date().getUTCHours()]?.occupancy || 0}
-                               </span>
+
+                           {/* Summary footer */}
+                           <div className="flex flex-wrap justify-between items-center mt-5 pt-4 border-t border-gray-100 gap-3">
+                               <div className="flex gap-4">
+                                   <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
+                                       <span className="text-[10px] text-indigo-400 font-bold uppercase block">Total IN</span>
+                                       <span className="text-lg font-black text-indigo-600">{hourlyStats.reduce((sum, s) => sum + (s.in || 0), 0)}</span>
+                                   </div>
+                                   <div className="bg-violet-50 px-4 py-2 rounded-xl border border-violet-100">
+                                       <span className="text-[10px] text-violet-400 font-bold uppercase block">Total OUT</span>
+                                       <span className="text-lg font-black text-violet-600">{hourlyStats.reduce((sum, s) => sum + (s.out || 0), 0)}</span>
+                                   </div>
+                                   <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                                       <span className="text-[10px] text-emerald-400 font-bold uppercase block">Net Occupancy</span>
+                                       <span className="text-lg font-black text-emerald-600">
+                                           {Math.max(0, hourlyStats.reduce((sum, s) => sum + (s.in || 0), 0) - hourlyStats.reduce((sum, s) => sum + (s.out || 0), 0))}
+                                       </span>
+                                   </div>
+                               </div>
+                               <div className="text-right">
+                                   <span className="text-[10px] text-gray-400 font-medium block">
+                                       Peak Hour: {(() => { const peak = hourlyStats.reduce((max, s) => (s.in || 0) > (max.in || 0) ? s : max, hourlyStats[0]); return `${peak.hour === 0 ? '12' : peak.hour > 12 ? peak.hour - 12 : peak.hour}:00 ${peak.hour < 12 ? 'AM' : 'PM'} (${peak.in || 0} entries)`; })()}
+                                   </span>
+                                   <span className="text-[10px] text-gray-400 font-medium block">
+                                       Last updated: {new Date().toLocaleTimeString()}
+                                   </span>
+                               </div>
                            </div>
                       </div>
 
