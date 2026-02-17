@@ -21,19 +21,16 @@ export async function POST(req: Request) {
     let nextId = body.id;
 
     if (!nextId) {
-        // Auto-generate ID logic only if not provided
-        // Find the latest camera to determine next ID
-        const lastCamera = await CameraConfig.findOne({}).sort({ createdAt: -1 });
-        
-        let nextIdNumber = 1;
-        if (lastCamera && lastCamera.id) {
-            // extract number from "CAM-XX"
-            const match = lastCamera.id.match(/CAM-(\d+)/);
-            if (match && match[1]) {
-                nextIdNumber = parseInt(match[1]) + 1;
+        // Generate a random 6-digit ID
+        let unique = false;
+        while (!unique) {
+            const randomId = Math.floor(100000 + Math.random() * 900000).toString(); // e.g. "849201"
+            const existing = await CameraConfig.findOne({ id: randomId });
+            if (!existing) {
+                nextId = randomId;
+                unique = true;
             }
         }
-        nextId = `CAM-${nextIdNumber.toString().padStart(2, '0')}`;
     }
 
     const newCamera = new CameraConfig({
