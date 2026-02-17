@@ -1,4 +1,8 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+// Force Node.js to use Google Public DNS for SRV record resolution
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 interface CachedMongoose {
   conn: typeof mongoose | null;

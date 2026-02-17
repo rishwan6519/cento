@@ -6,59 +6,84 @@ export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    // Get Today's local date range
+    // Get today's date range in UTC (all timestamps stored are UTC)
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    
+    // Build today's UTC range: 00:00:00.000Z to 23:59:59.999Z
+    const startOfTodayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const endOfTodayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
 
-    // Fetch all events for today
+    console.log("[Hourly API] Querying events from", startOfTodayUTC.toISOString(), "to", endOfTodayUTC.toISOString());
+
+    // Fetch all events for today (UTC)
     const events = await ZoneEvent.find({
       timestamp: {
-        $gte: startOfToday,
-        $lt: endOfToday
+        $gte: startOfTodayUTC,
+        $lte: endOfTodayUTC
       }
     }).lean();
 
-    // Initialize hourly counts (0-23)
-    const hourlyStats = Array.from({ length: 24 }, (_, i) => ({
+    console.log(`[Hourly API] Found ${events.length} events for today`);
+
+    // Initialize hourly buckets (0-23) with unique person tracking per hour
+    const hourlyBuckets: {
+      hour: number;
+      inIds: Set<number>;
+      outIds: Set<number>;
+    }[] = Array.from({ length: 24 }, (_, i) => ({
       hour: i,
-      in: 0,
-      out: 0,
-      occupancy: 0
+      inIds: new Set<number>(),
+      outIds: new Set<number>()
     }));
 
-    // Tracks for Global Unique Counts (Daily)
-    const uniqueIn = new Set();
-    const uniqueOut = new Set();
+    // Global unique counters for the entire day
+    const dailyUniqueIn = new Set<number>();
+    const dailyUniqueOut = new Set<number>();
 
-    // Group by hour
+    // Bucket each event by its UTC hour
     events.forEach((ev: any) => {
       const date = new Date(ev.timestamp);
-      const hour = date.getHours();
-      
-      // Track Unique Persons for the Day
-      if (ev.action === "Entered") uniqueIn.add(ev.person_id);
-      if (ev.action === "Exited") uniqueOut.add(ev.person_id);
+      const hour = date.getUTCHours(); // Use UTC hours consistently
+      const personId = ev.person_id;
 
+      if (personId === undefined || personId === null) return;
+
+      // Track daily unique counts
+      if (ev.action === "Entered") dailyUniqueIn.add(personId);
+      if (ev.action === "Exited") dailyUniqueOut.add(personId);
+
+      // Track per-hour unique counts
       if (hour >= 0 && hour < 24) {
-        // Raw Transitions (for Hourly Volume & Occupancy Calculation)
-        if (ev.action === "Entered") hourlyStats[hour].in += 1;
-        else if (ev.action === "Exited") hourlyStats[hour].out += 1;
+        if (ev.action === "Entered") {
+          hourlyBuckets[hour].inIds.add(personId);
+        } else if (ev.action === "Exited") {
+          hourlyBuckets[hour].outIds.add(personId);
+        }
       }
     });
 
-    // Calculate Cumulative Occupancy (Raw Net transitions)
+    // Build the final hourly stats with unique counts + cumulative occupancy
     let runningOccupancy = 0;
-    for (let i = 0; i < 24; i++) {
-        runningOccupancy += (hourlyStats[i].in - hourlyStats[i].out);
-        hourlyStats[i].occupancy = Math.max(0, runningOccupancy); // Occupancy cannot be negative
-    }
+    const hourlyStats = hourlyBuckets.map((bucket) => {
+      const uniqueIn = bucket.inIds.size;
+      const uniqueOut = bucket.outIds.size;
+      runningOccupancy += (uniqueIn - uniqueOut);
+
+      return {
+        hour: bucket.hour,
+        in: uniqueIn,
+        out: uniqueOut,
+        occupancy: Math.max(0, runningOccupancy)
+      };
+    });
 
     return NextResponse.json({
       success: true,
       data: hourlyStats,
-      todayIn: uniqueIn.size,
-      todayOut: uniqueOut.size
+      todayIn: dailyUniqueIn.size,
+      todayOut: dailyUniqueOut.size,
+      totalEvents: events.length,
+      date: startOfTodayUTC.toISOString().split('T')[0]
     });
   } catch (error: any) {
     console.error("[API ERROR] Hourly stats failed:", error);

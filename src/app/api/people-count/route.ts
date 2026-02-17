@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     // 🔍 Fetch all documents for this camera
-    const documents = await ZoneEvent.find({ "metadata.camera_id": `camera` + cameraId }).lean();
+    const documents = await ZoneEvent.find({ "metadata.camera_id": cameraId }).lean();
     console.log(`[API] Found ${documents.length} documents for camera ${cameraId}`);
 
     // Get Today's local date range

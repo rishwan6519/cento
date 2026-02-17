@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     // ✅ Query for the resolved camera ID and time range
     const query = {
-      "metadata.camera_id":`camera`+ actualCameraId,
+      "metadata.camera_id": actualCameraId,
       timestamp: {
         $gte: startDateTime,
         $lte: endDateTime,

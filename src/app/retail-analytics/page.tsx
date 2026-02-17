@@ -847,39 +847,127 @@ let nextIdNumber = Math.floor(10000 + Math.random() * 90000);
                           </div>
                       </div>
 
-                      {/* Occupancy Trend Graph */}
+                      {/* Hourly Traffic Graph */}
                       <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
-                           <div className="flex justify-between items-center mb-6">
-                               <div className="flex items-center gap-2">
+                           <div className="flex justify-between items-center mb-4">
+                               <div className="flex items-center gap-3">
                                    <div className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
-                                   <span className="text-xs font-black text-gray-900 uppercase tracking-widest">In-Store Occupancy Trend (24H)</span>
+                                   <span className="text-xs font-black text-gray-900 uppercase tracking-widest">Hourly Traffic Today</span>
                                </div>
-                               {/* <div className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
-                                   LIVE: {hourlyStats[new Date().getHours()]?.occupancy || 0} PERSONS
-                               </div> */}
+                               <div className="flex items-center gap-3">
+                                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
+                                       <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block" /> IN</span>
+                                       <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-violet-400 inline-block" /> OUT</span>
+                                       <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-emerald-500 inline-block" /> Occupancy</span>
+                                   </div>
+                                   <button onClick={fetchHourlyStats} className="text-gray-400 hover:text-indigo-600 transition-colors p-1.5 rounded-lg hover:bg-indigo-50" title="Refresh">
+                                       <Icons.Refresh />
+                                   </button>
+                               </div>
                            </div>
-                           <div className="h-32 w-full bg-gray-50/50 rounded-2xl p-4">
-                               <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 240 100">
-                                   {/* Trend Area Fill */}
-                                   <path
-                                       d={`M 0 100 ${hourlyStats.map((s, i) => `L ${i * 10} ${100 - ((s.occupancy || 0) / Math.max(...hourlyStats.map(x=>x.occupancy||0), 1) * 80)}`).join(' ')} L 230 100 Z`}
-                                       fill="url(#gradient-occupancy)" fillOpacity="0.1"
-                                   />
-                                   <defs>
-                                       <linearGradient id="gradient-occupancy" x1="0" y1="0" x2="0" y2="1">
-                                           <stop offset="0%" stopColor="#4f46e5" />
-                                           <stop offset="100%" stopColor="#818cf8" />
-                                       </linearGradient>
-                                   </defs>
-                                   {/* Sharp Trend Line */}
-                                   <polyline
-                                       points={hourlyStats.map((s, i) => `${i * 10},${100 - ((s.occupancy || 0) / Math.max(...hourlyStats.map(x=>x.occupancy||0), 1) * 80)}`).join(' ')}
-                                       fill="none" stroke="#4f46e5" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" 
-                                   />
-                               </svg>
-                           </div>
-                           <div className="flex justify-between mt-4 text-[8px] font-bold text-gray-400 uppercase tracking-tighter px-2">
-                               {['12 AM', '6 AM', '12 PM', '6 PM', '11 PM'].map(t => <span key={t}>{t}</span>)}
+                           {(() => {
+                               const maxVal = Math.max(...hourlyStats.map(s => Math.max(s.in || 0, s.out || 0, s.occupancy || 0)), 1);
+                               const chartW = 720;
+                               const chartH = 180;
+                               const padL = 35;
+                               const padR = 10;
+                               const padT = 15;
+                               const padB = 30;
+                               const plotW = chartW - padL - padR;
+                               const plotH = chartH - padT - padB;
+                               const barGroupW = plotW / 24;
+                               const barW = barGroupW * 0.3;
+                               const barGap = 2;
+
+                               // Y-axis grid lines
+                               const yTicks = 4;
+                               const yStep = Math.ceil(maxVal / yTicks);
+
+                               return (
+                                   <div className="w-full overflow-x-auto">
+                                       <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} className="min-w-[600px]">
+                                           {/* Grid lines */}
+                                           {Array.from({ length: yTicks + 1 }, (_, i) => {
+                                               const yVal = i * yStep;
+                                               const yPos = padT + plotH - (yVal / (yStep * yTicks || 1)) * plotH;
+                                               return (
+                                                   <g key={`grid-${i}`}>
+                                                       <line x1={padL} y1={yPos} x2={chartW - padR} y2={yPos} stroke="#f1f5f9" strokeWidth="1" />
+                                                       <text x={padL - 5} y={yPos + 3} textAnchor="end" fontSize="8" fill="#94a3b8" fontWeight="600">{yVal}</text>
+                                                   </g>
+                                               );
+                                           })}
+
+                                           {/* Bars per hour */}
+                                           {hourlyStats.map((s, i) => {
+                                               const x = padL + i * barGroupW;
+                                               const inH = ((s.in || 0) / (yStep * yTicks || 1)) * plotH;
+                                               const outH = ((s.out || 0) / (yStep * yTicks || 1)) * plotH;
+                                               const inY = padT + plotH - inH;
+                                               const outY = padT + plotH - outH;
+
+                                               return (
+                                                   <g key={`bar-${i}`}>
+                                                       {/* IN bar */}
+                                                       <rect x={x + barGroupW * 0.1} y={inY} width={barW} height={Math.max(inH, 0)} rx="2" fill="#6366f1" opacity="0.9">
+                                                           <title>{`${i}:00 — IN: ${s.in || 0}`}</title>
+                                                       </rect>
+                                                       {/* OUT bar */}
+                                                       <rect x={x + barGroupW * 0.1 + barW + barGap} y={outY} width={barW} height={Math.max(outH, 0)} rx="2" fill="#a78bfa" opacity="0.8">
+                                                           <title>{`${i}:00 — OUT: ${s.out || 0}`}</title>
+                                                       </rect>
+                                                       {/* IN count on top */}
+                                                       {(s.in || 0) > 0 && (
+                                                           <text x={x + barGroupW * 0.1 + barW / 2} y={inY - 3} textAnchor="middle" fontSize="7" fill="#4f46e5" fontWeight="700">{s.in}</text>
+                                                       )}
+                                                       {/* OUT count on top */}
+                                                       {(s.out || 0) > 0 && (
+                                                           <text x={x + barGroupW * 0.1 + barW + barGap + barW / 2} y={outY - 3} textAnchor="middle" fontSize="7" fill="#7c3aed" fontWeight="700">{s.out}</text>
+                                                       )}
+                                                       {/* Hour label */}
+                                                       <text x={x + barGroupW / 2} y={chartH - 5} textAnchor="middle" fontSize="8" fill="#94a3b8" fontWeight="600">
+                                                           {i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i - 12}p`}
+                                                       </text>
+                                                   </g>
+                                               );
+                                           })}
+
+                                           {/* Occupancy trend line */}
+                                           <polyline
+                                               points={hourlyStats.map((s, i) => {
+                                                   const x = padL + i * barGroupW + barGroupW / 2;
+                                                   const y = padT + plotH - ((s.occupancy || 0) / (yStep * yTicks || 1)) * plotH;
+                                                   return `${x},${y}`;
+                                               }).join(' ')}
+                                               fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 2"
+                                           />
+                                           {/* Occupancy dots */}
+                                           {hourlyStats.map((s, i) => {
+                                               if ((s.occupancy || 0) === 0 && (s.in || 0) === 0 && (s.out || 0) === 0) return null;
+                                               const x = padL + i * barGroupW + barGroupW / 2;
+                                               const y = padT + plotH - ((s.occupancy || 0) / (yStep * yTicks || 1)) * plotH;
+                                               return (
+                                                   <circle key={`occ-${i}`} cx={x} cy={y} r="3" fill="#10b981" stroke="white" strokeWidth="1.5">
+                                                       <title>{`${i}:00 — Occupancy: ${s.occupancy || 0}`}</title>
+                                                   </circle>
+                                               );
+                                           })}
+
+                                           {/* Axes */}
+                                           <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#e2e8f0" strokeWidth="1" />
+                                           <line x1={padL} y1={padT + plotH} x2={chartW - padR} y2={padT + plotH} stroke="#e2e8f0" strokeWidth="1" />
+                                       </svg>
+                                   </div>
+                               );
+                           })()}
+                           <div className="flex justify-between items-center mt-3 px-2">
+                               <span className="text-[10px] text-gray-400 font-medium">
+                                   Total Events: {hourlyStats.reduce((sum, s) => sum + (s.in || 0) + (s.out || 0), 0)} | 
+                                   Peak Hour: {(() => { const peak = hourlyStats.reduce((max, s) => (s.in || 0) > (max.in || 0) ? s : max, hourlyStats[0]); return `${peak.hour}:00 (${peak.in || 0} IN)`; })()}
+                               </span>
+                               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                                   Current Occupancy: {hourlyStats[new Date().getUTCHours()]?.occupancy || 0}
+                               </span>
                            </div>
                       </div>
 
