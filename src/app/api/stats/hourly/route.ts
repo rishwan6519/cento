@@ -7,57 +7,58 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     // Get today's date range in UTC (all timestamps stored are UTC)
+    // Get today's local date range
     const now = new Date();
-    
-    // Build today's UTC range: 00:00:00.000Z to 23:59:59.999Z
-    const startOfTodayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-    const endOfTodayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-    console.log("[Hourly API] Querying events from", startOfTodayUTC.toISOString(), "to", endOfTodayUTC.toISOString());
+    console.log("[Hourly API] Querying events from", startOfToday.toString(), "to", endOfToday.toString());
 
-    // Fetch all events for today (UTC)
+    // Fetch all events for today
     const events = await ZoneEvent.find({
       timestamp: {
-        $gte: startOfTodayUTC,
-        $lte: endOfTodayUTC
+        $gte: startOfToday,
+        $lte: endOfToday
       }
     }).lean();
 
     console.log(`[Hourly API] Found ${events.length} events for today`);
 
-    // Initialize hourly buckets (0-23) with unique person tracking per hour
+    // Initialize hourly buckets (0-23)
     const hourlyBuckets: {
       hour: number;
-      inIds: Set<number>;
-      outIds: Set<number>;
+      inIds: Set<string>;
+      outIds: Set<string>;
     }[] = Array.from({ length: 24 }, (_, i) => ({
       hour: i,
-      inIds: new Set<number>(),
-      outIds: new Set<number>()
+      inIds: new Set<string>(),
+      outIds: new Set<string>()
     }));
 
     // Global unique counters for the entire day
-    const dailyUniqueIn = new Set<number>();
-    const dailyUniqueOut = new Set<number>();
+    const dailyUniqueIn = new Set<string>();
+    const dailyUniqueOut = new Set<string>();
 
-    // Bucket each event by its UTC hour
+    // Bucket each event by its (Local) hour
     events.forEach((ev: any) => {
       const date = new Date(ev.timestamp);
-      const hour = date.getUTCHours(); // Use UTC hours consistently
+      const hour = date.getHours(); // Use Local hours
       const personId = ev.person_id;
+      const camId = ev.metadata?.camera_id || 'unknown';
+      const key = `${camId}-${personId}`;
 
       if (personId === undefined || personId === null) return;
 
       // Track daily unique counts
-      if (ev.action === "Entered") dailyUniqueIn.add(personId);
-      if (ev.action === "Exited") dailyUniqueOut.add(personId);
+      if (ev.action === "Entered") dailyUniqueIn.add(key);
+      if (ev.action === "Exited") dailyUniqueOut.add(key);
 
       // Track per-hour unique counts
       if (hour >= 0 && hour < 24) {
         if (ev.action === "Entered") {
-          hourlyBuckets[hour].inIds.add(personId);
+          hourlyBuckets[hour].inIds.add(key);
         } else if (ev.action === "Exited") {
-          hourlyBuckets[hour].outIds.add(personId);
+          hourlyBuckets[hour].outIds.add(key);
         }
       }
     });
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
       todayIn: dailyUniqueIn.size,
       todayOut: dailyUniqueOut.size,
       totalEvents: events.length,
-      date: startOfTodayUTC.toISOString().split('T')[0]
+      date: `${startOfToday.getFullYear()}-${String(startOfToday.getMonth() + 1).padStart(2, '0')}-${String(startOfToday.getDate()).padStart(2, '0')}`
     });
   } catch (error: any) {
     console.error("[API ERROR] Hourly stats failed:", error);

@@ -80,6 +80,7 @@ const LoadingOverlay = ({ message }: { message: string }) => (
 export default function PeopleDetectionPage() {
   // Navigation
   const [activeTab, setActiveTab] = useState<"dashboard" | "setup" | "analytics" | "floorplan-upload" | "floorplan-config" | "heatmap" | "zone-config">("dashboard");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // MQTT & System State
   const [mqttClient, setMqttClient] = useState<mqtt.MqttClient | null>(null);
@@ -114,6 +115,12 @@ export default function PeopleDetectionPage() {
   const [currentLines, setCurrentLines] = useState<Line[]>([]);
   const [drawingMode, setDrawingMode] = useState<"none" | "zone" | "line">("none");
   const [newItemName, setNewItemName] = useState("");
+  
+  // Preview State
+  const [previewZone, setPreviewZone] = useState<{camId: string, zoneName: string} | null>(null);
+  const [previewSnapshotUrl, setPreviewSnapshotUrl] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewBounds, setPreviewBounds] = useState<{left: number, top: number, width: number, height: number} | null>(null);
   
   // Drawing Internal State
   const imgRef = useRef<HTMLImageElement>(null);
@@ -226,7 +233,7 @@ export default function PeopleDetectionPage() {
 
   // --- FETCH ANALYTICS DATA ---
   const fetchCounts = () => {
-    if (activeTab !== 'analytics' || cameras.length === 0) return;
+    if ((activeTab !== 'analytics' && activeTab !== 'dashboard') || cameras.length === 0) return;
     
     cameras.forEach(cam => {
       fetch(`/api/people-count?cameraId=${cam.id}`)
@@ -279,7 +286,7 @@ export default function PeopleDetectionPage() {
   }, [activeTab, cameras]);
 
   const fetchHistoricalData = async () => {
-    if (activeTab !== "analytics" || cameras.length === 0) return;
+    if ((activeTab !== "analytics" && activeTab !== "dashboard") || cameras.length === 0) return;
     setIsHistoryLoading(true);
     
     try {
@@ -307,7 +314,7 @@ export default function PeopleDetectionPage() {
   };
 
   useEffect(() => {
-    if (activeTab === 'analytics') {
+    if (activeTab === 'analytics' || activeTab === 'dashboard') {
         fetchHistoricalData();
     }
   }, [activeTab, analyticsFilter, cameras]);
@@ -398,7 +405,9 @@ export default function PeopleDetectionPage() {
         if (action === "snapshot") {
            if (response.image) {
              setSnapshotUrl(`data:image/jpeg;base64,${response.image}`);
+             setPreviewSnapshotUrl(`data:image/jpeg;base64,${response.image}`);
              setIsSnapshotLoading(false);
+             setIsPreviewLoading(false);
            }
         }
 
@@ -556,6 +565,28 @@ export default function PeopleDetectionPage() {
             if (prev) {
                 setSystemMessage("SNAPSHOT TIMEOUT");
                 setSystemStatus("warning");
+                return false;
+            }
+            return false;
+        });
+    }, 15000);
+  };
+
+  const handlePreviewZone = (camId: string | number, zoneName: string) => {
+    setPreviewZone({ camId: String(camId), zoneName });
+    setPreviewSnapshotUrl(null);
+    setIsPreviewLoading(true);
+    setPreviewBounds(null);
+    
+    mqttClient?.publish(
+      `vision/${piId}/${camId}/snapshot_request`,
+      JSON.stringify({ camera_id: camId }),
+      { qos: 1 }
+    );
+
+    setTimeout(() => {
+        setIsPreviewLoading(prev => {
+            if (prev) {
                 return false;
             }
             return false;
@@ -766,23 +797,45 @@ export default function PeopleDetectionPage() {
          </div>
 
          <nav className="flex-1 px-4 py-6 space-y-2">
-            {[
-                { id: "dashboard", label: "Dashboard", icon: Icons.Home },
-                { id: "floorplan-upload", label: "Upload Map", icon: Icons.Plus },
-                { id: "floorplan-config", label: "Map Config", icon: Icons.Map },
-                { id: "analytics", label: "Analytics", icon: Icons.Analytics },
-                { id: "setup", label: "Devices", icon: Icons.Camera },
-                { id: "zone-config", label: "Zone Config", icon: Icons.Settings },
-                { id: "heatmap", label: "Heatmap", icon: Icons.Heatmap },
-            ].map(item => (
-                <button key={item.id} onClick={() => setActiveTab(item.id as any)}
-                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-200 group relative overflow-hidden
-                    ${activeTab === item.id ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}>
-                    <div className={`relative z-10 transition-colors ${activeTab === item.id ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}>{item.icon()}</div>
-                    <span className="relative z-10 text-sm font-medium tracking-wide">{item.label}</span>
-                    {activeTab === item.id && <div className="absolute left-0 top-0 w-1 h-full bg-indigo-600" />}
-                </button>
-            ))}
+            <button onClick={() => setActiveTab("dashboard")}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-200 group relative overflow-hidden
+                ${activeTab === "dashboard" ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}>
+                <div className={`relative z-10 transition-colors ${activeTab === "dashboard" ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}><Icons.Home /></div>
+                <span className="relative z-10 text-sm font-medium tracking-wide">Dashboard</span>
+                {activeTab === "dashboard" && <div className="absolute left-0 top-0 w-1 h-full bg-indigo-600" />}
+            </button>
+            <button onClick={() => setActiveTab("heatmap")}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-200 group relative overflow-hidden
+                ${activeTab === "heatmap" ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}>
+                <div className={`relative z-10 transition-colors ${activeTab === "heatmap" ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}><Icons.Heatmap /></div>
+                <span className="relative z-10 text-sm font-medium tracking-wide">Heatmap</span>
+                {activeTab === "heatmap" && <div className="absolute left-0 top-0 w-1 h-full bg-indigo-600" />}
+            </button>
+
+            <button onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-200 group relative overflow-hidden text-gray-500 hover:text-gray-900 hover:bg-gray-100`}>
+                <div className={`relative z-10 transition-colors ${isSettingsOpen ? "text-gray-600" : "text-gray-400 group-hover:text-gray-600"}`}><Icons.Settings /></div>
+                <span className="relative z-10 text-sm font-medium tracking-wide">Settings</span>
+                <div className={`ml-auto relative z-10 transition-transform ${isSettingsOpen ? "rotate-180" : ""}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+            </button>
+            
+            {isSettingsOpen && (
+                <div className="pl-12 space-y-1 mt-1">
+                    {[
+                        { id: "zone-config", label: "Zone Config" },
+                        { id: "setup", label: "Device Add" },
+                        { id: "floorplan-upload", label: "Upload Map" },
+                        { id: "floorplan-config", label: "Map Config" },
+                    ].map(item => (
+                        <button key={item.id} onClick={() => setActiveTab(item.id as any)}
+                            className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${activeTab === item.id ? "text-indigo-600 bg-indigo-50 shadow-sm ring-1 ring-indigo-200" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}>
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
+            )}
          </nav>
 
          <div className="p-6">
@@ -846,17 +899,7 @@ export default function PeopleDetectionPage() {
                               <h1 className="text-3xl font-bold text-gray-900 tracking-tight">System <span className="text-indigo-600">Overview</span></h1>
                               <p className="text-sm text-gray-500 font-medium">Monitoring Node: {piId}</p>
                           </div>
-                          <div className="text-right">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Today's Total Traffic</span>
-                              <div className="flex gap-4">
-                                  <div className="bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
-                                      <span className="text-xs font-bold text-indigo-600">IN: {todayUniqueIn}</span>
-                                  </div>
-                                  <div className="bg-violet-50 px-3 py-1 rounded-lg border border-violet-100">
-                                      <span className="text-xs font-bold text-violet-600">OUT: {todayUniqueOut}</span>
-                                  </div>
-                              </div>
-                          </div>
+
                       </div>
 
                       {/* Hourly Traffic Graph */}
@@ -917,45 +960,13 @@ export default function PeopleDetectionPage() {
 
                            {/* Summary footer */}
                            <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
-                               <div className="flex gap-4">
-                                   <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
-                                       <span className="text-[10px] text-indigo-400 font-bold uppercase block">Total IN</span>
-                                       <span className="text-lg font-black text-indigo-600">{todayUniqueIn}</span>
-                                   </div>
-                                   <div className="bg-violet-50 px-4 py-2 rounded-xl border border-violet-100">
-                                       <span className="text-[10px] text-violet-400 font-bold uppercase block">Total OUT</span>
-                                       <span className="text-lg font-black text-violet-600">{todayUniqueOut}</span>
-                                   </div>
-                               </div>
+                              
                                <span className="text-[10px] text-gray-400 font-medium">
                                    Peak: {(() => { const p = hourlyStats.reduce((m, s) => (s.in || 0) > (m.in || 0) ? s : m, hourlyStats[0]); return `${p.hour === 0 ? '12' : p.hour > 12 ? p.hour - 12 : p.hour}${p.hour < 12 ? 'AM' : 'PM'} (${p.in || 0})`; })()}
                                </span>
                            </div>
                       </div>
 
-                       {/* Module Grid */}
-                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                           {[
-                               { id: "floorplan-upload", icon: <Icons.Plus />, label: "Upload Floor Plan", desc: "Import new store layouts.", color: "emerald" },
-                               { id: "floorplan-config", icon: <Icons.Map />, label: "Config Floor Plan", desc: "Map devices to layout.", color: "teal" },
-                               { id: "analytics", icon: <Icons.Analytics />, label: "Footfall Analytics", desc: "Monitor real-time traffic.", color: "indigo" },
-                               { id: "setup", icon: <Icons.Camera />, label: "Device Setup", desc: "Manage camera hardware.", color: "violet" },
-                               { id: "zone-config", icon: <Icons.Settings />, label: "Zone Config", desc: "Calibrate detection areas.", color: "sky" },
-                               { id: "heatmap", icon: <Icons.Heatmap />, label: "Heatmap View", desc: "Analyze dwell patterns.", color: "amber" },
-                           ].map((mod) => (
-                               <div key={mod.id} onClick={() => setActiveTab(mod.id as any)} 
-                                   className="group bg-white border-2 border-gray-100 rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl hover:border-indigo-500/20 transition-all cursor-pointer relative overflow-hidden flex flex-col items-center text-center">
-                                   <div className={`w-16 h-16 bg-${mod.color}-100 text-${mod.color}-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-                                       {mod.icon}
-                                   </div>
-                                   <h3 className="text-xl font-bold text-gray-900 mb-2">{mod.label}</h3>
-                                   <p className="text-gray-500 text-xs px-4">{mod.desc}</p>
-                                   <div className="mt-6 flex items-center gap-2 text-indigo-600 font-bold text-[10px] tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity">
-                                       Launch Module &rarr;
-                                   </div>
-                               </div>
-                           ))}
-                       </div>
                   </div>
               )}
 
@@ -1070,8 +1081,8 @@ export default function PeopleDetectionPage() {
               )}
 
               {/* ANALYTICS TAB */}
-              {activeTab === "analytics" && (
-                  <div className="space-y-6">
+              {(activeTab === "analytics" || activeTab === "dashboard") && (
+                  <div className={`space-y-6 ${activeTab === "dashboard" ? "w-full max-w-7xl mx-auto mt-6" : ""}`}>
                       {/* Detailed Filters */}
                       <div className="bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm space-y-6">
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1141,7 +1152,12 @@ export default function PeopleDetectionPage() {
                                                    <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em] mb-1">{cameras.find(c => c.id == camId)?.name || camId}</div>
                                                    <div className="text-xl font-black text-gray-900 tracking-tight">{zoneName}</div>
                                                </div>
-                                               <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Icons.Analytics /></div>
+                                               <div className="flex items-center gap-2">
+                                                   <button onClick={() => handlePreviewZone(camId, zoneName)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm group" title="Live Camera View">
+                                                       <Icons.Camera />
+                                                   </button>
+                                                   <div className="p-3 bg-gray-50 text-gray-400 rounded-xl"><Icons.Analytics /></div>
+                                               </div>
                                            </div>
                                            <div className="flex flex-col gap-4">
                                                {/* Today Section */}
@@ -1417,6 +1433,103 @@ export default function PeopleDetectionPage() {
             </div>
         </div>
       )}
+
+      {/* --- PREVIEW MODAL --- */}
+      {previewZone && (
+        <div className="fixed inset-0 bg-gray-900/50 z-[60] flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setPreviewZone(null)}>
+            <div className="bg-white w-full max-w-5xl rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl border border-gray-200 relative" onClick={e => e.stopPropagation()}>
+                <div className="px-8 py-5 border-b border-gray-200 flex justify-between items-center bg-white z-10 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
+                    <div>
+                        <h3 className="text-xl font-black text-gray-900 flex items-center gap-3 uppercase tracking-tight">
+                             <Icons.Camera />
+                             Zone Preview Node
+                             <span className="text-[10px] px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 uppercase tracking-widest">{previewZone.zoneName}</span>
+                        </h3>
+                    </div>
+                    <button onClick={() => setPreviewZone(null)} className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"><Icons.X /></button>
+                </div>
+
+                <div className="bg-gray-900 p-8 flex items-center justify-center overflow-hidden relative min-h-[500px]">
+                     {isPreviewLoading ? (
+                         <div className="flex flex-col items-center text-indigo-400 animate-pulse">
+                             <Icons.Refresh />
+                             <p className="mt-4 text-xs font-mono uppercase tracking-[0.3em]">Connecting to Sensor...</p>
+                         </div>
+                     ) : previewSnapshotUrl ? (
+                         <div className="relative w-full h-[65vh] flex items-center justify-center overflow-hidden rounded-2xl ring-1 ring-white/10 bg-black shadow-2xl group cursor-crosshair">
+                             {(() => {
+                                 const cam = cameras.find(c => String(c.id) === String(previewZone.camId));
+                                 const zone = cam?.zones?.find(z => z.name === previewZone.zoneName);
+                                 
+                                 return (
+                                     <>
+                                         <div className="relative w-full h-full flex items-center justify-center transition-transform duration-700 ease-out"
+                                              style={{
+                                                  transform: previewBounds ? `scale(1.2) translate(${(50 - (previewBounds.left + previewBounds.width/2)) / 2}%, ${(50 - (previewBounds.top + previewBounds.height/2)) / 2}%)` : 'scale(1)'
+                                              }}>
+                                              <img 
+                                                  onLoad={(e) => {
+                                                      if (!zone) return;
+                                                      const nw = e.currentTarget.naturalWidth;
+                                                      const nh = e.currentTarget.naturalHeight;
+                                                      if (nw > 0 && nh > 0) {
+                                                          setPreviewBounds({
+                                                              left: Math.min(zone.x1, zone.x2) / nw * 100,
+                                                              top: Math.min(zone.y1, zone.y2) / nh * 100,
+                                                              width: Math.abs(zone.x2 - zone.x1) / nw * 100,
+                                                              height: Math.abs(zone.y2 - zone.y1) / nh * 100
+                                                          });
+                                                      }
+                                                  }}
+                                                  src={previewSnapshotUrl} 
+                                                  className="max-w-full max-h-full object-contain block opacity-100" 
+                                                  draggable={false} />
+
+                                              {previewBounds && (
+                                                  <div className="absolute border-2 border-indigo-400 pointer-events-none transition-all duration-700 block"
+                                                      style={{
+                                                          left: `${previewBounds.left}%`,
+                                                          top: `${previewBounds.top}%`,
+                                                          width: `${previewBounds.width}%`,
+                                                          height: `${previewBounds.height}%`,
+                                                          boxShadow: '0 0 0 9999px rgba(0,0,0,0.65)'
+                                                      }}>
+                                                       {/* Crosshairs */}
+                                                       <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-white/50 -mt-0.5 -ml-0.5" />
+                                                       <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-white/50 -mt-0.5 -mr-0.5" />
+                                                       <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-white/50 -mb-0.5 -ml-0.5" />
+                                                       <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-white/50 -mb-0.5 -mr-0.5" />
+                                                  </div>
+                                              )}
+                                         </div>
+                                         <div className="absolute bottom-6 left-6 flex items-center gap-3">
+                                             <div className="px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur border border-white/10 flex items-center gap-2">
+                                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                                                 <span className="text-[10px] font-black text-white uppercase tracking-widest">LIVE</span>
+                                             </div>
+                                             {previewBounds && (
+                                                 <div className="px-3 py-1.5 rounded-lg bg-indigo-500/80 backdrop-blur border border-indigo-400 text-white flex items-center gap-2">
+                                                     <Icons.Analytics />
+                                                     <span className="text-[10px] font-black uppercase tracking-widest">Tracking Active</span>
+                                                 </div>
+                                             )}
+                                         </div>
+                                     </>
+                                 );
+                             })()}
+                         </div>
+                     ) : (
+                         <div className="text-gray-600 flex flex-col items-center gap-3 opacity-50">
+                             <Icons.Camera />
+                             <div className="font-mono text-xs font-black uppercase tracking-[0.2em]">NO SIGNAL RECEIVED</div>
+                         </div>
+                     )}
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Toast Notification Overlay */}
       {toast.show && (
           <div className="fixed bottom-10 right-10 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">

@@ -1,0 +1,44 @@
+/* Global resets for the landing page */
+.storesparc-root {
+    overflow-x: hidden;
+}
+
+.storesparc-root * {
+    box-sizing: border-box;
+}
+
+.storesparc-root body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Ensure container is centered and has consistent max-width */
+.storesparc-root .container {
+    max-width: 1280px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Custom scrollbar for premium feel */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: hsl(222 47% 6%);
+}
+
+::-webkit-scrollbar-thumb {
+    background: hsl(222 25% 18%);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: hsl(210 100% 50% / 0.5);
+}
+
+/* Fix for background consistency */
+html,
+body {
+    background-color: hsl(222 47% 6%);
+}

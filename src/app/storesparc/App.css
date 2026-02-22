@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+@theme inline {
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-card: hsl(var(--card));
+    --color-card-foreground: hsl(var(--card-foreground));
+    --color-secondary: hsl(var(--secondary));
+    --color-secondary-foreground: hsl(var(--secondary-foreground));
+    --color-muted: hsl(var(--muted));
+    --color-muted-foreground: hsl(var(--muted-foreground));
+    --color-border: hsl(var(--border));
+    --color-input: hsl(var(--input));
+    --color-ring: hsl(var(--ring));
+
+    --color-hero: hsl(var(--hero-bg));
+    --color-hero-foreground: hsl(var(--hero-foreground));
+    --color-hero-muted: hsl(var(--hero-muted));
+    --color-glow-blue: hsl(var(--glow-blue));
+    --color-glow-cyan: hsl(var(--glow-cyan));
+    --color-primary: hsl(var(--primary));
+    --color-primary-foreground: hsl(var(--primary-foreground));
+    --color-accent: hsl(var(--accent));
+    --color-accent-foreground: hsl(var(--accent-foreground));
+
+    --font-sans: 'Inter', sans-serif;
+    --font-display: 'Space Grotesk', sans-serif;
+}
+
+/* ===== Theme Tokens ===== */
+@layer base {
+    :root {
+        --background: 220 20% 97%;
+        --foreground: 220 25% 10%;
+
+        --card: 0 0% 100%;
+        --card-foreground: 220 25% 10%;
+
+        --primary: 210 100% 50%;
+        --primary-foreground: 0 0% 100%;
+
+        --secondary: 220 15% 92%;
+        --secondary-foreground: 220 25% 10%;
+
+        --muted: 220 15% 95%;
+        --muted-foreground: 220 10% 50%;
+
+        --accent: 175 85% 45%;
+        --accent-foreground: 220 25% 10%;
+
+        --border: 220 15% 90%;
+        --input: 220 15% 90%;
+        --ring: 210 100% 50%;
+
+        --radius: 0.75rem;
+
+        /* Custom Design Tokens */
+        --hero-bg: 222 47% 6%;
+        --hero-foreground: 220 20% 95%;
+        --hero-muted: 220 15% 60%;
+
+        --glow-blue: 210 100% 60%;
+        --glow-cyan: 180 100% 50%;
+    }
+
+    .dark {
+        --background: 222 47% 6%;
+        --foreground: 220 20% 95%;
+        --card: 222 40% 10%;
+        --card-foreground: 220 20% 95%;
+        --secondary: 220 30% 15%;
+        --muted: 220 25% 14%;
+        --muted-foreground: 220 15% 55%;
+        --border: 220 25% 18%;
+    }
+}
+
+/* ===== Base Styles ===== */
+@layer base {
+    body {
+        @apply bg-background text-foreground font-sans antialiased;
+        font-family: 'Inter', sans-serif;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-family: 'Space Grotesk', sans-serif;
+    }
+}
+
+/* ===== Utilities ===== */
+@layer utilities {
+    .text-gradient {
+        background: linear-gradient(135deg, hsl(210 100% 60%), hsl(175 85% 50%));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .bg-hero {
+        background-color: hsl(var(--hero-bg));
+    }
+
+    .text-hero {
+        color: hsl(var(--hero-foreground));
+    }
+
+    .text-hero-muted {
+        color: hsl(var(--hero-muted));
+    }
+
+    .bg-glow-blue {
+        background-color: hsl(var(--glow-blue));
+    }
+
+    .bg-glow-cyan {
+        background-color: hsl(var(--glow-cyan));
+    }
+
+    .text-glow-cyan {
+        color: hsl(var(--glow-cyan));
+    }
+
+    .glass-card {
+        background: hsl(222 40% 10% / 0.6);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid hsl(220 25% 20% / 0.5);
+    }
+
+    .glass-card-light {
+        background: hsl(0 0% 100% / 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid hsl(220 15% 90%);
+    }
+
+    .gradient-border {
+        position: relative;
+        border: 1px solid transparent;
+        background: linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+            linear-gradient(135deg, hsl(var(--glow-blue)), hsl(var(--glow-cyan))) border-box;
+    }
+
+    .animate-pulse-glow {
+        animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse-glow {
+
+        0%,
+        100% {
+            opacity: 1;
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+        }
+
+        50% {
+            opacity: .8;
+            box-shadow: 0 0 20px 2px rgba(59, 130, 246, 0.3);
+        }
+    }
+}

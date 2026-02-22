@@ -12,6 +12,7 @@ export interface ICameraConfig {
   status: string;
   zones: any[];
   lines: any[];
+  snapshot?: string;
 }
 
 export type ICameraConfigDocument = ICameraConfig & Document;
@@ -56,7 +57,11 @@ const cameraConfigSchema = new Schema<ICameraConfig>({
     default: 'inactive' // active, inactive, error
   },
   zones: [Schema.Types.Mixed],
-  lines: [Schema.Types.Mixed]
+  lines: [Schema.Types.Mixed],
+  snapshot: {
+      type: String, // Base64 or URL
+      required: false
+  }
 }, { timestamps: true });
 
 export const CameraConfig: Model<ICameraConfig> = mongoose.models.CameraConfig || mongoose.model<ICameraConfig>('CameraConfig', cameraConfigSchema);
