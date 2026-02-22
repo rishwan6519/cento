@@ -1457,16 +1457,23 @@ export default function PeopleDetectionPage() {
                              <p className="mt-4 text-xs font-mono uppercase tracking-[0.3em]">Connecting to Sensor...</p>
                          </div>
                      ) : previewSnapshotUrl ? (
-                         <div className="relative w-full h-[65vh] flex items-center justify-center overflow-hidden rounded-2xl ring-1 ring-white/10 bg-black shadow-2xl group cursor-crosshair">
+                         <div className="relative w-full h-[65vh] flex items-center justify-center overflow-hidden rounded-2xl bg-gray-900 group">
                              {(() => {
                                  const cam = cameras.find(c => String(c.id) === String(previewZone.camId));
                                  const zone = cam?.zones?.find(z => z.name === previewZone.zoneName);
                                  
+                                 // Calculate optimal zoom to fit the zone in the viewport
+                                 let scale = 1;
+                                 if (previewBounds) {
+                                     // Prevent infinite scale, cap at 5x
+                                     scale = Math.min(100 / Math.max(previewBounds.width, previewBounds.height), 5) * 0.8; 
+                                 }
+
                                  return (
                                      <>
-                                         <div className="relative w-full h-full flex items-center justify-center transition-transform duration-700 ease-out"
+                                         <div className="relative w-full h-full flex items-center justify-center transition-transform duration-1000 ease-out"
                                               style={{
-                                                  transform: previewBounds ? `scale(1.2) translate(${(50 - (previewBounds.left + previewBounds.width/2)) / 2}%, ${(50 - (previewBounds.top + previewBounds.height/2)) / 2}%)` : 'scale(1)'
+                                                  transform: previewBounds ? `scale(${scale}) translate(${(50 - (previewBounds.left + previewBounds.width/2))}%, ${(50 - (previewBounds.top + previewBounds.height/2))}%)` : 'scale(1)'
                                               }}>
                                               <img 
                                                   onLoad={(e) => {
@@ -1483,23 +1490,20 @@ export default function PeopleDetectionPage() {
                                                       }
                                                   }}
                                                   src={previewSnapshotUrl} 
-                                                  className="max-w-full max-h-full object-contain block opacity-100" 
+                                                  className="max-w-full max-h-full object-contain block opacity-100"
+                                                  style={previewBounds ? {
+                                                      clipPath: `polygon(${previewBounds.left}% ${previewBounds.top}%, ${previewBounds.left + previewBounds.width}% ${previewBounds.top}%, ${previewBounds.left + previewBounds.width}% ${previewBounds.top + previewBounds.height}%, ${previewBounds.left}% ${previewBounds.top + previewBounds.height}%)`
+                                                  } : {}}
                                                   draggable={false} />
 
                                               {previewBounds && (
-                                                  <div className="absolute border-2 border-indigo-400 pointer-events-none transition-all duration-700 block"
+                                                  <div className="absolute border-2 border-indigo-500 pointer-events-none transition-all duration-700 block"
                                                       style={{
                                                           left: `${previewBounds.left}%`,
                                                           top: `${previewBounds.top}%`,
                                                           width: `${previewBounds.width}%`,
                                                           height: `${previewBounds.height}%`,
-                                                          boxShadow: '0 0 0 9999px rgba(0,0,0,0.65)'
                                                       }}>
-                                                       {/* Crosshairs */}
-                                                       <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-white/50 -mt-0.5 -ml-0.5" />
-                                                       <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-white/50 -mt-0.5 -mr-0.5" />
-                                                       <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-white/50 -mb-0.5 -ml-0.5" />
-                                                       <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-white/50 -mb-0.5 -mr-0.5" />
                                                   </div>
                                               )}
                                          </div>
