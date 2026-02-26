@@ -99,6 +99,7 @@ const fetchZoneHeatmapData = async (
       endDate,
       endTime,
     });
+    console.log(params,"this is params of zones");
     const res = await fetch(`/api/zones?${params}`);
     const data = await res.json();
     
