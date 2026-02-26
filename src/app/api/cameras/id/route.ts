@@ -44,9 +44,8 @@ export async function GET(req: NextRequest) {
     todayDocuments.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
       const action = doc.action;
-      const personId = doc.person_id;
 
-      if (!zoneName || !action || personId === undefined) return;
+      if (!zoneName || !action) return;
 
       if (!zoneCounts[zoneName]) {
         zoneCounts[zoneName] = { in_count: 0, out_count: 0 };

@@ -34,12 +34,11 @@ export async function GET(request: NextRequest) {
     documents.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
       const action = doc.action;
-      const personId = doc.person_id;
       
       const eventTime = new Date(doc.timestamp);
       const isToday = eventTime >= startOfToday && eventTime < endOfToday;
 
-      if (!zoneName || !action || personId === undefined) return;
+      if (!zoneName || !action) return;
 
       if (!allCounts[zoneName]) allCounts[zoneName] = { in: 0, out: 0 };
       if (!todayCounts[zoneName]) todayCounts[zoneName] = { in: 0, out: 0 };

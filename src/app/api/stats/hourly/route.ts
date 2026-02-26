@@ -43,9 +43,6 @@ export async function GET(request: NextRequest) {
     events.forEach((ev: any) => {
       const date = new Date(ev.timestamp);
       const hour = date.getHours(); // Use Local hours
-      const personId = ev.person_id;
-
-      if (personId === undefined || personId === null) return;
 
       // Track daily counts
       if (ev.action === "Entered") dailyIn++;
