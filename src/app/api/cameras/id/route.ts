@@ -27,19 +27,21 @@ export async function GET(req: NextRequest) {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
-    // REAL DB FETCH: Get all events for this camera for TODAY
-    const documents = await ZoneEvent.find({ 
-      'metadata.camera_id': id,
-      timestamp: {
-        $gte: startOfToday,
-        $lt: endOfToday
-      }
+    // FETCH ALL EVENTS FOR THIS CAMERA (needed for lifetime summary)
+    const allDocuments = await ZoneEvent.find({ 
+      'metadata.camera_id': id
     }).lean();
 
-    // 🧮 Aggregate IN/OUT counts per zone (Unique Person IDs)
-    const zoneCounts: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
+    // Filter just today's documents for the detailed zone breakdown
+    const todayDocuments = allDocuments.filter((d: any) => {
+        const time = new Date(d.timestamp).getTime();
+        return time >= startOfToday.getTime() && time < endOfToday.getTime();
+    });
 
-    documents.forEach((doc: any) => {
+    // 🧮 Aggregate IN/OUT counts per zone using flat counts!
+    const zoneCounts: Record<string, { in_count: number; out_count: number }> = {};
+
+    todayDocuments.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
       const action = doc.action;
       const personId = doc.person_id;
@@ -47,13 +49,13 @@ export async function GET(req: NextRequest) {
       if (!zoneName || !action || personId === undefined) return;
 
       if (!zoneCounts[zoneName]) {
-        zoneCounts[zoneName] = { in_ids: new Set(), out_ids: new Set() };
+        zoneCounts[zoneName] = { in_count: 0, out_count: 0 };
       }
 
       if (action === "Entered") {
-        zoneCounts[zoneName].in_ids.add(personId);
+        zoneCounts[zoneName].in_count++;
       } else if (action === "Exited") {
-        zoneCounts[zoneName].out_ids.add(personId);
+        zoneCounts[zoneName].out_count++;
       }
     });
 
@@ -65,8 +67,8 @@ export async function GET(req: NextRequest) {
       return {
         id: zoneId,
         zone_name: zoneName,
-        total_in_count: zoneCounts[zoneName].in_ids.size,
-        total_out_count: zoneCounts[zoneName].out_ids.size,
+        total_in_count: zoneCounts[zoneName].in_count,
+        total_out_count: zoneCounts[zoneName].out_count,
       };
     });
 
@@ -74,8 +76,9 @@ export async function GET(req: NextRequest) {
       camera_id: id,
       zones_footfall: zones,
       summary: {
-        total_unique_in: new Set(documents.filter(d => d.action === 'Entered').map(d => d.person_id)).size,
-        total_unique_out: new Set(documents.filter(d => d.action === 'Exited').map(d => d.person_id)).size
+       // Using all documents for the true lifetime total count
+       total_in: allDocuments.filter((d: any) => d.action === 'Entered').length,
+       total_out: allDocuments.filter((d: any) => d.action === 'Exited').length
       }
     });
 

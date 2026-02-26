@@ -27,9 +27,9 @@ export async function GET(request: NextRequest) {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
-    // 🧮 Aggregate sets for uniqueness
-    const allUnique: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
-    const todayUnique: Record<string, { in_ids: Set<number>; out_ids: Set<number> }> = {};
+    // 🧮 Aggregate counts for events
+    const allCounts: Record<string, { in: number; out: number }> = {};
+    const todayCounts: Record<string, { in: number; out: number }> = {};
 
     documents.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
@@ -41,33 +41,33 @@ export async function GET(request: NextRequest) {
 
       if (!zoneName || !action || personId === undefined) return;
 
-      if (!allUnique[zoneName]) allUnique[zoneName] = { in_ids: new Set(), out_ids: new Set() };
-      if (!todayUnique[zoneName]) todayUnique[zoneName] = { in_ids: new Set(), out_ids: new Set() };
+      if (!allCounts[zoneName]) allCounts[zoneName] = { in: 0, out: 0 };
+      if (!todayCounts[zoneName]) todayCounts[zoneName] = { in: 0, out: 0 };
 
       // All Time
-      if (action === "Entered") allUnique[zoneName].in_ids.add(personId);
-      else if (action === "Exited") allUnique[zoneName].out_ids.add(personId);
+      if (action === "Entered") allCounts[zoneName].in++;
+      else if (action === "Exited") allCounts[zoneName].out++;
 
       // Today
       if (isToday) {
-        if (action === "Entered") todayUnique[zoneName].in_ids.add(personId);
-        else if (action === "Exited") todayUnique[zoneName].out_ids.add(personId);
+        if (action === "Entered") todayCounts[zoneName].in++;
+        else if (action === "Exited") todayCounts[zoneName].out++;
       }
     });
 
-    const formatZones = (source: Record<string, { in_ids: Set<number>; out_ids: Set<number> }>) => {
+    const formatZones = (source: Record<string, { in: number; out: number }>) => {
       return Object.keys(source).map(name => ({
         zone_name: name,
-        in: source[name].in_ids.size,
-        out: source[name].out_ids.size
+        in: source[name].in,
+        out: source[name].out
       })).sort((a, b) => a.zone_name.localeCompare(b.zone_name));
     };
 
     return NextResponse.json({
       success: true,
       cameraId,
-      today: formatZones(todayUnique),
-      allTime: formatZones(allUnique)
+      today: formatZones(todayCounts),
+      allTime: formatZones(allCounts)
     });
   } catch (error: any) {
     console.error("[API ERROR] Failed to fetch zone data:", error);

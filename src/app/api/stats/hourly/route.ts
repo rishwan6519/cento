@@ -27,53 +27,51 @@ export async function GET(request: NextRequest) {
     // Initialize hourly buckets (0-23)
     const hourlyBuckets: {
       hour: number;
-      inIds: Set<string>;
-      outIds: Set<string>;
+      inCount: number;
+      outCount: number;
     }[] = Array.from({ length: 24 }, (_, i) => ({
       hour: i,
-      inIds: new Set<string>(),
-      outIds: new Set<string>()
+      inCount: 0,
+      outCount: 0
     }));
 
-    // Global unique counters for the entire day
-    const dailyUniqueIn = new Set<string>();
-    const dailyUniqueOut = new Set<string>();
+    // Global counters for the entire day
+    let dailyIn = 0;
+    let dailyOut = 0;
 
     // Bucket each event by its (Local) hour
     events.forEach((ev: any) => {
       const date = new Date(ev.timestamp);
       const hour = date.getHours(); // Use Local hours
       const personId = ev.person_id;
-      const camId = ev.metadata?.camera_id || 'unknown';
-      const key = `${camId}-${personId}`;
 
       if (personId === undefined || personId === null) return;
 
-      // Track daily unique counts
-      if (ev.action === "Entered") dailyUniqueIn.add(key);
-      if (ev.action === "Exited") dailyUniqueOut.add(key);
+      // Track daily counts
+      if (ev.action === "Entered") dailyIn++;
+      if (ev.action === "Exited") dailyOut++;
 
-      // Track per-hour unique counts
+      // Track per-hour counts
       if (hour >= 0 && hour < 24) {
         if (ev.action === "Entered") {
-          hourlyBuckets[hour].inIds.add(key);
+          hourlyBuckets[hour].inCount++;
         } else if (ev.action === "Exited") {
-          hourlyBuckets[hour].outIds.add(key);
+          hourlyBuckets[hour].outCount++;
         }
       }
     });
 
-    // Build the final hourly stats with unique counts + cumulative occupancy
+    // Build the final hourly stats with counts + cumulative occupancy
     let runningOccupancy = 0;
     const hourlyStats = hourlyBuckets.map((bucket) => {
-      const uniqueIn = bucket.inIds.size;
-      const uniqueOut = bucket.outIds.size;
-      runningOccupancy += (uniqueIn - uniqueOut);
+      const totalIn = bucket.inCount;
+      const totalOut = bucket.outCount;
+      runningOccupancy += (totalIn - totalOut);
 
       return {
         hour: bucket.hour,
-        in: uniqueIn,
-        out: uniqueOut,
+        in: totalIn,
+        out: totalOut,
         occupancy: Math.max(0, runningOccupancy)
       };
     });
@@ -81,8 +79,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: hourlyStats,
-      todayIn: dailyUniqueIn.size,
-      todayOut: dailyUniqueOut.size,
+      todayIn: dailyIn,
+      todayOut: dailyOut,
       totalEvents: events.length,
       date: `${startOfToday.getFullYear()}-${String(startOfToday.getMonth() + 1).padStart(2, '0')}-${String(startOfToday.getDate()).padStart(2, '0')}`
     });

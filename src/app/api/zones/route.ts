@@ -74,11 +74,8 @@ export async function GET(request: NextRequest) {
     const documents = await ZoneEvent.find(query).lean();
     console.log(`[API] Found ${documents.length} documents`);
 
-    // ✅ Aggregate counts (Unique Person IDs)
-    const zoneCounts: Record<
-      string,
-      { in_ids: Set<number>; out_ids: Set<number> }
-    > = {};
+    // ✅ Aggregate counts 
+    const zoneCounts: Record<string, { in_count: number; out_count: number }> = {};
 
     documents.forEach((doc: any) => {
       const zoneName = doc.metadata?.zone_name;
@@ -88,13 +85,13 @@ export async function GET(request: NextRequest) {
       if (!zoneName || !action || personId === undefined) return;
 
       if (!zoneCounts[zoneName]) {
-        zoneCounts[zoneName] = { in_ids: new Set(), out_ids: new Set() };
+        zoneCounts[zoneName] = { in_count: 0, out_count: 0 };
       }
 
       if (action === "Entered") {
-        zoneCounts[zoneName].in_ids.add(personId);
+        zoneCounts[zoneName].in_count++;
       } else if (action === "Exited") {
-        zoneCounts[zoneName].out_ids.add(personId);
+        zoneCounts[zoneName].out_count++;
       }
     });
 
@@ -106,8 +103,8 @@ export async function GET(request: NextRequest) {
       return {
         zone_id: zoneId,
         zone_name: zoneName,
-        total_in_count: zoneCounts[zoneName].in_ids.size,
-        total_out_count: zoneCounts[zoneName].out_ids.size,
+        total_in_count: zoneCounts[zoneName].in_count,
+        total_out_count: zoneCounts[zoneName].out_count,
       };
     });
 
