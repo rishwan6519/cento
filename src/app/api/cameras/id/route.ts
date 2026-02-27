@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { CameraConfig } from '@/models/Camera/CameraConfig';
-
+import CameraMarker from '@/models/CameraMarker';
 import { ZoneEvent } from '@/models/ZoneEvent';
 
 export async function GET(req: NextRequest) {
@@ -111,7 +111,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-  const id = req.nextUrl.searchParams.get("id");
+    const id = req.nextUrl.searchParams.get("id");
     await connectToDatabase();
 
     const deletedCamera = await CameraConfig.findOneAndDelete({ id: id });
@@ -120,7 +120,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Camera not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ message: 'Camera deleted successfully' });
+    // Attempt to delete any map markers associated with the removed camera
+    try {
+      if (id) {
+        await CameraMarker.deleteMany({ cameraId: id });
+        console.log(`[API] Cleaned up map markers for deleted camera ${id}`);
+      }
+    } catch (markerErr) {
+      console.error(`[API] Warning: Failed to clean up associated map markers for camera ${id}`, markerErr);
+    }
+
+    return NextResponse.json({ message: 'Camera and linked spatial markers deleted successfully' });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to delete camera' }, { status: 500 });
   }
