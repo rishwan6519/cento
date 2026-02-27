@@ -19,6 +19,7 @@ interface FloorMap {
 
 interface CameraMarker {
   id?: string;
+  _id?: string;
   cameraId: string;
   x: number;
   y: number;
@@ -324,6 +325,28 @@ const FloorPlanUploader: React.FC<FloorPlanUploaderProps> = ({ initialStep }) =>
     }
   };
 
+  const handleDeleteMarker = async (cameraId: string) => {
+    const marker = existingMarkers.find(m => m.cameraId === cameraId);
+    if (!marker || (!marker.id && !marker._id)) return;
+    setIsLoading(true);
+    try {
+      const idToDelete = marker._id || marker.id;
+      const res = await fetch(`/api/camera-marker?id=${idToDelete}`, { method: "DELETE" });
+      if (res.ok) {
+        setExistingMarkers(prev => prev.filter(m => m.cameraId !== cameraId));
+        if (selectedCameraId === cameraId) {
+          resetToConfig();
+        }
+      } else {
+        setErrorMessage("Failed to delete marker from database.");
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const resetToConfig = () => {
     setStep("config");
     setSelectedCameraId("");
@@ -433,32 +456,46 @@ const FloorPlanUploader: React.FC<FloorPlanUploaderProps> = ({ initialStep }) =>
                   {availableCameras.map(cam => {
                      const camId = (cam.id || cam._id) as string;
                      const isAssigned = existingMarkers.some(m => m.cameraId === camId);
+                     const isSelected = selectedCameraId === camId;
                      return (
                        <button 
                          key={camId}
-                         onClick={() => !isAssigned && setSelectedCameraId(camId)}
-                         className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${selectedCameraId === camId ? 'border-indigo-600 bg-indigo-50' : 'bg-slate-50 border-slate-100'} ${isAssigned ? 'opacity-40 grayscale cursor-not-allowed' : 'hover:border-slate-200'}`}
+                         onClick={() => setSelectedCameraId(camId)}
+                         className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isSelected ? 'border-indigo-600 bg-indigo-50' : 'bg-slate-50 border-slate-100'} ${isAssigned && !isSelected ? 'opacity-80' : 'hover:border-slate-200'}`}
                        >
                          <div className="flex items-center space-x-3 text-left">
-                           <div className={`p-2 rounded-lg ${selectedCameraId === camId ? 'bg-indigo-600 text-white' : 'bg-white shadow-sm text-slate-400'}`}>
+                           <div className={`p-2 rounded-lg ${isSelected ? 'bg-indigo-600 text-white' : 'bg-white shadow-sm text-slate-400'}`}>
                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14" /></svg>
                            </div>
                            <div>
                              <p className="font-black text-slate-800 text-xs">{cam.name}</p>
-                             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{isAssigned ? 'Already Positioned' : `Channel ${cam.zones.length} Zones`}</p>
+                             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{isAssigned ? 'Positioned / Assigned' : `Channel ${cam.zones.length} Zones`}</p>
                            </div>
                          </div>
                        </button>
                      );
                   })}
                 </div>
-                <button 
-                  onClick={startMarkingCamera}
-                  disabled={!selectedCameraId}
-                  className="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black text-xl shadow-2xl disabled:opacity-20"
-                >
-                  Configure Markers
-                </button>
+
+                {selectedCameraId && existingMarkers.some(m => m.cameraId === selectedCameraId) ? (
+                  <div className="flex flex-col space-y-3">
+                    <button 
+                      onClick={() => handleDeleteMarker(selectedCameraId)}
+                      className="w-full py-5 bg-rose-600 text-white rounded-3xl font-black text-xl shadow-2xl hover:bg-rose-700 transition-all font-sans"
+                    >
+                      Delete Assigned Marker
+                    </button>
+                    <p className="text-xs text-center text-slate-500 font-bold uppercase tracking-tighter">Delete first to re-configure map</p>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={startMarkingCamera}
+                    disabled={!selectedCameraId}
+                    className="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black text-xl shadow-2xl disabled:opacity-20"
+                  >
+                    Configure Markers
+                  </button>
+                )}
               </div>
             </div>
           )}

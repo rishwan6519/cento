@@ -104,3 +104,25 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+// DELETE /api/camera-marker?id=xxx
+export async function DELETE(req: NextRequest) {
+  try {
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Missing marker id" },
+        { status: 400 }
+      );
+    }
+    await connectToDatabase();
+    await CameraMarker.findByIdAndDelete(id);
+    return NextResponse.json({ success: true, message: "Marker deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting camera marker:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
