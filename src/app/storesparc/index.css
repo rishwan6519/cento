@@ -12,9 +12,11 @@
     padding: 0;
 }
 
-/* Ensure container is centered and has consistent max-width */
+/* Ensure container is centered and takes full width for a modern fluid layout */
 .storesparc-root .container {
-    max-width: 1280px !important;
+    max-width: 100% !important;
+    padding-left: 5% !important;
+    padding-right: 5% !important;
     margin-left: auto !important;
     margin-right: auto !important;
 }

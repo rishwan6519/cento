@@ -39,11 +39,26 @@ interface Device {
   handMovements?: string[];
 }
 
+import { useRouter } from "next/navigation";
+
 export default function RobotAdminDashboard() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>([]);
   const [activeSection, setActiveSection] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Authentication Check
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("userRole");
+    
+    if (!token || role !== "admin") {
+      toast.error("Unauthorized access. Please login first.");
+      router.push("/admin/login");
+      return;
+    }
+  }, [router]);
 
   useEffect(() => {
     fetchDeviceTypes();

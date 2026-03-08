@@ -68,6 +68,7 @@ import ViewGroups from "@/components/ViewGroups/ViewGroups";
 import DeviceDetails from "@/components/DeviceDetails/DeviceDetails";
 import { Play } from "next/font/google";
 import CreatePresentation from "@/components/Presentation/Presentation";
+import UserSettings from "@/components/UserSettings/UserSettings";
 
 // import RobotIcon from "@/components/icons/centelon-logo.svg";
 
@@ -88,6 +89,7 @@ interface UserData {
   _id: string;
   username: string;
   role: string;
+  storeName?: string;
 }
 interface Slide {
   id: string;
@@ -139,6 +141,9 @@ type ExtendedMenuKey =
   // Reports
   | "playbackHistory"
   | "announcementLog"
+  
+  // Settings
+  | "userSettings"
   | "engagementTrends"
   | "exportReports"
 
@@ -168,6 +173,7 @@ export default function UserPlatform(): React.ReactElement {
 const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 const [slides, setSlides] = useState<Slide[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showAllDevices, setShowAllDevices] = useState(false);
 
   
 
@@ -175,7 +181,7 @@ const [slides, setSlides] = useState<Slide[]>([]);
     const fetchSliderData = async () => {
       try {
         const response = await fetch(
-          "https://iot.centelon.com/api/get-slider?userId=688c8989c3f5fa5504dfb2f6"
+          "/api/get-slider?userId="+localStorage.getItem("userId")
         );
         const result = await response.json();
         console.log(result,"result")
@@ -186,7 +192,7 @@ const [slides, setSlides] = useState<Slide[]>([]);
 
           const formattedSlides: Slide[] = sliderItems.map((item: any, index: number) => ({
             id: item._id || index.toString(),
-            src: `https://iot.centelon.com${item.url}`, // prepend base URL
+            src: item.url, // URL usually starts with /uploads/...
             alt: item.description || `Slide ${index + 1}`,
             description: item.description || "",
           }));
@@ -420,6 +426,14 @@ const menuSections: MenuItem[] = [
     icon: <FaCalendarAlt size={20} />,
     items: [
       { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
+    ],
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    icon: <FaCog size={20} />,
+    items: [
+      { key: "userSettings", label: "Account Settings", icon: <FaUserCircle /> },
     ],
   },
 ];
@@ -913,7 +927,7 @@ useEffect(() => {
       if (!serial) continue;
       try {
         const response = await fetch(
-          `https://iot.centelon.com/api/status-check?serialNumber=${serial}`
+          `/api/status-check?serialNumber=${serial}`
         );
         const data = await response.json();
         if (data.success) {
@@ -1030,54 +1044,49 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
 
   return (
     <div
-      className={`relative flex flex-col rounded-xl shadow-lg overflow-hidden w-72 cursor-pointer select-none transition-transform transform hover:scale-[1.02] ${
+      className={`relative flex flex-col rounded-2xl shadow-sm border overflow-hidden w-full h-[180px] cursor-pointer select-none transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg ${
         isOnline
-          ? "bg-gradient-to-tr from-blue-200 to-blue-100"
-          : "bg-gray-100"
+          ? "bg-gradient-to-br from-[#f8fbff] to-[#eef5ff] border-blue-200"
+          : "bg-white border-gray-200"
       }`}
-      onClick={onClick} // Add click handler
+      onClick={onClick}
     >
+      {/* Decorative side accent */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${isOnline ? 'bg-blue-500' : 'bg-gray-300'}`} />
+      
+      <div className="flex-1 p-5 pl-7 flex flex-col justify-between relative">
+        {/* Top-right Status Pill */}
+        <div className="absolute top-5 right-5 flex items-center gap-2 bg-white/80 backdrop-blur-sm py-1.5 px-3 rounded-full border shadow-sm">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" : "bg-red-500"
+            }`}
+          />
+          <span className="text-[11px] font-bold text-gray-600 tracking-widest uppercase">
+            {isOnline ? "Online" : "Offline"}
+          </span>
+        </div>
 
-      {/* device image section .*/}
-       {/* <div className="relative h-44 w-full overflow-hidden rounded-t-xl">
-        <img
-          src={imageUrl}
-          alt={device.deviceId.name || "Device"}
-          loading="lazy"
-          className="w-full h-full object-cover"
-        />
-      </div> */}
-      <div className="flex-1 p-4 flex flex-col justify-between">
-        <div>
-          <h3 className="font-semibold text-lg text-gray-900">
+        <div className="w-full">
+          <h3 className="font-bold text-xl text-gray-900 mb-1.5 pr-28 truncate">
             {device.deviceId.name || "Device Name"}
           </h3>
 
-          <p className="text-xs text-gray-600 mt-1">
-            Type : {device.deviceId?.name || "Unknown Type"}
-            <span className="mx-1">|</span>
-            Serial Number : {serial}
-          </p>
-
-          <div className="mt-2 space-y-1 text-sm">
-            <p className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full inline-block ${
-                  isOnline ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              {isOnline ? "Online" : "Offline"}
-            </p>
-
-            <p className="flex items-center gap-2">
-              <FaSyncAlt className="inline" />
-              Last connection - {lastSync}
-            </p>
-
-            <p className="flex items-center gap-2 truncate">
-             
-            </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 font-medium mb-3">
+            <span className="bg-white px-2.5 py-1 rounded-md border border-gray-100 shadow-sm">
+               Type: <span className="text-gray-800">{device.deviceId?.name || "Unknown"}</span>
+            </span>
+            <span className="bg-white px-2.5 py-1 rounded-md border border-gray-100 shadow-sm">
+               SN: <span className="text-gray-800">{serial}</span>
+            </span>
           </div>
+        </div>
+
+        <div className="mt-auto pt-3 border-t border-gray-200/60">
+          <p className="flex items-center gap-2 text-sm text-gray-600 font-medium">
+            <FaSyncAlt className={`inline ${isOnline ? "text-blue-500" : "text-gray-400"}`} />
+            <span>Last Sync:</span> <span className="text-gray-900 bg-white/50 px-2 py-0.5 rounded">{lastSync}</span>
+          </p>
         </div>
       </div>
     </div>
@@ -1172,34 +1181,30 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
       </div>
 
       {/* Right Content */}
-      <div className="flex items-center gap-3">
-        {/* Search Bar */}
-        <div className="flex items-center bg-white rounded-xl shadow px-3 py-1.5">
-          <Search className="text-gray-400 w-4 h-4 mr-2" />
-          <input
-            type="text"
-            placeholder="Search"
-            className="outline-none text-sm w-32 md:w-48 bg-transparent"
-          />
+      <div 
+        className="flex items-center gap-3 cursor-pointer group"
+        onClick={() => setSelectedMenu("userSettings")}
+      >
+        <div className="hidden sm:flex flex-col items-end pr-2 border-r border-[#B3E5EF]">
+           <span className="text-sm font-semibold text-gray-900 group-hover:text-orange-500 transition-colors">
+            {userData?.storeName || "Centelon Store"}
+           </span>
+           <span className="text-xs text-gray-500">
+            {userData?.username || "Admin"}
+           </span>
         </div>
-
-        {/* Notification Icon */}
-        <button className="bg-white shadow rounded-xl p-2 hover:bg-gray-50 transition">
-          <Bell className="text-orange-500 w-5 h-5" />
-        </button>
-
-        {/* Profile Icon */}
-        <button className="bg-white shadow rounded-xl p-2 hover:bg-gray-50 transition">
-          <User className="text-orange-500 w-5 h-5" />
+        <button className="bg-white shadow rounded-xl p-2 group-hover:bg-orange-50 transition border border-transparent group-hover:border-orange-200">
+          <User className="text-[#07323C] group-hover:text-orange-500 transition-colors w-5 h-5" />
         </button>
       </div>
     </header>
 
      
-  <div className="flex flex-col lg:flex-row gap-8">
-      {/* Left: Slider */}
-  {/* Left: Enhanced Slider */}
-<div className="relative flex-1 min-w-[320px] h-[450px] rounded-2xl overflow-hidden shadow-2xl group bg-gray-900">
+  <div className="flex flex-col lg:flex-row-reverse gap-8 justify-end">
+      {/* Right: Slider (rendered visually on the right via flex-row-reverse) */}
+  {/* Enhanced Slider */}
+  
+<div className="relative w-full max-w-[320px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-2xl group bg-gray-900">
   {slides.length > 0 ? (
     <>
       {slides.map((slide, index) => (
@@ -1263,95 +1268,78 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
 
 
       {/* Right: Recently Played */}
-  <aside className="w-full lg:w-80 flex flex-col space-y-6">
-  <div className="flex items-center gap-2">
-    <div className="h-8 w-1 bg-gradient-to-b bg-orange-600 rounded-full"></div>
-    <h2 className="text-xl font-bold text-gray-900">Recently Connected PLaylist</h2>
+<aside className="flex-1 w-full flex flex-col space-y-6">
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <div className="h-8 w-1 bg-gradient-to-b bg-orange-600 rounded-full"></div>
+      <h2 className="text-xl font-bold text-gray-900">Devices</h2>
+    </div>
+    {devices.length > 2 && (
+      <button 
+        onClick={() => setShowAllDevices(true)}
+        className="text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
+      >
+        View More
+      </button>
+    )}
   </div>
   
-  <div className="space-y-3">
-    {recentPlaylists.length === 0 ? (
-      <div className="text-center py-12 px-4">
-        <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Music className="text-blue-500" size={28} />
-        </div>
-        <p className="text-gray-600 font-medium mb-1">No playlists yet</p>
-        <p className="text-gray-400 text-sm">Connect your first playlist to get started</p>
-      </div>
+  <div className="space-y-4">
+    {isLoading ? (
+      <p className="text-gray-500 font-sans">Loading devices...</p>
+    ) : devices.length === 0 ? (
+      <p className="text-gray-500 font-sans">No devices found.</p>
     ) : (
-      recentPlaylists.map((playlist) => (
-        <div
-          key={playlist._id}
-          className="group relative bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 p-4 cursor-pointer border border-gray-100 hover:border-blue-200 overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          <div className="relative flex items-start gap-3">
-            <div className="bg-gradient-to-br from-blue-500 to-orange-600 p-2.5 rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
-              <Music className="text-white" size={20} />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-gray-900 truncate mb-2 group-hover:text-blue-600 transition-colors">
-                {playlist.name}
-              </h3>
-              
-              <div className="flex items-center text-xs text-gray-500 mb-3">
-                <Clock size={12} className="mr-1.5 flex-shrink-0" />
-                <span className="truncate">
-                  {playlist.createdAt 
-                    ? new Date(playlist.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                    : playlist.updatedAt 
-                    ? new Date(playlist.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                    : "Unknown date"}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center text-xs px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg font-medium">
-                  <FileText size={12} className="mr-1" />
-                  {playlist.files?.length || 0}
-                </span>
-                <span className="text-xs px-2.5 py-1 bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 rounded-lg font-medium">
-                  {playlist.contentType}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      ))
+      <div className="flex flex-col gap-6 items-center lg:items-start">
+        {devices.slice(0, 2).map((d) => (
+          <DeviceCard
+            key={d.deviceId.serialNumber}
+            device={d}
+            deviceStatuses={deviceStatuses}
+            onClick={() => setSelectedDevice(d)}
+          />
+        ))}
+      </div>
     )}
   </div>
 </aside>
-    </div>
-      {/* Devices Section */}
-      <section>
-        <h2 className="text-lg font-semibold font-sans mb-5">Devices</h2>
-        {isLoading ? (
-          <p className="text-gray-500 font-sans">Loading devices...</p>
-        ) : devices.length === 0 ? (
-          <p className="text-gray-500 font-sans">No devices found.</p>
-        ) : (
-          // <div className="flex flex-wrap gap-6">
-          //   {devices.map((device) => (
-          //     <DeviceCard key={device._id} device={device} />
-          //   ))}
-          // </div>
-          <div className="flex flex-wrap gap-6">
-  {devices.map((d) => (
-    <DeviceCard
-      key={d.deviceId.serialNumber}
-      device={d}
-      deviceStatuses={deviceStatuses}
-      onClick={() => setSelectedDevice(d)} // Pass click handler
-    />
-  ))}
-</div>
 
-        )}
-      </section>
+{/* Show All Devices Modal */}
+{showAllDevices && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+        <h2 className="text-2xl font-bold text-gray-900">All Devices</h2>
+        <button 
+          onClick={() => setShowAllDevices(false)}
+          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+        >
+          <FaTimes size={20} />
+        </button>
+      </div>
+      
+      <div className="p-6 overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+          {devices.map((d) => (
+            <DeviceCard
+              key={d.deviceId.serialNumber}
+              device={d}
+              deviceStatuses={deviceStatuses}
+              onClick={() => {
+                setSelectedDevice(d);
+                setShowAllDevices(false);
+              }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
-  );
+  </div>
+)}
+
+    </div>
+  </div>
+);
 
   const SidebarContent = () => (
     // <div className="flex flex-col h-full  text-white font-sans select-none" style={{backgroundColor:"#07323C"}}>
@@ -1507,6 +1495,8 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
         return <AnnouncementList />;
       case "TextToSpeech":
         return <TTSCreator />;
+      case "userSettings":
+        return <UserSettings />;
       default:
         return (
           <div className="p-4 text-center py-20">

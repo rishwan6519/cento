@@ -97,6 +97,10 @@ export default function PeopleDetectionPage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [zoneCounts, setZoneCounts] = useState<Record<string, Record<string, ZoneCount>>>({});
 
+  const [entranceCameraId, setEntranceCameraId] = useState<string | null>(null);
+  const [isEditingEntranceCam, setIsEditingEntranceCam] = useState(false);
+  const [tempEntranceCamId, setTempEntranceCamId] = useState<string>("");
+
   // Form State
   // const [newCamId, setNewCamId] = useState(""); // ID is now auto-generated
   const [newCamName, setNewCamName] = useState("");
@@ -134,14 +138,16 @@ export default function PeopleDetectionPage() {
     endDate: new Date().toISOString().split('T')[0],
     startTime: "00:00",
     endTime: "23:59",
-    cameraId: "all"
+    cameraId: "all",
+    chartInterval: "1h"
   });
   const [eventHistory, setEventHistory] = useState<any[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(50);
-  const [hourlyStats, setHourlyStats] = useState<{hour: number, in: number, out: number, occupancy: number}[]>(Array.from({length: 24}, (_, i) => ({hour: i, in: 0, out: 0, occupancy: 0})));
+  const [hourlyStats, setHourlyStats] = useState<{hour: number | string, label?: string, in: number, out: number, occupancy: number}[]>(Array.from({length: 24}, (_, i) => ({hour: i, label: '', in: 0, out: 0, occupancy: 0})));
   const [todayUniqueIn, setTodayUniqueIn] = useState(0);
   const [todayUniqueOut, setTodayUniqueOut] = useState(0);
+  const [showAllZones, setShowAllZones] = useState(false);
 
   // --- DERIVED RTSP URL (LIVE PREVIEW OF STRING) ---
   const getGeneratedRtspUrl = () => {
@@ -153,10 +159,37 @@ export default function PeopleDetectionPage() {
       }
   };
 
+  // --- GET ACTIVE CAMERA FOR GRAPH/ZONES ---
+  const getActiveCameraId = () => {
+      // 1. If user explicitly chose a camera in Advanced Filter dropdown
+      if (analyticsFilter.cameraId && analyticsFilter.cameraId !== 'all') {
+          return analyticsFilter.cameraId;
+      }
+      // 2. Fallback to assigned Entrance Camera from Sidebar Settings
+      if (entranceCameraId) {
+          return entranceCameraId;
+      }
+      // 3. Fallback to auto-detect by name
+      const entranceCam = cameras.find(c => 
+        c.name?.toLowerCase() === "entrace camera" || 
+        c.name?.toLowerCase() === "entrance camera" ||
+        c.name?.toLowerCase() === "entrace" ||
+        c.name?.toLowerCase() === "entrance"
+      );
+      // Return 'none' if no valid camera is found, so it STRICTLY won't show all cameras
+      return entranceCam ? String(entranceCam.id) : 'none';
+  };
+
   // --- FETCH HOURLY STATS ---
   const fetchHourlyStats = async () => {
     try {
-      const res = await fetch("/api/stats/hourly");
+      const activeCamId = getActiveCameraId();
+      let url = `/api/stats/hourly?interval=${analyticsFilter.chartInterval}&startDate=${analyticsFilter.startDate}&endDate=${analyticsFilter.endDate}&startTime=${analyticsFilter.startTime}&endTime=${analyticsFilter.endTime}`;
+      if (activeCamId) {
+        url += `&cameraId=${activeCamId}`;
+      }
+
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setHourlyStats(data.data);
@@ -172,16 +205,22 @@ export default function PeopleDetectionPage() {
     if (activeTab === "dashboard") {
       fetchHourlyStats();
     }
-  }, [activeTab]);
+  }, [activeTab, cameras, analyticsFilter, entranceCameraId]);
 
   // --- LOAD SETTINGS ---
   const fetchSettings = async () => {
     try {
       const res = await fetch('/api/settings');
       const data = await res.json();
-      if (data.success && data.data.pi_id) {
-        setPiId(data.data.pi_id);
-        setTempPiId(data.data.pi_id);
+      if (data.success) {
+        if (data.data.pi_id) {
+          setPiId(data.data.pi_id);
+          setTempPiId(data.data.pi_id);
+        }
+        if (data.data.entrance_camera_id) {
+          setEntranceCameraId(data.data.entrance_camera_id);
+          setTempEntranceCamId(data.data.entrance_camera_id);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch settings", err);
@@ -203,6 +242,23 @@ export default function PeopleDetectionPage() {
       }
     } catch (err) {
       console.error("Failed to save PI ID", err);
+    }
+  };
+
+  const saveEntranceCamera = async () => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'entrance_camera_id', value: tempEntranceCamId })
+      });
+      if (res.ok) {
+        setEntranceCameraId(tempEntranceCamId);
+        setIsEditingEntranceCam(false);
+        setToast({ show: true, message: "Entrance camera updated!", type: "success" });
+        setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to save Entrance Camera", err);
     }
   };
 
@@ -283,7 +339,7 @@ export default function PeopleDetectionPage() {
     fetchCounts();
     const interval = setInterval(fetchCounts, 5000);
     return () => clearInterval(interval);
-  }, [activeTab, cameras]);
+  }, [activeTab, cameras, entranceCameraId, analyticsFilter.cameraId]);
 
   const fetchHistoricalData = async () => {
     if ((activeTab !== "analytics" && activeTab !== "dashboard") || cameras.length === 0) return;
@@ -868,6 +924,35 @@ export default function PeopleDetectionPage() {
                  ) : (
                      <div className="text-xs text-gray-500 font-mono">NODE: {piId}</div>
                  )}
+                 
+                 <div className="mt-4 pt-4 border-t border-gray-200">
+                     <div className="flex items-center justify-between mb-2">
+                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Entrance Cam</span>
+                         <button onClick={() => setIsEditingEntranceCam(!isEditingEntranceCam)} className="text-gray-400 hover:text-indigo-600 transition-colors">
+                             <Icons.Edit />
+                         </button>
+                     </div>
+                     {isEditingEntranceCam ? (
+                         <div className="flex flex-col gap-2">
+                             <select
+                                 value={tempEntranceCamId}
+                                 onChange={(e) => setTempEntranceCamId(e.target.value)}
+                                 className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[10px] font-mono focus:ring-1 focus:ring-indigo-500 outline-none"
+                             >
+                                 <option value="">-- None --</option>
+                                 {cameras.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                             </select>
+                             <div className="flex gap-2">
+                                 <button onClick={saveEntranceCamera} className="flex-1 bg-indigo-600 text-white text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Save</button>
+                                 <button onClick={() => setIsEditingEntranceCam(false)} className="flex-1 bg-gray-200 text-gray-600 text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Cancel</button>
+                             </div>
+                         </div>
+                     ) : (
+                         <div className="text-[11px] text-indigo-600 font-bold truncate">
+                            {cameras.find(c => String(c.id) === entranceCameraId)?.name || 'Not Configured'}
+                         </div>
+                     )}
+                 </div>
              </div>
          </div>
       </aside>
@@ -908,11 +993,24 @@ export default function PeopleDetectionPage() {
                            <div className="flex justify-between items-center mb-6">
                                <div className="flex items-center gap-3">
                                    <div className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
-                                   <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Hourly Footfall — Today</span>
+                                   <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Footfall Analysis Graph</span>
                                </div>
-                               <button onClick={fetchHourlyStats} className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-xl hover:bg-indigo-50" title="Refresh">
-                                   <Icons.Refresh />
-                               </button>
+                               <div className="flex items-center gap-2">
+                                   <select 
+                                       className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-700 outline-none hover:bg-gray-100 transition-colors cursor-pointer"
+                                       value={analyticsFilter.chartInterval}
+                                       onChange={(e) => setAnalyticsFilter(p => ({ ...p, chartInterval: e.target.value }))}
+                                   >
+                                       <option value="5m">5 Minutes</option>
+                                       <option value="15m">15 Minutes</option>
+                                       <option value="30m">30 Minutes</option>
+                                       <option value="1h">Hourly</option>
+                                       <option value="1d">Daily</option>
+                                   </select>
+                                   <button onClick={fetchHourlyStats} className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-xl hover:bg-indigo-50" title="Refresh">
+                                       <Icons.Refresh />
+                                   </button>
+                               </div>
                            </div>
 
                            {/* Chart */}
@@ -927,7 +1025,7 @@ export default function PeopleDetectionPage() {
                                                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
                                                    {/* Tooltip */}
                                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold rounded-lg px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-lg">
-                                                       {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i-12} PM`}: {val}
+                                                       {s.label || s.hour}: {val}
                                                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
                                                    </div>
                                                    {/* Value label */}
@@ -951,18 +1049,22 @@ export default function PeopleDetectionPage() {
 
                            {/* X-axis labels */}
                            <div className="flex gap-[3px] mt-2 border-t border-gray-100 pt-2">
-                               {hourlyStats.map((_, i) => (
-                                   <div key={i} className="flex-1 text-center text-[9px] font-semibold text-gray-400">
-                                       {i % 3 === 0 ? (i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i-12}p`) : ''}
-                                   </div>
-                               ))}
+                               {hourlyStats.map((s, i) => {
+                                   const skip = Math.max(1, Math.floor(hourlyStats.length / 8));
+                                   const showLabel = i % skip === 0;
+                                   return (
+                                       <div key={i} className="flex-1 text-center text-[9px] font-semibold text-gray-400">
+                                           {showLabel ? (s.label || s.hour) : ''}
+                                       </div>
+                                   );
+                               })}
                            </div>
 
                            {/* Summary footer */}
                            <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
                               
                                <span className="text-[10px] text-gray-400 font-medium">
-                                   Peak: {(() => { const p = hourlyStats.reduce((m, s) => (s.in || 0) > (m.in || 0) ? s : m, hourlyStats[0]); return `${p.hour === 0 ? '12' : p.hour > 12 ? p.hour - 12 : p.hour}${p.hour < 12 ? 'AM' : 'PM'} (${p.in || 0})`; })()}
+                                   Peak In: {(() => { const p = hourlyStats.reduce((m, s) => (s.in || 0) > (m.in || 0) ? s : m, hourlyStats[0] || {hour:0, in:0}); return `${p.label || p.hour} (${p.in || 0})`; })()}
                                </span>
                            </div>
                       </div>
@@ -1143,58 +1245,79 @@ export default function PeopleDetectionPage() {
                                    <span className="mt-4 text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Live Stream...</span>
                                </div>
                           ) : (
-                              Object.entries(zoneCounts).map(([camId, zones]) => (
-                                   Object.entries(zones).map(([zoneName, count]: [string, any]) => (
-                                       <div key={`${camId}-${zoneName}`} className="bg-white border border-gray-200 p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group hover:shadow-xl transition-all duration-500">
-                                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
-                                           <div className="flex justify-between items-start mb-8">
-                                               <div>
-                                                   <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em] mb-1">{cameras.find(c => c.id == camId)?.name || camId}</div>
-                                                   <div className="text-xl font-black text-gray-900 tracking-tight">{zoneName}</div>
-                                               </div>
-                                               <div className="flex items-center gap-2">
-                                                   <button onClick={() => handlePreviewZone(camId, zoneName)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm group" title="Live Camera View">
-                                                       <Icons.Camera />
-                                                   </button>
-                                                   <div className="p-3 bg-gray-50 text-gray-400 rounded-xl"><Icons.Analytics /></div>
-                                               </div>
-                                           </div>
-                                           <div className="flex flex-col gap-4">
-                                               {/* Today Section */}
-                                               <div className="bg-slate-50 border border-slate-100 p-4 rounded-3xl">
-                                                   <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Live Stats (Today)</div>
-                                                   <div className="flex gap-3">
-                                                       <div className="flex-1 text-center">
-                                                           <div className="text-2xl font-black text-emerald-600">{count.todayIn}</div>
-                                                           <div className="text-[7px] uppercase font-black text-emerald-600/40">In</div>
-                                                       </div>
-                                                       <div className="w-px h-8 bg-slate-200 self-center" />
-                                                       <div className="flex-1 text-center">
-                                                           <div className="text-2xl font-black text-rose-600">{count.todayOut}</div>
-                                                           <div className="text-[7px] uppercase font-black text-rose-600/40">Out</div>
-                                                       </div>
-                                                   </div>
-                                               </div>
+                              (() => {
+                                  const cards: any[] = [];
+                                  Object.entries(zoneCounts).forEach(([camId, zones]) => {
+                                      Object.entries(zones).forEach(([zoneName, count]: [string, any]) => {
+                                          cards.push({ camId, zoneName, count, traffic: (count.todayIn || 0) + (count.todayOut || 0) + (count.allIn || 0) + (count.allOut || 0) });
+                                      });
+                                  });
+                                  cards.sort((a, b) => b.traffic - a.traffic);
+                                  
+                                  const displayCards = showAllZones ? cards : cards.slice(0, 4);
 
-                                               {/* All Time Section */}
-                                               <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-500/20">
-                                                   <div className="text-[8px] font-black text-indigo-200 uppercase tracking-widest mb-3 text-center">Life-Time Yield</div>
-                                                   <div className="flex gap-3">
-                                                       <div className="flex-1 text-center">
-                                                           <div className="text-2xl font-black">{count.allIn}</div>
-                                                           <div className="text-[7px] uppercase font-black text-indigo-300">Total In</div>
-                                                       </div>
-                                                       <div className="w-px h-8 bg-indigo-500/50 self-center" />
-                                                       <div className="flex-1 text-center">
-                                                           <div className="text-2xl font-black">{count.allOut}</div>
-                                                           <div className="text-[7px] uppercase font-black text-indigo-300">Total Out</div>
-                                                       </div>
-                                                   </div>
-                                               </div>
-                                           </div>
-                                       </div>
-                                   ))
-                              ))
+                                  return (
+                                      <>
+                                          {displayCards.map(({ camId, zoneName, count }) => (
+                                              <div key={`${camId}-${zoneName}`} className="bg-white border border-gray-200 p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group hover:shadow-xl transition-all duration-500">
+                                                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+                                                  <div className="flex justify-between items-start mb-8">
+                                                      <div>
+                                                          <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em] mb-1">{cameras.find(c => c.id == camId)?.name || camId}</div>
+                                                          <div className="text-xl font-black text-gray-900 tracking-tight">{zoneName}</div>
+                                                      </div>
+                                                      <div className="flex items-center gap-2">
+                                                          <button onClick={() => handlePreviewZone(camId, zoneName)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm group" title="Live Camera View">
+                                                              <Icons.Camera />
+                                                          </button>
+                                                          <div className="p-3 bg-gray-50 text-gray-400 rounded-xl"><Icons.Analytics /></div>
+                                                      </div>
+                                                  </div>
+                                                  <div className="flex flex-col gap-4">
+                                                      {/* Today Section */}
+                                                      <div className="bg-slate-50 border border-slate-100 p-4 rounded-3xl">
+                                                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Live Stats (Today)</div>
+                                                          <div className="flex gap-3">
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black text-emerald-600">{count.todayIn}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-emerald-600/40">In</div>
+                                                              </div>
+                                                              <div className="w-px h-8 bg-slate-200 self-center" />
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black text-rose-600">{count.todayOut}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-rose-600/40">Out</div>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+
+                                                      {/* All Time Section */}
+                                                      <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-500/20">
+                                                          <div className="text-[8px] font-black text-indigo-200 uppercase tracking-widest mb-3 text-center">Life-Time Yield</div>
+                                                          <div className="flex gap-3">
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black">{count.allIn}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-indigo-300">Total In</div>
+                                                              </div>
+                                                              <div className="w-px h-8 bg-indigo-500/50 self-center" />
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black">{count.allOut}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-indigo-300">Total Out</div>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                          {cards.length > 5 && (
+                                              <div className="col-span-full flex justify-center mt-4">
+                                                  <button onClick={() => setShowAllZones(!showAllZones)} className="px-8 py-3 bg-white border border-gray-200 text-indigo-600 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-sm hover:border-indigo-600 hover:shadow-indigo-500/10 transition-all flex items-center gap-3">
+                                                      {showAllZones ? "View Less" : "View More"}
+                                                  </button>
+                                              </div>
+                                          )}
+                                      </>
+                                  );
+                              })()
                           )}
                       </div>
 

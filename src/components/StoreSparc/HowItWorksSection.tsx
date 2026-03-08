@@ -44,7 +44,7 @@ const HowItWorksSection = () => {
           </p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full mx-auto">
           {items.map((item, i) => (
             <motion.div
               key={item.title}

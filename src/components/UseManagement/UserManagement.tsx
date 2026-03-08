@@ -31,14 +31,13 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      // Get controllerId from localStorage
       const controllerId = localStorage.getItem('userId');
-      if (!controllerId) {
-        toast.error('User ID not found');
-        return;
-      }
+      
+      const url = controllerId 
+        ? `/api/user?controllerId=${controllerId}`
+        : `/api/user`;
 
-      const response = await fetch(`/api/user?controllerId=${controllerId}`);
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
       if (data.success) {
@@ -52,20 +51,17 @@ export default function UserManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Get controllerId from localStorage
       const controllerId = localStorage.getItem('userId');
-      if (!controllerId) {
-        toast.error('User ID not found');
-        return;
+      
+      const payload: any = { ...formData };
+      if (controllerId) {
+        payload.controllerId = controllerId;
       }
 
       const response = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          controllerId
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();

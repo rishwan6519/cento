@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { CameraConfig } from "@/models/Camera/CameraConfig";
 import { AvailableCamera } from "@/models/Camera/AvailableCamera";
+import { PiStatus } from "@/models/PiStatus";
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,6 +58,26 @@ export async function POST(req: NextRequest) {
 
     // Execute all updates in parallel
     await Promise.all(updatePromises);
+
+    // 3. Update the PiStatus document if a pi_id was provided
+    if (pi_id) {
+      const activeCameras = cameras
+        .filter((c: any) => c.status && c.status.toLowerCase().includes("connected") && !c.status.toLowerCase().includes("disconnected"))
+        .map((c: any) => c.camera_id);
+
+      await PiStatus.updateOne(
+        { pi_id },
+        {
+          $set: {
+            status: "active",
+            cameras_active: activeCameras,
+            camera_count: activeCameras.length,
+            last_frame_time: timestamp ? new Date(timestamp) : new Date(),
+          }
+        },
+        { upsert: true }
+      );
+    }
 
     return NextResponse.json({
       success: true,

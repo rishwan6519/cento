@@ -30,7 +30,7 @@ const DummyUI = ({ title, onBack }: { title: string; onBack: () => void }) => (
 const cardList = [
   {
     id: "customer interaction",
-    label: "Ambience",
+    label: "Multimedia Platform",
     icon: <IoPeopleSharp className="text-4xl text-purple-600" />,
     route: "/user-platform",
     apiKey: "platform",
@@ -48,7 +48,7 @@ const cardList = [
     icon: <FaEye className="text-4xl text-green-600" />,
     route: "/retail-analytics",
     apiKey: "peopleDetection",
-    // removed hasOptions: true — analytics will navigate directly
+    hasOptions: true,
   },
 ];
 
@@ -188,7 +188,7 @@ const CustomerEngagementPlatform = () => {
           transition={{ duration: 0.6 }}
         >
           <Image
-            src="/assets/logo.png"
+            src="/assets/centelon-robotics.png"
             alt="Centelon Logo"
             width={50}
             height={50}

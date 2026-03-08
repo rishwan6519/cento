@@ -1,21 +1,6 @@
-// app/api/available-cameras/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { MongoClient } from "mongodb";
-
-const uri =
-  "mongodb+srv://retail_admin:LCQ3b6kYRiN6wUEl@retailanalytics.kznhbji.mongodb.net/?retryWrites=true&w=majority&appName=RetailAnalytics";
-const dbName = "retail_analytics_test";
-
-let client: MongoClient | null = null;
-
-async function connectToDatabase() {
-  if (!client) {
-    client = new MongoClient(uri);
-    await client.connect();
-    console.log("[MongoDB] Connected successfully");
-  }
-  return client.db(dbName);
-}
+import { connectToDatabase } from "@/lib/db";
+import { PiStatus } from "@/models/PiStatus";
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,17 +16,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = await connectToDatabase();
+    await connectToDatabase();
 
-    // collection name is `pi_status` (per your message)
-    const collection = db.collection("pi_status");
-    console.log(collection,"this is colle")
-
-    // Query for the pi document
-    const query = { pi_id: piId };
-    console.log("[API] MongoDB query:", query);
-
-    const piDoc = await collection.findOne(query);
+    // Query for the pi document using the Mongoose Model
+    const piDoc = await PiStatus.findOne({ pi_id: piId }).lean();
 
     if (!piDoc) {
       return NextResponse.json(
@@ -51,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Expecting cameras_active to be an array of camera objects or names
-    // Example you've shown implies an array, so handle multiple shapes:
+    // Handle multiple shapes
     const camerasActiveRaw = piDoc.cameras_active ?? [];
     // Normalize into an array of camera names / identifiers
     const camerasActive = Array.isArray(camerasActiveRaw)

@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { RingLoader } from 'react-spinners';
+import { redirect } from 'next/navigation';
 
 export default function Home() {
+    redirect('/storesparc');
   const [loading, setLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 

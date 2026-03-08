@@ -52,7 +52,7 @@ const IndustrySection = () => {
         </motion.div>
 
         {/* Cards */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-6 w-full mx-auto">
           {industries.map((industry, i) => (
             <motion.div
               key={industry.title}

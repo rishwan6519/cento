@@ -11,7 +11,7 @@ import Footer from "@/components/StoreSparc/Footer";
 
 const Index = () => {
   return (
-    <div className="min-h-screen">
+    <div className="storesparc-root min-h-screen">
       <Navbar />
       <HeroSection />
       <ProblemSection />

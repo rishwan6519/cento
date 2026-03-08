@@ -67,9 +67,10 @@ const HeroSection = () => {
             </Button>
 
             <Button 
-              className="bg-white hover:bg-slate-50 text-slate-400 rounded-full px-10 py-5 h-auto text-lg font-bold shadow-xl flex items-center justify-center gap-3 transition-all hover:scale-105"
+              variant="outline"
+              className="bg-white hover:bg-slate-50 !text-slate-900 border border-slate-200 rounded-full px-10 py-5 h-auto text-lg font-bold shadow-xl flex items-center justify-center gap-3 transition-all hover:scale-105"
             >
-              <Play size={22} fill="currentColor" stroke="none" className="opacity-10" />
+              <Play size={22} fill="currentColor" stroke="none" className="text-blue-600" />
               Watch Video
             </Button>
           </motion.div>
@@ -80,7 +81,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 60 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.6 }}
-          className="mt-16 max-w-5xl mx-auto relative"
+          className="mt-16 w-full max-w-screen-2xl mx-auto relative"
         >
           <div className="rounded-xl overflow-hidden glow-blue gradient-border">
             <Image

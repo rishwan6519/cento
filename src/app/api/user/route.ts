@@ -95,15 +95,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const controllerId = searchParams.get("controllerId");
 
-    if (!controllerId) {
-      return NextResponse.json(
-        { success: false, message: "Controller ID is required" },
-        { status: 400 }
-      );
-    }
+    const query = controllerId ? { controllerId } : {};
 
-    // Find all users with matching controllerId, exclude password field
-    const users = await User.find({ controllerId })
+    // Find all users (or match controllerId), exclude password field
+    const users = await User.find(query)
       .select("-password")
       .sort({ createdAt: -1 });
 
@@ -142,30 +137,38 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const { username, password, storeName, storeLocation } = await req.json(); // Added new fields
+    const { username, password, currentPassword, storeName, storeLocation } = await req.json(); // Added new fields
 
-    const updateData: any = { username };
-    
-    // Add new fields to update data
-    if (storeName !== undefined) updateData.storeName = storeName;
-    if (storeLocation !== undefined) updateData.storeLocation = storeLocation;
-    
-    if (password) {
-      updateData.password = await bcrypt.hash(password, 10);
-    }
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
+    const user = await User.findById(userId);
     if (!user) {
       return NextResponse.json(
         { success: false, message: "User not found" },
         { status: 404 }
       );
     }
+
+    if (password) {
+      if (!currentPassword) {
+        return NextResponse.json(
+          { success: false, message: "Current password is required to change password" },
+          { status: 400 }
+        );
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return NextResponse.json(
+          { success: false, message: "Incorrect current password" },
+          { status: 400 }
+        );
+      }
+      user.password = await bcrypt.hash(password, 10);
+    }
+
+    if (username !== undefined) user.username = username;
+    if (storeName !== undefined) user.storeName = storeName;
+    if (storeLocation !== undefined) user.storeLocation = storeLocation;
+
+    await user.save();
 
     const { password: _, ...userWithoutPassword } = user.toObject();
     return NextResponse.json({ success: true, data: userWithoutPassword });

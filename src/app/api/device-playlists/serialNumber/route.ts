@@ -27,6 +27,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Update last connection time to act as a heartbeat
+    device.lastConnection = new Date();
+    device.status = 'active'; // Optionally ensure status is active
+    await device.save();
+
     // Step 2: Find device's playlist connections
     const devicePlaylists = await DevicePlaylist.findOne(
       { deviceId: device._id },

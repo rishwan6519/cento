@@ -12,6 +12,9 @@ interface Event {
   title: string;
   start: Date;
   end: Date;
+  resource?: {
+    type: "playlist" | "announcement";
+  };
 }
 
 // Configure date-fns localizer
@@ -86,24 +89,81 @@ const Scheduler: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
   const [date, setDate] = useState<Date>(new Date());
- const [view, setView] = useState<View>("month");
+  const [view, setView] = useState<View>("month");
+
+  React.useEffect(() => {
+    const fetchSchedules = async () => {
+      const userId = localStorage.getItem("userId");
+      if (!userId) return;
+
+      try {
+        const [playlistsRes, announcementsRes] = await Promise.all([
+          fetch(`/api/playlists?userId=${userId}`),
+          fetch(`/api/announcement/get-announcement?userId=${userId}`)
+        ]);
+
+        const playlists = playlistsRes.ok ? await playlistsRes.json() : [];
+        const announcements = announcementsRes.ok ? (await announcementsRes.json()).announcements || [] : [];
+
+        const formattedEvents: Event[] = [];
+
+        // Helper to format Date
+        const getStartEndDates = (item: any) => {
+           // Provide fallback to today if startDate is missing
+           const baseDate = item.startDate ? new Date(item.startDate) : new Date();
+           const startTime = item.startTime || "00:00"; 
+           const endTime = item.endTime || "23:59";
+           
+           const [startH, startM] = startTime.split(':');
+           const [endH, endM] = endTime.split(':');
+           
+           const start = new Date(baseDate);
+           start.setHours(parseInt(startH), parseInt(startM), 0);
+           
+           const end = new Date(baseDate);
+           end.setHours(parseInt(endH), parseInt(endM), 0);
+
+           return { start, end };
+        };
+
+        playlists.forEach((p: any) => {
+          const { start, end } = getStartEndDates(p);
+          formattedEvents.push({
+            title: p.name || "Unnamed Playlist",
+            start,
+            end,
+            resource: { type: "playlist" }
+          });
+        });
+
+        announcements.forEach((a: any) => {
+          const { start, end } = getStartEndDates(a);
+          formattedEvents.push({
+            title: a.announcementName || "Unnamed Announcement",
+            start,
+            end,
+            resource: { type: "announcement" }
+          });
+        });
+
+        setEvents(formattedEvents);
+
+      } catch (error) {
+        console.error("Error fetching schedules:", error);
+      }
+    };
+
+    fetchSchedules();
+  }, []);
 
   const handleSelectSlot = (slotInfo: SlotInfo) => {
     setSelectedSlot({ start: slotInfo.start, end: slotInfo.end });
   };
 
   const handleAddEvent = () => {
-    if (!selectedSlot) {
-      alert("Please select a date/time on the calendar first!");
-      return;
-    }
-    const newEvent: Event = {
-      title: `Playlist ${events.length + 1}`,
-      start: selectedSlot.start,
-      end: selectedSlot.end,
-    };
-    setEvents([...events, newEvent]);
-    setSelectedSlot(null);
+    // Left empty since it requires a dedicated "Add Schedule" flow with device connections,
+    // which was not specified. Typically would open a modal to navigate.
+    alert("Schedule creation requires linking to a specific Device via the platform dashboard.");
   };
 
   return (
@@ -122,22 +182,7 @@ const Scheduler: React.FC = () => {
   
         {/* Right Content */}
         <div className="flex items-center gap-3">
-          {/* Search Bar */}
-           <div className="flex items-center bg-white rounded-xl shadow px-3 py-1.5">
-            <Search className="text-gray-400 w-4 h-4 mr-2" />
-             <input
-              type="text"
-              placeholder="Search"
-              className="outline-none text-sm w-32 md:w-48 bg-transparent"
-            />
-          </div>
-  
-          {/* Notification Icon */}
-          <button className="bg-white shadow rounded-xl p-2 hover:bg-gray-50 transition">
-            <Bell className="text-orange-500 w-5 h-5" />
-          </button>
-  
-          {/* Profile Icon */}
+          {/* Profile Icon Only */}
           <button className="bg-white shadow rounded-xl p-2 hover:bg-gray-50 transition">
             <User className="text-orange-500 w-5 h-5" />
           </button>
@@ -163,9 +208,9 @@ const Scheduler: React.FC = () => {
   components={{
     toolbar: (props: ToolbarProps<Event>) => <CustomToolbar {...props} onAddEvent={handleAddEvent} />,
   }}
-  eventPropGetter={() => ({
+  eventPropGetter={(event: Event) => ({
     style: {
-      backgroundColor: "#CEF6FF",
+      backgroundColor: event.resource?.type === "announcement" ? "#FFCBA4" : "#CEF6FF", // Distinct colors
       color: "#000",
       borderRadius: "6px",
       padding: "2px 4px",
