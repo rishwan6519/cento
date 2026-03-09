@@ -107,6 +107,16 @@ const CustomerEngagementPlatform = () => {
       return;
     }
 
+    // Explicitly show "No Access" for Analytics card as requested
+    if (card.label === "Analytics") {
+      setDummyCard(card.label);
+      toast.error(`You don't have access to ${card.label}`, {
+        duration: 3000,
+        position: "top-right",
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/user/users?userId=${userId}`);
       const data = await res.json();
