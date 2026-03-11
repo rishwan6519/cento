@@ -28,10 +28,10 @@ const ProblemSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">
+          <h2 className="font-display text-3xl md:text-5xl font-bold text-white mb-4">
             In-store campaign execution is <span className="text-cyan-400">broken</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-white/80 text-lg max-w-2xl mx-auto">
             Too many manual steps. Too many people involved. StoreSPARC fixes this.
           </p>
         </motion.div>
@@ -45,7 +45,7 @@ const ProblemSection = () => {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="bg-destructive/5 border border-destructive/10 rounded-2xl p-8"
           >
-            <h3 className="font-display text-xl font-semibold text-foreground mb-6 flex items-center gap-2">
+            <h3 className="font-display text-xl font-semibold text-white mb-6 flex items-center gap-2">
               <span className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center">
                 <AlertTriangle size={16} className="text-destructive" />
               </span>
@@ -59,7 +59,7 @@ const ProblemSection = () => {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.1 * i + 0.2 }}
-                  className="flex items-center gap-3 text-muted-foreground"
+                  className="flex items-center gap-3 text-white text-[15px]"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-destructive/50 shrink-0" />
                   {item.text}
@@ -76,7 +76,7 @@ const ProblemSection = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="bg-primary/5 border border-primary/10 rounded-2xl p-8"
           >
-            <h3 className="font-display text-xl font-semibold text-foreground mb-6 flex items-center gap-2">
+            <h3 className="font-display text-xl font-semibold text-white mb-6 flex items-center gap-2">
               <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                 <CheckCircle2 size={16} className="text-primary" />
               </span>
@@ -90,7 +90,7 @@ const ProblemSection = () => {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.1 * i + 0.3 }}
-                  className="flex items-center gap-3 text-foreground"
+                  className="flex items-center gap-3 text-white text-[15px]"
                 >
                   <CheckCircle2 size={18} className="text-primary shrink-0" />
                   {item.text}

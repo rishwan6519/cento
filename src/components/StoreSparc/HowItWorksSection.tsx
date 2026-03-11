@@ -36,10 +36,10 @@ const HowItWorksSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">
+          <h2 className="font-display text-3xl md:text-5xl font-bold text-white mb-4">
             Enterprise-ready <span className="text-gradient">by design</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-white/80 text-lg max-w-2xl mx-auto">
             Security, governance, and extensibility built into every layer.
           </p>
         </motion.div>
@@ -57,8 +57,8 @@ const HowItWorksSection = () => {
               <div className="w-14 h-14 rounded-2xl bg-primary/5 group-hover:bg-primary/10 flex items-center justify-center mx-auto mb-5 transition-colors">
                 <item.icon size={24} className="text-primary" />
               </div>
-              <h3 className="font-display text-lg font-semibold text-foreground mb-2">{item.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+              <h3 className="font-display text-lg font-semibold text-white mb-2">{item.title}</h3>
+              <p className="text-sm text-white/70 leading-relaxed">{item.description}</p>
             </motion.div>
           ))}
         </div>
