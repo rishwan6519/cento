@@ -7,6 +7,7 @@ import {enUS} from "date-fns/locale/en-US";
 import { MdArrowBackIos, MdNavigateNext } from "react-icons/md";
 import { FaTimes } from "react-icons/fa";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import "./Scheduler.css";
 import { Bell, Search, User } from "lucide-react";
 
 interface Event {
@@ -250,33 +251,40 @@ const Scheduler: React.FC = () => {
       <div className="p-4 bg-blue-50 min-h-screen">
         
         <Calendar
-  localizer={localizer}
-  events={events}
-  startAccessor="start"
-  endAccessor="end"
-  selectable
-  onSelectSlot={handleSelectSlot}
-  onSelectEvent={handleSelectEvent}
-  onDrillDown={handleDrillDown}
-  style={{ height: 600, width: "100%" }}
-  views={["month", "week", "day"]}
-  date={date}
-  onNavigate={(newDate) => setDate(newDate)}
-  view={view}
-  onView={(newView: View) => setView(newView)}
-  components={{
-    toolbar: (props: ToolbarProps<Event>) => <CustomToolbar {...props} onAddEvent={handleAddEvent} />,
-  }}
-  eventPropGetter={(event: Event) => ({
-    style: {
-      backgroundColor: event.resource?.type === "announcement" ? "#FFCBA4" : "#CEF6FF", // Distinct colors
-      color: "#000",
-      borderRadius: "6px",
-      padding: "2px 4px",
-      fontWeight: "bold",
-    },
-  })}
-/>
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          selectable
+          onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
+          onDrillDown={handleDrillDown}
+          style={{ height: view === "month" ? 650 : 700, width: "100%" }}
+          views={["month", "week", "day"]}
+          date={date}
+          onNavigate={(newDate) => setDate(newDate)}
+          view={view}
+          onView={(newView: View) => setView(newView)}
+          step={30}
+          timeslots={1}
+          min={new Date(1970, 1, 1, 6, 0, 0)}
+          max={new Date(1970, 1, 1, 23, 0, 0)}
+          components={{
+            toolbar: (props: ToolbarProps<Event>) => <CustomToolbar {...props} onAddEvent={handleAddEvent} />,
+          }}
+          eventPropGetter={(event: Event) => ({
+            style: {
+              backgroundColor: event.resource?.type === "announcement" ? "#FFCBA4" : "#CEF6FF",
+              color: "#000",
+              borderRadius: "6px",
+              padding: "2px 6px",
+              fontWeight: "bold",
+              fontSize: "12px",
+              border: "none",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+            },
+          })}
+        />
       </div>
 
       {/* Popup Modal for Date Info */}

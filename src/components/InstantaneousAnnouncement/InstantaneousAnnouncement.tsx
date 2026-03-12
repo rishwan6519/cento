@@ -461,7 +461,12 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
                     }`}
                 >
                     <div className="flex items-center gap-3">
-                      <img src={device.imageUrl} alt={device.name} className="w-12 h-12 rounded-lg object-cover" />
+                      <img src={(() => {
+                        const n = device.name?.toLowerCase() || "";
+                        if (n.includes("tv")) return "/assets/video.svg";
+                        if (n.includes("audio")) return "/assets/audio.svg";
+                        return device.imageUrl || "/placeholder.jpg";
+                      })()} alt={device.name} className="w-12 h-12 rounded-full object-contain" />
                       <div>
                           <h3 className="font-medium text-gray-900">{device.name}</h3>
                           <p className="text-sm text-gray-500">ID: {device.serialNumber}</p>

@@ -1235,8 +1235,16 @@ useEffect(() => {
         // </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
   {availableDevices.map((device) => {
-    const imageUrl = device.deviceId?.imageUrl || "/placeholder.jpg";
     const deviceName = device.deviceId?.name || device.name;
+    let iconPath = "/placeholder.jpg";
+    if (deviceName.toLowerCase().includes("tv")) {
+      iconPath = "/assets/video.svg";
+    } else if (deviceName.toLowerCase().includes("audio")) {
+      iconPath = "/assets/audio.svg";
+    } else if (device.deviceId?.imageUrl) {
+      iconPath = device.deviceId.imageUrl;
+    }
+
 
     return (
       <div
@@ -1247,13 +1255,12 @@ useEffect(() => {
         onClick={() => setSelectedDeviceForPlaylist(device)}
       >
         {/* Device Image */}
-        <div className="relative w-full overflow-hidden rounded-t-xl">
-  <img
-    src={device.deviceId.imageUrl ?? "/default-device-image.png"}
-    alt={device.deviceId.name}
-    loading="lazy"
-    className="w-full h-auto object-cover"
-  />
+        <div className="relative h-40 w-full bg-gray-800 flex items-center justify-center">
+          <img
+            src={iconPath}
+            alt={deviceName}
+            className="h-16 w-16 object-contain rounded-full"
+          />
           {device.status === "active" && (
             <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full border border-white"></span>
           )}
@@ -1338,11 +1345,17 @@ useEffect(() => {
   <div className="border-2 border-dashed border-[#FFB6A3] mt-6 rounded-xl p-6 text-center w-[300px] bg-white">
     {/* Device Icon */}
     <div className="flex justify-center mb-3">
-      <img
-        src={selectedDeviceForPlaylist.deviceId.imageUrl}
-        alt={selectedDeviceForPlaylist.deviceId.name}
-        className="w-14 h-14"
-      />
+      {(() => {
+        const n = selectedDeviceForPlaylist.deviceId.name?.toLowerCase() || "";
+        const imgSrc = n.includes("tv") ? "/assets/video.svg" : n.includes("audio") ? "/assets/audio.svg" : (selectedDeviceForPlaylist.deviceId.imageUrl || "/placeholder.jpg");
+        return (
+          <img
+            src={imgSrc}
+            alt={selectedDeviceForPlaylist.deviceId.name}
+            className="w-14 h-14 object-contain rounded-full"
+          />
+        );
+      })()}
     </div>
 
     {/* Device Name */}

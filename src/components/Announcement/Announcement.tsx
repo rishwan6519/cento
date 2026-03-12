@@ -264,8 +264,12 @@ export default function PlaylistSetup() {
                 name: assignment.deviceId?.name || "Unknown Device",
                 serialNumber: assignment.deviceId?.serialNumber || "N/A",
                 status: assignment.deviceId?.status || "inactive",
-                imageUrl:
-                  assignment.deviceId?.imageUrl || "/default-device-image.png",
+                imageUrl: (() => {
+                  const n = (assignment.deviceId?.name || "").toLowerCase();
+                  if (n.includes("tv")) return "/assets/video.svg";
+                  if (n.includes("audio")) return "/assets/audio.svg";
+                  return assignment.deviceId?.imageUrl || "/default-device-image.png";
+                })(),
               },
               typeId: {
                 _id: assignment.deviceId?.typeId?._id || "unknown-type",

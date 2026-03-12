@@ -2026,8 +2026,12 @@ if (userRole !== "user" && userRole !== "superUser") {
                   name: assignment.deviceId?.name || "Unknown Device",
                   serialNumber: assignment.deviceId?.serialNumber || "N/A",
                   status: assignment.deviceId?.status || "inactive",
-                  imageUrl:
-                    assignment.deviceId?.imageUrl || "/default-device-image.png",
+                  imageUrl: (() => {
+                    const n = (assignment.deviceId?.name || "").toLowerCase();
+                    if (n.includes("tv")) return "/assets/video.svg";
+                    if (n.includes("audio")) return "/assets/audio.svg";
+                    return assignment.deviceId?.imageUrl || "/default-device-image.png";
+                  })(),
                 },
                 typeId: {
                   _id: assignment.deviceId?.typeId?._id || "unknown-type",
@@ -3397,8 +3401,16 @@ playlistConfig.files.map((file, index) => (
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
   {availableDevices.map((device) => {
-    const imageUrl = device.deviceId?.imageUrl || "/placeholder.jpg";
     const deviceName = device.deviceId?.name || device.name;
+    let iconPath = "/placeholder.jpg";
+    if (deviceName.toLowerCase().includes("tv")) {
+      iconPath = "/assets/video.svg";
+    } else if (deviceName.toLowerCase().includes("audio")) {
+      iconPath = "/assets/audio.svg";
+    } else if (device.deviceId?.imageUrl) {
+      iconPath = device.deviceId.imageUrl;
+    }
+
 
     return (
       <div
@@ -3409,12 +3421,11 @@ playlistConfig.files.map((file, index) => (
         onClick={() => setSelectedDeviceForPlaylist(device)}
       >
         {/* Device Image */}
-         <div className="relative w-full overflow-hidden rounded-t-xl">
+        <div className="relative h-40 w-full bg-gray-800 flex items-center justify-center">
   <img
-    src={device.deviceId.imageUrl ?? "/default-device-image.png"}
-    alt={device.deviceId.name}
-    loading="lazy"
-    className="w-full h-auto object-cover"
+    src={iconPath}
+    alt={deviceName}
+    className="h-16 w-16 object-contain rounded-full"
   />
           {device.status === "active" && (
             <span className="absolute top-3 right-3 w-3 h-3 bg-green-500 rounded-full border border-white"></span>

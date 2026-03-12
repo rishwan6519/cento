@@ -111,17 +111,33 @@ export async function DELETE(req: NextRequest) {
 
 
 export async function PATCH(request: NextRequest) {
-  await connectToDatabase();
-  const { name, id } = await request.json();
+  try {
+    await connectToDatabase();
+    const { id, name, imageUrl, color, status } = await request.json();
 
-  if (!name || !id) {
-    return NextResponse.json({ success: false, message: "Device name and ID required" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ success: false, message: "Device ID is required" }, { status: 400 });
+    }
+
+    // Build update object with only provided fields
+    const updateData: Record<string, any> = {};
+    if (name !== undefined) updateData.name = name;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (color !== undefined) updateData.color = color;
+    if (status !== undefined) updateData.status = status;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ success: false, message: "No fields to update" }, { status: 400 });
+    }
+
+    const updatedDevice = await Device.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedDevice) {
+      return NextResponse.json({ success: false, message: "Device not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, device: updatedDevice });
+  } catch (error) {
+    console.error('Error updating device:', error);
+    return NextResponse.json({ success: false, message: "Failed to update device" }, { status: 500 });
   }
-
-  const updatedDevice = await Device.findByIdAndUpdate(id, { name }, { new: true });
-  if (!updatedDevice) {
-    return NextResponse.json({ success: false, message: "Device not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ success: true, device: updatedDevice });
 }

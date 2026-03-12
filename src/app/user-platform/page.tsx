@@ -1044,7 +1044,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl shadow-sm border overflow-hidden w-full h-[180px] cursor-pointer select-none transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg ${
+      className={`relative flex flex-col rounded-2xl shadow-sm border overflow-hidden w-full h-[160px] cursor-pointer select-none transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg ${
         isOnline
           ? "bg-gradient-to-br from-[#f8fbff] to-[#eef5ff] border-blue-200"
           : "bg-white border-gray-200"
@@ -1274,7 +1274,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
       <div className="h-8 w-1 bg-gradient-to-b bg-orange-600 rounded-full"></div>
       <h2 className="text-xl font-bold text-gray-900">Devices</h2>
     </div>
-    {devices.length > 2 && (
+    {devices.length > 4 && (
       <button 
         onClick={() => setShowAllDevices(true)}
         className="text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
@@ -1290,8 +1290,8 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
     ) : devices.length === 0 ? (
       <p className="text-gray-500 font-sans">No devices found.</p>
     ) : (
-      <div className="flex flex-col gap-6 items-center lg:items-start">
-        {devices.slice(0, 2).map((d) => (
+      <div className="grid grid-cols-2 gap-4">
+        {devices.slice(0, 4).map((d) => (
           <DeviceCard
             key={d.deviceId.serialNumber}
             device={d}

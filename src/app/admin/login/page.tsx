@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 export default function AdminLogin() {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -18,17 +19,21 @@ export default function AdminLogin() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ password }),
-        credentials: 'include' // Important for cookies
+        body: JSON.stringify({ username, password }),
+        credentials: 'include'
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // Store auth info so the admin dashboard page accepts the session
+        localStorage.setItem("token", data.data?._id || "admin-session");
+        localStorage.setItem("userRole", "admin");
+        localStorage.setItem("userId", data.data?._id || "");
         router.push("/admin");
         toast.success("Login successful");
       } else {
-        toast.error(data.message || "Invalid password");
+        toast.error(data.message || "Invalid credentials");
       }
     } catch (error) {
       toast.error("Login failed");
@@ -46,7 +51,21 @@ export default function AdminLogin() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Admin Password
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter admin username"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Password
             </label>
             <input
               type="password"

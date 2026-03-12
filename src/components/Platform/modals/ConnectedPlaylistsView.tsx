@@ -76,7 +76,12 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
               typeId: device?.typeId?.name || "",
               batteryLevel: device?.batteryLevel || "",
               lastActive: device?.lastActive || "",
-              imageUrl: device?.deviceId?.imageUrl || "",
+              imageUrl: (() => {
+                const n = (device?.deviceId?.name || "").toLowerCase();
+                if (n.includes("tv")) return "/assets/video.svg";
+                if (n.includes("audio")) return "/assets/audio.svg";
+                return device?.deviceId?.imageUrl || "";
+              })(),
             };
           }),
         }));

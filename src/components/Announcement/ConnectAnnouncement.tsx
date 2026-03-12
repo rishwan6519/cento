@@ -214,8 +214,17 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
           {availableDevices.map((device) => {
-            const imageUrl = device.deviceId?.imageUrl || "/placeholder.jpg";
-            const deviceName = device.deviceId?.name || device.name;
+           const deviceName = device.deviceId?.name || device.name;
+
+let iconPath = "/placeholder.jpg";
+
+if (deviceName.toLowerCase().includes("tv")) {
+  iconPath = "/assets/video.svg";
+} else if (deviceName.toLowerCase().includes("audio")) {
+  iconPath = "/assets/audio.svg";
+} else if (device.deviceId?.imageUrl) {
+  iconPath = device.deviceId.imageUrl;
+}
 
             return (
               <div
@@ -226,7 +235,7 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
                 onClick={() => setSelectedDevice(device)}
               >
                 {/* Device Image */}
-                <div className="relative h-40 w-full bg-gray-800 flex items-center justify-center">
+                {/* <div className="relative h-40 w-full bg-gray-800 flex items-center justify-center">
                   {device.deviceId.imageUrl ? (
                     <img
                       src={device.deviceId.imageUrl}
@@ -237,7 +246,15 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
                     <Database size={40} className="text-white" />
                   )}
                
-                </div>
+                </div> */}
+                  <div className="relative h-40 w-full bg-gray-800 flex items-center justify-center">
+                    <img
+                      src={iconPath}
+                      alt={deviceName}
+                      className="h-16 w-16 object-contain rounded-full"
+                    />
+                  </div>
+                
 
                 {/* Device Info */}
                 <div className="p-4 flex flex-col gap-2">
@@ -280,15 +297,19 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
             <h3 className="font-semibold mb-3">Your selected device</h3>
             <div className="border-2 border-dashed border-[#FFB6A3] mt-6 rounded-xl p-6 text-center w-[300px] bg-white">
               <div className="flex justify-center mb-3">
-                {selectedDevice.deviceId.imageUrl ? (
-                  <img
-                    src={selectedDevice.deviceId.imageUrl}
-                    alt={selectedDevice.deviceId.name}
-                    className="w-14 h-14 rounded-full"
-                  />
-                ) : (
-                  <Database size={40} className="text-[#0A2E3C]" />
-                )}
+                {(() => {
+                  const n = (selectedDevice.deviceId.name || "").toLowerCase();
+                  const imgSrc = n.includes("tv") ? "/assets/video.svg" : n.includes("audio") ? "/assets/audio.svg" : (selectedDevice.deviceId.imageUrl || "");
+                  return imgSrc ? (
+                    <img
+                      src={imgSrc}
+                      alt={selectedDevice.deviceId.name}
+                      className="w-14 h-14 object-contain rounded-full"
+                    />
+                  ) : (
+                    <Database size={40} className="text-[#0A2E3C]" />
+                  );
+                })()}
               </div>
               <p className="text-base font-semibold text-[#00353E] mb-1">
                 {selectedDevice.deviceId.name}
