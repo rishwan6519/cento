@@ -1242,14 +1242,7 @@ useEffect(() => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
   {availableDevices.map((device) => {
     const deviceName = device.deviceId?.name || device.name;
-    let iconPath = "/placeholder.jpg";
-    if (deviceName.toLowerCase().includes("tv")) {
-      iconPath = "/assets/video.svg";
-    } else if (deviceName.toLowerCase().includes("audio")) {
-      iconPath = "/assets/audio.svg";
-    } else if (device.deviceId?.imageUrl) {
-      iconPath = device.deviceId.imageUrl;
-    }
+    let iconPath = device.deviceId?.imageUrl || "/placeholder.jpg";
 
 
     return (
@@ -1351,17 +1344,15 @@ useEffect(() => {
   <div className="border-2 border-dashed border-[#FFB6A3] mt-6 rounded-xl p-6 text-center w-[300px] bg-white">
     {/* Device Icon */}
     <div className="flex justify-center mb-3">
-      {(() => {
-        const n = selectedDeviceForPlaylist.deviceId.name?.toLowerCase() || "";
-        const imgSrc = n.includes("tv") ? "/assets/video.svg" : n.includes("audio") ? "/assets/audio.svg" : (selectedDeviceForPlaylist.deviceId.imageUrl || "/placeholder.jpg");
-        return (
+      {selectedDeviceForPlaylist.deviceId.imageUrl ? (
           <img
-            src={imgSrc}
+            src={selectedDeviceForPlaylist.deviceId.imageUrl}
             alt={selectedDeviceForPlaylist.deviceId.name}
             className="w-14 h-14 object-contain rounded-full"
           />
-        );
-      })()}
+        ) : (
+          <Database size={40} className="text-[#0A2E3C]" />
+        )}
     </div>
 
     {/* Device Name */}

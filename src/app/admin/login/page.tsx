@@ -31,7 +31,7 @@ export default function AdminLogin() {
         localStorage.setItem("userRole", "admin");
         localStorage.setItem("userId", data.data?._id || "");
         router.push("/admin");
-        toast.success("Login successful");
+        toast.success("Login successful", { duration: 2000 });
       } else {
         toast.error(data.message || "Invalid credentials");
       }

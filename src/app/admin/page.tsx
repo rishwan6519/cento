@@ -177,7 +177,6 @@ export default function RobotAdminDashboard() {
 
   return (
     <div className="flex h-screen bg-[#F1F5F9] text-slate-900 font-sans overflow-hidden">
-      <Toaster position="top-right" />
       
       {/* Sidebar - Desktop */}
       <aside className={`

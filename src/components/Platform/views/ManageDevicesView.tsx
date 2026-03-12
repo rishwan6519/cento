@@ -78,20 +78,17 @@ const ManageDevicesView: React.FC<ManageDevicesViewProps> = ({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        {(() => {
-                          const n = (device.deviceId?.name || device.name || "").toLowerCase();
-                          if (n.includes("tv")) return <img src="/assets/video.svg" alt={device.name} className="w-8 h-8 object-contain" />;
-                          if (n.includes("audio")) return <img src="/assets/audio.svg" alt={device.name} className="w-8 h-8 object-contain" />;
-                          return (
-                            <Image
+                        {device.deviceId?.imageUrl ? (
+                           <Image
                               src={device.deviceId.imageUrl}
                               alt={device.name}
                               width={40}
                               height={40}
                               className="object-contain rounded-full"
                             />
-                          );
-                        })()}
+                        ) : (
+                          <FaRobot className="text-gray-400" />
+                        )}
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">

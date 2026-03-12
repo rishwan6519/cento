@@ -91,6 +91,7 @@ export default function RoboticPlatform(): React.ReactElement {
     if (userRole === "superUser") {
       toast.success("Welcome Super User!", {
         style: { background: "#1e293b", color: "#fff" },
+        duration: 2000,
       });
     } else {
       toast.error("You are not authorized to access this page.");
@@ -476,7 +477,6 @@ export default function RoboticPlatform(): React.ReactElement {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
-      <Toaster position="top-right" />
 
       {/* --- SIDEBAR --- */}
       <aside

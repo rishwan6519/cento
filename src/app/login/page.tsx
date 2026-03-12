@@ -39,7 +39,7 @@ export default function LoginPage() {
         localStorage.setItem("token", data.token);
         localStorage.setItem("userId", data.user.id); // Save user ID for later use
         localStorage.setItem("userRole", data.user.role); // Save user role for later use
-        toast.success("Login successful!");
+        toast.success("Login successful!", { duration: 2000 });
         if (data.user.role === "admin") {
           router.push("/admin"); // Redirect to admin page
         }else if (data.user.role === "superUser") {

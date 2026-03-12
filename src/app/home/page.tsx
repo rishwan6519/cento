@@ -162,7 +162,6 @@ const CustomerEngagementPlatform = () => {
   if (dummyCard) {
     return (
       <>
-        <Toaster />
         <DummyUI title={dummyCard} onBack={handleBackToHome} />
       </>
     );
@@ -171,7 +170,6 @@ const CustomerEngagementPlatform = () => {
   if (showUploader) {
     return (
       <>
-        <Toaster />
         <div className="min-h-screen bg-blue-50">
           <FloorMapUploader />
           <div className="text-center mt-4">
@@ -189,7 +187,6 @@ const CustomerEngagementPlatform = () => {
 
   return (
     <>
-      <Toaster />
       <div className="min-h-screen bg-gradient-to-br from-white to-blue-100 flex flex-col items-center px-4 py-10">
         <motion.div
           className="flex items-center gap-4 mb-8"

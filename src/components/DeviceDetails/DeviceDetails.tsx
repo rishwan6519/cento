@@ -289,15 +289,9 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
       <div className="bg-white rounded-xl shadow-md p-6 mb-8">
         <div className="flex flex-col md:flex-row items-center">
           <div className="relative w-24 h-24 md:w-32 md:h-32 rounded-xl overflow-hidden mb-4 md:mb-0 md:mr-6">
-            {(() => {
-              const n = (device.deviceId?.name || "").toLowerCase();
-              let imgSrc = device.deviceId?.imageUrl || "";
-              if (n.includes("tv")) imgSrc = "/assets/video.svg";
-              else if (n.includes("audio")) imgSrc = "/assets/audio.svg";
-              
-              return imgSrc ? (
+            {device.deviceId?.imageUrl ? (
                 <img 
-                  src={imgSrc} 
+                  src={device.deviceId.imageUrl} 
                   alt={device.deviceId?.name}
                   className="w-full h-full object-contain rounded-full p-2"
                 />
@@ -305,8 +299,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                 <div className="bg-gray-200 w-full h-full flex items-center justify-center">
                   <Database size={40} className="text-gray-400" />
                 </div>
-              );
-            })()}
+              )}
             <div className={`absolute top-2 right-2 w-3 h-3 rounded-full border-2 border-white ${
               device.deviceId?.status === "active" ? "bg-green-500" : "bg-red-500"
             }`}></div>
