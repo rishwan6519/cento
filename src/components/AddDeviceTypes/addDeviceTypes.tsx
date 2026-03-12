@@ -7,32 +7,34 @@ interface AddDeviceTypeProps {
   activeSection: string;
   onCancel: () => void;
   onSuccess: (newType: any) => void;
+  initialData?: any; // Add this prop for editing
 }
 
 const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
   activeSection,
   onCancel,
-  onSuccess
+  onSuccess,
+  initialData
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [customDeviceName, setCustomDeviceName] = useState<string>("");
+  const [customDeviceName, setCustomDeviceName] = useState<string>(initialData?.name || "");
   const [deviceTypeImage, setDeviceTypeImage] = useState<File | null>(null);
-  const [handMovements, setHandMovements] = useState<string>("");
-  const [bodyMovements, setBodyMovements] = useState<string>("");
-  const [screenWidth, setScreenWidth] = useState<string>("");
-  const [screenHeight, setScreenHeight] = useState<string>("");
-  const [blockCodingEnabled, setBlockCodingEnabled] = useState<boolean>(false);
-
+  const [existingImageUrl, setExistingImageUrl] = useState<string>(initialData?.imageUrl || "");
+  const [handMovements, setHandMovements] = useState<string>(initialData?.handMovements?.join(", ") || "");
+  const [bodyMovements, setBodyMovements] = useState<string>(initialData?.bodyMovements?.join(", ") || "");
+  const [screenWidth, setScreenWidth] = useState<string>(initialData?.screenSize?.width?.toString() || "");
+  const [screenHeight, setScreenHeight] = useState<string>(initialData?.screenSize?.height?.toString() || "");
+  const [blockCodingEnabled, setBlockCodingEnabled] = useState<boolean>(initialData?.blockCodingEnabled || false);
 
   // Skip rendering if not the active section
-  if (activeSection !== "addDeviceType") {
+  if (activeSection !== "addDeviceType" && activeSection !== "editDeviceType") {
     return null;
   }
 
-  const addDeviceType = async () => {
+  const handleSubmit = async () => {
     if (
       !customDeviceName ||
-      !deviceTypeImage ||
+      (!deviceTypeImage && !existingImageUrl) ||
       !handMovements ||
       !bodyMovements ||
       !screenWidth ||
@@ -45,55 +47,60 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
     setIsLoading(true);
     
     try {
-      // First upload the image
-      const formData = new FormData();
-      formData.append("file", deviceTypeImage);
-      
-      const imageUploadResponse = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!imageUploadResponse.ok) {
-        throw new Error("Failed to upload image");
+      let imageUrl = existingImageUrl;
+
+      // If a new image is selected, upload it
+      if (deviceTypeImage) {
+        const formData = new FormData();
+        formData.append("file", deviceTypeImage);
+        
+        const imageUploadResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!imageUploadResponse.ok) {
+          throw new Error("Failed to upload image");
+        }
+        
+        const imageData = await imageUploadResponse.json();
+        imageUrl = imageData.url;
       }
       
-      const imageData = await imageUploadResponse.json();
-      const imageUrl = imageData.url;
-      
-      // Then create the device type
-      const response = await fetch("/api/device-types", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: customDeviceName,
-          imageUrl: imageUrl,
-          handMovements: handMovements.split(",").map((m) => m.trim()),
-          bodyMovements: bodyMovements.split(",").map((m) => m.trim()),
-          screenSize: {
-            width: parseInt(screenWidth),
-            height: parseInt(screenHeight),
-          },
-          blockCodingEnabled: blockCodingEnabled, 
+      const payload = {
+        id: initialData?.id,
+        name: customDeviceName,
+        imageUrl: imageUrl,
+        handMovements: handMovements.split(",").map((m) => m.trim()).filter(Boolean),
+        bodyMovements: bodyMovements.split(",").map((m) => m.trim()).filter(Boolean),
+        screenSize: {
+          width: parseInt(screenWidth),
+          height: parseInt(screenHeight),
+        },
+        blockCodingEnabled: blockCodingEnabled,
+      };
 
-        }),
+      const response = await fetch("/api/device-types", {
+        method: initialData ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
       
       if (!response.ok) {
-        throw new Error("Failed to add device type");
+        throw new Error(`Failed to ${initialData ? "update" : "add"} device type`);
       }
       
-      const newType = await response.json();
-      toast.success("Device type added successfully!");
+      const result = await response.json();
+      toast.success(`Device type ${initialData ? "updated" : "added"} successfully!`);
       
-      // Reset form
-      resetForm();
+      // Reset form if not editing
+      if (!initialData) resetForm();
       
       // Notify parent of success
-      onSuccess(newType);
+      onSuccess(result);
     } catch (error) {
-      console.error("Error adding device type:", error);
-      toast.error("Failed to add device type!");
+      console.error(`Error ${initialData ? "updating" : "adding"} device type:`, error);
+      toast.error(`Failed to ${initialData ? "update" : "add"} device type!`);
     } finally {
       setIsLoading(false);
     }
@@ -111,8 +118,12 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
   return (
     <div className="bg-white/50 backdrop-blur-md rounded-[2.5rem] p-10 min-h-600 animate-in fade-in slide-in-from-bottom-4 duration-500">
        <div className="mb-10 text-center md:text-left">
-        <h2 className="text-4xl font-black text-slate-900 tracking-tight">Model Definition</h2>
-        <p className="text-lg text-slate-500 font-medium">Engineer new hardware blueprints for the ecosystem.</p>
+        <h2 className="text-4xl font-black text-slate-900 tracking-tight">
+          {initialData ? "Refine Model Blueprint" : "Model Definition"}
+        </h2>
+        <p className="text-lg text-slate-500 font-medium">
+          {initialData ? "Update hardware specifications and operational parameters." : "Engineer new hardware blueprints for the ecosystem."}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -196,21 +207,53 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) =>
-                    setDeviceTypeImage(e.target.files?.[0] || null)
-                  }
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setDeviceTypeImage(file);
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                 />
-                <div className="w-full bg-slate-50 border-2 border-dashed border-slate-200 group-hover:border-blue-500 rounded-2xl px-6 py-8 flex flex-col items-center justify-center transition-all bg-white group-hover:bg-blue-50/50">
-                    <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400 group-hover:text-blue-500 group-hover:scale-110 transition-all mb-3">
-                       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                       </svg>
-                    </div>
-                    <span className="text-sm font-bold text-slate-600">
-                      {deviceTypeImage ? deviceTypeImage.name : "Select technical snapshot"}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">PNG, JPG, SVG supported</span>
+                <div className="w-full bg-slate-50 border-2 border-dashed border-slate-200 group-hover:border-blue-500 rounded-2xl p-2 flex flex-col items-center justify-center transition-all bg-white group-hover:bg-blue-50/50 min-h-[200px]">
+                    {(deviceTypeImage || existingImageUrl) ? (
+                      <div className="relative w-full h-full flex flex-col items-center">
+                        <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-3">
+                           <img 
+                            src={deviceTypeImage ? URL.createObjectURL(deviceTypeImage) : existingImageUrl} 
+                            alt="Preview" 
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <span className="text-sm font-bold text-blue-600 px-4 py-2 bg-blue-50 rounded-lg max-w-full truncate">
+                          {deviceTypeImage ? deviceTypeImage.name : "Current Architecture Snapshot"}
+                        </span>
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (deviceTypeImage) {
+                              setDeviceTypeImage(null);
+                            } else {
+                              setExistingImageUrl("");
+                            }
+                          }}
+                          className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg z-30 hover:bg-red-600 transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400 group-hover:text-blue-500 group-hover:scale-110 transition-all mb-3">
+                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                           </svg>
+                        </div>
+                        <span className="text-sm font-bold text-slate-600">Select technical snapshot</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">PNG, JPG, SVG supported</span>
+                      </>
+                    )}
                 </div>
               </div>
             </div>
@@ -245,14 +288,14 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
           disabled={isLoading}
           className="px-10 py-4 text-slate-400 font-bold hover:text-slate-900 hover:bg-slate-50 rounded-2xl transition-all order-2 sm:order-1"
         >
-          Cancel
+          {initialData ? "Abort Changes" : "Cancel"}
         </button>
         <button
-          onClick={addDeviceType}
+          onClick={handleSubmit}
           disabled={
             isLoading ||
             !customDeviceName ||
-            !deviceTypeImage ||
+            (!deviceTypeImage && !existingImageUrl) ||
             !handMovements ||
             !bodyMovements ||
             !screenWidth ||
@@ -261,7 +304,7 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
           className={`px-12 py-4 rounded-2xl font-extrabold shadow-xl text-white transition-all transform active:scale-95 flex items-center justify-center gap-3 order-1 sm:order-2 ${
             isLoading ||
             !customDeviceName ||
-            !deviceTypeImage ||
+            (!deviceTypeImage && !existingImageUrl) ||
             !handMovements ||
             !bodyMovements ||
             !screenWidth ||
@@ -273,10 +316,10 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
           {isLoading ? (
             <>
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Compiling...
+              {initialData ? "Updating System..." : "Compiling..."}
             </>
           ) : (
-            "Authorize Model Definition"
+            initialData ? "Update Model Definition" : "Authorize Model Definition"
           )}
         </button>
       </div>

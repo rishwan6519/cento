@@ -18,6 +18,7 @@ import AddDeviceType from "@/components/AddDeviceTypes/addDeviceTypes";
 import AddDevice from "@/components/AddDevice/addDevice";
 import UserManagement from "@/components/UseManagement/UserManagement";
 import ShowDevices from "@/components/ShowDevices/ShowDevices";
+import ManageDeviceTypes from "@/components/ManageDeviceTypes/ManageDeviceTypes";
 
 interface DeviceType {
   id: string;
@@ -47,6 +48,7 @@ export default function RobotAdminDashboard() {
   const [activeSection, setActiveSection] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [usersCount, setUsersCount] = useState<number>(0);
+  const [editingDeviceType, setEditingDeviceType] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function RobotAdminDashboard() {
           description: "Register a new device in the system",
         },
         {
-          id: "addDeviceType",
+          id: "manageDeviceTypes",
           label: "Device Types",
           icon: <Database size={20} className="text-indigo-500" />,
           description: "Manage device categories and types",
@@ -389,13 +391,27 @@ export default function RobotAdminDashboard() {
                 </button>
                 
                 <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden h-full min-h-[600px]">
-                   {activeSection === "addDeviceType" && (
+                   {activeSection === "manageDeviceTypes" && (
+                    <ManageDeviceTypes 
+                      onBack={() => setActiveSection("")} 
+                      onEdit={(type) => {
+                        setEditingDeviceType(type);
+                        setActiveSection("editDeviceType");
+                      }}
+                      onAdd={() => {
+                        setEditingDeviceType(null);
+                        setActiveSection("addDeviceType");
+                      }}
+                    />
+                  )}
+
+                  {(activeSection === "addDeviceType" || activeSection === "editDeviceType") && (
                     <AddDeviceType
                       activeSection={activeSection}
-                      onCancel={() => setActiveSection("")}
-                      onSuccess={(newType) => {
-                        setDeviceTypes((prev) => [...prev, newType]);
-                        setActiveSection("");
+                      initialData={editingDeviceType}
+                      onCancel={() => setActiveSection("manageDeviceTypes")}
+                      onSuccess={() => {
+                        setActiveSection("manageDeviceTypes");
                         fetchDeviceTypes();
                       }}
                     />
@@ -1016,7 +1032,7 @@ export default function RobotAdminDashboard() {
 //                   </h3>
 //                   <p className="text-sm text-gray-500">Registered Devices</p>
 //                 </div>
-
+// 
 //                 <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
 //                   <div className="flex items-center justify-between mb-4">
 //                     <div className="p-3 bg-orange-50 rounded-lg">
