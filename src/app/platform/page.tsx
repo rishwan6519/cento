@@ -21,7 +21,8 @@ import {
   FaUser, 
   FaChevronRight, 
   FaTachometerAlt,
-  FaMobile
+  FaMobile,
+  FaStore
 } from "react-icons/fa";
 import { RiDashboardLine } from "react-icons/ri";
 import { BsMusicNoteList } from "react-icons/bs";
@@ -49,10 +50,13 @@ import AssignDevice from "@/components/AssignDevice/AssignDevice";
 import Announcement from "@/components/Announcement/Announcement";
 import CreateAnnouncement from "@/components/CreateAnnouncement/CreateAnnouncement";
 import ShowAnnouncement from "@/components/Announcement/ShowAnnouncement";
+import InstantaneousAnnouncement from "@/components/InstantaneousAnnouncement/InstantaneousAnnouncement";
 import AssignApiKey from "@/components/AssignApiKey/AssignApiKey";
 import CreateSlider from "@/components/CreatSlider/CreateSlider";
 import SliderManager from "@/components/showSlider/showSlider";
 import AssignSlider from "@/components/AssignSlider/AssignSlider";
+import StoreManagement from "@/components/StoreManagement/StoreManagement";
+import AccountSettings from "@/components/AccountSettings/AccountSettings";
 
 // Types
 import { 
@@ -65,9 +69,10 @@ import {
 
 export default function RoboticPlatform(): React.ReactElement {
   // --- State Management (Fully Restored) ---
-  const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
+  const [selectedMenu, setSelectedMenu] = useState<MenuKey>("storeManagement");
   const [devices, setDevices] = useState<Device[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [devicePlaylists, setDevicePlaylists] = useState<any[]>([]);
   const [showOnboardModal, setShowOnboardModal] = useState<boolean>(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState<boolean>(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -78,6 +83,7 @@ export default function RoboticPlatform(): React.ReactElement {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingSlider, setEditingSlider] = useState<any>(null);
 
   // --- Auth & Initial Fetch (Fully Restored) ---
   useEffect(() => {
@@ -132,18 +138,43 @@ export default function RoboticPlatform(): React.ReactElement {
         setIsLoading(false);
       }
     };
+    
+    const fetchPlaylists = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (userId) {
+// Fetch ALL global playlists mapped to devices (don't limit by userId since we are on the superUser platform)
+          const response = await fetch(`/api/device-playlists`);
+          if (response.ok) {
+            const data = await response.json();
+            setDevicePlaylists(data);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching playlists:", err);
+      }
+    };
 
     fetchDevices();
+    fetchPlaylists();
   }, []);
 
   // --- Derived Data ---
   const devicesWithPlaylistInfo = useMemo(() => 
-    devices.map((device) => ({
-      ...device,
-      connectedPlaylists: playlists.filter((p) =>
-        p.deviceIds.some((deviceRef) => deviceRef.id === device._id)
-      ),
-    })), [devices, playlists]);
+    devices.map((device) => {
+      const connected = devicePlaylists
+        .filter((p) => p.deviceIds && p.deviceIds.includes(device.deviceId._id))
+        .map((p) => ({
+          id: p.playlistData._id,
+          name: p.playlistData.name || "Unnamed Playlist",
+          status: "active",
+          files: p.playlistData.files || [],
+        }));
+      return {
+        ...device,
+        connectedPlaylists: connected,
+      };
+    }), [devices, devicePlaylists]);
 
   // --- Handlers (Fully Restored) ---
   const toggleMenuExpansion = (menuSection: string) => {
@@ -258,7 +289,9 @@ export default function RoboticPlatform(): React.ReactElement {
     {
       title: "General",
       items: [
-        { key: "dashboard" as MenuKey, label: "Dashboard", icon: <RiDashboardLine /> },
+        { key: "storeManagement" as MenuKey, label: "Stores", icon: <FaStore /> },
+        { key: "dashboard" as MenuKey, label: "All Devices", icon: <RiDashboardLine /> },
+        { key: "accountSettings" as MenuKey, label: "Account Settings", icon: <IoMdSettings /> },
       ],
     },
     {
@@ -296,13 +329,14 @@ export default function RoboticPlatform(): React.ReactElement {
         { key: "createAnnouncement" as MenuKey, label: "Create New", icon: <IoMdSettings /> },
         { key: "setupAnnouncement" as MenuKey, label: "Setup Builder", icon: <IoMdSettings /> },
         { key: "showAnnouncement" as MenuKey, label: "Show All", icon: <IoMdSettings /> },
+        { key: "instantAnnouncement" as MenuKey, label: "Instant Send", icon: <IoMdSettings /> },
       ]
     },
     {
-      title: "User Management",
+      title: "Store Management",
       items: [
-        { key: "createUser" as MenuKey, label: "Create User", icon: <FaUser /> },
-        { key: "showUser" as MenuKey, label: "Show User", icon: <FaUser /> },
+        { key: "createUser" as MenuKey, label: "Create Store", icon: <FaStore /> },
+        { key: "showUser" as MenuKey, label: "Show Stores", icon: <FaStore /> },
       ],
     },
   ];
@@ -346,15 +380,21 @@ export default function RoboticPlatform(): React.ReactElement {
       case "dashboard":
         return (
           <DashboardView
-            devices={devices}
+            devices={devicesWithPlaylistInfo as any}
             setDevices={setDevices}
             onAddNew={() => setSelectedMenu("onboardDevice")}
             onEditDevice={handleEditDevice}
             onManagePlaylists={handleManagePlaylists}
           />
         );
+      case "storeManagement":
+        return (
+          <StoreManagement
+            onNavigate={(menu) => setSelectedMenu(menu as MenuKey)}
+          />
+        );
       case "onboardDevice":
-        return <OnboardingPage />;
+        return <OnboardingPage onSuccess={() => setSelectedMenu("dashboard")} />;
       case "connectedPlaylists":
         return (
           <ConnectedPlaylistsView
@@ -377,6 +417,8 @@ export default function RoboticPlatform(): React.ReactElement {
         return <CreateAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("setupAnnouncement")} />;
       case "showAnnouncement":
         return <ShowAnnouncement onCancel={() => setSelectedMenu("dashboard")} />;
+      case "instantAnnouncement":
+        return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("dashboard")} />;
       case "assignDevice":
         return <AssignDevice />;
       case "assignApi":
@@ -386,9 +428,28 @@ export default function RoboticPlatform(): React.ReactElement {
       case "showPlaylist":
         return <PlaylistManager />;
       case "createSlider":
-        return <CreateSlider onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showSlider")} />;
+        return (
+          <CreateSlider
+            editingSlider={editingSlider}
+            onCancel={() => {
+              setEditingSlider(null);
+              setSelectedMenu("showSlider");
+            }}
+            onSuccess={() => {
+              setEditingSlider(null);
+              setSelectedMenu("showSlider");
+            }}
+          />
+        );
       case "showSlider":
-        return <SliderManager />;
+        return (
+          <SliderManager 
+            onEdit={(slider) => {
+              setEditingSlider(slider);
+              setSelectedMenu("createSlider");
+            }} 
+          />
+        );
       case "assignSlider":
         return <AssignSlider />;
       case "createMedia":
@@ -399,6 +460,8 @@ export default function RoboticPlatform(): React.ReactElement {
         return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
       case "createUser":
         return <CreateUser />;
+      case "accountSettings":
+        return <AccountSettings />;
       default:
         return (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl shadow-sm border border-slate-100">
@@ -543,30 +606,13 @@ export default function RoboticPlatform(): React.ReactElement {
           </div>
 
           <div className="flex items-center gap-4 md:gap-8">
-            {/* Search Bar */}
-            <div className="hidden lg:flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-2xl border border-transparent focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all w-72">
-              <HiOutlineSearch className="text-slate-400 text-lg" />
-              <input 
-                type="text" 
-                placeholder="Search nodes, media..." 
-                className="bg-transparent border-none text-sm outline-none text-slate-700 w-full placeholder:text-slate-400" 
-              />
-            </div>
-            
             <div className="flex items-center gap-3">
-              <button className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all relative">
-                <HiOutlineBell size={22} />
-                <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
-              <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
-              <div className="flex items-center gap-3 pl-2">
-                <div className="hidden sm:block text-right">
-                  <p className="text-sm font-bold text-slate-800 leading-none">Super User</p>
-                  <p className="text-[11px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">Administrator</p>
-                </div>
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200 overflow-hidden font-bold">
-                  SU
-                </div>
+              <div className="hidden sm:block text-right">
+                <p className="text-sm font-bold text-slate-800 leading-none">Super User</p>
+                <p className="text-[11px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">Administrator</p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200 overflow-hidden font-bold">
+                SU
               </div>
             </div>
           </div>

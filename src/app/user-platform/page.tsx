@@ -210,14 +210,14 @@ const [slides, setSlides] = useState<Slide[]>([]);
   }, []);
 
   // Auto slide every 4 seconds
-  // useEffect(() => {
-  //   if (slides.length > 0) {
-  //     const interval = setInterval(() => {
-  //       setCurrentIndex((prev) => (prev + 1) % slides.length);
-  //     }, 4000);
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [slides]);
+  useEffect(() => {
+    if (slides.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % slides.length);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [slides.length]);
  useEffect(() => {
   const fetchSliderData = async () => {
     try {
@@ -1037,9 +1037,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
   const deviceState = deviceStatuses[serial] || {};
   const isOnline = deviceState.status === "online";
   const lastSync = deviceState.lastSync || "None";
-    const imageUrl = device.deviceId.imageUrl || "/default-device-image.png"; // fallback
-
-
+  const imageUrl = device.deviceId.imageUrl || "/default-device-image.png";
   const remainingTime = isOnline ? device.deviceId.status : null;
 
   return (

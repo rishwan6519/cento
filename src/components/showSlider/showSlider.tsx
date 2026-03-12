@@ -17,7 +17,11 @@ interface SliderDocument {
   updatedAt: string;
 }
 
-const SliderManager: React.FC = () => {
+interface SliderManagerProps {
+  onEdit?: (slider: SliderDocument) => void;
+}
+
+const SliderManager: React.FC<SliderManagerProps> = ({ onEdit }) => {
   const [sliderDocs, setSliderDocs] = useState<SliderDocument[]>([]);
   const [selectedSlider, setSelectedSlider] = useState<{ docId: string; slider: SliderItem } | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -80,8 +84,16 @@ const SliderManager: React.FC = () => {
       ) : (
         <div className="space-y-10">
           {sliderDocs.map((doc) => (
-            <div key={doc._id}>
-              <h3 className="text-xl font-semibold mb-4 text-gray-700">{doc.sliderName}</h3>
+            <div key={doc._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">{doc.sliderName}</h3>
+                <button 
+                  onClick={() => onEdit?.(doc)}
+                  className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold hover:bg-blue-100 transition-colors"
+                >
+                  Edit Group
+                </button>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {doc.sliders.map((slider, index) => (
                   <div

@@ -18,6 +18,7 @@ export type MenuKey =
   |"setupAnnouncement"
   | "createAnnouncement"
   |"showAnnouncement"
+  | "instantAnnouncement"
   | "showPlaylist"
   | "connectPlaylist"
   | "onboardDevice"
@@ -26,6 +27,9 @@ export type MenuKey =
   |"blockCoding"
   |"peopleDetection"
   |"assignApi"
+  |"storeManagement"
+  |"ManageDevice"
+  | "accountSettings"
 
 export interface Device {
   _id: string;

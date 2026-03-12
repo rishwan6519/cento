@@ -41,7 +41,11 @@ const ConnectedPlaylistsView: React.FC<ConnectedPlaylistsViewProps> = ({
         const userId = localStorage.getItem("userId");
         if (!userId) throw new Error("User ID not found");
 
-        const response = await fetch(`/api/device-playlists?userId=${userId}`);
+        const userRole = localStorage.getItem("userRole");
+
+        // Super users fetch all playlists. Normal users fetch by userId.
+        const url = userRole === "superUser" ? `/api/device-playlists` : `/api/device-playlists?userId=${userId}`;
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`Error: ${response.statusText}`);
 
         const data = await response.json();

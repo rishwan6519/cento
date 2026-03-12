@@ -217,7 +217,7 @@ export default function PlaylistSetup() {
 
   useEffect(() => {
     const userRole = localStorage.getItem("userRole");
-    if (userRole !== "user") {
+    if (!["user", "admin", "superUser"].includes(userRole || "")) {
       toast.error("You are not authorized to access this page.");
       window.location.href = "/login";
       return;

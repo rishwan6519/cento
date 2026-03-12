@@ -71,11 +71,12 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const userId = url.searchParams.get('userId');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const query: any = {};
+    if (userId) {
+      query.userId = userId;
     }
 
-    const devicePlaylists: DevicePlaylist[] = await DevicePlaylist.find({ userId })
+    const devicePlaylists: DevicePlaylist[] = await DevicePlaylist.find(query)
       .populate("playlistIds")
       .select("-__v -createdAt -updatedAt");
       console.log('devicePlaylists', devicePlaylists);

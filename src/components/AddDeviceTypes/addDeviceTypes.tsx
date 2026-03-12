@@ -109,148 +109,176 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
-      <h2 className="text-2xl font-bold mb-6 text-black">
-        Add New Device Type
-      </h2>
-      <div className="space-y-6">
-        {/* Device Type Name */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Device Type Name
-          </label>
-          <input
-            value={customDeviceName}
-            onChange={(e) => setCustomDeviceName(e.target.value)}
-            placeholder="Enter device type name"
-            className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        
-        {/* Hand Movements */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Hand Movements
-          </label>
-          <input
-            value={handMovements}
-            onChange={(e) => setHandMovements(e.target.value)}
-            placeholder="Enter hand movements (comma-separated)"
-            className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Example: wave, grab, point
-          </p>
-        </div>
-        
-        {/* Body Movements */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Body Movements
-          </label>
-          <input
-            value={bodyMovements}
-            onChange={(e) => setBodyMovements(e.target.value)}
-            placeholder="Enter body movements (comma-separated)"
-            className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Example: walk, turn, dance
-          </p>
-        </div>
-        
-        {/* Screen Size */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Screen Size
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+    <div className="bg-white/50 backdrop-blur-md rounded-[2.5rem] p-10 min-h-600 animate-in fade-in slide-in-from-bottom-4 duration-500">
+       <div className="mb-10 text-center md:text-left">
+        <h2 className="text-4xl font-black text-slate-900 tracking-tight">Model Definition</h2>
+        <p className="text-lg text-slate-500 font-medium">Engineer new hardware blueprints for the ecosystem.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div className="space-y-8">
+          {/* Device Type Name */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Model Designation</label>
+            <input
+              value={customDeviceName}
+              onChange={(e) => setCustomDeviceName(e.target.value)}
+              placeholder="e.g. Sentinel-7 Series"
+              className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all text-xl shadow-sm hover:shadow-md"
+            />
+          </div>
+          
+          {/* Movements Container */}
+          <div className="bg-white/40 rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-8">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-50 pb-4">Kinematic Parameters</h3>
+            
+            {/* Hand Movements */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Hand Gestures / Articulations</label>
               <input
-                type="number"
-                value={screenWidth}
-                onChange={(e) => setScreenWidth(e.target.value)}
-                placeholder="Width (px)"
-                className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={handMovements}
+                onChange={(e) => setHandMovements(e.target.value)}
+                placeholder="wave, grab, index_point"
+                className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all"
               />
+              <p className="text-[10px] text-slate-400 font-medium pl-2 italic">Format: CSV string</p>
             </div>
-            <div>
+            
+            {/* Body Movements */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Locomotion / Body Control</label>
               <input
-                type="number"
-                value={screenHeight}
-                onChange={(e) => setScreenHeight(e.target.value)}
-                placeholder="Height (px)"
-                className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
+                value={bodyMovements}
+                onChange={(e) => setBodyMovements(e.target.value)}
+                placeholder="bipedal_walk, rotate_360, squat"
+                className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all"
               />
             </div>
           </div>
         </div>
-        
-        {/* Image Upload */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Device Type Image
-          </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) =>
-              setDeviceTypeImage(e.target.files?.[0] || null)
-            }
-            className="w-full p-3 border border-gray-300 text-black rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
 
-        {/* Enable Block Coding */}
-<div>
-  <label className="inline-flex items-center space-x-3">
-    <input
-      type="checkbox"
-      checked={blockCodingEnabled}
-      onChange={(e) => setBlockCodingEnabled(e.target.checked)}
-      className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-    />
-    <span className="text-sm font-semibold text-gray-700">
-      Enable Block Coding
-    </span>
-  </label>
-</div>
+        <div className="space-y-8">
+           {/* Screen Geometry */}
+           <div className="bg-white/40 rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-8">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-50 pb-4">Display Geometry</h3>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Horizontal (px)</label>
+                <input
+                  type="number"
+                  value={screenWidth}
+                  onChange={(e) => setScreenWidth(e.target.value)}
+                  placeholder="1080"
+                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-3 font-bold text-slate-900 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Vertical (px)</label>
+                <input
+                  type="number"
+                  value={screenHeight}
+                  onChange={(e) => setScreenHeight(e.target.value)}
+                  placeholder="1920"
+                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-3 font-bold text-slate-900 outline-none transition-all"
+                />
+              </div>
+            </div>
+          </div>
 
-        
-        <div className="flex justify-end gap-3 pt-4">
-          <button
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-6 py-3 text-gray-600 hover:text-gray-800 font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={addDeviceType}
-            disabled={
-              isLoading ||
-              !customDeviceName ||
-              !deviceTypeImage ||
-              !handMovements ||
-              !bodyMovements ||
-              !screenWidth ||
-              !screenHeight
-            }
-            className={`px-6 py-3 rounded-lg ${
-              isLoading ||
-              !customDeviceName ||
-              !deviceTypeImage ||
-              !handMovements ||
-              !bodyMovements ||
-              !screenWidth ||
-              !screenHeight
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700"
-            } text-white font-semibold transition-colors`}
-          >
-            {isLoading ? "Adding..." : "Add Device Type"}
-          </button>
+          {/* Media & Configuration */}
+          <div className="bg-white/40 rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-8">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-50 pb-4">Model Assets</h3>
+            
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Architecture Schema (Image)</label>
+              <div className="relative group">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setDeviceTypeImage(e.target.files?.[0] || null)
+                  }
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div className="w-full bg-slate-50 border-2 border-dashed border-slate-200 group-hover:border-blue-500 rounded-2xl px-6 py-8 flex flex-col items-center justify-center transition-all bg-white group-hover:bg-blue-50/50">
+                    <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400 group-hover:text-blue-500 group-hover:scale-110 transition-all mb-3">
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                       </svg>
+                    </div>
+                    <span className="text-sm font-bold text-slate-600">
+                      {deviceTypeImage ? deviceTypeImage.name : "Select technical snapshot"}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">PNG, JPG, SVG supported</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Block Coding */}
+            <div className="pt-4">
+              <label className="flex items-center gap-4 cursor-pointer group">
+                <div className="relative">
+                   <input
+                    type="checkbox"
+                    checked={blockCodingEnabled}
+                    onChange={(e) => setBlockCodingEnabled(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-14 h-8 rounded-full transition-colors duration-300 ${blockCodingEnabled ? 'bg-blue-600' : 'bg-slate-200'}`} />
+                  <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${blockCodingEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-black text-slate-900 tracking-tight">Logic Engine Support</span>
+                  <span className="text-xs text-slate-400 font-medium tracking-tight">Enables Drag-and-Drop Block Coding for this model.</span>
+                </div>
+              </label>
+            </div>
+          </div>
         </div>
+      </div>
+      
+      {/* Footer Actions */}
+      <div className="flex flex-col sm:flex-row justify-end gap-6 mt-12 pt-10 border-t border-slate-100/50">
+        <button
+          onClick={onCancel}
+          disabled={isLoading}
+          className="px-10 py-4 text-slate-400 font-bold hover:text-slate-900 hover:bg-slate-50 rounded-2xl transition-all order-2 sm:order-1"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={addDeviceType}
+          disabled={
+            isLoading ||
+            !customDeviceName ||
+            !deviceTypeImage ||
+            !handMovements ||
+            !bodyMovements ||
+            !screenWidth ||
+            !screenHeight
+          }
+          className={`px-12 py-4 rounded-2xl font-extrabold shadow-xl text-white transition-all transform active:scale-95 flex items-center justify-center gap-3 order-1 sm:order-2 ${
+            isLoading ||
+            !customDeviceName ||
+            !deviceTypeImage ||
+            !handMovements ||
+            !bodyMovements ||
+            !screenWidth ||
+            !screenHeight
+              ? "bg-slate-300 shadow-none cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/25"
+          }`}
+        >
+          {isLoading ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Compiling...
+            </>
+          ) : (
+            "Authorize Model Definition"
+          )}
+        </button>
       </div>
     </div>
   );

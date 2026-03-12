@@ -30,7 +30,11 @@ interface DeviceInfo {
   color?: string;
 }
 
-const OnboardingPage: React.FC = () => {
+interface OnboardingPageProps {
+  onSuccess?: () => void;
+}
+
+const OnboardingPage: React.FC<OnboardingPageProps> = ({ onSuccess }) => {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -50,14 +54,18 @@ const OnboardingPage: React.FC = () => {
 
 
   useEffect(() => {
-  if (showSuccess) {
-    const timer = setTimeout(() => {
-      window.location.href = "/platform"; // Redirect to platform page
-    }, 1800);
+    if (showSuccess) {
+      const timer = setTimeout(() => {
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          window.location.href = "/platform"; // fallback redirect
+        }
+      }, 1800);
 
-    return () => clearTimeout(timer); // cleanup
-  }
-}, [showSuccess]); 
+      return () => clearTimeout(timer); // cleanup
+    }
+  }, [showSuccess, onSuccess]); 
 
   // Setup camera when step is 3 and scanning is active
   
@@ -460,7 +468,7 @@ const OnboardingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 text-gray-800 w-[100%] h-[100%] ">
+    <div className="flex flex-col text-gray-800 w-full h-full relative">
       {loading && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -476,24 +484,7 @@ const OnboardingPage: React.FC = () => {
         </motion.div>
       )}
 
-      <header className="w-full py-8 flex justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <Image
-            src="/assets/centelon_logo.png"
-            alt="Logo"
-            width={180}
-            height={60}
-            priority
-            className="drop-shadow-lg"
-          />
-        </motion.div>
-      </header>
-
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
+      <div className="flex-1 flex flex-col items-center justify-center py-6">
         <AnimatePresence mode="wait">
           {step === 0 && (
             <motion.div

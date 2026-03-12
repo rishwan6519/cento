@@ -106,43 +106,53 @@ const AddDevice: React.FC<AddDeviceProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
-      <h2 className="text-2xl font-bold mb-6 text-black">
-        Add New Device
-      </h2>
+    <div className="bg-white/50 backdrop-blur-md rounded-[2.5rem] p-10 min-h-600 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="mb-10 text-center md:text-left">
+        <h2 className="text-4xl font-black text-slate-900 tracking-tight">System Onboarding</h2>
+        <p className="text-lg text-slate-500 font-medium">Provision new hardware into the operational framework.</p>
+      </div>
       
       {/* Step 1: Device Type Selection */}
       {!newDevice.typeId && (
-        <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-gray-700">
-            Step 1: Select Device Type
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-10">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-black shadow-lg shadow-blue-500/20">1</div>
+            <h3 className="text-xl font-black text-slate-900">Select Hardware Architecture</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {deviceTypes.map((type) => (
               <button
                 key={type.id}
                 onClick={() =>
                   setNewDevice({ ...newDevice, typeId: type.id })
                 }
-                className="relative group p-4 border rounded-lg hover:border-blue-500 transition-all text-left"
+                className="group relative flex flex-col bg-white rounded-[2rem] p-6 border-2 border-slate-50 hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 text-left overflow-hidden translate-z-0"
               >
+                <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 group-hover:bg-blue-50 transition-colors" />
+                
                 {type.imageUrl && (
-                  <div className="mb-4 aspect-square rounded-lg overflow-hidden bg-gray-100">
+                  <div className="relative z-10 mb-6 aspect-video rounded-2xl overflow-hidden bg-slate-50 border border-slate-100/50">
                     <img
                       src={type.imageUrl}
                       alt={type.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-700"
                     />
                   </div>
                 )}
-                <h4 className="font-medium text-gray-800">
-                  {type.name}
-                </h4>
-                {type.description && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    {type.description}
-                  </p>
-                )}
+                <div className="relative z-10 flex flex-col h-full">
+                  <h4 className="text-lg font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                    {type.name}
+                  </h4>
+                  {type.description && (
+                    <p className="text-sm text-slate-400 font-medium mt-2 line-clamp-2">
+                      {type.description}
+                    </p>
+                  )}
+                  <div className="mt-6 flex items-center gap-2 text-blue-600 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
+                    Deploy this model →
+                  </div>
+                </div>
               </button>
             ))}
           </div>
@@ -151,100 +161,103 @@ const AddDevice: React.FC<AddDeviceProps> = ({
       
       {/* Step 2: Device Details Form */}
       {newDevice.typeId && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-black shadow-lg shadow-blue-500/20">2</div>
+              <h3 className="text-xl font-black text-slate-900">Define Operational Identity</h3>
+            </div>
             <button
               onClick={resetDeviceForm}
-              className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
+              className="flex items-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 transition-all"
             >
-              <ArrowLeft size={20} />
-              <span>Back to Device Types</span>
+              <ArrowLeft size={16} />
+              Switch Model
             </button>
           </div>
-          <div className="flex flex-col md:flex-row gap-6">
+
+          <div className="flex flex-col lg:flex-row gap-12 bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm">
             {/* Selected Type Preview */}
-            <div className="w-full md:w-1/3">
-              {deviceTypes.find((t) => t.id === newDevice.typeId)
-                ?.imageUrl && (
-                <div className="rounded-lg overflow-hidden bg-gray-100">
+            <div className="w-full lg:w-2/5 flex flex-col items-center">
+              <div className="w-full aspect-square rounded-[2rem] overflow-hidden bg-slate-50 border border-slate-100 p-8 shadow-inner group">
+                {deviceTypes.find((t) => t.id === newDevice.typeId)?.imageUrl && (
                   <img
-                    src={
-                      deviceTypes.find((t) => t.id === newDevice.typeId)
-                        ?.imageUrl
-                    }
+                    src={deviceTypes.find((t) => t.id === newDevice.typeId)?.imageUrl}
                     alt="Selected type"
-                    className="w-full h-auto object-cover"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700"
                   />
-                </div>
-              )}
+                )}
+              </div>
+              <div className="mt-6 text-center">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 block">Architecture</span>
+                 <h4 className="text-xl font-black text-slate-900">{deviceTypes.find((t) => t.id === newDevice.typeId)?.name}</h4>
+              </div>
             </div>
             
             {/* Device Details Form */}
-            <div className="w-full md:w-2/3 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-700">
-                Step 2: Enter Device Details
-              </h3>
-              
-              {/* Serial Number */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Serial Number
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter device serial number"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-black"
-                  value={newDevice.serialNumber}
-                  onChange={(e) =>
-                    setNewDevice({
-                      ...newDevice,
-                      serialNumber: e.target.value,
-                    })
-                  }
-                />
+            <div className="flex-1 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Serial Number */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">System Serial (UID)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. SN-882-QX"
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all"
+                    value={newDevice.serialNumber}
+                    onChange={(e) =>
+                      setNewDevice({
+                        ...newDevice,
+                        serialNumber: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                
+                {/* Device color */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Finish / Color</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={newDevice.color}
+                      onChange={(e) =>
+                        setNewDevice({
+                          ...newDevice,
+                          color: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. Phantom Black"
+                      className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all pl-12"
+                    />
+                    <div 
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border border-slate-200"
+                      style={{ backgroundColor: newDevice.color || 'transparent' }}
+                    />
+                  </div>
+                </div>
               </div>
-              
+
               {/* Device Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Device Name
-                </label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Operational Designation (Name)</label>
                 <input
                   type="text"
                   value={newDevice.name}
                   onChange={(e) =>
                     setNewDevice({ ...newDevice, name: e.target.value })
                   }
-                  placeholder="Enter device name"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-black"
-                />
-              </div>
-              
-              {/* Device color */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Device Color
-                </label>
-                <input
-                  type="text"
-                  value={newDevice.color}
-                  onChange={(e) =>
-                    setNewDevice({
-                      ...newDevice,
-                      color: e.target.value,
-                    })
-                  }
-                  placeholder="Enter device color"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-black"
+                  placeholder="e.g. Concierge Alpha"
+                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all text-xl"
                 />
               </div>
               
               {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-8">
                 <button
                   onClick={onCancel}
                   disabled={isLoading}
-                  className="px-6 py-2 text-gray-600 hover:text-gray-800"
+                  className="px-10 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 hover:text-slate-900 transition-all order-2 sm:order-1"
                 >
                   Cancel
                 </button>
@@ -255,15 +268,22 @@ const AddDevice: React.FC<AddDeviceProps> = ({
                     !newDevice.name ||
                     !newDevice.serialNumber
                   }
-                  className={`px-6 py-3 rounded-lg ${
+                  className={`px-12 py-4 rounded-2xl font-extrabold shadow-xl text-white transition-all transform active:scale-95 flex items-center justify-center gap-3 order-1 sm:order-2 ${
                     isLoading ||
                     !newDevice.name ||
                     !newDevice.serialNumber
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  } text-white font-semibold transition-colors`}
+                      ? "bg-slate-300 shadow-none cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/25"
+                  }`}
                 >
-                  {isLoading ? "Adding..." : "Add Device"}
+                  {isLoading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Initializing...
+                    </>
+                  ) : (
+                    "Authorize Provisioning"
+                  )}
                 </button>
               </div>
             </div>

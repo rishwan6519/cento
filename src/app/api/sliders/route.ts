@@ -13,10 +13,12 @@ export async function POST(req: Request) {
     const sliderName = (formData.get("sliderName") as string) || "My Slider"; // get slider name
     const files = formData.getAll("files[]") as File[];
     const descriptions = formData.getAll("descriptions[]") as string[];
+    const existingSlidersStr = formData.get("existingSliders") as string;
+    const existingSliders = existingSlidersStr ? JSON.parse(existingSlidersStr) : [];
 
-    if (!files || files.length === 0) {
+    if ((!files || files.length === 0) && existingSliders.length === 0) {
       return NextResponse.json(
-        { success: false, message: "No files uploaded" },
+        { success: false, message: "No images provided" },
         { status: 400 }
       );
     }
@@ -24,7 +26,7 @@ export async function POST(req: Request) {
     const uploadsDir = path.join(process.cwd(), "uploads", "sliders", userId);
     await mkdir(uploadsDir, { recursive: true });
 
-    const slidersData = [];
+    const slidersData = [...existingSliders];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const desc = descriptions[i] || "";
@@ -37,20 +39,13 @@ export async function POST(req: Request) {
       slidersData.push({ url: `/uploads/sliders/${userId}/${fileName}`, description: desc });
     }
 
-    // Find existing slider document for user
-    let sliderDoc = await Slider.findOne({ userId });
-    if (sliderDoc) {
-      sliderDoc.sliders.push(...slidersData);
-      sliderDoc.sliderName = sliderName; // update name if needed
-      await sliderDoc.save();
-    } else {
-      sliderDoc = await Slider.create({
-        userId,
-        sliderName,
-        sliders: slidersData,
-        assignedDevices: [],
-      });
-    }
+    // Always create a new slider document (group)
+    const sliderDoc = await Slider.create({
+      userId,
+      sliderName,
+      sliders: slidersData,
+      assignedDevices: [],
+    });
 
     return NextResponse.json({ success: true, data: sliderDoc });
   } catch (error) {
@@ -71,5 +66,32 @@ export async function GET() {
   } catch (error) {
     console.error("Fetch sliders error:", error);
     return NextResponse.json({ success: false, message: "Failed to fetch sliders" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    await connectToDatabase();
+    const body = await req.json();
+    const { sliderId, sliderName, sliders } = body;
+
+    if (!sliderId) {
+      return NextResponse.json({ success: false, message: "Slider ID is required" }, { status: 400 });
+    }
+
+    const updatedSlider = await Slider.findByIdAndUpdate(
+      sliderId,
+      { sliderName, sliders },
+      { new: true }
+    );
+
+    if (!updatedSlider) {
+      return NextResponse.json({ success: false, message: "Slider group not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: updatedSlider });
+  } catch (error) {
+    console.error("Update slider error:", error);
+    return NextResponse.json({ success: false, message: "Update failed" }, { status: 500 });
   }
 }

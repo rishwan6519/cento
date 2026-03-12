@@ -177,74 +177,94 @@ export default function ShowDevices({ onBack }: ShowDevicesProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={onBack}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <h2 className="text-2xl font-bold">Registered Devices</h2>
+    <div className="bg-white/50 backdrop-blur-md rounded-[2rem] p-8 min-h-full">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={onBack}
+            className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-slate-900 hover:border-slate-300 rounded-2xl transition-all shadow-sm"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Fleet Repository</h2>
+            <p className="text-slate-500 font-medium">Manage and monitor all registered devices.</p>
+          </div>
+        </div>
+        
+        <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-2">
+           <div className="px-4 py-2 bg-white rounded-xl shadow-sm text-xs font-bold text-slate-900">
+              {devices.length} Total Units
+           </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {devices.map((device) => (
           <div
             key={device._id}
-            className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6"
+            className="group relative bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-500 hover:-translate-y-2 overflow-hidden"
           >
-            <div className="relative">
-              <img
-                src={device.imageUrl || device.typeId?.imageUrl || '/placeholder-device.png'}
-                alt={device.name}
-                className="w-full h-48 object-cover rounded-lg mb-4"
-              />
-              <span
-                className={`absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-medium ${
+            {/* Background Decorative Element */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:bg-blue-50 transition-colors duration-500" />
+            
+            <div className="relative z-10">
+              <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-slate-100 mb-6 shadow-inner">
+                <img
+                  src={device.imageUrl || device.typeId?.imageUrl || '/placeholder-device.png'}
+                  alt={device.name}
+                  className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-700"
+                />
+                <div className={`absolute top-4 right-4 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg ${
                   device.status === 'active'
-                    ? 'bg-green-100 text-green-800'
+                    ? 'bg-green-500 text-white'
                     : device.status === 'maintenance'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {device.status}
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-gray-800">{device.name}</h3>
-              <p className="text-sm text-gray-600">Type: {device.typeId?.name}</p>
-              <p className="text-sm text-gray-600">
-                Serial: {device.serialNumber}
-              </p>
-              {device.color && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Color:</span>
-                  <div
-                    className="w-6 h-6 rounded-full border"
-                    style={{ backgroundColor: device.color }}
-                  />
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-slate-500 text-white'
+                }`}>
+                  {device.status}
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50 transition-colors"
-                onClick={() => openEditModal(device)}
-                title="Edit Device"
-              >
-                <Edit size={18} />
-              </button>
-              <button
-                className="p-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50 transition-colors"
-                onClick={() => handleDelete(device._id)}
-                title="Delete Device"
-              >
-                <Trash2 size={18} />
-              </button>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 group-hover:text-blue-600 transition-colors truncate">{device.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Type:</span>
+                    <span className="text-xs font-bold text-slate-600 truncate">{device.typeId?.name}</span>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                   <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Serial Number</span>
+                      <span className="text-sm font-mono font-bold text-slate-900">{device.serialNumber}</span>
+                   </div>
+                   {device.color && (
+                      <div 
+                        className="w-8 h-8 rounded-xl shadow-sm border-2 border-white ring-1 ring-slate-100" 
+                        style={{ backgroundColor: device.color }} 
+                      />
+                   )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-4">
+                  <button
+                    onClick={() => openEditModal(device)}
+                    className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-2xl font-bold text-xs hover:bg-blue-600 hover:text-white transition-all transition-colors duration-300 shadow-sm"
+                  >
+                    <Edit size={14} />
+                    Modify
+                  </button>
+                  <button
+                    onClick={() => handleDelete(device._id)}
+                    className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-400 hover:bg-red-500 hover:text-white rounded-2xl font-bold text-xs transition-all transition-colors duration-300 shadow-sm"
+                  >
+                    <Trash2 size={14} />
+                    Retire
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         ))}

@@ -126,9 +126,14 @@ const ConnectAnnouncement: React.FC<ConnectAnnouncementProps> = ({
       toast.error("Please select an announcement playlist to connect.");
       return;
     }
-    setIsLoading(true);
     try {
       const alreadyConnectedIds = connectedAnnouncements[selectedDevice.deviceId._id] || [];
+      if (alreadyConnectedIds.length > 0) {
+        const userConfirmed = window.confirm("Warning: A user has already set an announcement for this device. Are you sure you want to assign a new one, which might conflict with their slot?");
+        if (!userConfirmed) return;
+      }
+
+      setIsLoading(true);
       const combinedIds = [...new Set([...alreadyConnectedIds, ...selectedAnnouncements])];
 
       const response = await fetch("/api/announcement/device-announcement", {

@@ -16,7 +16,7 @@ export interface ISlider extends Document {
 
 const SliderSchema = new Schema<ISlider>(
   {
-    userId: { type: String, required: true, unique: true },
+    userId: { type: String, required: true },
     sliderName: { type: String, required: true, default: "My Slider" }, // default name
     sliders: [
       {

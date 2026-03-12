@@ -46,6 +46,7 @@ export default function RobotAdminDashboard() {
   const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>([]);
   const [activeSection, setActiveSection] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [usersCount, setUsersCount] = useState<number>(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -61,9 +62,32 @@ export default function RobotAdminDashboard() {
   }, [router]);
 
   useEffect(() => {
-    fetchDeviceTypes();
-    fetchDevices();
-  }, []);
+    if (!activeSection) {
+      fetchDeviceTypes();
+      fetchDevices();
+      fetchUsersCount();
+    }
+  }, [activeSection]);
+
+  const fetchUsersCount = async () => {
+    try {
+      const controllerId = localStorage.getItem("userId");
+      const url = controllerId 
+        ? `/api/user?controllerId=${controllerId}`
+        : `/api/user`;
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch users");
+      const data = await response.json();
+      if (data.success) {
+        // Filter for superUsers only
+        const count = data.data.filter((u: any) => u.role === 'superUser').length;
+        setUsersCount(count);
+      }
+    } catch (error) {
+      console.error("Error fetching users count:", error);
+    }
+  };
 
   const fetchDevices = async () => {
     try {
@@ -94,6 +118,17 @@ export default function RobotAdminDashboard() {
   };
 
   const sidebarItems = [
+    {
+      category: "Navigation",
+      items: [
+        {
+          id: "",
+          label: "Dashboard",
+          icon: <LayoutDashboard size={20} className="text-cyan-400" />,
+          description: "System overview and statistics",
+        },
+      ],
+    },
     {
       category: "Device Management",
       items: [
@@ -135,203 +170,262 @@ export default function RobotAdminDashboard() {
     },
   ];
 
-  return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-white shadow-sm p-4">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            {isSidebarOpen ? (
-              <XCircle size={24} className="text-gray-600" />
-            ) : (
-              <Menu size={24} className="text-gray-600" />
-            )}
-          </button>
-          <h1 className="text-lg font-semibold text-gray-800">Centor Admin</h1>
-        </div>
-      </div>
+  const handleLogout = () => {
+    localStorage.clear();
+    router.push("/admin/login");
+  };
 
-      {/* Enhanced Sidebar */}
-      <div
-        className={`${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 fixed md:relative z-20 w-72 h-full bg-white shadow-xl transition-transform duration-300 ease-in-out`}
-      >
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <LayoutDashboard className="text-blue-600 h-8 w-8" />
-            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Centor Admin
-            </h1>
+  return (
+    <div className="flex h-screen bg-[#F1F5F9] text-slate-900 font-sans overflow-hidden">
+      <Toaster position="top-right" />
+      
+      {/* Sidebar - Desktop */}
+      <aside className={`
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        md:translate-x-0 fixed md:relative z-40 w-72 h-full bg-[#07323C] text-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col
+      `}>
+        <div className="p-8 border-b border-teal-800 flex items-center gap-4">
+          <div className="bg-gradient-to-br from-cyan-400 to-blue-500 p-2 rounded-xl shadow-lg shadow-cyan-500/20">
+            <LayoutDashboard size={28} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight">Multimedia Platform Admin</h1>
+            <p className="text-[10px] text-teal-400 font-bold uppercase tracking-[0.2em]">Operational Console</p>
           </div>
         </div>
 
-        <nav className="p-4 space-y-6">
+        <nav className="flex-1 px-4 py-8 overflow-y-auto space-y-8">
           {sidebarItems.map((category) => (
-            <div key={category.category} className="space-y-2">
-              <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <div key={category.category} className="space-y-3">
+              <h3 className="px-4 text-[10px] font-bold text-teal-500 uppercase tracking-[0.15em]">
                 {category.category}
               </h3>
-              {category.items.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveSection(item.id);
-                    setIsSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                    activeSection === item.id
-                      ? "bg-blue-50 text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {item.icon}
-                  <div className="text-left">
-                    <span className="block text-sm font-medium">
-                      {item.label}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {item.description}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              <div className="space-y-1">
+                {category.items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveSection(item.id);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`
+                      w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-300 group
+                      ${activeSection === item.id
+                        ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
+                        : "text-teal-100/60 hover:bg-[#041C22] hover:text-white"
+                      }
+                    `}
+                  >
+                    <div className={`p-2 rounded-lg transition-colors ${
+                      activeSection === item.id ? "bg-white/20" : "bg-teal-900/50 group-hover:bg-teal-800"
+                    }`}>
+                      {item.icon}
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-sm font-semibold tracking-wide">
+                        {item.label}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           ))}
         </nav>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 w-full md:w-auto p-4 md:p-8 pt-20 md:pt-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Enhanced Dashboard Overview */}
-          {!activeSection && (
-            <div className="space-y-8">
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                  Dashboard Overview
-                </h2>
-                <p className="text-gray-600">
-                  Welcome to your device management control center
-                </p>
-              </div>
+        <div className="p-6 border-t border-teal-800">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-300 font-bold text-sm"
+          >
+            <XCircle size={18} />
+            Sign Out
+          </button>
+        </div>
+      </aside>
 
-              {/* Enhanced Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-all duration-200 transform hover:-translate-y-1">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <Database size={24} className="text-blue-500" />
-                    </div>
-                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                      Devices
-                    </span>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        {/* Header */}
+        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
+          <div className="flex items-center gap-4 lg:hidden">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+            >
+              <Menu size={24} />
+            </button>
+            <h1 className="font-bold text-lg">Centor Admin</h1>
+          </div>
+          
+          <div className="hidden lg:block">
+            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+              {activeSection ? activeSection.replace(/([A-Z])/g, ' $1').trim() : "Dashboard Overview"}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-4">
+             <div className="flex flex-col items-end mr-4">
+                <span className="text-sm font-bold text-slate-900">System Admin</span>
+                <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full uppercase">Master Mode</span>
+             </div>
+             <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden text-slate-400 flex items-center justify-center font-bold">
+                A
+             </div>
+          </div>
+        </header>
+
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-y-auto p-8 bg-[#F8FAFC]">
+          <div className="max-w-7xl mx-auto">
+            {!activeSection ? (
+              <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">
+                       Admin Dashboard
+                    </h1>
+                    <p className="text-slate-500 font-medium text-lg">
+                      Real-time insights and system control at your fingertips.
+                    </p>
                   </div>
-                  <h3 className="text-3xl font-bold text-gray-800 mb-1">
-                    {devices.length}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    Total Registered Devices
-                  </p>
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <button
-                      onClick={() => setActiveSection("showDevices")}
-                      className="text-sm text-blue-600 hover:text-blue-700"
-                    >
-                      {" "}
-                      View all devices →
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Activity Section */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Recent Activity
-                  </h3>
-                  <button
-                    onClick={() => setActiveSection("showDevices")}
-                    className="text-sm text-blue-600 hover:text-blue-700"
+                  <button 
+                    onClick={() => setActiveSection("addDevice")}
+                    className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-slate-900/20"
                   >
-                    View All
+                    <PlusCircle size={20} />
+                    Register New Device
                   </button>
                 </div>
-                <div className="space-y-4">
-                  {devices.slice(0, 3).map((device) => (
-                    <div
-                      key={device._id}
-                      className="flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">
-                        <img
-                          src={device.imageUrl || "/placeholder-image.jpg"}
-                          alt={device.name}
-                          className="w-8 h-8 rounded object-cover"
-                        />
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500" />
+                    <div className="relative z-10">
+                      <div className="w-14 h-14 bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-6">
+                        <Database size={28} />
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-800">
-                          {device.name}
-                        </h4>
-                        <p className="text-sm text-gray-500">
-                          {
-                            deviceTypes.find(
-                              (type) => type.id === device.typeId
-                            )?.name
-                          }
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50 transition-colors">
-                          <Edit size={16} />
-                        </button>
-                        <button className="p-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50 transition-colors">
-                          <Trash2 size={16} />
-                        </button>
+                      <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-1">Total Devices</p>
+                      <h3 className="text-4xl font-black text-slate-900">{devices.length}</h3>
+                      <div className="mt-6 flex items-center gap-2 text-blue-600 font-bold text-sm cursor-pointer hover:underline" onClick={() => setActiveSection("showDevices")}>
+                        Analyze fleet →
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-500" />
+                    <div className="relative z-10">
+                      <div className="w-14 h-14 bg-indigo-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 mb-6">
+                        <Users size={28} />
+                      </div>
+                      <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-1">Active Users</p>
+                      <h3 className="text-4xl font-black text-slate-900">{usersCount}</h3>
+                      <div className="mt-6 flex items-center gap-2 text-indigo-600 font-bold text-sm cursor-pointer hover:underline" onClick={() => setActiveSection("users")}>
+                        Manage accounts →
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main View Split */}
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                    <h3 className="text-xl font-black text-slate-900">Fleet Overview</h3>
+                    <button 
+                      onClick={() => setActiveSection("showDevices")} 
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all font-bold text-xs"
+                    >
+                      <span>View More</span>
+                      <Database size={16} />
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    {devices.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {devices.slice(0, 4).map((device) => (
+                           <div key={device._id} className="flex items-center gap-5 p-5 rounded-3xl bg-slate-50/50 hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-slate-100 group">
+                              <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center p-2 group-hover:scale-110 transition-transform">
+                                 <img src={device.imageUrl || "/placeholder.jpg"} className="w-full h-full object-contain" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-slate-900 truncate">{device.name}</h4>
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1">{device.serialNumber || "No Serial"}</p>
+                              </div>
+                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <button 
+                                    onClick={() => setActiveSection("showDevices")}
+                                    className="p-2.5 bg-white text-slate-400 hover:text-blue-500 hover:shadow-sm rounded-xl border border-slate-100"
+                                 >
+                                    <Edit size={16} />
+                                 </button>
+                                 <button className="p-2.5 bg-white text-slate-400 hover:text-red-500 hover:shadow-sm rounded-xl border border-slate-100">
+                                    <Trash2 size={16} />
+                                 </button>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                    ) : (
+                      <div className="py-20 flex flex-col items-center text-center">
+                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6 text-slate-300">
+                            <Database size={40} />
+                         </div>
+                         <h4 className="font-bold text-slate-900 text-xl">No devices connected</h4>
+                         <p className="text-slate-400 mt-2 max-w-xs">Start by registering your first device in the system.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full">
+                <button 
+                  onClick={() => setActiveSection("")}
+                  className="mb-8 flex items-center gap-2 text-slate-400 hover:text-slate-900 font-bold transition-colors"
+                >
+                  <LayoutDashboard size={20} />
+                  Back to Dashboard
+                </button>
+                
+                <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden h-full min-h-[600px]">
+                   {activeSection === "addDeviceType" && (
+                    <AddDeviceType
+                      activeSection={activeSection}
+                      onCancel={() => setActiveSection("")}
+                      onSuccess={(newType) => {
+                        setDeviceTypes((prev) => [...prev, newType]);
+                        setActiveSection("");
+                        fetchDeviceTypes();
+                      }}
+                    />
+                  )}
 
-          {activeSection === "addDeviceType" && (
-            <AddDeviceType
-              activeSection={activeSection}
-              onCancel={() => setActiveSection("")}
-              onSuccess={(newType) => {
-                setDeviceTypes((prev) => [...prev, newType]);
-                setActiveSection("");
-              }}
-            />
-          )}
+                  {activeSection === "addDevice" && (
+                    <AddDevice
+                      activeSection={activeSection}
+                      deviceTypes={deviceTypes}
+                      onCancel={() => setActiveSection("")}
+                      onSuccess={() => {
+                        fetchDevices();
+                        setActiveSection("");
+                      }}
+                    />
+                  )}
 
-          {activeSection === "addDevice" && (
-            <AddDevice
-              activeSection={activeSection}
-              deviceTypes={deviceTypes}
-              onCancel={() => setActiveSection("")}
-              onSuccess={() => {
-                fetchDevices();
-                setActiveSection("");
-              }}
-            />
-          )}
+                  {activeSection === "showDevices" && (
+                    <ShowDevices onBack={() => setActiveSection("")} />
+                  )}
 
-          {activeSection === "showDevices" && (
-            <ShowDevices onBack={() => setActiveSection("")} />
-          )}
+                  {activeSection === "users" && <UserManagement />}
 
-          {activeSection === "users" && <UserManagement />}
-
-          {activeSection === "gptAi" && <GptAiComponent />}
-        </div>
+                  {activeSection === "gptAi" && <GptAiComponent />}
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );

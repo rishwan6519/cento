@@ -22,7 +22,7 @@ export default function UserManagement() {
   const [formData, setFormData] = useState<UserFormData>({
     username: '',
     password: '',
-    role: 'User'
+    role: 'superUser'
   });
 
   useEffect(() => {
@@ -41,7 +41,9 @@ export default function UserManagement() {
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
       if (data.success) {
-        setUsers(data.data);
+        // Only show superUsers in the list
+        const filteredUsers = data.data.filter((u: User) => u.role === 'superUser');
+        setUsers(filteredUsers);
       }
     } catch (error) {
       toast.error('Failed to fetch users');
@@ -69,7 +71,7 @@ export default function UserManagement() {
         toast.success('User created successfully');
         fetchUsers();
         setIsAddingUser(false);
-        setFormData({ username: '', password: '', role: 'User' });
+        setFormData({ username: '', password: '', role: 'superUser' });
       } else {
         throw new Error(data.message);
       }
@@ -91,7 +93,7 @@ export default function UserManagement() {
         toast.success('User updated successfully');
         fetchUsers();
         setEditingUser(null);
-        setFormData({ username: '', password: '', role: 'User' });
+        setFormData({ username: '', password: '', role: 'superUser' });
       } else {
         throw new Error(data.message);
       }
@@ -122,144 +124,168 @@ export default function UserManagement() {
 
   // Add the component to your page
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">User Management</h2>
+    <div className="bg-white/50 backdrop-blur-md rounded-[2rem] p-8 min-h-full">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Identity Access</h2>
+          <p className="text-slate-500 font-medium">Control operational permissions and system roles.</p>
+        </div>
         <button
           onClick={() => setIsAddingUser(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          className="flex items-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-slate-900/20"
         >
           <UserPlus size={20} />
-          Add User
+          Onboard User
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {users.map((user) => (
-              <tr key={user._id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {editingUser === user._id ? (
-                    <input
-                      type="text"
-                      value={formData.username}
-                      onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                      className="border rounded px-2 py-1"
-                    />
-                  ) : (
-                    <div className="text-sm text-gray-900">{user.username}</div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{user.role}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <div className="flex gap-2">
-                    {editingUser === user._id ? (
-                      <>
-                        <button
-                          onClick={() => handleUpdate(user._id)}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingUser(null);
-                            setFormData({ username: '', password: '', role: 'User' });
-                          }}
-                          className="text-gray-600 hover:text-gray-900"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => {
-                            setEditingUser(user._id);
-                            setFormData({ username: user.username, password: '', role: user.role });
-                          }}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(user._id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-50">
+            <thead className="bg-[#07323C] text-white">
+              <tr>
+                <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Username</th>
+                <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Access Role</th>
+                <th className="px-8 py-5 text-right text-[10px] font-bold uppercase tracking-[0.2em]">Operations</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {users.map((user) => (
+                <tr key={user._id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-8 py-6 whitespace-nowrap">
+                    {editingUser === user._id ? (
+                      <input
+                        type="text"
+                        value={formData.username}
+                        onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                        className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-900 focus:border-blue-500 outline-none"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400">
+                          {user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="text-sm font-bold text-slate-900">{user.username}</div>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-8 py-6 whitespace-nowrap">
+                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      user.role === 'superUser' 
+                        ? 'bg-blue-100 text-blue-600' 
+                        : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 whitespace-nowrap text-right">
+                    <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {editingUser === user._id ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleUpdate(user._id)}
+                            className="px-4 py-2 bg-green-500 text-white rounded-xl font-bold text-xs"
+                          >
+                            Commit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingUser(null);
+                              setFormData({ username: '', password: '', role: 'superUser' });
+                            }}
+                            className="px-4 py-2 bg-slate-100 text-slate-400 rounded-xl font-bold text-xs"
+                          >
+                            Abort
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              setEditingUser(user._id);
+                              setFormData({ username: user.username, password: '', role: user.role });
+                            }}
+                            className="p-2.5 bg-white text-slate-400 hover:text-blue-500 hover:shadow-sm rounded-xl border border-slate-100 transition-all"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(user._id)}
+                            className="p-2.5 bg-white text-slate-400 hover:text-red-500 hover:shadow-sm rounded-xl border border-slate-100 transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {isAddingUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-black">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-semibold mb-4">Add New User</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-lg shadow-2xl animate-in fade-in zoom-in duration-300">
+            <div className="mb-8 text-center">
+               <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                  <UserPlus size={40} />
+               </div>
+               <h3 className="text-2xl font-black text-slate-900">Provision Account</h3>
+               <p className="text-slate-500 font-medium">Create a new organizational identity.</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Username</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Username Identity</label>
                 <input
                   type="text"
                   value={formData.username}
                   onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all"
+                  placeholder="e.g. system_operator"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Security Key</label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all"
+                  placeholder="••••••••"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Role</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Operational Rank</label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all appearance-none"
                 >
-                  <option value="user">User</option>
-                  <option value="superUser">Super User</option>
+                   <option value="superUser">Super User</option>
                 </select>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col gap-4 pt-4">
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-extrabold shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-95"
+                >
+                  Confirm Provisioning
+                </button>
                 <button
                   type="button"
                   onClick={() => {
                     setIsAddingUser(false);
-                    setFormData({ username: '', password: '', role: 'User' });
+                    setFormData({ username: '', password: '', role: 'superUser' });
                   }}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                  className="w-full py-2 text-slate-400 font-bold hover:text-slate-900 transition-colors"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Add User
                 </button>
               </div>
             </form>
