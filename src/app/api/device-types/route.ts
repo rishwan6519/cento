@@ -2,33 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { DeviceType } from '@/models/DeviceTypes';
 import { blob } from 'stream/consumers';
+import { writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 
 export async function POST(request: Request) {
   try {
     await connectToDatabase();
     const data = await request.json();
+    
+    console.log('[API/DeviceTypes] Creating Device Type with data:', JSON.stringify(data, null, 2));
+
+    if (!data.name || !data.imageUrl) {
+      console.error('[API/DeviceTypes] Validation Error: Name and Image URL are required');
+      return NextResponse.json(
+        { error: 'Name and Image URL are required' },
+        { status: 400 }
+      );
+    }
 
     const deviceType = await DeviceType.create({
       name: data.name,
       imageUrl: data.imageUrl,
-      handMovements: data.handMovements,
-      bodyMovements: data.bodyMovements,
+      handMovements: data.handMovements || [],
+      bodyMovements: data.bodyMovements || [],
       screenSize: {
-        width: data.screenSize.width,
-        height: data.screenSize.height
+        width: data.screenSize?.width || 0,
+        height: data.screenSize?.height || 0
       },
-      blockCodingEnabled: data.blockCodingEnabled,
+      blockCodingEnabled: !!data.blockCodingEnabled,
     });
-    console.log(deviceType)
+    
+    console.log('[API/DeviceTypes] Successfully created model:', deviceType._id);
 
     return NextResponse.json({
       success: true,
-      deviceType
+      deviceType: {
+        id: deviceType._id.toString(),
+        ...deviceType.toObject()
+      }
     });
-  } catch (error) {
-    console.error('Error creating device type:', error);
+  } catch (error: any) {
+    console.error('[API/DeviceTypes] Creation error:', error);
     return NextResponse.json(
-      { error: 'Failed to create device type' },
+      { error: 'Failed to create device type', details: error.message },
       { status: 500 }
     );
   }
@@ -39,6 +56,8 @@ export async function PUT(request: Request) {
     await connectToDatabase();
     const data = await request.json();
 
+    console.log(`[API/DeviceTypes] Updating ID: ${data.id} with data:`, JSON.stringify(data, null, 2));
+
     const updatedDeviceType = await DeviceType.findByIdAndUpdate(
       data.id,
       {
@@ -47,8 +66,8 @@ export async function PUT(request: Request) {
         handMovements: data.handMovements,
         bodyMovements: data.bodyMovements,
         screenSize: {
-          width: data.screenSize.width,
-          height: data.screenSize.height
+          width: data.screenSize?.width,
+          height: data.screenSize?.height
         },
         blockCodingEnabled: data.blockCodingEnabled,
       },
@@ -56,20 +75,23 @@ export async function PUT(request: Request) {
     );
 
     if (!updatedDeviceType) {
+      console.warn(`[API/DeviceTypes] Model not found for update: ${data.id}`);
       return NextResponse.json(
         { error: 'Device type not found' },
         { status: 404 }
       );
     }
 
+    console.log(`[API/DeviceTypes] Successfully updated model: ${data.id}`);
+
     return NextResponse.json({
       success: true,
       deviceType: updatedDeviceType
     });
-  } catch (error) {
-    console.error('Error updating device type:', error);
+  } catch (error: any) {
+    console.error('[API/DeviceTypes] Update error:', error);
     return NextResponse.json(
-      { error: 'Failed to update device type' },
+      { error: 'Failed to update device type', details: error.message },
       { status: 500 }
     );
   }

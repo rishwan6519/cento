@@ -3,7 +3,8 @@ import { connectToDatabase } from "@/lib/db";
 import PlaylistConfig from "@/models/PlaylistConfig";
 import DevicePlaylist from "@/models/ConectPlaylist";
 
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
+import { existsSync } from "fs";
 import path from "path";
 import Mongoose from "mongoose";
 
@@ -124,13 +125,17 @@ export async function PUT(req: NextRequest) {
         const bgImageFile = formData.get(`bgImage-${i}`);
         if (bgImageFile && bgImageFile instanceof File) {
           const fileName = `bg-${Date.now()}-${bgImageFile.name}`;
-          const filePath = path.join(
+          const uploadsDir = path.join(
             process.cwd(),
-            "public",
             "uploads",
-            "backgrounds",
-            fileName
+            "backgrounds"
           );
+
+          if (!existsSync(uploadsDir)) {
+            await mkdir(uploadsDir, { recursive: true });
+          }
+
+          const filePath = path.join(uploadsDir, fileName);
 
           const bytes = await bgImageFile.arrayBuffer();
           const buffer = Buffer.from(bytes);

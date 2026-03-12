@@ -87,7 +87,8 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to ${initialData ? "update" : "add"} device type`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.details || `Failed to ${initialData ? "update" : "add"} device type`);
       }
       
       const result = await response.json();
@@ -98,9 +99,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
       
       // Notify parent of success
       onSuccess(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error ${initialData ? "updating" : "adding"} device type:`, error);
-      toast.error(`Failed to ${initialData ? "update" : "add"} device type!`);
+      toast.error(error.message || `Failed to ${initialData ? "update" : "add"} device type!`);
     } finally {
       setIsLoading(false);
     }
