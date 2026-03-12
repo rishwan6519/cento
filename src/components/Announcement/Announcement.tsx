@@ -979,12 +979,17 @@ export default function PlaylistSetup() {
           isConnected ? "bg-gradient-to-tr from-blue-200 to-blue-100" : "bg-gray-100"}`}
       >
         {/* Device Image */}
-        <div className="relative h-44 w-full overflow-hidden rounded-t-xl">
+        <div className="relative h-44 w-full overflow-hidden rounded-t-xl bg-gray-800 flex items-center justify-center">
           <img
-            src={device.deviceId.imageUrl ?? "/default-device-image.png"}
+            src={(() => {
+              const n = (device.deviceId.name || "").toLowerCase();
+              if (n.includes("tv")) return "/assets/video.svg";
+              if (n.includes("audio")) return "/assets/audio.svg";
+              return device.deviceId.imageUrl || "/default-device-image.png";
+            })()}
             alt={device.deviceId.name}
             loading="lazy"
-            className="w-full h-full object-cover"
+            className="h-16 w-16 object-contain rounded-full"
           />
           {/* Status Icon */}
           <div className="absolute top-3 right-3">

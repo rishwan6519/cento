@@ -652,17 +652,16 @@ export default function AssignDevice() {
                   >
                     {/* Image */}
                     <div className="w-full h-36 mb-4 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {device.deviceId.imageUrl ? (
-                        <Image
-                          src={device.deviceId.imageUrl}
-                          alt={device.deviceId.name}
-                          width={256}
-                          height={144}
-                          className="object-cover w-full h-full"
-                        />
-                      ) : (
-                        <MonitorSmartphone className="text-gray-400 w-10 h-10" />
-                      )}
+                      {(() => {
+                        const n = (device.deviceId.name || "").toLowerCase();
+                        if (n.includes("tv")) return <img src="/assets/video.svg" alt={device.deviceId.name} className="h-16 w-16 object-contain rounded-full" />;
+                        if (n.includes("audio")) return <img src="/assets/audio.svg" alt={device.deviceId.name} className="h-16 w-16 object-contain rounded-full" />;
+                        return device.deviceId.imageUrl ? (
+                          <Image src={device.deviceId.imageUrl} alt={device.deviceId.name} width={256} height={144} className="object-contain w-full h-full rounded-full" />
+                        ) : (
+                          <MonitorSmartphone className="text-gray-400 w-10 h-10" />
+                        );
+                      })()}
                     </div>
           
                     {/* Device Info */}
@@ -687,17 +686,16 @@ export default function AssignDevice() {
                   >
                     {/* Image */}
                     <div className="w-full h-36 mb-4 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {device.deviceId.imageUrl ? (
-                        <Image
-                          src={device.deviceId.imageUrl}
-                          alt={device.deviceId.name}
-                          width={256}
-                          height={144}
-                          className="object-cover w-full h-full"
-                        />
-                      ) : (
-                        <MonitorSmartphone className="text-gray-400 w-10 h-10" />
-                      )}
+                      {(() => {
+                        const n = (device.deviceId.name || "").toLowerCase();
+                        if (n.includes("tv")) return <img src="/assets/video.svg" alt={device.deviceId.name} className="h-16 w-16 object-contain rounded-full" />;
+                        if (n.includes("audio")) return <img src="/assets/audio.svg" alt={device.deviceId.name} className="h-16 w-16 object-contain rounded-full" />;
+                        return device.deviceId.imageUrl ? (
+                          <Image src={device.deviceId.imageUrl} alt={device.deviceId.name} width={256} height={144} className="object-contain w-full h-full rounded-full" />
+                        ) : (
+                          <MonitorSmartphone className="text-gray-400 w-10 h-10" />
+                        );
+                      })()}
                     </div>
           
                     {/* Device Info */}
