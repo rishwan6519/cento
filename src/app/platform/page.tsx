@@ -57,12 +57,14 @@ import SliderManager from "@/components/showSlider/showSlider";
 import AssignSlider from "@/components/AssignSlider/AssignSlider";
 import StoreManagement from "@/components/StoreManagement/StoreManagement";
 import AccountSettings from "@/components/AccountSettings/AccountSettings";
+import ViewGroups from "@/components/ViewGroups/ViewGroups";
 
 // Types
 import { 
   Device, 
   Playlist, 
   MenuKey, 
+  MenuItem,
   DeviceFormData, 
   DeviceReference 
 } from "@/components/Platform/types";
@@ -144,7 +146,7 @@ export default function RoboticPlatform(): React.ReactElement {
       try {
         const userId = localStorage.getItem("userId");
         if (userId) {
-// Fetch ALL global playlists mapped to devices (don't limit by userId since we are on the superUser platform)
+          // Fetch ALL global playlists mapped to devices (don't limit by userId since we are on the superUser platform)
           const response = await fetch(`/api/device-playlists`);
           if (response.ok) {
             const data = await response.json();
@@ -158,6 +160,11 @@ export default function RoboticPlatform(): React.ReactElement {
 
     fetchDevices();
     fetchPlaylists();
+
+    (window as any).refreshPlatformData = () => {
+      fetchDevices();
+      fetchPlaylists();
+    };
   }, []);
 
   // --- Derived Data ---
@@ -286,58 +293,52 @@ export default function RoboticPlatform(): React.ReactElement {
   };
 
   // --- Sidebar Navigation Structure (Grouped) ---
-  const menuSections = [
+  const menuSections: { title: string; items: MenuItem[] }[] = [
     {
       title: "General",
       items: [
-        { key: "storeManagement" as MenuKey, label: "Stores", icon: <FaStore /> },
-        { key: "dashboard" as MenuKey, label: "All Devices", icon: <RiDashboardLine /> },
-        { key: "accountSettings" as MenuKey, label: "Account Settings", icon: <IoMdSettings /> },
+        { key: "storeManagement", label: "Stores", icon: <FaStore /> },
+        { key: "dashboard", label: "All Devices", icon: <RiDashboardLine /> },
+        { key: "accountSettings", label: "Account Settings", icon: <IoMdSettings /> },
       ],
     },
     {
-      title: "Device Management",
+      title: "Devices",
       items: [
-        { key: "onboardDevice" as MenuKey, label: "Onboard Devices", icon: <FaMobileAlt /> },
-        { key: "assignDevice" as MenuKey, label: "Assign Device", icon: <FaRobot /> },
-        { key: "assignApi" as MenuKey, label: "Assign via API", icon: <IoMdSettings /> },
-        { key: "assignSlider" as MenuKey, label: "Assign Slider", icon: <FaRegFileImage /> },
-        {
-          key: "ManageDevice" as MenuKey,
-          label: "Manage Devices",
-          icon: <FaMobileAlt />,
-          subItems: [
-            { key: "connectedPlaylists" as MenuKey, label: "Connected Playlists", icon: <BsMusicNoteList /> },
-          ],
-        },
+        { key: "onboardDevice", label: "Add New Device", icon: <FaMobileAlt /> },
+        { key: "assignDevice", label: "Connect Device", icon: <FaRobot /> },
+        { key: "assignApi", label: "API Key", icon: <IoMdSettings /> },
+        { key: "assignSlider", label: "Connect Slider", icon: <FaRegFileImage /> },
+
       ],
     },
     {
-      title: "Media Management",
+      title: "Media",
       items: [
-        { key: "createMedia" as MenuKey, label: "Create Media", icon: <FaRegFileAudio /> },
-        { key: "showMedia" as MenuKey, label: "Show Media", icon: <FaRegFileAudio /> },
-        { key: "createSlider" as MenuKey, label: "Create Slider", icon: <FaRegFileImage /> },
-        { key: "showSlider" as MenuKey, label: "Show Slider", icon: <FaRegFileImage /> },
-        { key: "setupPlaylist" as MenuKey, label: "Setup Playlist", icon: <FaListAlt /> },
-        { key: "showPlaylist" as MenuKey, label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-        { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
+        { key: "createMedia", label: "Upload Media", icon: <FaRegFileAudio /> },
+        { key: "showMedia", label: "All Media", icon: <FaRegFileAudio /> },
+        { key: "createSlider", label: "Create Slider", icon: <FaRegFileImage /> },
+        { key: "showSlider", label: "Show Slider", icon: <FaRegFileImage /> },
+        { key: "setupPlaylist", label: "Create Playlist", icon: <FaListAlt /> },
+        { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
+        { key: "viewGroups", label: "Quick Playlist", icon: <RiDashboardLine /> },
+        { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
       ],
     },
     {
-      title: "Announcements",
+      title: "Broadcasting",
       items: [
-        { key: "createAnnouncement" as MenuKey, label: "Create New", icon: <IoMdSettings /> },
-        { key: "setupAnnouncement" as MenuKey, label: "Setup Builder", icon: <IoMdSettings /> },
-        { key: "showAnnouncement" as MenuKey, label: "Show All", icon: <IoMdSettings /> },
-        { key: "instantAnnouncement" as MenuKey, label: "Instant Send", icon: <IoMdSettings /> },
+        { key: "createAnnouncement", label: "Create Announcement", icon: <IoMdSettings /> },
+        { key: "setupAnnouncement", label: "Connect Announcements", icon: <IoMdSettings /> },
+        { key: "showAnnouncement", label: "View All", icon: <IoMdSettings /> },
+        { key: "instantAnnouncement", label: "Quick Send", icon: <IoMdSettings /> },
       ]
     },
     {
       title: "Store Management",
       items: [
-        { key: "createUser" as MenuKey, label: "Create Store", icon: <FaStore /> },
-        { key: "showUser" as MenuKey, label: "Show Stores", icon: <FaStore /> },
+        { key: "createUser", label: "Create Store", icon: <FaStore /> },
+        { key: "showUser", label: "Show Stores", icon: <FaStore /> },
       ],
     },
   ];
@@ -421,7 +422,14 @@ export default function RoboticPlatform(): React.ReactElement {
       case "instantAnnouncement":
         return <InstantaneousAnnouncement onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("dashboard")} />;
       case "assignDevice":
-        return <AssignDevice />;
+        return (
+          <AssignDevice 
+            onSuccess={() => {
+              if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
+              setSelectedMenu("dashboard");
+            }} 
+          />
+        );
       case "assignApi":
         return <AssignApiKey />;
       case "showUser":
@@ -452,13 +460,22 @@ export default function RoboticPlatform(): React.ReactElement {
           />
         );
       case "assignSlider":
-        return <AssignSlider />;
+        return (
+          <AssignSlider 
+            onSuccess={() => {
+              if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
+              setSelectedMenu("dashboard");
+            }} 
+          />
+        );
       case "createMedia":
         return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showMedia")} />;
       case "showMedia":
         return <ShowMedia />;
       case "connectPlaylist":
         return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
+      case "viewGroups":
+        return <ViewGroups />;
       case "createUser":
         return <CreateUser />;
       case "accountSettings":
@@ -559,7 +576,7 @@ export default function RoboticPlatform(): React.ReactElement {
             <div className="px-4 mt-6">
                <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs text-slate-400 font-medium">Live Nodes</span>
+                    <span className="text-xs text-slate-400 font-medium">Active Devices</span>
                     <span className="text-xs text-indigo-400 font-bold">
                       {devices.filter(d => d.status === "Connected").length}/{devices.length}
                     </span>

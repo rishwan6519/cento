@@ -429,7 +429,9 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
       if (data.success) {
         toast.success("Device assigned to store!");
         setShowOnboardModal(false);
-        fetchConnectedDevices(selectedUser._id);
+        // Refresh global data and navigate to All Devices section
+        if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
+        onNavigate("dashboard");
       } else {
         throw new Error(data.message || "Assignment failed");
       }

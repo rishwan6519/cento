@@ -401,7 +401,7 @@ const menuSections: MenuItem[] = [
         items: [
           { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
           { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-          { key: "viewGroups", label: "Quick PLaylist", icon: <FaThLarge /> },
+          { key: "viewGroups", label: "Quick Playlist", icon: <FaThLarge /> },
           { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
         ],
       },

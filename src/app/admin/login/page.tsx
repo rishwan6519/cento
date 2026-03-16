@@ -46,7 +46,7 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-6">🤖 Robot Admin Login</h1>
+        <h1 className="text-2xl font-bold text-center mb-6">Admin Login</h1>
         
         <form onSubmit={handleLogin} className="space-y-6">
           <div>

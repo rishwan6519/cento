@@ -18,18 +18,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if this slider is already assigned to this device
+    // Check if any slider is already assigned to this device
     const existingAssignment = await AssignedSlider.findOne({
-      userId:  mongoose.Types.ObjectId.createFromHexString(userId),
-      deviceId:  mongoose.Types.ObjectId.createFromHexString(deviceId),
-      sliderId:  mongoose.Types.ObjectId.createFromHexString(sliderId),
+      deviceId: mongoose.Types.ObjectId.createFromHexString(deviceId),
       status: 'active'
     });
 
     if (existingAssignment) {
       return NextResponse.json({
         success: false,
-        message: 'This slider is already assigned to the device'
+        message: 'A slider is already connected to this device. Please disconnect it first.'
       }, { status: 400 });
     }
 

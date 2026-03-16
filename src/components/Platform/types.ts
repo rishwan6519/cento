@@ -30,6 +30,7 @@ export type MenuKey =
   |"storeManagement"
   |"ManageDevice"
   | "accountSettings"
+  | "viewGroups"
 
 export interface Device {
   _id: string;

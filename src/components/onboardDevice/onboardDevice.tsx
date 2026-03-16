@@ -516,10 +516,10 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onSuccess }) => {
               </div>
               <div className="p-8 text-center">
                 <h2 className="text-2xl font-semibold mb-4 text-gray-800">
-                  Get Started with Your Robotic Platform
+                  Get Started with Your Platform
                 </h2>
                 <p className="text-gray-600 mb-8 leading-relaxed">
-                  Let's begin by onboarding your device. This quick process will
+                  Let's begin by adding your device. This quick process will
                   connect your device to our platform.
                 </p>
                 <motion.button
@@ -528,7 +528,7 @@ const OnboardingPage: React.FC<OnboardingPageProps> = ({ onSuccess }) => {
                   onClick={handleStart}
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium px-8 py-4 rounded-xl transition-all duration-200 flex items-center justify-center mx-auto shadow-lg"
                 >
-                  Onboard Device
+                  Add Device
                   <FaArrowRight className="ml-2" />
                 </motion.button>
               </div>
