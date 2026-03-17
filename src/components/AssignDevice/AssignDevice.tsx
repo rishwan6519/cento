@@ -45,9 +45,10 @@ interface ConnectedDevice {
 
 interface AssignDeviceProps {
   onSuccess?: () => void;
+  defaultAction?: 'assign' | 'disconnect';
 }
 
-export default function AssignDevice({ onSuccess }: AssignDeviceProps) {
+export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: AssignDeviceProps) {
   const [step, setStep] = useState(1);
   const [users, setUsers] = useState<User[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -57,7 +58,7 @@ export default function AssignDevice({ onSuccess }: AssignDeviceProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
-  const [actionType, setActionType] = useState<'assign' | 'disconnect'>('assign');
+  const [actionType, setActionType] = useState<'assign' | 'disconnect'>(defaultAction);
   const [searchTerm, setSearchTerm] = useState('');
 
   const superUserId = typeof window !== "undefined" ? localStorage.getItem('userId') : null;
@@ -232,7 +233,7 @@ export default function AssignDevice({ onSuccess }: AssignDeviceProps) {
               disabled={!selectedUser}
               className="w-full py-5 bg-slate-900 hover:bg-black text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-slate-200 transition-all flex items-center justify-center gap-3 disabled:opacity-20"
             >
-              See Available Devices <ChevronRight size={16} />
+              {actionType === 'assign' ? 'See Available Devices' : 'See Connected Devices'} <ChevronRight size={16} />
             </button>
           </motion.div>
         );
@@ -297,9 +298,9 @@ export default function AssignDevice({ onSuccess }: AssignDeviceProps) {
               <button
                 onClick={() => setStep(3)}
                 disabled={!selectedDevice}
-                className="flex-1 py-4 bg-slate-900 hover:bg-black text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all disabled:opacity-20"
+                className={`flex-1 py-4 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all disabled:opacity-20 ${actionType === 'assign' ? 'bg-slate-900 hover:bg-black' : 'bg-rose-600 hover:bg-rose-700'}`}
               >
-                Connect Now
+                {actionType === 'assign' ? 'Connect Now' : 'Disconnect Now'}
               </button>
             </div>
           </motion.div>

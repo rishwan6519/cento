@@ -12,6 +12,7 @@ export type MenuKey =
   |"createUser"
   | "showMedia"
   |"assignDevice"
+  |"disconnectDevice"
   |"presentation"
   |"showUser"
   | "setupPlaylist"

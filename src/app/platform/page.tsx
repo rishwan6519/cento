@@ -61,9 +61,7 @@ import AccountSettings from "@/components/AccountSettings/AccountSettings";
 import ViewGroups from "@/components/ViewGroups/ViewGroups";
 import CreateImage from "@/components/UploadImage/UploadImage";
 import CreateAudio from "@/components/UploadAudio/UploadAudio";
-import CreateSlider from "@/components/CreatSlider/CreateSlider";
-import SliderManager from "@/components/showSlider/showSlider";
-import AssignSlider from "@/components/AssignSlider/AssignSlider";
+
 
 // Types
 import { 
@@ -90,6 +88,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
     items: [
       { key: "onboardDevice", label: "Onboard Device", icon: <FaMobileAlt /> },
       { key: "assignDevice", label: "Connect Device", icon: <FaRobot /> },
+      { key: "disconnectDevice", label: "Disconnect Device", icon: <FaMobileAlt /> },
       { key: "assignApi", label: "API Key", icon: <IoMdSettings /> },
     ],
   },
@@ -112,14 +111,6 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
       { key: "showAnnouncement", label: "View All", icon: <IoMdSettings /> },
       { key: "instantAnnouncement", label: "Quick Send", icon: <IoMdSettings /> },
     ]
-  },
-  {
-    title: "Slider",
-    items: [
-      { key: "createSlider", label: "Create Slider", icon: <FaRegFileImage /> },
-      { key: "showSlider", label: "All Sliders", icon: <FaRegFileImage /> },
-      { key: "assignSlider", label: "Connect Slider", icon: <FaPlug /> },
-    ],
   },
   {
     title: "Store Management",
@@ -147,7 +138,8 @@ export default function RoboticPlatform(): React.ReactElement {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [editingSlider, setEditingSlider] = useState<any>(null);
+  const [deviceStatuses, setDeviceStatuses] = useState<Record<string, { status: string; lastSync: string }>>({});
+
 
 
   const fetchDevices = async () => {
@@ -171,8 +163,13 @@ export default function RoboticPlatform(): React.ReactElement {
 
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
+        // Sort devices by createdAt descending (last added first)
+        const sortedData = [...data.data].sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
         setDevices(
-          data.data.map((device: any) => ({
+          sortedData.map((device: any) => ({
             ...device,
             lastActive: new Date(device.updatedAt).toLocaleString(),
             status: device.deviceId.status === "active" ? "Connected" : "Disconnected",
@@ -217,6 +214,40 @@ export default function RoboticPlatform(): React.ReactElement {
       console.error("Error fetching announcements:", err);
     }
   };
+
+  // Status Polling Effect
+  useEffect(() => {
+    if (!devices?.length) return;
+
+    const fetchStatuses = async () => {
+      const statuses: any = {};
+      for (const d of devices) {
+        const serial = d?.deviceId?.serialNumber;
+        if (!serial) continue;
+        try {
+          const response = await fetch(`/api/status-check?serialNumber=${serial}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              statuses[serial] = {
+                status: data.status,
+                lastSync: data.lastConnection
+                  ? new Date(data.lastConnection).toLocaleString()
+                  : "",
+              };
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching device status:", error);
+        }
+      }
+      setDeviceStatuses(statuses);
+    };
+
+    fetchStatuses();
+    const intervalId = setInterval(fetchStatuses, 10000);
+    return () => clearInterval(intervalId);
+  }, [devices]);
 
   // --- Auth & Initial Fetch (Fully Restored) ---
   useEffect(() => {
@@ -440,16 +471,12 @@ export default function RoboticPlatform(): React.ReactElement {
     }
 
     switch (selectedMenu) {
-      case "createSlider":
-        return <CreateSlider editingSlider={editingSlider} onCancel={() => { setEditingSlider(null); setSelectedMenu("showSlider"); }} onSuccess={() => { setEditingSlider(null); setSelectedMenu("showSlider"); }} />;
-      case "showSlider":
-        return <SliderManager onEdit={(slider) => { setEditingSlider(slider); setSelectedMenu("createSlider"); }} />;
-      case "assignSlider":
-        return <AssignSlider onSuccess={() => setSelectedMenu("dashboard")} />;
+
       case "dashboard":
         return (
           <DashboardView
             devices={devicesWithPlaylistInfo as any}
+            deviceStatuses={deviceStatuses}
             setDevices={setDevices}
             onAddNew={() => setSelectedMenu("onboardDevice")}
             onEditDevice={handleEditDevice}
@@ -493,6 +520,17 @@ export default function RoboticPlatform(): React.ReactElement {
       case "assignDevice":
         return (
           <AssignDevice 
+            defaultAction="assign"
+            onSuccess={() => {
+              if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
+              setSelectedMenu("dashboard");
+            }} 
+          />
+        );
+      case "disconnectDevice":
+        return (
+          <AssignDevice 
+            defaultAction="disconnect"
             onSuccess={() => {
               if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
               setSelectedMenu("dashboard");

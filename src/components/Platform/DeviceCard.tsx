@@ -290,6 +290,7 @@ interface DeviceCardProps {
     updatedAt: string;
     __v: number;
   };
+  deviceStatuses?: Record<string, { status: string; lastSync: string }>;
   onEdit: (device: any) => void;
   onManagePlaylists?: (device: any) => void;
   onRemoveDevice?: (deviceId: string) => void;
@@ -320,6 +321,7 @@ const NoDeviceCard = ({ onboardDevice }: { onboardDevice: () => void }) => {
 
 const DeviceCard: React.FC<DeviceCardProps> = ({
   device,
+  deviceStatuses = {},
   onEdit,
   onManagePlaylists,
   onRemoveDevice,
@@ -395,10 +397,10 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         <div className="flex flex-col items-end gap-2">
            {/* Status Badge */}
            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-            deviceId.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+            (deviceStatuses[deviceId.serialNumber]?.status === "online") ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
           }`}>
-             <span className={`w-2 h-2 rounded-full ${deviceId.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
-             {deviceId.status === "active" ? "Online" : "Offline"}
+             <span className={`w-2 h-2 rounded-full ${(deviceStatuses[deviceId.serialNumber]?.status === "online") ? "bg-emerald-500" : "bg-red-500"}`} />
+             {(deviceStatuses[deviceId.serialNumber]?.status === "online") ? "Online" : "Offline"}
            </div>
 
            {/* SuperUser Edit floaty button - now inline next to status */}
