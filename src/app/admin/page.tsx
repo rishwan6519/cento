@@ -19,6 +19,11 @@ import AddDevice from "@/components/AddDevice/addDevice";
 import UserManagement from "@/components/UseManagement/UserManagement";
 import ShowDevices from "@/components/ShowDevices/ShowDevices";
 import ManageDeviceTypes from "@/components/ManageDeviceTypes/ManageDeviceTypes";
+import CreateSlider from "@/components/CreatSlider/CreateSlider";
+import SliderManager from "@/components/showSlider/showSlider";
+import CreateImage from "@/components/UploadImage/UploadImage";
+import ShowMedia from "@/components/ShowMedia/showMedia";
+import { ImageIcon, Film, Upload } from "lucide-react";
 
 interface DeviceType {
   id: string;
@@ -49,6 +54,7 @@ export default function RobotAdminDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [usersCount, setUsersCount] = useState<number>(0);
   const [editingDeviceType, setEditingDeviceType] = useState<any>(null);
+  const [editingSlider, setEditingSlider] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -158,17 +164,40 @@ export default function RobotAdminDashboard() {
           description: "View all registered devices",
         },
       ],
-    // },
-    // {
-    //   category: "AI Features",
-    //   items: [
-    //     {
-    //       id: "gptAi",
-    //       label: "AI Assistant",
-    //       icon: <FcDataConfiguration size={20} className="text-violet-500" />,
-    //       description: "Access AI-powered features and assistance",
-    //     },
-    //   ],
+    },
+    {
+      category: "Media Management",
+      items: [
+        {
+          id: "uploadMedia",
+          label: "Upload Media",
+          icon: <Upload size={20} className="text-orange-500" />,
+          description: "Upload new media for sliders and content",
+        },
+        {
+          id: "showMedia",
+          label: "Media Library",
+          icon: <Film size={20} className="text-purple-500" />,
+          description: "View and manage uploaded media files",
+        },
+      ],
+    },
+    {
+      category: "Slider Management",
+      items: [
+        {
+          id: "createSlider",
+          label: "Create Slider",
+          icon: <ImageIcon size={20} className="text-emerald-500" />,
+          description: "Create a new image slider group",
+        },
+        {
+          id: "showSlider",
+          label: "View Sliders",
+          icon: <ImageIcon size={20} className="text-blue-500" />,
+          description: "Manage existing slider groups",
+        },
+      ],
     },
   ];
 
@@ -435,7 +464,41 @@ export default function RobotAdminDashboard() {
 
                   {activeSection === "users" && <UserManagement />}
 
+                  {activeSection === "createSlider" && (
+                    <CreateSlider
+                      editingSlider={editingSlider}
+                      onCancel={() => {
+                        setEditingSlider(null);
+                        setActiveSection("showSlider");
+                      }}
+                      onSuccess={() => {
+                        setEditingSlider(null);
+                        setActiveSection("showSlider");
+                      }}
+                    />
+                  )}
+
+                  {activeSection === "showSlider" && (
+                    <SliderManager 
+                      onEdit={(slider) => {
+                        setEditingSlider(slider);
+                        setActiveSection("createSlider");
+                      }} 
+                    />
+                  )}
+
                   {activeSection === "gptAi" && <GptAiComponent />}
+
+                  {activeSection === "uploadMedia" && (
+                    <CreateImage 
+                      onCancel={() => setActiveSection("")} 
+                      onSuccess={() => setActiveSection("showMedia")} 
+                    />
+                  )}
+
+                  {activeSection === "showMedia" && (
+                    <ShowMedia />
+                  )}
                 </div>
               </div>
             )}

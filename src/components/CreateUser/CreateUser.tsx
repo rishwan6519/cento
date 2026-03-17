@@ -12,9 +12,6 @@ const CreateUser = () => {
     password: "",
     confirmPassword: "",
     role: "user", // default role
-    blockCoding: false, // new field for blocking coding
-    peopleDetection: false, // new field for people detection camera
-    platform: false, // new field for platform access
     storeLocation: "" // new field for store location
   });
   const [useStoreAsUsername, setUseStoreAsUsername] = useState(true); // new state for checkbox
@@ -58,9 +55,7 @@ const CreateUser = () => {
           password: formData.password,
           controllerId: id,
           role: formData.role,
-          blockCoding: formData.blockCoding, // send block coding status
-          peopleDetection: formData.peopleDetection, // send people detection status
-          platform: formData.platform, // send platform access status
+          platform: true, // Platform access is always enabled for all users
           storeLocation: formData.storeLocation // send store location
         }),
       });
@@ -78,9 +73,6 @@ const CreateUser = () => {
         password: "", 
         confirmPassword: "", 
         role: "user",
-        blockCoding: false,
-        peopleDetection: false,
-        platform: false,
         storeLocation: "" // reset store location
       });
       setUseStoreAsUsername(true); // reset checkbox
@@ -124,10 +116,7 @@ const CreateUser = () => {
     <div className="container mx-auto px-4 py-8">
       <Card className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaUserPlus className="text-indigo-600 text-2xl" />
-          </div>
-          <h2 className="text-2xl font-semibold text-gray-900">Create New User</h2>
+          <h2 className="text-2xl font-semibold text-gray-900">Create New Store</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -220,38 +209,7 @@ const CreateUser = () => {
                 required
               />
             </div>
-          </div>
-
-          {/* Role selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <div className="flex gap-6">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="role"
-                  value="user"
-                  checked={formData.role === "user"}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="form-radio"
-                />
-                <span className="ml-2">User</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="role"
-                  value="developer"
-                  checked={formData.role === "developer"}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="form-radio"
-                />
-                <span className="ml-2">Developer</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Store Location Field */}
+          </div>          {/* Store Location Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Store Location
@@ -270,73 +228,6 @@ const CreateUser = () => {
             </div>
           </div>
 
-          {/* Permissions Section */}
-          <div className="border-t pt-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Permissions</h3>
-            
-            {/* Block Coding Checkbox */}
-            <div className="mb-4">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.blockCoding}
-                  onChange={(e) => setFormData({ ...formData, blockCoding: e.target.checked })}
-                  className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
-                />
-                <div className="flex items-center">
-                  <FaCode className="text-red-500 mr-2" />
-                  <span className="text-sm font-medium text-gray-700">
-                    Block Coding Access
-                  </span>
-                </div>
-              </label>
-              <p className="text-xs text-gray-500 ml-8 mt-1">
-                When enabled, this user will be access block coding features
-              </p>
-            </div>
-
-            {/* People Detection Camera Checkbox */}
-            <div className="mb-4">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.peopleDetection}
-                  onChange={(e) => setFormData({ ...formData, peopleDetection: e.target.checked })}
-                  className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
-                />
-                <div className="flex items-center">
-                  <FaCamera className="text-green-500 mr-2" />
-                  <span className="text-sm font-medium text-gray-700">
-                    Enable People Detection Camera
-                  </span>
-                </div>
-              </label>
-              <p className="text-xs text-gray-500 ml-8 mt-1">
-                When enabled, people detection camera features will be available to this user
-              </p>
-            </div>
-
-            {/* Platform Checkbox */}
-            <div className="mb-4">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.platform}
-                  onChange={(e) => setFormData({ ...formData, platform: e.target.checked })}
-                  className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
-                />
-                <div className="flex items-center">
-                  <FaCogs className="text-blue-500 mr-2" />
-                  <span className="text-sm font-medium text-gray-700">
-                    Platform Access
-                  </span>
-                </div>
-              </label>
-              <p className="text-xs text-gray-500 ml-8 mt-1">
-                When enabled, this user will have access to platform management features
-              </p>
-            </div>
-          </div>
 
           <div className="mt-6">
             <Button
@@ -371,7 +262,7 @@ const CreateUser = () => {
                   Creating...
                 </span>
               ) : (
-                "Create User"
+                "Create Store"
               )}
             </Button>
           </div>

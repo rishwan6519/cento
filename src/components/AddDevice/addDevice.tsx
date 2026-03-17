@@ -57,10 +57,6 @@ const AddDevice: React.FC<AddDeviceProps> = ({
         (type) => type.id === newDevice.typeId
       );
       
-      if (!deviceType?.imageUrl) {
-        throw new Error("Device type image not found");
-      }
-      
       const response = await fetch("/api/devices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,7 +65,7 @@ const AddDevice: React.FC<AddDeviceProps> = ({
           color: newDevice.color,
           typeId: newDevice.typeId,
           serialNumber: newDevice.serialNumber,
-          imageUrl: deviceType.imageUrl, // Include the device type's image
+          imageUrl: deviceType?.imageUrl || "", // Allow empty image if not provided
         }),
       });
       
@@ -199,7 +195,9 @@ const AddDevice: React.FC<AddDeviceProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Serial Number */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">System Serial (UID)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                    System Serial (UID) <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. SN-882-QX"
@@ -216,7 +214,9 @@ const AddDevice: React.FC<AddDeviceProps> = ({
                 
                 {/* Device color */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Finish / Color</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                    Finish / Color <span className="text-slate-400/50 normal-case">(Optional)</span>
+                  </label>
                   <div className="relative">
                     <input
                       type="text"
@@ -240,7 +240,9 @@ const AddDevice: React.FC<AddDeviceProps> = ({
 
               {/* Device Name */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Operational Designation (Name)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                  Operational Designation (Name) <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={newDevice.name}

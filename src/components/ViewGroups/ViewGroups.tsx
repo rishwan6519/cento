@@ -2,6 +2,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import Swal from "sweetalert2";
 import {
   FaFolder,
   FaFolderOpen,
@@ -77,6 +78,7 @@ export default function ViewGroups() {
   const [mediaFilterType, setMediaFilterType] = useState<"all" | "audio" | "video" | "image">("all");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<MediaFile | null>(null);
+  const [regularPlaylistAssignments, setRegularPlaylistAssignments] = useState<any[]>([]);
 
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
 
@@ -142,6 +144,14 @@ export default function ViewGroups() {
         serialNumber: d.deviceId?.serialNumber || d.serialNumber || "N/A",
       }));
       setAvailableDevices(devices);
+      
+      // Also fetch regular playlist assignments to check for conflicts
+      const playlistRes = await fetch(`/api/device-playlists?userId=${userId}`);
+      if (playlistRes.ok) {
+        const playlistData = await playlistRes.json();
+        const devicesWithPlaylists = playlistData.flatMap((item: any) => item.deviceIds);
+        setRegularPlaylistAssignments(devicesWithPlaylists);
+      }
     } catch (err) {
       console.error("Error fetching devices:", err);
     }
@@ -231,7 +241,17 @@ export default function ViewGroups() {
   };
 
   const handleDeleteGroup = async (groupId: string) => {
-    if (!confirm("Are you sure you want to delete this group? This will disconnect all devices.")) return;
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "This will delete the group and disconnect all assigned devices!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#07323C',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       const response = await fetch(`/api/media-groups?groupId=${groupId}`, {
@@ -248,7 +268,17 @@ export default function ViewGroups() {
   };
 
   const handleRemoveMedia = async (groupId: string, mediaId: string) => {
-    if (!confirm("Remove this file from the group?")) return;
+    const result = await Swal.fire({
+      title: 'Remove Media?',
+      text: "Are you sure you want to remove this file from the group?",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#07323C',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, remove'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       const response = await fetch(
@@ -309,14 +339,24 @@ export default function ViewGroups() {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to assign devices");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to assign devices");
 
       toast.success("Devices assigned successfully");
       resetAssignDevicesModal();
       fetchGroups();
-    } catch (error) {
+  } catch (error: any) {
       console.error("Error assigning devices:", error);
-      toast.error("Failed to assign devices");
+      if (error.message?.includes('Conflict')) {
+        Swal.fire({
+          title: 'Assignment Blocked',
+          text: error.message,
+          icon: 'error',
+          confirmButtonColor: '#07323C'
+        });
+      } else {
+        toast.error(error.message || "Failed to assign devices");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -386,12 +426,30 @@ export default function ViewGroups() {
           group._id !== targetGroup?._id && 
           group.deviceIds.some(d => d._id === deviceId)
         );
-        
+
         if (isAssigned) {
           const device = availableDevices.find(d => d._id === deviceId);
-          toast.error(`Device "${device?.name}" is already assigned to another group`);
-          return newSet; // Don't add it
+          Swal.fire({
+            title: 'Selection Blocked',
+            text: `Device "${device?.name}" is already assigned to another Quick Playlist group.`,
+            icon: 'error',
+            confirmButtonColor: '#07323C'
+          });
+          return newSet;
         }
+
+        // Check if this device has a regular playlist assigned
+        if (regularPlaylistAssignments.includes(deviceId)) {
+          const device = availableDevices.find(d => d._id === deviceId);
+          Swal.fire({
+            title: 'Selection Blocked',
+            text: `Device "${device?.name}" already has a Regular Playlist connected. Please disconnect it first.`,
+            icon: 'error',
+            confirmButtonColor: '#07323C'
+          });
+          return newSet;
+        }
+
         newSet.add(deviceId);
       }
       return newSet;

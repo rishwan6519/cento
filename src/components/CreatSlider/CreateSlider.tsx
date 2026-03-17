@@ -36,6 +36,7 @@ const CreateSlider: React.FC<CreateSliderProps> = ({ onCancel, onSuccess, editin
   const [isLoading, setIsLoading] = useState(false);
   const [isMediaLoading, setIsMediaLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [sliderExists, setSliderExists] = useState(false);
 
   const generateUniqueId = () => Math.random().toString(36).substring(2, 11);
 
@@ -48,6 +49,20 @@ const CreateSlider: React.FC<CreateSliderProps> = ({ onCancel, onSuccess, editin
         isExisting: true
       }));
       setItems(initialItems);
+    } else {
+      // Check if a slider already exists (enforce single slider rule)
+      const checkExisting = async () => {
+        try {
+          const res = await fetch('/api/sliders');
+          const data = await res.json();
+          if (data.success && data.data?.length > 0) {
+            setSliderExists(true);
+          }
+        } catch (err) {
+          console.error("Error checking existing sliders", err);
+        }
+      };
+      checkExisting();
     }
     fetchMedia();
   }, [editingSlider]);
@@ -237,6 +252,37 @@ const CreateSlider: React.FC<CreateSliderProps> = ({ onCancel, onSuccess, editin
       setIsLoading(false);
     }
   };
+  // If a slider already exists and we're NOT editing, block creation
+  if (sliderExists && !editingSlider) {
+    return (
+      <div className="bg-white rounded-2xl shadow-xl text-black max-w-5xl mx-auto overflow-hidden border border-gray-100">
+        <div className="p-6 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Create New Slider Group</h2>
+            <p className="text-blue-100 text-sm mt-1">Only one slider set is allowed at a time</p>
+          </div>
+          <button onClick={onCancel} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <CheckCircle2 className="rotate-45" />
+          </button>
+        </div>
+        <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+          <div className="w-20 h-20 bg-amber-50 rounded-2xl flex items-center justify-center mb-6 text-amber-500">
+            <CheckCircle2 size={40} />
+          </div>
+          <h3 className="text-2xl font-bold text-slate-900 mb-2">A Slider Already Exists</h3>
+          <p className="text-slate-500 max-w-md mb-8">
+            Only one slider set can be active at a time. Please go to &quot;View Sliders&quot; to edit or remove the existing slider before creating a new one.
+          </p>
+          <button
+            onClick={onCancel}
+            className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+          >
+            Go to Slider Manager
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-xl text-black max-w-5xl mx-auto overflow-hidden border border-gray-100">

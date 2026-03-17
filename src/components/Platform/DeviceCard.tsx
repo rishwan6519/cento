@@ -284,6 +284,7 @@ interface DeviceCardProps {
       name: string;
       status: string;
       files?: any[];
+      type?: 'regular' | 'announcement';
     }>;
     createdAt: string;
     updatedAt: string;
@@ -292,6 +293,7 @@ interface DeviceCardProps {
   onEdit: (device: any) => void;
   onManagePlaylists?: (device: any) => void;
   onRemoveDevice?: (deviceId: string) => void;
+  onUnlinkPlaylist?: (deviceId: string, playlistId: string, type: 'regular' | 'announcement') => void;
 }
 
 const NoDeviceCard = ({ onboardDevice }: { onboardDevice: () => void }) => {
@@ -321,6 +323,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   onEdit,
   onManagePlaylists,
   onRemoveDevice,
+  onUnlinkPlaylist,
 }) => {
   if (!device) {
     return <NoDeviceCard onboardDevice={() => onEdit(null)} />;
@@ -436,11 +439,30 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
                   key={playlist.id}
                   className="flex flex-col text-xs p-3 bg-indigo-50/50 border border-indigo-100/50 rounded-xl text-indigo-900 shadow-sm"
                 >
-                  <div className="flex items-center mb-2">
-                    <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-500 flex items-center justify-center mr-3 flex-shrink-0">
-                      <BsMusicNoteList size={10} />
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center">
+                      <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-500 flex items-center justify-center mr-3 flex-shrink-0">
+                        <BsMusicNoteList size={10} />
+                      </div>
+                      <span className="font-semibold truncate pr-2">{playlist.name}</span>
+                      {playlist.type === 'announcement' && (
+                        <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Announcement</span>
+                      )}
                     </div>
-                    <span className="font-semibold truncate pr-2">{playlist.name}</span>
+                    {onUnlinkPlaylist && userRole === 'superUser' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Unlink "${playlist.name}" from this device?`)) {
+                            onUnlinkPlaylist(deviceId._id, playlist.id, playlist.type || 'regular');
+                          }
+                        }}
+                        className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded-md transition-colors"
+                        title="Unlink Playlist"
+                      >
+                        <FiX size={14} />
+                      </button>
+                    )}
                   </div>
                   {playlist.files && playlist.files.length > 0 && (
                      <div className="pl-3 mt-1 ml-3 border-l-2 border-indigo-200 py-1 space-y-1">

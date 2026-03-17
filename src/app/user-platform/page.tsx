@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, Fragment, useRef } from "react";
+import React, { useState, useEffect, Fragment, useRef, useMemo } from "react";
 import { Transition } from "@headlessui/react";
 import toast from "react-hot-toast";
 import {
@@ -160,11 +160,76 @@ interface MenuItem {
 
 
 
-// const slides = [
-//   { id: 1, src: "/assets/slider1home.jpg", alt: "Robot 1" },
-//   { id: 2, src: "/assets/engagement_robot.jpg", alt: "Robot 2" },
-//   { id: 3, src: "/assets/service_robot.jpg", alt: "Robot 3" },
-// ];
+// --- Constants ---
+const menuSections: MenuItem[] = [
+  { key: "dashboard", label: "Dashboard", icon: <FaThLarge size={15} /> },
+  {
+    key: "mediaManagement",
+    label: "Media Management",
+    icon: <FaMusic size={20} />,
+    items: [
+      {
+        key: "upload",
+        label: "Upload",
+        icon: <FaUpload size={15} />,
+        items: [
+          { key: "uploadVideo", label: "Upload Video", icon: <FaListAlt /> },
+          { key: "uploadAudio", label: "Upload Audio", icon: <FaMusic /> },
+          { key: "uploadImage", label: "Upload Image", icon: <FaRegFileAudio /> },
+        ],
+      },
+      {
+        key: "media",
+        label: "Media",
+        icon: <FaMusic size={15} />,
+        items: [
+          { key: "mediaLibrary", label: "Media Library", icon: <FaRegFileAudio /> },
+          // {key:"presentation", label:"Presentation", icon:<FaDesktop />}
+        ],
+      },
+      {
+        key: "playlist",
+        label: "Playlist",
+        icon: <MdOutlinePlaylistPlay size={15} />,
+        items: [
+          { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
+          { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
+          { key: "viewGroups", label: "Quick Playlist", icon: <FaThLarge /> },
+          { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
+        ],
+      },
+    ],
+  },
+  {
+    key: "announcement",
+    label: "Announcement Hub",
+    icon: <FaBullhorn size={20} />,
+    items: [
+      { key: "createAnnouncement", label: "Create new announcement", icon: <MdAnnouncement /> },
+      { key: "scheduleAnnouncement", label: "Schedule announcement", icon: <FaCog /> },
+      { key: "announcementPlaylist", label: "Announcement playlist", icon: <FaListAlt /> },
+      { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
+      { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
+      { key: "InstantaneousAnnouncement", label: "Instantaneous Announcement", icon: <FaBolt /> },
+    ],
+  },
+  {
+    key: "scheduler",
+    label: "Scheduler", 
+    icon: <FaCalendarAlt size={20} />,
+    items: [
+      { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
+    ],
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    icon: <FaCog size={20} />,
+    items: [
+      { key: "userSettings", label: "Account Settings", icon: <FaUserCircle /> },
+    ],
+  },
+];
 
 export default function UserPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<ExtendedMenuKey>("dashboard");
@@ -180,26 +245,26 @@ const [slides, setSlides] = useState<Slide[]>([]);
   useEffect(() => {
     const fetchSliderData = async () => {
       try {
-        const response = await fetch(
-          "/api/get-slider?userId="+localStorage.getItem("userId")
-        );
+        // Fetch all sliders globally (admin-created)
+        const response = await fetch("/api/sliders");
         const result = await response.json();
-        console.log(result,"result")
-       
 
         if (result.success && result.data?.length > 0) {
-          const sliderItems = result.data[0].sliderId?.sliders || [];
+          // Get the most recent slider (only one should exist at a time)
+          const latestSlider = result.data[0];
+          const sliderItems = latestSlider.sliders || [];
 
           const formattedSlides: Slide[] = sliderItems.map((item: any, index: number) => ({
             id: item._id || index.toString(),
-            src: item.url, // URL usually starts with /uploads/...
+            src: item.url,
             alt: item.description || `Slide ${index + 1}`,
             description: item.description || "",
           }));
 
           setSlides(formattedSlides);
         } else {
-          console.error("Invalid slider data structure:", result);
+          console.log("No sliders available from admin.");
+          setSlides([]);
         }
       } catch (error) {
         console.error("Error fetching slider data:", error);
@@ -368,77 +433,7 @@ const [slides, setSlides] = useState<Slide[]>([]);
     }
   };
 
-const menuSections: MenuItem[] = [
-  { key: "dashboard", label: "Dashboard", icon: <FaThLarge size={15} /> },
-  {
-    key: "mediaManagement",
-    label: "Media Management",
-    icon: <FaMusic size={20} />,
-    items: [
-      {
-        key: "upload",
-        label: "Upload",
-        icon: <FaUpload size={15} />,
-        items: [
-          { key: "uploadVideo", label: "Upload Video", icon: <FaListAlt /> },
-          { key: "uploadAudio", label: "Upload Audio", icon: <FaMusic /> },
-          { key: "uploadImage", label: "Upload Image", icon: <FaRegFileAudio /> },
-        ],
-      },
-      {
-        key: "media",
-        label: "Media",
-        icon: <FaMusic size={15} />,
-        items: [
-          { key: "mediaLibrary", label: "Media Library", icon: <FaRegFileAudio /> },
-          // {key:"presentation", label:"Presentation", icon:<FaDesktop />}
-        ],
-      },
-      {
-        key: "playlist",
-        label: "Playlist",
-        icon: <MdOutlinePlaylistPlay size={15} />,
-        items: [
-          { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
-          { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-          { key: "viewGroups", label: "Quick Playlist", icon: <FaThLarge /> },
-          { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
-        ],
-      },
-    ],
-  },
-  {
-    key: "announcement",
-    label: "Announcement Hub",
-    icon: <FaBullhorn size={20} />,
-    items: [
-      { key: "createAnnouncement", label: "Create new announcement", icon: <MdAnnouncement /> },
-      { key: "scheduleAnnouncement", label: "Schedule announcement", icon: <FaCog /> },
-      { key: "announcementPlaylist", label: "Announcement playlist", icon: <FaListAlt /> },
-      { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
-      { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
-      { key: "InstantaneousAnnouncement", label: "Instantaneous Announcement", icon: <FaBolt /> },
-    ],
-  },
-  {
-    key: "scheduler",
-    label: "Scheduler", 
-    icon: <FaCalendarAlt size={20} />,
-    items: [
-      { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
-    ],
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: <FaCog size={20} />,
-    items: [
-      { key: "userSettings", label: "Account Settings", icon: <FaUserCircle /> },
-    ],
-  },
-];
-
-const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
 
 const toggleMenu = (key: string) => {
   setExpandedMenus((prev) => {
@@ -1334,117 +1329,111 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
     </div>
   </div>
 )}
-
     </div>
-  </div>
-);
-
-  const SidebarContent = () => (
-    // <div className="flex flex-col h-full  text-white font-sans select-none" style={{backgroundColor:"#07323C"}}>
-     <div
-  className="flex flex-col h-full w-100 text-white font-sans select-none"
-  style={{ backgroundColor: "#07323C" }}
->
-     <div className="px-6 py-6 border-b border-teal-800 flex items-center gap-4">
-        {/* <FaRobot className="text-emerald-300" size={28} />
-         <RobotIcon size={28} className="text-emerald-300" /> */}
-          <Image
-      src="/assets/centelon-logo.svg"
-      alt="Centelon Logo"
-      width={30}
-      height={30}
-    />
-        <span className="font-semibold text-[12px]">Centelon Robotics</span>
-      </div>
-      <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6">
-        
-        
-        {menuSections.map((section) => {
-          const renderMenuItem = (item: MenuItem, depth = 0) => {
-            const hasChildren = item.items && item.items.length > 0;
-            const isExpanded = expandedMenus.has(item.key);
-            const isSelected = selectedMenu === item.key;
-            const paddingLeft = 16 + depth * 12;
-
-            // Professional styles for sub-menu items
-            const baseClass =
-              "flex items-center justify-between w-full py-3 pr-4 rounded-lg transition-colors";
-            const mainMenuClass =
-              "font-semibold text-[13px]";
-            const subMenuClass =
-              "font-normal text-[12px] pl-3 border-l-2 border-transparent hover:border-cyan-400";
-            const selectedClass =
-              "bg-custom-cyan text-white shadow-lg";
-            const unselectedClass =
-              "text-[#9898A6] hover:bg-[#041C22]";
-
-            return (
-              <div key={item.key}>
-                <button
-                  onClick={() => {
-                    if (hasChildren) {
-                      toggleMenu(item.key);
-                    } else {
-                      handleMenuClick(item.key as ExtendedMenuKey);
-                    }
-                  }}
-                  className={[
-                    baseClass,
-                    depth === 0 ? mainMenuClass : subMenuClass,
-                    isSelected ? selectedClass : unselectedClass,
-                  ].join(" ")}
-                  style={{ paddingLeft: `${paddingLeft}px` }}
-                >
-                  <div className="flex items-center gap-3">
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </div>
-                  {hasChildren && (
-                    <RiArrowDropDownLine
-                      className={`transition-transform duration-200 ${
-                        isExpanded ? "rotate-180" : ""
-                      }`}
-                      size={20}
-                    />
-                  )}
-                </button>
-                {hasChildren && isExpanded && (
-                  <div className="mt-1 space-y-1">
-                    {item.items!.map((subItem) => renderMenuItem(subItem, depth + 1))}
-                  </div>
-                )}
-              </div>
-            );
-          };
-
-          return renderMenuItem(section);
-        })}
-
-       
-      </nav>
-      <div className="px-6 py-4 border-t border-teal-800 flex items-center gap-4">
-        {userData ? (
-          <>
-            <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold select-none">
-              {userData.username.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold">{userData.username}</span>
-              <span className="text-xs text-teal-300">{userData.role}</span>
-            </div>
-          </>
-        ) : null}
-        <button
-          onClick={handleLogout}
-          title="Logout"
-          className="ml-auto bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1.5 flex items-center gap-2 text-sm transition-colors"
-        >
-          <FaSignOutAlt />
-          Logout
-        </button>
-      </div>
     </div>
   );
+
+  // --- SIDEBAR CONTENT COMPONENTS (Move structure outside but keep logic inside if needed, or use useMemo) ---
+  const SidebarContent = useMemo(() => {
+    return (
+      <div
+        className="flex flex-col h-full w-full text-white font-sans select-none will-change-transform"
+        style={{ backgroundColor: "#07323C", transform: "translateZ(0)" }}
+      >
+        <div className="px-6 py-6 border-b border-teal-800 flex items-center gap-4">
+          <Image
+            src="/assets/centelon-logo.svg"
+            alt="Centelon Logo"
+            width={30}
+            height={30}
+          />
+          <span className="font-semibold text-[12px]">Centelon Robotics</span>
+        </div>
+        <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6 custom-scrollbar">
+          {menuSections.map((section) => {
+            const renderMenuItem = (item: MenuItem, depth = 0) => {
+              const hasChildren = item.items && item.items.length > 0;
+              const isExpanded = expandedMenus.has(item.key);
+              const isSelected = selectedMenu === item.key;
+              const paddingLeft = 16 + depth * 12;
+
+              const baseClass =
+                "flex items-center justify-between w-full py-3 pr-4 rounded-lg transition-colors";
+              const mainMenuClass =
+                "font-semibold text-[13px]";
+              const subMenuClass =
+                "font-normal text-[12px] pl-3 border-l-2 border-transparent hover:border-cyan-400";
+              const selectedClass =
+                "bg-custom-cyan text-white shadow-lg";
+              const unselectedClass =
+                "text-[#9898A6] hover:bg-[#041C22]";
+
+              return (
+                <div key={item.key}>
+                  <button
+                    onClick={() => {
+                      if (hasChildren) {
+                        toggleMenu(item.key);
+                      } else {
+                        handleMenuClick(item.key as ExtendedMenuKey);
+                      }
+                    }}
+                    className={[
+                      baseClass,
+                      depth === 0 ? mainMenuClass : subMenuClass,
+                      isSelected ? selectedClass : unselectedClass,
+                    ].join(" ")}
+                    style={{ paddingLeft: `${paddingLeft}px` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </div>
+                    {hasChildren && (
+                      <RiArrowDropDownLine
+                        className={`transition-transform duration-200 ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                        size={20}
+                      />
+                    )}
+                  </button>
+                  {hasChildren && isExpanded && (
+                    <div className="mt-1 space-y-1">
+                      {item.items!.map((subItem) => renderMenuItem(subItem, depth + 1))}
+                    </div>
+                  )}
+                </div>
+              );
+            };
+
+            return renderMenuItem(section);
+          })}
+        </nav>
+        <div className="px-6 py-4 border-t border-teal-800 flex items-center gap-4">
+          {userData ? (
+            <>
+              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold select-none">
+                {userData.username.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold">{userData.username}</span>
+                <span className="text-xs text-teal-300">{userData.role}</span>
+              </div>
+            </>
+          ) : null}
+          <button
+            onClick={handleLogout}
+            title="Logout"
+            className="ml-auto bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1.5 flex items-center gap-2 text-sm transition-colors"
+          >
+            <FaSignOutAlt />
+            Logout
+          </button>
+        </div>
+      </div>
+    );
+  }, [expandedMenus, selectedMenu, userData]);
 
   const renderContent = (): React.ReactElement => {
   if (selectedDevice) {
@@ -1539,8 +1528,8 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
   return (
     <div className="flex h-screen bg-[#e6f2f7] text-gray-800 font-sans overflow-hidden">
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex lg:flex-shrink-0 w-85">
-        <SidebarContent />
+      <aside className="hidden lg:flex lg:flex-shrink-0 w-80 shadow-2xl border-r border-teal-800/30">
+        {SidebarContent}
       </aside>
 
       {/* Mobile Sidebar */}
@@ -1572,8 +1561,8 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
             leaveFrom="translate-x-0"
             leaveTo="-translate-x-full"
           >
-            <aside className="fixed inset-y-0 left-0 w-64 bg-teal-900 z-50">
-              <SidebarContent />
+            <aside className="fixed inset-y-0 left-0 w-80 bg-teal-900 z-50 shadow-2xl overflow-hidden">
+              {SidebarContent}
             </aside>
           </Transition.Child>
         </div>
@@ -1620,6 +1609,24 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
       </button>
 
       {/* End of Main Wrapper. */}
+      <style jsx global>{`
+        body {
+          scrollbar-gutter: stable;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0,0,0,0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(20,184,166,0.3);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(20,184,166,0.5);
+        }
+      `}</style>
     </div>
   );
 }

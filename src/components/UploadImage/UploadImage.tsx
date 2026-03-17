@@ -226,12 +226,6 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
                          Using file.previewUrl instead of URL.createObjectURL(file.file) 
                          prevents the player from resetting/flickering during state updates 
                       */}
-                      {file.type.startsWith("audio/") && (
-                        <audio controls className="w-full mt-2" src={file.previewUrl} />
-                      )}
-                      {file.type.startsWith("video/") && (
-                        <video controls className="w-full mt-2 h-20 rounded object-cover" src={file.previewUrl} />
-                      )}
                       {file.type.startsWith("image/") && (
                         <img src={file.previewUrl} alt={file.name} className="mt-2 h-20 w-20 object-cover rounded" />
                       )}

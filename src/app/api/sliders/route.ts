@@ -8,9 +8,18 @@ export async function POST(req: Request) {
   try {
     await connectToDatabase();
 
+    // Enforce single slider: only one slider set allowed at a time
+    const existingSlider = await Slider.findOne();
+    if (existingSlider) {
+      return NextResponse.json(
+        { success: false, message: "A slider already exists. Please edit or remove the existing slider before creating a new one." },
+        { status: 400 }
+      );
+    }
+
     const formData = await req.formData();
     const userId = formData.get("userId") as string;
-    const sliderName = (formData.get("sliderName") as string) || "My Slider"; // get slider name
+    const sliderName = (formData.get("sliderName") as string) || "My Slider";
     const files = formData.getAll("files[]") as File[];
     const descriptions = formData.getAll("descriptions[]") as string[];
     const existingSlidersStr = formData.get("existingSliders") as string;
@@ -39,7 +48,6 @@ export async function POST(req: Request) {
       slidersData.push({ url: `/uploads/sliders/${userId}/${fileName}`, description: desc });
     }
 
-    // Always create a new slider document (group)
     const sliderDoc = await Slider.create({
       userId,
       sliderName,
@@ -61,6 +69,7 @@ export async function POST(req: Request) {
 export async function GET() {
   try {
     await connectToDatabase();
+    // Return all sliders sorted by most recent (should be only 1)
     const sliders = await Slider.find().sort({ createdAt: -1 });
     return NextResponse.json({ success: true, data: sliders });
   } catch (error) {
@@ -95,3 +104,26 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: false, message: "Update failed" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    await connectToDatabase();
+    const { searchParams } = new URL(req.url);
+    const sliderId = searchParams.get("sliderId");
+
+    if (!sliderId) {
+      return NextResponse.json({ success: false, message: "Slider ID is required" }, { status: 400 });
+    }
+
+    const deleted = await Slider.findByIdAndDelete(sliderId);
+    if (!deleted) {
+      return NextResponse.json({ success: false, message: "Slider not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: "Slider removed successfully" });
+  } catch (error) {
+    console.error("Delete slider error:", error);
+    return NextResponse.json({ success: false, message: "Failed to delete slider" }, { status: 500 });
+  }
+}
+

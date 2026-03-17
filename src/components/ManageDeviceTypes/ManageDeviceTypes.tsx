@@ -144,23 +144,35 @@ export default function ManageDeviceTypes({ onBack, onEdit, onAdd }: ManageDevic
                     <h3 className="text-xl font-black text-slate-900 group-hover:text-blue-600 transition-colors truncate">{type.name}</h3>
                     <div className="flex items-center gap-2 mt-2">
                        <span className="w-2 h-2 rounded-full bg-slate-200" />
-                       <span className="text-xs font-bold text-slate-500 tracking-tight">
-                         {type.screenSize.width} × {type.screenSize.height} px Display
-                       </span>
+                        <span className="text-xs font-bold text-slate-500 tracking-tight">
+                          {type.screenSize.width > 0 && type.screenSize.height > 0 
+                            ? `${type.screenSize.width} × ${type.screenSize.height} px Display`
+                            : "Standard Display Architecture"}
+                        </span>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-slate-50 space-y-3">
                      <div className="flex flex-col gap-1.5">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Kinematics</span>
-                        <div className="flex flex-wrap gap-2">
-                           <span className="px-2 py-0.5 bg-slate-50 rounded-md text-[10px] font-bold text-slate-600">
-                             {type.handMovements.length} Hand
-                           </span>
-                           <span className="px-2 py-0.5 bg-slate-50 rounded-md text-[10px] font-bold text-slate-600">
-                             {type.bodyMovements.length} Body
-                           </span>
-                        </div>
+                         <div className="flex flex-wrap gap-2">
+                           {type.handMovements.length > 0 || type.bodyMovements.length > 0 ? (
+                             <>
+                               {type.handMovements.length > 0 && (
+                                 <span className="px-2 py-0.5 bg-blue-50 rounded-md text-[10px] font-bold text-blue-600">
+                                   {type.handMovements.length} Hand
+                                 </span>
+                               )}
+                               {type.bodyMovements.length > 0 && (
+                                 <span className="px-2 py-0.5 bg-slate-50 rounded-md text-[10px] font-bold text-slate-600">
+                                   {type.bodyMovements.length} Body
+                                 </span>
+                               )}
+                             </>
+                           ) : (
+                             <span className="text-[10px] font-bold text-slate-400 italic">Standard Kinematics</span>
+                           )}
+                         </div>
                      </div>
                   </div>
                 </div>

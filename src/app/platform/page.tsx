@@ -22,7 +22,10 @@ import {
   FaChevronRight, 
   FaTachometerAlt,
   FaMobile,
-  FaStore
+  FaStore,
+  FaUpload,
+  FaVideo,
+  FaMusic
 } from "react-icons/fa";
 import { RiDashboardLine } from "react-icons/ri";
 import { BsMusicNoteList } from "react-icons/bs";
@@ -52,12 +55,15 @@ import CreateAnnouncement from "@/components/CreateAnnouncement/CreateAnnounceme
 import ShowAnnouncement from "@/components/Announcement/ShowAnnouncement";
 import InstantaneousAnnouncement from "@/components/InstantaneousAnnouncement/InstantaneousAnnouncement";
 import AssignApiKey from "@/components/AssignApiKey/AssignApiKey";
-import CreateSlider from "@/components/CreatSlider/CreateSlider";
-import SliderManager from "@/components/showSlider/showSlider";
-import AssignSlider from "@/components/AssignSlider/AssignSlider";
+
 import StoreManagement from "@/components/StoreManagement/StoreManagement";
 import AccountSettings from "@/components/AccountSettings/AccountSettings";
 import ViewGroups from "@/components/ViewGroups/ViewGroups";
+import CreateImage from "@/components/UploadImage/UploadImage";
+import CreateAudio from "@/components/UploadAudio/UploadAudio";
+import CreateSlider from "@/components/CreatSlider/CreateSlider";
+import SliderManager from "@/components/showSlider/showSlider";
+import AssignSlider from "@/components/AssignSlider/AssignSlider";
 
 // Types
 import { 
@@ -69,12 +75,68 @@ import {
   DeviceReference 
 } from "@/components/Platform/types";
 
+// --- Constants ---
+const menuSections: { title: string; items: MenuItem[] }[] = [
+  {
+    title: "General",
+    items: [
+      { key: "storeManagement", label: "Stores", icon: <FaStore /> },
+      { key: "dashboard", label: "All Devices", icon: <RiDashboardLine /> },
+      { key: "accountSettings", label: "Account Settings", icon: <IoMdSettings /> },
+    ],
+  },
+  {
+    title: "Devices",
+    items: [
+      { key: "onboardDevice", label: "Onboard Device", icon: <FaMobileAlt /> },
+      { key: "assignDevice", label: "Connect Device", icon: <FaRobot /> },
+      { key: "assignApi", label: "API Key", icon: <IoMdSettings /> },
+    ],
+  },
+  {
+    title: "Media",
+    items: [
+      { key: "uploadImage", label: "Upload Image", icon: <FaUpload /> },
+      { key: "showMedia", label: "All Media", icon: <FaRegFileAudio /> },
+      { key: "setupPlaylist", label: "Create Playlist", icon: <FaListAlt /> },
+      { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
+      { key: "viewGroups", label: "Quick Playlist", icon: <RiDashboardLine /> },
+      { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
+    ],
+  },
+  {
+    title: "Announcement",
+    items: [
+      { key: "createAnnouncement", label: "Create Announcement", icon: <IoMdSettings /> },
+      { key: "setupAnnouncement", label: "Connect Announcements", icon: <IoMdSettings /> },
+      { key: "showAnnouncement", label: "View All", icon: <IoMdSettings /> },
+      { key: "instantAnnouncement", label: "Quick Send", icon: <IoMdSettings /> },
+    ]
+  },
+  {
+    title: "Slider",
+    items: [
+      { key: "createSlider", label: "Create Slider", icon: <FaRegFileImage /> },
+      { key: "showSlider", label: "All Sliders", icon: <FaRegFileImage /> },
+      { key: "assignSlider", label: "Connect Slider", icon: <FaPlug /> },
+    ],
+  },
+  {
+    title: "Store Management",
+    items: [
+      { key: "createUser", label: "Create Store", icon: <FaStore /> },
+      { key: "showUser", label: "Show Stores", icon: <FaStore /> },
+    ],
+  },
+];
+
 export default function RoboticPlatform(): React.ReactElement {
   // --- State Management (Fully Restored) ---
-  const [selectedMenu, setSelectedMenu] = useState<MenuKey>("storeManagement");
+  const [selectedMenu, setSelectedMenu] = useState<MenuKey>("dashboard");
   const [devices, setDevices] = useState<Device[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [devicePlaylists, setDevicePlaylists] = useState<any[]>([]);
+  const [deviceAnnouncements, setDeviceAnnouncements] = useState<any[]>([]);
   const [showOnboardModal, setShowOnboardModal] = useState<boolean>(false);
   const [showPlaylistModal, setShowPlaylistModal] = useState<boolean>(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -86,6 +148,75 @@ export default function RoboticPlatform(): React.ReactElement {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [editingSlider, setEditingSlider] = useState<any>(null);
+
+
+  const fetchDevices = async () => {
+    try {
+      setIsLoading(true);
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        setError("Please log in to view devices");
+        return;
+      }
+
+      const response = await fetch(`/api/onboarded-devices?userId=${userId}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch devices");
+      }
+
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        setDevices(
+          data.data.map((device: any) => ({
+            ...device,
+            lastActive: new Date(device.updatedAt).toLocaleString(),
+            status: device.deviceId.status === "active" ? "Connected" : "Disconnected",
+          }))
+        );
+      } else {
+        throw new Error("Invalid data format received from server");
+      }
+    } catch (err) {
+      console.error("Error fetching devices:", err);
+      setError(err instanceof Error ? err.message : "Failed to load devices");
+      setDevices([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const fetchPlaylists = async () => {
+    try {
+      const userId = localStorage.getItem("userId");
+      if (userId) {
+        // Fetch ALL global playlists mapped to devices (don't limit by userId since we are on the superUser platform)
+        const response = await fetch(`/api/device-playlists`);
+        if (response.ok) {
+          const data = await response.json();
+          setDevicePlaylists(data);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching playlists:", err);
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    try {
+      const response = await fetch('/api/announcement/all-connections');
+      const data = await response.json();
+      if (data.success) {
+        setDeviceAnnouncements(data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching announcements:", err);
+    }
+  };
 
   // --- Auth & Initial Fetch (Fully Restored) ---
   useEffect(() => {
@@ -100,89 +231,45 @@ export default function RoboticPlatform(): React.ReactElement {
       window.location.href = "/login";
     }
 
-    const fetchDevices = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
-          setError("Please log in to view devices");
-          return;
-        }
-
-        const response = await fetch(`/api/onboarded-devices?userId=${userId}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to fetch devices");
-        }
-
-        const data = await response.json();
-        if (data.success && Array.isArray(data.data)) {
-          setDevices(
-            data.data.map((device: any) => ({
-              ...device,
-              lastActive: new Date(device.updatedAt).toLocaleString(),
-              status: device.deviceId.status === "active" ? "Connected" : "Disconnected",
-            }))
-          );
-        } else {
-          throw new Error("Invalid data format received from server");
-        }
-      } catch (err) {
-        console.error("Error fetching devices:", err);
-        setError(err instanceof Error ? err.message : "Failed to load devices");
-        setDevices([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    const fetchPlaylists = async () => {
-      try {
-        const userId = localStorage.getItem("userId");
-        if (userId) {
-          // Fetch ALL global playlists mapped to devices (don't limit by userId since we are on the superUser platform)
-          const response = await fetch(`/api/device-playlists`);
-          if (response.ok) {
-            const data = await response.json();
-            setDevicePlaylists(data);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching playlists:", err);
-      }
-    };
-
     fetchDevices();
     fetchPlaylists();
+    fetchAnnouncements();
 
     (window as any).refreshPlatformData = () => {
       fetchDevices();
       fetchPlaylists();
+      fetchAnnouncements();
     };
   }, []);
 
   // --- Derived Data ---
   const devicesWithPlaylistInfo = useMemo(() => 
     devices.map((device) => {
-      const connected = devicePlaylists
-        .filter((p) => p.deviceIds && p.deviceIds.includes(device.deviceId._id))
+      const regularConnected = devicePlaylists
+        .filter((p) => p.deviceIds && p.deviceIds.includes(device.deviceId._id.toString()))
         .map((p) => ({
           id: p.playlistData._id,
           name: p.playlistData.name || "Unnamed Playlist",
           status: "active",
           files: p.playlistData.files || [],
+          type: 'regular'
         }));
+
+      const announcementConnected = deviceAnnouncements
+        .filter((conn) => conn.deviceId.toString() === device.deviceId._id.toString())
+        .flatMap((conn) => (conn.announcementPlaylistIds || []).map((ap: any) => ({
+            id: ap._id,
+            name: ap.name || "Announcement Playlist",
+            status: "active",
+            files: [], // Announcement playlists might not have top-level files in the same structure
+            type: 'announcement'
+          })));
+
       return {
         ...device,
-        connectedPlaylists: connected,
+        connectedPlaylists: [...regularConnected, ...announcementConnected],
       };
-    }), [devices, devicePlaylists]);
+    }), [devices, devicePlaylists, deviceAnnouncements]);
 
   // --- Handlers (Fully Restored) ---
   const toggleMenuExpansion = (menuSection: string) => {
@@ -253,6 +340,31 @@ export default function RoboticPlatform(): React.ReactElement {
     toast.success("Playlist connected to device");
   };
 
+  const unlinkPlaylist = async (deviceId: string, playlistId: string, type: 'regular' | 'announcement') => {
+    try {
+      let url = '';
+      if (type === 'regular') {
+        url = `/api/device-playlists?deviceId=${deviceId}&playlistId=${playlistId}`;
+      } else {
+        url = `/api/announcement/device-announcement?deviceId=${deviceId}&announcementPlaylistId=${playlistId}`;
+      }
+
+      const response = await fetch(url, { method: 'DELETE' });
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || "Disconnected successfully");
+        fetchPlaylists();
+        fetchAnnouncements();
+      } else {
+        toast.error(data.error || "Failed to disconnect");
+      }
+    } catch (err) {
+      console.error("Error unlinking:", err);
+      toast.error("An error occurred");
+    }
+  };
+
   const handleEditDevice = async (device: Device): Promise<void> => {
     try {
       const newStatus = device.status === "Connected" ? "Disconnected" : "Connected";
@@ -292,57 +404,6 @@ export default function RoboticPlatform(): React.ReactElement {
     window.location.href = "/login";
   };
 
-  // --- Sidebar Navigation Structure (Grouped) ---
-  const menuSections: { title: string; items: MenuItem[] }[] = [
-    {
-      title: "General",
-      items: [
-        { key: "storeManagement", label: "Stores", icon: <FaStore /> },
-        { key: "dashboard", label: "All Devices", icon: <RiDashboardLine /> },
-        { key: "accountSettings", label: "Account Settings", icon: <IoMdSettings /> },
-      ],
-    },
-    {
-      title: "Devices",
-      items: [
-        { key: "onboardDevice", label: "Add New Device", icon: <FaMobileAlt /> },
-        { key: "assignDevice", label: "Connect Device", icon: <FaRobot /> },
-        { key: "assignApi", label: "API Key", icon: <IoMdSettings /> },
-        { key: "assignSlider", label: "Connect Slider", icon: <FaRegFileImage /> },
-
-      ],
-    },
-    {
-      title: "Media",
-      items: [
-        { key: "createMedia", label: "Upload Media", icon: <FaRegFileAudio /> },
-        { key: "showMedia", label: "All Media", icon: <FaRegFileAudio /> },
-        { key: "createSlider", label: "Create Slider", icon: <FaRegFileImage /> },
-        { key: "showSlider", label: "Show Slider", icon: <FaRegFileImage /> },
-        { key: "setupPlaylist", label: "Create Playlist", icon: <FaListAlt /> },
-        { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-        { key: "viewGroups", label: "Quick Playlist", icon: <RiDashboardLine /> },
-        { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
-      ],
-    },
-    {
-      title: "Broadcasting",
-      items: [
-        { key: "createAnnouncement", label: "Create Announcement", icon: <IoMdSettings /> },
-        { key: "setupAnnouncement", label: "Connect Announcements", icon: <IoMdSettings /> },
-        { key: "showAnnouncement", label: "View All", icon: <IoMdSettings /> },
-        { key: "instantAnnouncement", label: "Quick Send", icon: <IoMdSettings /> },
-      ]
-    },
-    {
-      title: "Store Management",
-      items: [
-        { key: "createUser", label: "Create Store", icon: <FaStore /> },
-        { key: "showUser", label: "Show Stores", icon: <FaStore /> },
-      ],
-    },
-  ];
-
   // Helper to find label for Breadcrumbs
   const getActiveLabel = () => {
     for (const section of menuSections) {
@@ -379,6 +440,12 @@ export default function RoboticPlatform(): React.ReactElement {
     }
 
     switch (selectedMenu) {
+      case "createSlider":
+        return <CreateSlider editingSlider={editingSlider} onCancel={() => { setEditingSlider(null); setSelectedMenu("showSlider"); }} onSuccess={() => { setEditingSlider(null); setSelectedMenu("showSlider"); }} />;
+      case "showSlider":
+        return <SliderManager onEdit={(slider) => { setEditingSlider(slider); setSelectedMenu("createSlider"); }} />;
+      case "assignSlider":
+        return <AssignSlider onSuccess={() => setSelectedMenu("dashboard")} />;
       case "dashboard":
         return (
           <DashboardView
@@ -387,6 +454,8 @@ export default function RoboticPlatform(): React.ReactElement {
             onAddNew={() => setSelectedMenu("onboardDevice")}
             onEditDevice={handleEditDevice}
             onManagePlaylists={handleManagePlaylists}
+            onUnlinkPlaylist={unlinkPlaylist}
+            userRole={localStorage.getItem("userRole") || undefined}
           />
         );
       case "storeManagement":
@@ -436,44 +505,17 @@ export default function RoboticPlatform(): React.ReactElement {
         return <ShowUsers />;
       case "showPlaylist":
         return <PlaylistManager />;
-      case "createSlider":
-        return (
-          <CreateSlider
-            editingSlider={editingSlider}
-            onCancel={() => {
-              setEditingSlider(null);
-              setSelectedMenu("showSlider");
-            }}
-            onSuccess={() => {
-              setEditingSlider(null);
-              setSelectedMenu("showSlider");
-            }}
-          />
-        );
-      case "showSlider":
-        return (
-          <SliderManager 
-            onEdit={(slider) => {
-              setEditingSlider(slider);
-              setSelectedMenu("createSlider");
-            }} 
-          />
-        );
-      case "assignSlider":
-        return (
-          <AssignSlider 
-            onSuccess={() => {
-              if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
-              setSelectedMenu("dashboard");
-            }} 
-          />
-        );
+
       case "createMedia":
-        return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showMedia")} />;
+      case "uploadVideo":
+      case "uploadImage":
+        return <CreateImage onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => { fetchPlaylists(); fetchAnnouncements(); setSelectedMenu("showMedia"); }} />;
+      case "uploadAudio":
+        return <CreateAudio onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => { fetchPlaylists(); fetchAnnouncements(); setSelectedMenu("showMedia"); }} />;
       case "showMedia":
         return <ShowMedia />;
       case "connectPlaylist":
-        return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => setSelectedMenu("showPlaylist")} />;
+        return <ConnectPlaylist onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => { fetchPlaylists(); fetchAnnouncements(); setSelectedMenu("showPlaylist"); }} />;
       case "viewGroups":
         return <ViewGroups />;
       case "createUser":
@@ -497,17 +539,21 @@ export default function RoboticPlatform(): React.ReactElement {
 
       {/* --- SIDEBAR --- */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-slate-300 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-slate-300 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 will-change-transform
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ transform: "translateZ(0)" }}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-8 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setSelectedMenu("dashboard")}
+            >
               <div className="p-2.5 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/30">
                 <FaRobot className="text-white text-2xl" />
               </div>
-              <span className="text-xl font-bold text-white tracking-tight">Admin</span>
+              <span className="text-xl font-bold text-white tracking-tight">System</span>
             </div>
             <button className="lg:hidden text-slate-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
               <HiOutlineMenuAlt2 size={24} />
@@ -528,7 +574,7 @@ export default function RoboticPlatform(): React.ReactElement {
                     return (
                       <div key={item.key}>
                         <button
-                          onClick={() => item.subItems ? toggleMenuExpansion("devices") : (setSelectedMenu(item.key), setIsMobileMenuOpen(false))}
+                          onClick={() => item.subItems ? toggleMenuExpansion(item.key) : (setSelectedMenu(item.key), setIsMobileMenuOpen(false))}
                           className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group
                           ${isActive ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" : "hover:bg-slate-800 hover:text-white"}`}
                         >
@@ -539,13 +585,13 @@ export default function RoboticPlatform(): React.ReactElement {
                             <span className="font-medium text-[14px]">{item.label}</span>
                           </div>
                           {item.subItems && (
-                            <HiOutlineChevronDown className={`transition-transform duration-200 ${menuExpanded.devices ? "rotate-180" : ""}`} />
+                            <HiOutlineChevronDown className={`transition-transform duration-200 ${menuExpanded[item.key] ? "rotate-180" : ""}`} />
                           )}
                         </button>
                         
                         {/* Nested Items */}
                         <AnimatePresence>
-                          {item.subItems && menuExpanded.devices && (
+                          {item.subItems && menuExpanded[item.key] && (
                             <motion.div 
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
@@ -613,12 +659,25 @@ export default function RoboticPlatform(): React.ReactElement {
             <button className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors" onClick={() => setIsMobileMenuOpen(true)}>
               <HiOutlineMenuAlt2 size={24} />
             </button>
-            <div className="hidden md:flex items-center gap-3 text-sm font-medium">
+            <div 
+              className="hidden md:flex items-center gap-3 text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity"
+              onClick={() => setSelectedMenu("dashboard")}
+            >
               <span className="text-slate-400">Platform</span>
               <FaChevronRight size={10} className="text-slate-300" />
-              <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase text-[11px] font-bold tracking-wider">
-                {getActiveLabel()}
-              </span>
+              {selectedMenu !== "dashboard" && selectedMenu !== "storeManagement" ? (
+                <button 
+                  onClick={() => setSelectedMenu("dashboard")}
+                  className="flex items-center gap-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-4 py-1.5 rounded-full transition-all group"
+                >
+                  <RiDashboardLine size={14} className="group-hover:scale-110 transition-transform" />
+                  <span className="uppercase text-[11px] font-bold tracking-wider">Back to Dashboard</span>
+                </button>
+              ) : (
+                <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase text-[11px] font-bold tracking-wider">
+                  {getActiveLabel()}
+                </span>
+              )}
             </div>
           </div>
 
@@ -684,6 +743,9 @@ export default function RoboticPlatform(): React.ReactElement {
       </AnimatePresence>
 
       <style jsx global>{`
+        body {
+          scrollbar-gutter: stable;
+        }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }

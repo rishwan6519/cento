@@ -977,6 +977,7 @@ import React, { useState, useEffect } from "react";
 import { Database, ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 import { FaPlay, FaPauseCircle, FaSyncAlt } from "react-icons/fa";
+import Swal from "sweetalert2";
 
 interface Device {
   connectedPlaylists: any;
@@ -1031,6 +1032,7 @@ const ConnectPlaylist: React.FC<ConnectPlaylistProps> = ({
     setConnectedPlaylists,
   ] = useState<{ [deviceId: string]: string[] }>({});
   const [isDisconnecting, setIsDisconnecting] = useState<string | null>(null); // To track which playlist is disconnecting
+  const [quickPlaylistAssignments, setQuickPlaylistAssignments] = useState<any[]>([]); // To track Quick Playlists (MediaGroups)
 
 console.log("selectedDevice",selectedDeviceForPlaylist)
 console.log("playlists",playlists)
@@ -1075,8 +1077,21 @@ console.log("availableDevices",availableDevices);
       }
     };
 
+    const fetchQuickPlaylists = async () => {
+      try {
+        const res = await fetch(`/api/media-groups?userId=${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setQuickPlaylistAssignments(data.groups || []);
+        }
+      } catch (err) {
+        console.error("Error fetching quick playlists:", err);
+      }
+    };
+
     fetchDevices();
     fetchPlaylists();
+    fetchQuickPlaylists();
   }, [userId]);
 
   const handleConnect = async () => {
@@ -1089,10 +1104,40 @@ console.log("availableDevices",availableDevices);
       return;
     }
 
+    // 1. Check for Regular Playlist conflict (Local state check)
     const existingConnections = connectedPlaylists[selectedDeviceForPlaylist.deviceId._id] || [];
     if (existingConnections.length > 0) {
-      const userConfirmed = window.confirm("Warning: A user has already set a playlist for this device. Are you sure you want to assign a new one, which might conflict with their slot?");
-      if (!userConfirmed) return;
+      const result = await Swal.fire({
+        title: 'Playlist Conflict Warning!',
+        text: "A store user has already connected playlist(s) to this device. Connecting your playlist may cause scheduling conflicts. Do you want to proceed anyway?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#07323C',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, proceed',
+        cancelButtonText: 'Cancel'
+      });
+
+      if (!result.isConfirmed) return;
+    }
+
+    // 2. Check for Quick Playlist conflict (Local state check)
+    const isDeviceInQuickPlaylist = quickPlaylistAssignments.some(group => 
+      group.deviceIds.some((d: any) => d._id === selectedDeviceForPlaylist.deviceId._id)
+    );
+
+    if (isDeviceInQuickPlaylist) {
+      const groupName = quickPlaylistAssignments.find(group => 
+        group.deviceIds.some((d: any) => d._id === selectedDeviceForPlaylist.deviceId._id)
+      )?.name;
+
+      await Swal.fire({
+        title: 'Connection Blocked',
+        text: `This device is already assigned to the Quick Playlist group "${groupName}". Please remove it from there first before connecting a regular playlist.`,
+        icon: 'error',
+        confirmButtonColor: '#07323C'
+      });
+      return;
     }
 
     setIsLoading(true);
@@ -1107,15 +1152,34 @@ console.log("availableDevices",availableDevices);
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || "Failed to connect playlists");
       }
 
-      toast.success("Playlist connected successfully");
+      // Check for conflict warning from API
+      if (data.conflict) {
+        toast(data.conflictMessage || "Playlists connected, but another user also has playlists on this device.", {
+          icon: '⚠️',
+          duration: 6000,
+          style: { background: '#FEF3C7', color: '#92400E', fontWeight: 600 }
+        });
+      } else {
+        toast.success("Playlist connected successfully");
+      }
       onSuccess();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to connect playlists");
+    } catch (error: any) {
+      if (error.message?.includes('Conflict')) {
+        Swal.fire({
+          title: 'Connection Blocked',
+          text: error.message,
+          icon: 'error',
+          confirmButtonColor: '#07323C'
+        });
+      } else {
+        toast.error(error.message || "Failed to connect playlists");
+      }
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import MediaGroup from '@/models/MediaGroups';
+import DevicePlaylist from '@/models/ConectPlaylist';
 import mongoose from 'mongoose';
 
 export async function POST(req: NextRequest) {
@@ -27,6 +28,19 @@ export async function POST(req: NextRequest) {
     const validDeviceIds = deviceIds
       .filter((id: string) => mongoose.Types.ObjectId.isValid(id))
       .map((id: string) => new mongoose.Types.ObjectId(id));
+
+    // Check if ANY of these devices already have an active regular playlist connected
+    const devicePlaylistConflict = await DevicePlaylist.findOne({
+      deviceId: { $in: validDeviceIds },
+      'playlistIds.0': { $exists: true }
+    }).populate('deviceId');
+
+    if (devicePlaylistConflict) {
+      return NextResponse.json({
+        error: `Conflict: Device "${devicePlaylistConflict.deviceId?.name || 'one of the selected devices'}" already has a regular playlist connected. Please disconnect it first.`,
+        conflict: true
+      }, { status: 409 });
+    }
 
     const updatedGroup = await MediaGroup.findByIdAndUpdate(
       groupId,
@@ -82,6 +96,19 @@ export async function PUT(req: NextRequest) {
     const validDeviceIds = (deviceIds || [])
       .filter((id: string) => mongoose.Types.ObjectId.isValid(id))
       .map((id: string) => new mongoose.Types.ObjectId(id));
+
+    // Check if ANY of these devices already have an active regular playlist connected
+    const devicePlaylistConflict = await DevicePlaylist.findOne({
+      deviceId: { $in: validDeviceIds },
+      'playlistIds.0': { $exists: true }
+    }).populate('deviceId');
+
+    if (devicePlaylistConflict) {
+      return NextResponse.json({
+        error: `Conflict: Device "${devicePlaylistConflict.deviceId?.name || 'one of the selected devices'}" already has a regular playlist connected. Please disconnect it first.`,
+        conflict: true
+      }, { status: 409 });
+    }
 
     const updatedGroup = await MediaGroup.findByIdAndUpdate(
       groupId,

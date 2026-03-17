@@ -55,6 +55,7 @@
     "roslib": "^1.4.1",
     "sanitize-filename": "^1.6.3",
     "sonner": "^2.0.3",
+    "sweetalert2": "^11.26.23",
     "tailwind-merge": "^3.0.2",
     "tailwind-scrollbar-hide": "^2.0.0",
     "uuid": "^11.1.0"

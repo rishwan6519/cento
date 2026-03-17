@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
-import  PlaylistConfig from '@/models/PlaylistConfig';
+import PlaylistConfig from '@/models/PlaylistConfig';
+import DevicePlaylist from '@/models/ConectPlaylist';
+import OnboardedDevice from '@/models/OnboardedDevice';
+import AssignedDevice from '@/models/AssignDevice';
 import mongoose from 'mongoose';
 
 export async function POST(req: NextRequest) {
@@ -76,12 +79,57 @@ export async function GET(req: NextRequest) {
     
     await connectToDatabase();
     
-    const playlists = await PlaylistConfig.find({userId: new mongoose.Types.ObjectId(userId)})
-      .sort({ createdAt: -1 });
-      console.log("playlists",playlists);
-      
+    // Look up the user to find their controllerId (super user)
+    const User = mongoose.models.User;
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    let myPlaylistsQuery: any = { userId: userObjectId };
+    let controllerId: mongoose.Types.ObjectId | null = null;
     
-    return NextResponse.json(playlists);
+    if (User) {
+      const user = await User.findById(userId).select('controllerId');
+      if (user?.controllerId) {
+        controllerId = new mongoose.Types.ObjectId(user.controllerId);
+      }
+    }
+    
+    // Fetch user's own playlists
+    const ownPlaylists = await PlaylistConfig.find(myPlaylistsQuery);
+    
+    // For controller (super user) playlists, only include if they are CONNECTED to one of the user's devices
+    let connectedSuperUserPlaylists: any[] = [];
+    if (controllerId) {
+      // 1. Get all device IDs that this user owns or is assigned to
+      const onboarded = await OnboardedDevice.find({ userId: userObjectId }).select('deviceId');
+      const assigned = await AssignedDevice.find({ userId: userObjectId, status: 'active' }).select('deviceId');
+      
+      const deviceIds = [
+        ...onboarded.map(d => d.deviceId),
+        ...assigned.map(d => d.deviceId)
+      ];
+
+      if (deviceIds.length > 0) {
+        // 2. Find all active connections for these devices
+        const connections = await DevicePlaylist.find({ deviceId: { $in: deviceIds } }).select('playlistIds');
+        const activePlaylistIds = connections.reduce((acc: mongoose.Types.ObjectId[], curr) => {
+          if (curr.playlistIds) acc.push(...curr.playlistIds);
+          return acc;
+        }, []);
+
+        if (activePlaylistIds.length > 0) {
+          // 3. Find playlists from controller that are in our active list
+          connectedSuperUserPlaylists = await PlaylistConfig.find({
+            _id: { $in: activePlaylistIds },
+            userId: controllerId
+          });
+        }
+      }
+    }
+    
+    // Combine both sets
+    const allPlaylists = [...ownPlaylists, ...connectedSuperUserPlaylists]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+    return NextResponse.json(allPlaylists);
   } catch (error) {
     console.error('Error fetching playlists:', error);
     return NextResponse.json(

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {connectToDatabase} from '@/lib/db';
 import DevicePlaylist from '@/models/ConectPlaylist';
+import MediaGroup from '@/models/MediaGroups';
 import "@/models/PlaylistConfig"
 import "@/models/Device";
 import "@/models/User"
+import mongoose from 'mongoose';
 
 
 
@@ -14,23 +16,41 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     const body = await req.json();
-    const { deviceId, playlistIds,userId } = body;
-    console.log('Request body:', body);
+    const { deviceId, playlistIds, userId } = body;
 
     if (!deviceId || !playlistIds || playlistIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Fetch the existing record
+    // 1. Check for Quick Playlist (Media Group) conflict first
+    const deviceObjectId = new mongoose.Types.ObjectId(deviceId);
+    const existingQuick = await MediaGroup.findOne({ deviceIds: deviceObjectId });
+    if (existingQuick) {
+      return NextResponse.json({
+        error: `Conflict: This device is already assigned to the Quick Playlist group "${existingQuick.name}". Please disconnect it there first.`,
+        conflict: true,
+        conflictType: 'quick'
+      }, { status: 409 });
+    }
+
+    // 2. Check for existing regular playlist record
     const existing = await DevicePlaylist.findOne({ deviceId });
 
     if (existing) {
-      // Merge playlistIds, remove duplicates
-      const updatedPlaylistIds = Array.from(new Set([...existing.playlistIds, ...playlistIds]));
+      // Check if a DIFFERENT user already has playlists on this device — BLOCK only if they have active playlists
+      if (existing.userId && existing.userId.toString() !== userId && existing.playlistIds && existing.playlistIds.length > 0) {
+        return NextResponse.json({
+          error: 'Conflict: Another user already has a regular playlist connected to this device. Please disconnect it first.',
+          conflict: true,
+          conflictType: 'regular'
+        }, { status: 409 });
+      }
 
+      // If different user but empty playlists, or same user: update/reassign
+      const updatedPlaylistIds = Array.from(new Set([...(existing.playlistIds || []), ...playlistIds]));
       existing.playlistIds = updatedPlaylistIds;
+      existing.userId = userId; // Update user just in case it was an empty remnant from another user
       existing.updatedAt = new Date();
-
       await existing.save();
 
       return NextResponse.json(existing);
@@ -42,7 +62,6 @@ export async function POST(req: NextRequest) {
         userId,
         updatedAt: new Date()
       });
-
 
       return NextResponse.json(newDevicePlaylist);
     }
@@ -59,7 +78,7 @@ interface Playlist {
   startTime?: string;
   endTime?: string;
 }
-interface DevicePlaylist {
+interface IDevicePlaylist {
   deviceId: string;
   playlistIds: Playlist[];
 }
@@ -71,12 +90,14 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const userId = url.searchParams.get('userId');
 
-    const query: any = {};
+    const query: any = {
+      'playlistIds.0': { $exists: true }
+    };
     if (userId) {
       query.userId = userId;
     }
 
-    const devicePlaylists: DevicePlaylist[] = await DevicePlaylist.find(query)
+    const devicePlaylists: IDevicePlaylist[] = await DevicePlaylist.find(query)
       .populate("playlistIds")
       .select("-__v -createdAt -updatedAt");
       console.log('devicePlaylists', devicePlaylists);
@@ -84,7 +105,7 @@ export async function GET(req: NextRequest) {
     const playlistMap = new Map();
 
     devicePlaylists.forEach(dp => {
-      const deviceId = dp.deviceId;
+      const deviceIdString = dp.deviceId.toString();
 
       dp.playlistIds.forEach((playlist: Playlist) => {
         const playlistId = playlist._id.toString();
@@ -97,8 +118,8 @@ export async function GET(req: NextRequest) {
         }
 
         const entry = playlistMap.get(playlistId);
-        if (!entry.deviceIds.includes(deviceId)) {
-          entry.deviceIds.push(deviceId);
+        if (!entry.deviceIds.includes(deviceIdString)) {
+          entry.deviceIds.push(deviceIdString);
         }
       });
     });

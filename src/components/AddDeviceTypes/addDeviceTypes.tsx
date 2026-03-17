@@ -32,15 +32,8 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
   }
 
   const handleSubmit = async () => {
-    if (
-      !customDeviceName ||
-      (!deviceTypeImage && !existingImageUrl) ||
-      !handMovements ||
-      !bodyMovements ||
-      !screenWidth ||
-      !screenHeight
-    ) {
-      toast.error("Please fill in all required fields!");
+    if (!customDeviceName || (!deviceTypeImage && !existingImageUrl)) {
+      toast.error("Model Designation and Architecture Schema are required!");
       return;
     }
     
@@ -74,8 +67,8 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
         handMovements: handMovements.split(",").map((m) => m.trim()).filter(Boolean),
         bodyMovements: bodyMovements.split(",").map((m) => m.trim()).filter(Boolean),
         screenSize: {
-          width: parseInt(screenWidth),
-          height: parseInt(screenHeight),
+          width: screenWidth ? parseInt(screenWidth) : 0,
+          height: screenHeight ? parseInt(screenHeight) : 0,
         },
         blockCodingEnabled: blockCodingEnabled,
       };
@@ -131,7 +124,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
         <div className="space-y-8">
           {/* Device Type Name */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Model Designation</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+              Model Designation <span className="text-red-500">*</span>
+            </label>
             <input
               value={customDeviceName}
               onChange={(e) => setCustomDeviceName(e.target.value)}
@@ -146,7 +141,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
             
             {/* Hand Movements */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Hand Gestures / Articulations</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                  Hand Gestures / Articulations <span className="text-slate-400/50 normal-case">(Optional)</span>
+                </label>
               <input
                 value={handMovements}
                 onChange={(e) => setHandMovements(e.target.value)}
@@ -158,7 +155,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
             
             {/* Body Movements */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Locomotion / Body Control</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                  Locomotion / Body Control <span className="text-slate-400/50 normal-case">(Optional)</span>
+                </label>
               <input
                 value={bodyMovements}
                 onChange={(e) => setBodyMovements(e.target.value)}
@@ -175,7 +174,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-50 pb-4">Display Geometry</h3>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Horizontal (px)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                    Horizontal (px) <span className="text-slate-400/50 normal-case">(Optional)</span>
+                  </label>
                 <input
                   type="number"
                   value={screenWidth}
@@ -185,7 +186,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Vertical (px)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                    Vertical (px) <span className="text-slate-400/50 normal-case">(Optional)</span>
+                  </label>
                 <input
                   type="number"
                   value={screenHeight}
@@ -203,7 +206,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
             
             {/* Image Upload */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Architecture Schema (Image)</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                Architecture Schema (Image) <span className="text-red-500">*</span>
+              </label>
               <div className="relative group">
                 <input
                   type="file"
@@ -293,23 +298,9 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
         </button>
         <button
           onClick={handleSubmit}
-          disabled={
-            isLoading ||
-            !customDeviceName ||
-            (!deviceTypeImage && !existingImageUrl) ||
-            !handMovements ||
-            !bodyMovements ||
-            !screenWidth ||
-            !screenHeight
-          }
+          disabled={isLoading || !customDeviceName || (!deviceTypeImage && !existingImageUrl)}
           className={`px-12 py-4 rounded-2xl font-extrabold shadow-xl text-white transition-all transform active:scale-95 flex items-center justify-center gap-3 order-1 sm:order-2 ${
-            isLoading ||
-            !customDeviceName ||
-            (!deviceTypeImage && !existingImageUrl) ||
-            !handMovements ||
-            !bodyMovements ||
-            !screenWidth ||
-            !screenHeight
+            isLoading || !customDeviceName || (!deviceTypeImage && !existingImageUrl)
               ? "bg-slate-300 shadow-none cursor-not-allowed"
               : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/25"
           }`}

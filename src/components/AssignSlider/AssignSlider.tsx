@@ -6,6 +6,7 @@ import { User, MonitorSmartphone } from 'lucide-react';
 import Image from 'next/image';
 import { FaCheckCircle } from 'react-icons/fa';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 interface AppUser {
   _id: string;

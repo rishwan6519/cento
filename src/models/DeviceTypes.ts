@@ -30,11 +30,11 @@ const deviceTypeSchema = new mongoose.Schema({
   screenSize: {
     width: { 
       type: Number, 
-      required: true 
+      default: 0
     },
     height: { 
       type: Number, 
-      required: true 
+      default: 0
     }
   },
   blockCodingEnabled: { 

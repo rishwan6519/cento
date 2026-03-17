@@ -31,6 +31,9 @@ export type MenuKey =
   |"ManageDevice"
   | "accountSettings"
   | "viewGroups"
+  | "uploadVideo"
+  | "uploadAudio"
+  | "uploadImage"
 
 export interface Device {
   _id: string;
