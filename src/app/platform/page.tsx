@@ -492,7 +492,10 @@ export default function RoboticPlatform(): React.ReactElement {
           />
         );
       case "onboardDevice":
-        return <OnboardingPage onSuccess={() => setSelectedMenu("dashboard")} />;
+        return <OnboardingPage onSuccess={() => {
+          if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
+          setSelectedMenu("dashboard");
+        }} />;
       case "connectedPlaylists":
         return (
           <ConnectedPlaylistsView

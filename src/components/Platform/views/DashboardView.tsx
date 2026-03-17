@@ -203,7 +203,31 @@ const DashboardView: React.FC<DashboardViewProps> = ({
                     deviceStatuses={deviceStatuses}
                     onEdit={handleDeviceEdit}
                     onManagePlaylists={onManagePlaylists}
-                    onUnlinkPlaylist={onUnlinkPlaylist}
+                    onRemoveDevice={async (deviceId) => {
+                      try {
+                        const res = await fetch(`api/onboarded-devices?deviceId=${deviceId}`, {
+                          method: "DELETE",
+                        });
+
+                        if (res.ok) {
+                          setDevices(devices.filter((d) => d._id !== deviceId));
+                          toast.success("Device removed successfully");
+                        } else {
+                          toast.error("Failed to remove device");
+                        }
+                      } catch (error) {
+                        console.error("Error removing device:", error);
+                        toast.error("An error occurred while removing the device");
+                      }
+                    }}
+                    onUnlinkPlaylist={async (deviceId, playlistId, type) => {
+                      if (onUnlinkPlaylist) {
+                        await onUnlinkPlaylist(deviceId, playlistId, type);
+                        if ((window as any).refreshPlatformData) {
+                          (window as any).refreshPlatformData();
+                        }
+                      }
+                    }}
                   />
                 ))}
               </div>

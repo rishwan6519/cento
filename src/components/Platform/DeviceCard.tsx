@@ -15,45 +15,102 @@ const RemoveDeviceModal = ({
   onClose,
   onConfirm,
   deviceName,
+  assignedStores = [],
+  isCheckingAssignments = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   deviceName: string;
+  assignedStores?: string[];
+  isCheckingAssignments?: boolean;
 }) => {
   if (!isOpen) return null;
 
+  const hasAssignments = assignedStores.length > 0;
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-gray-100 transform transition-all">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 transform transition-all">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-            <IoMdTrash className="text-red-500 text-2xl" />
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${hasAssignments ? 'bg-amber-50' : 'bg-red-50'}`}>
+            {isCheckingAssignments ? (
+              <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+            ) : hasAssignments ? (
+              <svg className="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.27 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            ) : (
+              <IoMdTrash className="text-red-500 text-2xl" />
+            )}
           </div>
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Remove Device</h3>
+            <h3 className="text-xl font-bold text-gray-900">
+              {hasAssignments ? 'Warning: Device in Use' : 'Remove Device'}
+            </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Delete <span className="font-semibold text-gray-700">{deviceName}</span>?
+              {isCheckingAssignments ? 'Checking assignments...' : (
+                <>Remove <span className="font-semibold text-gray-700">{deviceName}</span>?</>
+              )}
             </p>
           </div>
         </div>
-        <p className="text-gray-600/90 text-sm mb-8 leading-relaxed">
-          This action will permanently remove the device from your dashboard. It cannot be undone.
-        </p>
-        <div className="flex justify-end gap-3">
-          <button 
-            onClick={onClose} 
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 shadow-md shadow-red-500/20 transition-all active:scale-95"
-          >
-            Yes, Remove
-          </button>
-        </div>
+
+        {isCheckingAssignments ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {hasAssignments && (
+              <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                <p className="text-amber-800 text-sm font-semibold mb-2 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
+                  </svg>
+                  This device is connected to {assignedStores.length} store{assignedStores.length > 1 ? 's' : ''}:
+                </p>
+                <div className="space-y-1.5 ml-6">
+                  {assignedStores.map((store, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm text-amber-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="font-medium capitalize">{store}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-amber-700 text-xs mt-3 leading-relaxed">
+                  Removing this device will also disconnect it from all connected stores. The device will still be available at the admin level.
+                </p>
+              </div>
+            )}
+
+            <p className="text-gray-600/90 text-sm mb-8 leading-relaxed">
+              {hasAssignments 
+                ? 'Are you sure you want to proceed? This will remove the device from your dashboard and disconnect it from all store-level users.'
+                : 'This action will remove the device from your dashboard. The device will still be available at the admin level for re-onboarding.'
+              }
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={onClose} 
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-all active:scale-95 ${
+                  hasAssignments 
+                    ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' 
+                    : 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
+                }`}
+              >
+                {hasAssignments ? 'Proceed & Remove' : 'Yes, Remove'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -334,6 +391,8 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   const [showPlaylists, setShowPlaylists] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [assignedStores, setAssignedStores] = useState<string[]>([]);
+  const [isCheckingAssignments, setIsCheckingAssignments] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -350,12 +409,30 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
     return url && url.trim() !== "" && !url.includes("undefined");
   };
 
-
+  const handleOpenRemoveModal = async () => {
+    setShowRemoveModal(true);
+    setIsCheckingAssignments(true);
+    setAssignedStores([]);
+    try {
+      const res = await fetch(`/api/onboarded-devices?deviceId=${device._id}&checkOnly=true`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success && data.hasAssignments) {
+        setAssignedStores(data.assignedStores || []);
+      }
+    } catch (err) {
+      console.error("Error checking assignments:", err);
+    } finally {
+      setIsCheckingAssignments(false);
+    }
+  };
 
   const handleRemoveDevice = () => {
     if (onRemoveDevice) {
       onRemoveDevice(device._id);
       setShowRemoveModal(false);
+      setAssignedStores([]);
     }
   };
 
@@ -522,7 +599,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
           </button>
           
           <button
-            onClick={() => setShowRemoveModal(true)}
+            onClick={handleOpenRemoveModal}
             className="p-2.5 text-gray-400 hover:text-white hover:bg-red-500 bg-gray-50 rounded-xl transition-all duration-300 shadow-sm"
             title="Remove Device"
           >
@@ -535,9 +612,11 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
 
     <RemoveDeviceModal
       isOpen={showRemoveModal}
-      onClose={() => setShowRemoveModal(false)}
+      onClose={() => { setShowRemoveModal(false); setAssignedStores([]); }}
       onConfirm={handleRemoveDevice}
       deviceName={deviceId.name}
+      assignedStores={assignedStores}
+      isCheckingAssignments={isCheckingAssignments}
     />
     <EditDeviceModal
       isOpen={showEditModal}

@@ -182,7 +182,8 @@ export async function DELETE(req: NextRequest) {
   try {
     const url = req.nextUrl;
     const deviceId = url.searchParams.get("deviceId");
-    console.log("Received deviceId", deviceId);
+    const checkOnly = url.searchParams.get("checkOnly"); // If "true", only check assignments without deleting
+    console.log("Received deviceId", deviceId, "checkOnly", checkOnly);
 
     if (!deviceId) {
       return NextResponse.json(
@@ -199,9 +200,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const deviceObjectId = new mongoose.Types.ObjectId(deviceId);
-
-    // First, find the device to get the actual device ID from the main Device collection
+    // First, find the onboarded device record
     const onboardedDevice = await OnboardedDevice.findById(deviceId);
     
     if (!onboardedDevice) {
@@ -211,19 +210,38 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Delete from all related collections
+    // Check if device is assigned to any store-level users
+    const assignedToStores = await AssignedDevice.find({ 
+      deviceId: onboardedDevice.deviceId,
+      status: "active" 
+    }).populate("userId", "username");
+
+    const assignedStoreNames = assignedToStores.map((a: any) => 
+      a.userId?.username || "Unknown Store"
+    );
+
+    // If checkOnly, return assignment info without deleting
+    if (checkOnly === "true") {
+      return NextResponse.json({
+        success: true,
+        hasAssignments: assignedToStores.length > 0,
+        assignedStores: assignedStoreNames,
+        assignmentCount: assignedToStores.length,
+      });
+    }
+
+    const deviceObjectId = new mongoose.Types.ObjectId(deviceId);
+
+    // Delete from related collections (but NOT from admin-level Device collection)
     const deleteResults = await Promise.all([
-      // Delete from OnboardedDevice collection
+      // Delete from OnboardedDevice collection (superuser level)
       OnboardedDevice.findByIdAndDelete(deviceId),
       
       // Delete from DevicePlaylist connections
       DevicePlaylist.deleteMany({ deviceId: deviceObjectId }),
       
-      // Delete from AssignedDevice connections
+      // Delete from AssignedDevice connections (store level)
       AssignedDevice.deleteMany({ deviceId: onboardedDevice.deviceId }),
-      
-      // Delete from main Device collection
-      Device.findByIdAndDelete(onboardedDevice.deviceId)
     ]);
 
     // Check if the main deletion was successful
@@ -235,7 +253,11 @@ export async function DELETE(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, message: "Device removed successfully from all collections" },
+      { 
+        success: true, 
+        message: "Device removed successfully",
+        removedAssignments: assignedToStores.length,
+      },
       { status: 200 }
     );
   } catch (error) {
