@@ -95,6 +95,8 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
   {
     title: "Media",
     items: [
+      { key: "uploadVideo", label: "Upload Video", icon: <FaVideo /> },
+      { key: "uploadAudio", label: "Upload Audio", icon: <FaMusic /> },
       { key: "uploadImage", label: "Upload Image", icon: <FaUpload /> },
       { key: "showMedia", label: "All Media", icon: <FaRegFileAudio /> },
       { key: "setupPlaylist", label: "Create Playlist", icon: <FaListAlt /> },
@@ -549,6 +551,7 @@ export default function RoboticPlatform(): React.ReactElement {
 
       case "createMedia":
       case "uploadVideo":
+        return <CreateMedia onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => { fetchPlaylists(); fetchAnnouncements(); setSelectedMenu("showMedia"); }} />;
       case "uploadImage":
         return <CreateImage onCancel={() => setSelectedMenu("dashboard")} onSuccess={() => { fetchPlaylists(); fetchAnnouncements(); setSelectedMenu("showMedia"); }} />;
       case "uploadAudio":

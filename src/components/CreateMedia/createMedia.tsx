@@ -166,6 +166,9 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
       formData.append("files[0]", fileObj.file);
       formData.append("fileNames[0]", fileObj.name);
       formData.append("userId", userId);
+      // Send role so the server can enforce file-type restrictions
+      const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") || "" : "";
+      formData.append("userRole", userRole);
 
       xhr.open("POST", "/api/media/upload", true);
 

@@ -32,7 +32,12 @@ export async function GET(request: NextRequest) {
       }
     };
     if (cameraId && cameraId !== 'all') {
-      query["metadata.camera_id"] = cameraId;
+      const ids = cameraId.split(',');
+      if (ids.length > 1) {
+        query["metadata.camera_id"] = { $in: ids };
+      } else {
+        query["metadata.camera_id"] = cameraId;
+      }
     }
 
     // Fetch matching events

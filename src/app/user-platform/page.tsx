@@ -160,76 +160,90 @@ interface MenuItem {
 
 
 
-// --- Constants ---
-const menuSections: MenuItem[] = [
-  { key: "dashboard", label: "Dashboard", icon: <FaThLarge size={15} /> },
-  {
-    key: "mediaManagement",
-    label: "Media Management",
-    icon: <FaMusic size={20} />,
-    items: [
-      {
-        key: "upload",
-        label: "Upload",
-        icon: <FaUpload size={15} />,
-        items: [
-          { key: "uploadVideo", label: "Upload Video", icon: <FaListAlt /> },
-          { key: "uploadAudio", label: "Upload Audio", icon: <FaMusic /> },
-          { key: "uploadImage", label: "Upload Image", icon: <FaRegFileAudio /> },
-        ],
-      },
-      {
-        key: "media",
-        label: "Media",
-        icon: <FaMusic size={15} />,
-        items: [
-          { key: "mediaLibrary", label: "Media Library", icon: <FaRegFileAudio /> },
-          // {key:"presentation", label:"Presentation", icon:<FaDesktop />}
-        ],
-      },
-      {
-        key: "playlist",
-        label: "Playlist",
-        icon: <MdOutlinePlaylistPlay size={15} />,
-        items: [
-          { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
-          { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-          { key: "viewGroups", label: "Quick Playlist", icon: <FaThLarge /> },
-          { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
-        ],
-      },
-    ],
-  },
-  {
-    key: "announcement",
-    label: "Announcement Hub",
-    icon: <FaBullhorn size={20} />,
-    items: [
-      { key: "createAnnouncement", label: "Create new announcement", icon: <MdAnnouncement /> },
-      { key: "scheduleAnnouncement", label: "Schedule announcement", icon: <FaCog /> },
-      { key: "announcementPlaylist", label: "Announcement playlist", icon: <FaListAlt /> },
-      { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
-      { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
-      { key: "InstantaneousAnnouncement", label: "Instantaneous Announcement", icon: <FaBolt /> },
-    ],
-  },
-  {
-    key: "scheduler",
-    label: "Scheduler", 
-    icon: <FaCalendarAlt size={20} />,
-    items: [
-      { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
-    ],
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: <FaCog size={20} />,
-    items: [
-      { key: "userSettings", label: "Account Settings", icon: <FaUserCircle /> },
-    ],
-  },
-];
+// --- Build menu sections based on user role ---
+// admin → image upload only
+// user (store-level) and superUser → can upload images, audio, and video
+const buildMenuSections = (role: string | null): MenuItem[] => {
+  // Restrict to images only for admin accounts
+  const isAdminOnly = role === "admin";
+
+  const uploadItems: MenuItem[] = isAdminOnly
+    ? [
+        // Admin: images only
+        { key: "uploadImage", label: "Upload Image", icon: <FaRegFileAudio /> },
+      ]
+    : [
+        // user / superUser: all media types
+        { key: "uploadVideo", label: "Upload Video", icon: <FaListAlt /> },
+        { key: "uploadAudio", label: "Upload Audio", icon: <FaMusic /> },
+        { key: "uploadImage", label: "Upload Image", icon: <FaRegFileAudio /> },
+      ];
+
+  return [
+    { key: "dashboard", label: "Dashboard", icon: <FaThLarge size={15} /> },
+    {
+      key: "mediaManagement",
+      label: "Media Management",
+      icon: <FaMusic size={20} />,
+      items: [
+        {
+          key: "upload",
+          label: "Upload",
+          icon: <FaUpload size={15} />,
+          items: uploadItems,
+        },
+        {
+          key: "media",
+          label: "Media",
+          icon: <FaMusic size={15} />,
+          items: [
+            { key: "mediaLibrary", label: "Media Library", icon: <FaRegFileAudio /> },
+          ],
+        },
+        {
+          key: "playlist",
+          label: "Playlist",
+          icon: <MdOutlinePlaylistPlay size={15} />,
+          items: [
+            { key: "setupPlaylist", label: "Setup Playlist", icon: <FaListAlt /> },
+            { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
+            { key: "viewGroups", label: "Quick Playlist", icon: <FaThLarge /> },
+            { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
+          ],
+        },
+      ],
+    },
+    {
+      key: "announcement",
+      label: "Announcement Hub",
+      icon: <FaBullhorn size={20} />,
+      items: [
+        { key: "createAnnouncement", label: "Create new announcement", icon: <MdAnnouncement /> },
+        { key: "scheduleAnnouncement", label: "Schedule announcement", icon: <FaCog /> },
+        { key: "announcementPlaylist", label: "Announcement playlist", icon: <FaListAlt /> },
+        { key: "announcementLibrary", label: "Announcement library", icon: <FaRegFileAudio /> },
+        { key: "connectAnnouncement", label: "Connect announcement", icon: <FaLink /> },
+        { key: "InstantaneousAnnouncement", label: "Instantaneous Announcement", icon: <FaBolt /> },
+      ],
+    },
+    {
+      key: "scheduler",
+      label: "Scheduler",
+      icon: <FaCalendarAlt size={20} />,
+      items: [
+        { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
+      ],
+    },
+    {
+      key: "settings",
+      label: "Settings",
+      icon: <FaCog size={20} />,
+      items: [
+        { key: "userSettings", label: "Account Settings", icon: <FaUserCircle /> },
+      ],
+    },
+  ];
+};
 
 export default function UserPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<ExtendedMenuKey>("dashboard");
@@ -310,6 +324,7 @@ const [slides, setSlides] = useState<Slide[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["playlist", "announcement"])
   );
@@ -319,12 +334,13 @@ const [slides, setSlides] = useState<Slide[]>([]);
   // Autoplay every 3 seconds
 
   useEffect(() => {
-    const userRole = localStorage.getItem("userRole");
-    if (userRole !== "user") {
+    const storedRole = localStorage.getItem("userRole");
+    if (storedRole !== "user") {
       toast.error("You are not authorized to access this page.");
       window.location.href = "/login";
       return;
     }
+    setUserRole(storedRole);
 
     const fetchUserData = async () => {
       try {
@@ -1350,7 +1366,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
           <span className="font-semibold text-[12px]">Centelon Robotics</span>
         </div>
         <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6 custom-scrollbar">
-          {menuSections.map((section) => {
+          {buildMenuSections(userRole).map((section: MenuItem) => {
             const renderMenuItem = (item: MenuItem, depth = 0) => {
               const hasChildren = item.items && item.items.length > 0;
               const isExpanded = expandedMenus.has(item.key);
@@ -1433,7 +1449,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
         </div>
       </div>
     );
-  }, [expandedMenus, selectedMenu, userData]);
+  }, [expandedMenus, selectedMenu, userData, userRole]);
 
   const renderContent = (): React.ReactElement => {
   if (selectedDevice) {
