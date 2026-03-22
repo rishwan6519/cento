@@ -76,9 +76,10 @@ export async function POST(request: Request) {
       }, { status: 404 });
     }
 
-    // Check if device is already assigned
+    // Check if device is already assigned by this parent
     const existingAssignment = await AssignedDevice.findOne({
       deviceId,
+      assignedBy,
       status: 'active'
     });
 

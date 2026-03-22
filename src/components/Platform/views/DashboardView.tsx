@@ -56,124 +56,115 @@ const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Main Content Area with Slider (Matches Store User Platform Layout) */}
-      <div className="flex flex-col lg:flex-row-reverse gap-8">
-        {/* Dynamic Promotional Slider on Right */}
-        <div className="w-full lg:w-[320px] shrink-0">
-          <SliderDisplay />
+      {/* Main Content Area */}
+      <div className="space-y-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Devices</p>
+                <h4 className="text-2xl font-bold text-gray-900 mt-1">{totalCount}</h4>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <FaRobot className="text-blue-500 text-xl" />
+              </div>
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Connected</p>
+                <h4 className="text-2xl font-bold text-gray-900 mt-1">{connectedCount}</h4>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Offline</p>
+                <h4 className="text-2xl font-bold text-gray-900 mt-1">{offlineCount}</h4>
+              </div>
+              <div className="p-3 bg-red-50 rounded-lg">
+                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+            </div>
+          </Card>
         </div>
 
-        {/* Devices and Stats on Left */}
-        <div className="flex-1 space-y-8">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total Devices</p>
-                  <h4 className="text-2xl font-bold text-gray-900 mt-1">{totalCount}</h4>
-                </div>
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <FaRobot className="text-blue-500 text-xl" />
-                </div>
-              </div>
-            </Card>
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Connected</p>
-                  <h4 className="text-2xl font-bold text-gray-900 mt-1">{connectedCount}</h4>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
-            </Card>
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Offline</p>
-                  <h4 className="text-2xl font-bold text-gray-900 mt-1">{offlineCount}</h4>
-                </div>
-                <div className="p-3 bg-red-50 rounded-lg">
-                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </div>
-              </div>
-            </Card>
-          </div>
+        {/* Device Cards or Empty State */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {devices.length > 0 ? (
+            devices.slice(0, 4).map((device) => (
+              <DeviceCard
+                key={device._id}
+                device={device}
+                deviceStatuses={deviceStatuses}
+                onEdit={handleDeviceEdit}
+                onManagePlaylists={onManagePlaylists}
+                onRemoveDevice={async (deviceId) => {
+                  try {
+                    const res = await fetch(`api/onboarded-devices?deviceId=${deviceId}`, {
+                      method: "DELETE",
+                    });
 
-          {/* Device Cards or Empty State */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {devices.length > 0 ? (
-              devices.slice(0, 4).map((device) => (
-                <DeviceCard
-                  key={device._id}
-                  device={device}
-                  deviceStatuses={deviceStatuses}
-                  onEdit={handleDeviceEdit}
-                  onManagePlaylists={onManagePlaylists}
-                  onRemoveDevice={async (deviceId) => {
-                    try {
-                      const res = await fetch(`api/onboarded-devices?deviceId=${deviceId}`, {
-                        method: "DELETE",
-                      });
-
-                      if (res.ok) {
-                        setDevices(devices.filter((d) => d._id !== deviceId));
-                        toast.success(`Device ${deviceId} removed successfully`);
-                      } else {
-                        toast.error(`Failed to remove device ${deviceId}`);
-                      }
-                    } catch (error) {
-                      console.error("Error removing device:", error);
-                      toast.error("An error occurred while removing the device");
+                    if (res.ok) {
+                      setDevices(devices.filter((d) => d._id !== deviceId));
+                      toast.success(`Device ${deviceId} removed successfully`);
+                    } else {
+                      toast.error(`Failed to remove device ${deviceId}`);
                     }
-                  }}
-                  onUnlinkPlaylist={async (deviceId, playlistId, type) => {
-                    if (onUnlinkPlaylist) {
-                      await onUnlinkPlaylist(deviceId, playlistId, type);
-                      // After unlinking, we need to refresh the parent platform data
-                      if ((window as any).refreshPlatformData) {
-                        (window as any).refreshPlatformData();
-                      }
+                  } catch (error) {
+                    console.error("Error removing device:", error);
+                    toast.error("An error occurred while removing the device");
+                  }
+                }}
+                onUnlinkPlaylist={async (deviceId, playlistId, type) => {
+                  if (onUnlinkPlaylist) {
+                    await onUnlinkPlaylist(deviceId, playlistId, type);
+                    if ((window as any).refreshPlatformData) {
+                      (window as any).refreshPlatformData();
                     }
-                  }}
-                />
-              ))
-            ) : (
-              <EmptyState
-                onAddNew={isSuperUser ? onAddNew : undefined}
-                message={
-                  isSuperUser
-                    ? "You haven't onboarded any robotic devices yet. Get started by adding your first device."
-                    : "You have no assigned device available here. Kindly contact your admin."
-                }
-                icon={<FaRobot className="text-blue-500 text-3xl" />}
-                buttonText={isSuperUser ? "Onboard Device" : undefined}
-                role={userRole}
+                  }
+                }}
               />
-            )}
-          </div>
-
-          {devices.length > 4 && (
-            <div className="flex justify-center mt-8">
-              <Button
-                variant="secondary"
-                onClick={() => setShowAllDevices(true)}
-                className="px-8 py-3 rounded-xl border-2 border-indigo-100 text-indigo-600 font-bold hover:bg-indigo-50 transition-all flex items-center gap-2"
-              >
-                View All {devices.length} Onboarded Devices
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </Button>
-            </div>
+            ))
+          ) : (
+            <EmptyState
+              onAddNew={isSuperUser ? onAddNew : undefined}
+              message={
+                isSuperUser
+                  ? "You haven't onboarded any robotic devices yet. Get started by adding your first device."
+                  : "You have no assigned device available here. Kindly contact your admin."
+              }
+              icon={<FaRobot className="text-blue-500 text-3xl" />}
+              buttonText={isSuperUser ? "Onboard Device" : undefined}
+              role={userRole}
+            />
           )}
         </div>
+
+        {devices.length > 4 && (
+          <div className="flex justify-center mt-8">
+            <Button
+              variant="secondary"
+              onClick={() => setShowAllDevices(true)}
+              className="px-8 py-3 rounded-xl border-2 border-indigo-100 text-indigo-600 font-bold hover:bg-indigo-50 transition-all flex items-center gap-2"
+            >
+              View All {devices.length} Onboarded Devices
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* View All Devices Modal */}

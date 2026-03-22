@@ -78,7 +78,6 @@ const ManageContentModal = ({
 }) => {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [sliders, setSliders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -113,20 +112,6 @@ const ManageContentModal = ({
           connectedIds.includes(a._id)
         );
         setAnnouncements(connectedAnns);
-      }
-
-      // 3. Fetch Sliders
-      const sliderRes = await fetch(`/api/sliders`);
-      const assignedRes = await fetch(`/api/assign-slider?deviceId=${device.deviceId._id}`);
-      if (sliderRes.ok && assignedRes.ok) {
-        const sliderData = await sliderRes.json();
-        const assignedData = await assignedRes.json();
-        // Assuming assign-slider returns an array of assignments
-        const assignedIds = (assignedData.data || []).map((a: any) => a.sliderId);
-        const connectedSliders = (sliderData.data || []).filter((s: any) => 
-          assignedIds.includes(s._id)
-        );
-        setSliders(connectedSliders);
       }
     } catch (err) {
       toast.error("Failed to fetch device content");
@@ -165,20 +150,7 @@ const ManageContentModal = ({
     }
   };
 
-  const handleUnlinkSlider = async (sliderId: string) => {
-    if (!device) return;
-    try {
-      const res = await fetch(`/api/assign-slider?deviceId=${device.deviceId._id}&sliderId=${sliderId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        toast.success("Slider unlinked");
-        fetchContent(); // Refresh
-      } else throw new Error();
-    } catch {
-      toast.error("Failed to unlink slider");
-    }
-  };
+
 
   if (!isOpen || !device) return null;
 
@@ -229,37 +201,6 @@ const ManageContentModal = ({
                           </div>
                           <button 
                             onClick={() => handleUnlinkPlaylist(pl.playlistData._id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors"
-                          >
-                            <FiLink2 className="rotate-45" /> Unlink
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Sliders Section */}
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <FaBullhorn className="text-indigo-500" /> Connected Sliders
-                </h3>
-                {sliders.length === 0 ? (
-                  <div className="text-center py-6 bg-white rounded-xl border border-dashed border-gray-200">
-                    <p className="text-sm text-gray-400">No sliders connected</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {sliders.map(s => (
-                      <div key={s._id} className="flex flex-col bg-white p-4 rounded-xl border border-gray-100 shadow-sm gap-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-semibold text-gray-900">{s.sliderName}</p>
-                            <p className="text-xs text-gray-500">{s.sliders.length} Images</p>
-                          </div>
-                          <button 
-                            onClick={() => handleUnlinkSlider(s._id)}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 text-xs font-semibold rounded-lg hover:bg-red-100 transition-colors"
                           >
                             <FiLink2 className="rotate-45" /> Unlink
@@ -330,11 +271,35 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
   const [managingDevice, setManagingDevice] = useState<ConnectedDevice | null>(null);
 
   const controllerId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
-  // Fetch users/stores
   useEffect(() => {
-    fetchUsers();
+    const role = localStorage.getItem("userRole"); // Updated to match userRole
+    setCurrentUserRole(role);
   }, []);
+
+  // Helper to get labels based on role
+  const getSubRoleLabels = () => {
+    switch(currentUserRole) {
+      case 'admin':
+        return { plural: "Resellers", singular: "Reseller", targetRole: "reseller" };
+      case 'reseller':
+        return { plural: "Account Users", singular: "Account User", targetRole: "superUser" };
+      case 'superUser':
+        return { plural: "Stores", singular: "Store", targetRole: "user" };
+      default:
+        // By default, assume the user manages stores (e.g. if they are a superUser)
+        return { plural: "Stores", singular: "Store", targetRole: "user" };
+    }
+  };
+
+  const labels = getSubRoleLabels();
+
+  useEffect(() => {
+    if (currentUserRole && controllerId) {
+      fetchUsers();
+    }
+  }, [currentUserRole, controllerId]);
 
   const fetchUsers = async () => {
     try {
@@ -342,9 +307,16 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
       const res = await fetch(`/api/user?controllerId=${controllerId}`);
       if (!res.ok) throw new Error("Failed to fetch users");
       const data = await res.json();
-      setUsers(data.data?.filter((u: User) => u.role === "user") || []);
+      
+      // Determine target role based directly on currentUserRole to avoid race conditions
+      let targetRole = "user";
+      if (currentUserRole === 'admin') targetRole = "reseller";
+      else if (currentUserRole === 'reseller') targetRole = "superUser";
+      else targetRole = "user";
+
+      setUsers(data.data?.filter((u: User) => u.role === targetRole) || []);
     } catch {
-      toast.error("Failed to load stores");
+      toast.error(`Failed to load items`);
     } finally {
       setLoading(false);
     }
@@ -380,16 +352,16 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
 
   // Disconnect/remove device from user
   const handleRemoveDevice = async (assignmentId: string) => {
-    if (!confirm("Are you sure you want to remove this device from the store?")) return;
+    if (!confirm(`Are you sure you want to remove this device from the ${labels.singular.toLowerCase()}?`)) return;
     try {
       const res = await fetch(`/api/assign-device?userId=${assignmentId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed");
-      toast.success("Device removed from store");
+      toast.success(`Device removed from ${labels.singular.toLowerCase()}`);
       if (selectedUser) fetchConnectedDevices(selectedUser._id);
     } catch {
-      toast.error("Failed to remove device");
+      toast.error(`Failed to remove device from ${labels.singular.toLowerCase()}`);
     }
   };
 
@@ -427,7 +399,7 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       if (data.success) {
-        toast.success("Device assigned to store!");
+        toast.success(`Device assigned to ${labels.singular.toLowerCase()}!`);
         setShowOnboardModal(false);
         // Refresh global data and navigate to All Devices section
         if ((window as any).refreshPlatformData) (window as any).refreshPlatformData();
@@ -483,22 +455,28 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500 mb-1">Connected Devices</p>
-            <p className="text-3xl font-bold text-gray-900">{connectedDevices.length}</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-6 shadow-xl shadow-indigo-200">
+            <p className="text-sm text-indigo-100 font-medium mb-1">Total Onboarded</p>
+            <p className="text-4xl font-extrabold text-white">{connectedDevices.length}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500 mb-1">Active</p>
-            <p className="text-3xl font-bold text-green-600">
-              {connectedDevices.filter((d) => d.deviceId?.status === "active").length}
-            </p>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100/50 flex flex-col justify-between">
+            <p className="text-sm text-gray-500 font-medium mb-1">Connected & Active</p>
+            <div className="flex items-end justify-between">
+               <p className="text-4xl font-extrabold text-emerald-600">
+                 {connectedDevices.filter((d) => d.deviceId?.status === "active").length}
+               </p>
+               <div className="h-2 w-2 rounded-full bg-emerald-500 mb-2 animate-pulse" />
+            </div>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500 mb-1">Inactive</p>
-            <p className="text-3xl font-bold text-red-500">
-              {connectedDevices.filter((d) => d.deviceId?.status !== "active").length}
-            </p>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-red-100/50 flex flex-col justify-between">
+            <p className="text-sm text-gray-500 font-medium mb-1">Offline / Inactive</p>
+            <div className="flex items-end justify-between">
+               <p className="text-4xl font-extrabold text-red-500">
+                 {connectedDevices.filter((d) => d.deviceId?.status !== "active").length}
+               </p>
+               <div className="h-2 w-2 rounded-full bg-red-500 mb-2" />
+            </div>
           </div>
         </div>
 
@@ -522,12 +500,6 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
           >
             <FaBullhorn /> Announcement
           </button>
-          <button
-            onClick={() => onNavigate("assignSlider")}
-            className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl font-semibold text-sm hover:bg-purple-700 transition-colors shadow-md shadow-purple-200"
-          >
-            <FaImage /> Slider
-          </button>
         </div>
 
         {/* Connected Devices Grid */}
@@ -540,7 +512,7 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
           ) : connectedDevices.length === 0 ? (
             <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
               <MdDevices className="mx-auto text-4xl text-gray-300 mb-3" />
-              <p className="text-gray-500 font-medium">No devices connected to this store yet.</p>
+              <p className="text-gray-500 font-medium">No devices connected to this {labels.singular.toLowerCase()} yet.</p>
               <button
                 onClick={handleOpenOnboard}
                 className="mt-4 px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors"
@@ -553,22 +525,25 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
               {connectedDevices.map((device) => (
                 <motion.div
                   key={device._id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow group"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ y: -5 }}
+                  className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-indigo-100 transition-all duration-300 group"
                 >
                   {/* Device Image */}
-                  <div className="h-36 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center relative">
+                  <div className="h-40 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative group-hover:from-indigo-50 group-hover:to-white transition-colors">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] opacity-20" />
                     <img
                       src={getDeviceIcon(device.deviceId?.name, device.deviceId?.imageUrl)}
                       alt={device.deviceId?.name}
-                      className="h-16 w-16 object-contain rounded-full"
+                      className="h-20 w-20 object-contain drop-shadow-2xl transform group-hover:scale-110 transition-transform duration-500"
                     />
-                    <span
-                      className={`absolute top-3 right-3 w-3 h-3 rounded-full border-2 border-white ${
-                        device.deviceId?.status === "active" ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    />
+                    <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 bg-white/80 backdrop-blur-md rounded-full shadow-sm border border-white">
+                       <span className={`w-2 h-2 rounded-full ${device.deviceId?.status === "active" ? "bg-emerald-500" : "bg-red-500"}`} />
+                       <span className="text-[10px] font-bold text-slate-700 uppercase tracking-tight">
+                         {device.deviceId?.status === "active" ? "Online" : "Offline"}
+                       </span>
+                    </div>
                   </div>
 
                   {/* Device Info */}
@@ -702,7 +677,7 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
                             disabled={assigningDeviceId === device._id}
                             className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {assigningDeviceId === device._id ? "Assigning..." : "Assign to Store"}
+                            {assigningDeviceId === device._id ? "Assigning..." : `Assign to ${labels.singular}`}
                           </button>
                         </div>
                       ))}
@@ -729,21 +704,21 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-gray-900">Stores</h3>
-          <p className="text-gray-500">Select a store to manage its devices and content</p>
+          <h3 className="text-2xl font-bold text-gray-900">{labels.plural}</h3>
+          <p className="text-gray-500">Select a {labels.singular.toLowerCase()} to manage its devices and content</p>
         </div>
         <button
           onClick={() => onNavigate("createUser")}
           className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200"
         >
-          <FaPlus /> Create New Store
+          <FaPlus /> Create New {labels.singular}
         </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500 mb-1">Total Stores</p>
+          <p className="text-sm text-gray-500 mb-1">Total {labels.plural}</p>
           <p className="text-3xl font-bold text-gray-900">{users.length}</p>
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
@@ -763,14 +738,14 @@ const StoreManagement: React.FC<StoreManagementProps> = ({ onNavigate }) => {
       {/* Store Cards Grid */}
       {users.length === 0 ? (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-16 text-center">
-          <FaStore className="mx-auto text-5xl text-gray-300 mb-4" />
-          <p className="text-gray-500 font-medium text-lg">No stores created yet.</p>
-          <p className="text-sm text-gray-400 mt-1">Create your first store to get started.</p>
+          <FaUser className="mx-auto text-5xl text-gray-300 mb-4" />
+          <p className="text-gray-500 font-medium text-lg">No {labels.plural.toLowerCase()} created yet.</p>
+          <p className="text-sm text-gray-400 mt-1">Create your first {labels.singular.toLowerCase()} to get started.</p>
           <button
             onClick={() => onNavigate("createUser")}
             className="mt-5 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors"
           >
-            Create Store
+            Create {labels.singular}
           </button>
         </div>
       ) : (

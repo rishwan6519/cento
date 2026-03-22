@@ -23,6 +23,7 @@ import CreateSlider from "@/components/CreatSlider/CreateSlider";
 import SliderManager from "@/components/showSlider/showSlider";
 import CreateImage from "@/components/UploadImage/UploadImage";
 import ShowMedia from "@/components/ShowMedia/showMedia";
+import AssignDevice from "@/components/AssignDevice/AssignDevice";
 import { ImageIcon, Film, Upload } from "lucide-react";
 
 interface DeviceType {
@@ -162,6 +163,12 @@ export default function RobotAdminDashboard() {
           label: "View Devices",
           icon: <Database size={20} className="text-purple-500" />,
           description: "View all registered devices",
+        },
+        {
+          id: "assignDevice",
+          label: "Assign Device",
+          icon: <Database size={20} className="text-pink-500" />,
+          description: "Assign devices to Resellers",
         },
       ],
     },
@@ -460,6 +467,10 @@ export default function RobotAdminDashboard() {
 
                   {activeSection === "showDevices" && (
                     <ShowDevices onBack={() => setActiveSection("")} />
+                  )}
+
+                  {activeSection === "assignDevice" && (
+                    <AssignDevice onSuccess={() => setActiveSection("")} defaultAction="assign" />
                   )}
 
                   {activeSection === "users" && <UserManagement />}

@@ -397,6 +397,10 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
 
   const { deviceId, typeId, connectedPlaylists } = device;
+  const anyDevice = device as any;
+  const anyDeviceId = anyDevice.deviceId || {};
+  const safeDeviceId = anyDeviceId;
+  const safeTypeId = anyDevice.typeId || anyDeviceId.typeId || {};
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -460,10 +464,10 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       {/* Top Section */}
       <div className="flex items-start justify-between mb-4">
         <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-sm relative overflow-hidden">
-          {isValidImageUrl(deviceId.imageUrl) ? (
+          {isValidImageUrl(safeDeviceId.imageUrl) ? (
             <img
-              src={deviceId.imageUrl}
-              alt={`Device ${deviceId.name}`}
+              src={safeDeviceId.imageUrl}
+              alt={`Device ${safeDeviceId.name || 'Unknown'}`}
               className="w-full h-full object-contain"
             />
           ) : (
@@ -474,10 +478,10 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         <div className="flex flex-col items-end gap-2">
            {/* Status Badge */}
            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-            (deviceStatuses[deviceId.serialNumber]?.status === "online") ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+            (deviceStatuses[safeDeviceId.serialNumber]?.status === "online") ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
           }`}>
-             <span className={`w-2 h-2 rounded-full ${(deviceStatuses[deviceId.serialNumber]?.status === "online") ? "bg-emerald-500" : "bg-red-500"}`} />
-             {(deviceStatuses[deviceId.serialNumber]?.status === "online") ? "Online" : "Offline"}
+             <span className={`w-2 h-2 rounded-full ${(deviceStatuses[safeDeviceId.serialNumber]?.status === "online") ? "bg-emerald-500" : "bg-red-500"}`} />
+             {(deviceStatuses[safeDeviceId.serialNumber]?.status === "online") ? "Online" : "Offline"}
            </div>
 
            {/* SuperUser Edit floaty button - now inline next to status */}
@@ -498,10 +502,10 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
 
       {/* Main content body */}
       <div className="flex-grow flex flex-col mb-4">
-        <h4 className="font-extrabold text-gray-900 text-xl tracking-tight mb-1 truncate">{deviceId.name}</h4>
+        <h4 className="font-extrabold text-gray-900 text-xl tracking-tight mb-1 truncate">{safeDeviceId.name || "Unknown Device"}</h4>
         <div className="flex items-center text-xs text-gray-500 font-medium tracking-wide gap-2">
-           <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md uppercase">{typeId.name}</span>
-           <span>S/N: {deviceId.serialNumber}</span>
+           <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md uppercase">{safeTypeId.name || "Unknown Type"}</span>
+           <span>S/N: {safeDeviceId.serialNumber || "N/A"}</span>
         </div>
       </div>
       
@@ -528,12 +532,12 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
                         <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Announcement</span>
                       )}
                     </div>
-                    {onUnlinkPlaylist && userRole === 'superUser' && (
+                    {onUnlinkPlaylist && (userRole === 'superUser' || userRole === 'user') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (confirm(`Unlink "${playlist.name}" from this device?`)) {
-                            onUnlinkPlaylist(deviceId._id, playlist.id, playlist.type || 'regular');
+                            onUnlinkPlaylist(safeDeviceId._id || device._id, playlist.id, playlist.type || 'regular');
                           }
                         }}
                         className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded-md transition-colors"
@@ -583,7 +587,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       )}
 
       {/* Superuser Actions */}
-      {userRole === "superUser" && (
+      {(userRole === "superUser" || userRole === "user") && (
         <div className="flex items-center justify-between gap-3 mt-auto pt-2">
           <button
             onClick={() => {
@@ -614,7 +618,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       isOpen={showRemoveModal}
       onClose={() => { setShowRemoveModal(false); setAssignedStores([]); }}
       onConfirm={handleRemoveDevice}
-      deviceName={deviceId.name}
+      deviceName={safeDeviceId.name || "Unknown"}
       assignedStores={assignedStores}
       isCheckingAssignments={isCheckingAssignments}
     />
@@ -622,9 +626,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       isOpen={showEditModal}
       onClose={() => setShowEditModal(false)}
       onSave={handleSaveEdit}
-      initialName={deviceId.name}
-      initialImageUrl={deviceId.imageUrl || ""}
-      deviceId={deviceId._id}
+      initialName={safeDeviceId.name || ""}
+      initialImageUrl={safeDeviceId.imageUrl || ""}
+      deviceId={safeDeviceId._id || device._id}
     />
     </>
   );

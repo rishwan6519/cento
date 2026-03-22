@@ -1140,6 +1140,30 @@ console.log("availableDevices",availableDevices);
       return;
     }
 
+    // 3. Check for Announcement conflicts (Enhanced for User Request)
+    try {
+      const annRes = await fetch(`/api/announcement/device-announcement?deviceId=${selectedDeviceForPlaylist.deviceId._id}`);
+      if (annRes.ok) {
+        const annData = await annRes.json();
+        // If there are announcements connected to this device, show a warning
+        if (annData && annData.length > 0) {
+          const result = await Swal.fire({
+            title: 'Announcement Conflict Warning!',
+            text: "This device has active announcements scheduled. Connecting a playlist might overlap with these announcements during playback. Do you want to proceed anyway?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#07323C',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, proceed',
+            cancelButtonText: 'Cancel'
+          });
+          if (!result.isConfirmed) return;
+        }
+      }
+    } catch (err) {
+      console.error("Error checking announcement conflict:", err);
+    }
+
     setIsLoading(true);
     try {
       const response = await fetch("/api/device-playlists", {

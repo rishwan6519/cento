@@ -95,7 +95,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const controllerId = searchParams.get("controllerId");
 
-    const query = controllerId ? { controllerId } : {};
+    const query: any = {};
+    if (controllerId) {
+      if (mongoose.Types.ObjectId.isValid(controllerId)) {
+        query.controllerId = mongoose.Types.ObjectId.createFromHexString(controllerId);
+      } else {
+        query.controllerId = controllerId;
+      }
+    }
 
     // Find all users (or match controllerId), exclude password field
     const users = await User.find(query)

@@ -22,7 +22,7 @@ export default function UserManagement() {
   const [formData, setFormData] = useState<UserFormData>({
     username: '',
     password: '',
-    role: 'superUser'
+    role: 'reseller'
   });
 
   useEffect(() => {
@@ -41,8 +41,8 @@ export default function UserManagement() {
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
       if (data.success) {
-        // Only show superUsers in the list
-        const filteredUsers = data.data.filter((u: User) => u.role === 'superUser');
+        // Only show resellers in the list
+        const filteredUsers = data.data.filter((u: User) => u.role === 'reseller');
         setUsers(filteredUsers);
       }
     } catch (error) {
@@ -71,7 +71,7 @@ export default function UserManagement() {
         toast.success('User created successfully');
         fetchUsers();
         setIsAddingUser(false);
-        setFormData({ username: '', password: '', role: 'superUser' });
+        setFormData({ username: '', password: '', role: 'reseller' });
       } else {
         throw new Error(data.message);
       }
@@ -93,7 +93,7 @@ export default function UserManagement() {
         toast.success('User updated successfully');
         fetchUsers();
         setEditingUser(null);
-        setFormData({ username: '', password: '', role: 'superUser' });
+        setFormData({ username: '', password: '', role: 'reseller' });
       } else {
         throw new Error(data.message);
       }
@@ -171,7 +171,7 @@ export default function UserManagement() {
                   </td>
                   <td className="px-8 py-6 whitespace-nowrap">
                     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                      user.role === 'superUser' 
+                      user.role === 'reseller' 
                         ? 'bg-blue-100 text-blue-600' 
                         : 'bg-slate-100 text-slate-500'
                     }`}>
@@ -191,7 +191,7 @@ export default function UserManagement() {
                           <button
                             onClick={() => {
                               setEditingUser(null);
-                              setFormData({ username: '', password: '', role: 'superUser' });
+                              setFormData({ username: '', password: '', role: 'reseller' });
                             }}
                             className="px-4 py-2 bg-slate-100 text-slate-400 rounded-xl font-bold text-xs"
                           >
@@ -267,7 +267,7 @@ export default function UserManagement() {
                   onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
                   className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all appearance-none"
                 >
-                   <option value="superUser">Super User</option>
+                   <option value="reseller">Reseller</option>
                 </select>
               </div>
               <div className="flex flex-col gap-4 pt-4">
@@ -281,7 +281,7 @@ export default function UserManagement() {
                   type="button"
                   onClick={() => {
                     setIsAddingUser(false);
-                    setFormData({ username: '', password: '', role: 'superUser' });
+                    setFormData({ username: '', password: '', role: 'reseller' });
                   }}
                   className="w-full py-2 text-slate-400 font-bold hover:text-slate-900 transition-colors"
                 >

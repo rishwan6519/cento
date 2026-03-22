@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {connectToDatabase} from '@/lib/db';
+import { connectToDatabase } from '@/lib/db';
 import DevicePlaylist from '@/models/ConectPlaylist';
 import MediaGroup from '@/models/MediaGroups';
-import "@/models/PlaylistConfig"
+import PlaylistConfig from "@/models/PlaylistConfig";
+import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
+import DeviceAnnouncementConnection from '@/models/AnnouncementConnection';
 import "@/models/Device";
-import "@/models/User"
+import "@/models/User";
 import mongoose from 'mongoose';
+import { isTimeOverlapping } from '@/lib/conflictCheck';
 
 
 
@@ -33,7 +36,45 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
 
-    // 2. Check for existing regular playlist record
+    // 2. Schedule Conflict Check (New Feature)
+    const newPlaylists = await PlaylistConfig.find({ _id: { $in: playlistIds } });
+    
+    // Check against existing regular playlists for THIS device
+    const existingConnections = await DevicePlaylist.findOne({ deviceId }).populate('playlistIds');
+    if (existingConnections) {
+      for (const newP of newPlaylists) {
+        for (const existingP of (existingConnections.playlistIds || []) as any[]) {
+          if (newP._id.toString() === existingP._id.toString()) continue;
+          if (isTimeOverlapping(newP as any, existingP as any)) {
+             return NextResponse.json({
+                error: `Conflict: Time Slot overlap with existing playlist "${existingP.name}"`,
+                conflict: true,
+                conflictType: 'regular'
+              }, { status: 409 });
+          }
+        }
+      }
+    }
+
+    // Check against existing announcements for THIS device
+    const announcementConnections = await DeviceAnnouncementConnection.findOne({ deviceId }).populate('announcementPlaylistIds');
+    if (announcementConnections) {
+       for (const newP of newPlaylists) {
+         for (const existingAnn of (announcementConnections.announcementPlaylistIds || []) as any[]) {
+            const schedule = existingAnn.schedule || {};
+            if (schedule.scheduleType === 'hourly') continue; // Simple overlap skip for hourly for now or treat as always overlap?
+            if (isTimeOverlapping(newP as any, schedule as any)) {
+               return NextResponse.json({
+                  error: `Conflict: Time Slot overlap with existing announcement "${existingAnn.name}"`,
+                  conflict: true,
+                  conflictType: 'announcement'
+                }, { status: 409 });
+            }
+         }
+       }
+    }
+
+    // 3. Check for existing regular playlist record (Previous logic)
     const existing = await DevicePlaylist.findOne({ deviceId });
 
     if (existing) {

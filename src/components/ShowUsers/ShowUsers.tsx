@@ -20,9 +20,10 @@ interface UpdateModalProps {
   user: User;
   onClose: () => void;
   onUpdate: () => void;
+  labels: { plural: string; singular: string; targetRole: string };
 }
 
-const UpdateUserModal: React.FC<UpdateModalProps> = ({ user, onClose, onUpdate }) => {
+const UpdateUserModal: React.FC<UpdateModalProps> = ({ user, onClose, onUpdate, labels }) => {
   const [formData, setFormData] = useState({
     username: user.username,
     password: "",
@@ -100,29 +101,29 @@ const UpdateUserModal: React.FC<UpdateModalProps> = ({ user, onClose, onUpdate }
             />
           </div>
 
-          {/* Store Name Field */}
+          {/* Dynamic Name Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Store Name
+              {labels.singular} Name
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaStore className="text-gray-400" />
+                <FaUser className="text-gray-400" />
               </div>
               <input
                 type="text"
                 value={formData.storeName}
                 onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
                 className="w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="Enter store name"
+                placeholder={`Enter ${labels.singular.toLowerCase()} name`}
               />
             </div>
           </div>
 
-          {/* Store Location Field */}
+          {/* Dynamic Location Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Store Location
+              {labels.singular} Location
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -133,7 +134,7 @@ const UpdateUserModal: React.FC<UpdateModalProps> = ({ user, onClose, onUpdate }
                 value={formData.storeLocation}
                 onChange={(e) => setFormData({ ...formData, storeLocation: e.target.value })}
                 className="w-full pl-10 px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="Enter store location"
+                placeholder={`Enter ${labels.singular.toLowerCase()} location`}
               />
             </div>
           </div>
@@ -184,15 +185,43 @@ const ShowUsers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const controllerId = localStorage.getItem("userId");
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentUserRole(localStorage.getItem("userRole"));
+  }, []);
+
+  const getSubRoleLabels = () => {
+    switch(currentUserRole) {
+      case 'admin': return { plural: "Resellers", singular: "Reseller", targetRole: "reseller" };
+      case 'reseller': return { plural: "Account Users", singular: "Account User", targetRole: "superUser" };
+      case 'superUser': return { plural: "Stores", singular: "Store", targetRole: "user" };
+      default: return { plural: "Stores", singular: "Store", targetRole: "user" };
+    }
+  };
+
+  const labels = getSubRoleLabels();
 
   const fetchUsers = async () => {
+    if (!controllerId || !currentUserRole) {
+      setLoading(false);
+      return;
+    }
     try {
       const response = await fetch(`/api/user?controllerId=${controllerId}`);
       if (!response.ok) throw new Error("Failed to fetch users");
       const data = await response.json();
-      setUsers(data.data);
+      
+      // Determine target role based directly on currentUserRole to avoid race conditions
+      let targetRole = "user";
+      if (currentUserRole === 'admin') targetRole = "reseller";
+      else if (currentUserRole === 'reseller') targetRole = "superUser";
+      else targetRole = "user";
+
+      const filtered = data.data?.filter((u: any) => u.role === targetRole) || [];
+      setUsers(filtered);
     } catch (error) {
-      toast.error("Failed to load users");
+      toast.error(`Failed to load users`);
     } finally {
       setLoading(false);
     }
@@ -200,7 +229,7 @@ const ShowUsers: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [controllerId]);
+  }, [controllerId, currentUserRole, labels.targetRole]); // Corrected dependencies
 
   const handleDelete = async (userId: string) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
@@ -231,8 +260,8 @@ const ShowUsers: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <Card>
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-gray-900">User Management</h2>
-          <p className="text-gray-600">Manage users connected to your controller</p>
+          <h2 className="text-2xl font-semibold text-gray-900">{labels.plural} Management</h2>
+          <p className="text-gray-600">Manage {labels.plural.toLowerCase()} connected to your account</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -243,10 +272,10 @@ const ShowUsers: React.FC = () => {
                   Username
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Store Name
+                  {labels.singular} Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Store Location
+                  {labels.singular} Location
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Role
@@ -312,6 +341,7 @@ const ShowUsers: React.FC = () => {
             user={selectedUser}
             onClose={() => setSelectedUser(null)}
             onUpdate={fetchUsers}
+            labels={labels}
           />
         )}
       </AnimatePresence>

@@ -74,54 +74,58 @@ import {
 } from "@/components/Platform/types";
 
 // --- Constants ---
-const menuSections: { title: string; items: MenuItem[] }[] = [
-  {
-    title: "General",
-    items: [
-      { key: "storeManagement", label: "Stores", icon: <FaStore /> },
-      { key: "dashboard", label: "All Devices", icon: <RiDashboardLine /> },
-      { key: "accountSettings", label: "Account Settings", icon: <IoMdSettings /> },
-    ],
-  },
-  {
-    title: "Devices",
-    items: [
-      { key: "onboardDevice", label: "Onboard Device", icon: <FaMobileAlt /> },
-      { key: "assignDevice", label: "Connect Device", icon: <FaRobot /> },
-      { key: "disconnectDevice", label: "Disconnect Device", icon: <FaMobileAlt /> },
-      { key: "assignApi", label: "API Key", icon: <IoMdSettings /> },
-    ],
-  },
-  {
-    title: "Media",
-    items: [
-      { key: "uploadVideo", label: "Upload Video", icon: <FaVideo /> },
-      { key: "uploadAudio", label: "Upload Audio", icon: <FaMusic /> },
-      { key: "uploadImage", label: "Upload Image", icon: <FaUpload /> },
-      { key: "showMedia", label: "All Media", icon: <FaRegFileAudio /> },
-      { key: "setupPlaylist", label: "Create Playlist", icon: <FaListAlt /> },
-      { key: "showPlaylist", label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
-      { key: "viewGroups", label: "Quick Playlist", icon: <RiDashboardLine /> },
-      { key: "connectPlaylist", label: "Connect Playlist", icon: <FaPlug /> },
-    ],
-  },
-  {
-    title: "Announcement",
-    items: [
-      { key: "createAnnouncement", label: "Create Announcement", icon: <IoMdSettings /> },
-      { key: "setupAnnouncement", label: "Connect Announcements", icon: <IoMdSettings /> },
-      { key: "showAnnouncement", label: "View All", icon: <IoMdSettings /> },
-      { key: "instantAnnouncement", label: "Quick Send", icon: <IoMdSettings /> },
-    ]
-  },
-  {
-    title: "Store Management",
-    items: [
-      { key: "createUser", label: "Create Store", icon: <FaStore /> },
-      { key: "showUser", label: "Show Stores", icon: <FaStore /> },
-    ],
-  },
-];
+const getMenuSections = (role: string | null): { title: string; items: MenuItem[] }[] => {
+  const isReseller = role === "reseller";
+
+  return [
+    {
+      title: "General",
+      items: [
+        { key: "storeManagement" as MenuKey, label: isReseller ? "Account Users" : "Stores", icon: <FaStore /> },
+        { key: "dashboard" as MenuKey, label: "All Devices", icon: <RiDashboardLine /> },
+        { key: "accountSettings" as MenuKey, label: "Account Settings", icon: <IoMdSettings /> },
+      ] as MenuItem[],
+    },
+    {
+      title: "Devices",
+      items: [
+        ...(isReseller ? [{ key: "onboardDevice" as MenuKey, label: "Onboard Device", icon: <FaMobileAlt /> }] : []),
+        { key: "assignDevice" as MenuKey, label: "Connect Device", icon: <FaRobot /> },
+        { key: "disconnectDevice" as MenuKey, label: "Disconnect Device", icon: <FaMobileAlt /> },
+        ...(role === "superUser" ? [{ key: "assignApi" as MenuKey, label: "API Key", icon: <IoMdSettings /> }] : []),
+      ] as MenuItem[],
+    },
+    {
+      title: "Media",
+      items: [
+        { key: "uploadVideo" as MenuKey, label: "Upload Video", icon: <FaVideo /> },
+        { key: "uploadAudio" as MenuKey, label: "Upload Audio", icon: <FaMusic /> },
+        { key: "uploadImage" as MenuKey, label: "Upload Image", icon: <FaUpload /> },
+        { key: "showMedia" as MenuKey, label: "All Media", icon: <FaRegFileAudio /> },
+        { key: "setupPlaylist" as MenuKey, label: "Create Playlist", icon: <FaListAlt /> },
+        { key: "showPlaylist" as MenuKey, label: "Show Playlist", icon: <MdOutlinePlaylistPlay /> },
+        { key: "viewGroups" as MenuKey, label: "Quick Playlist", icon: <RiDashboardLine /> },
+        { key: "connectPlaylist" as MenuKey, label: "Connect Playlist", icon: <FaPlug /> },
+      ] as MenuItem[],
+    },
+    {
+      title: "Announcement",
+      items: [
+        { key: "createAnnouncement" as MenuKey, label: "Create Announcement", icon: <IoMdSettings /> },
+        { key: "setupAnnouncement" as MenuKey, label: "Connect Announcements", icon: <IoMdSettings /> },
+        { key: "showAnnouncement" as MenuKey, label: "View All", icon: <IoMdSettings /> },
+        { key: "instantAnnouncement" as MenuKey, label: "Quick Send", icon: <IoMdSettings /> },
+      ] as MenuItem[],
+    },
+    {
+      title: isReseller ? "Account Management" : "Store Management",
+      items: [
+        { key: "createUser" as MenuKey, label: isReseller ? "Create Account User" : "Create Store", icon: <FaStore /> },
+        { key: "showUser" as MenuKey, label: isReseller ? "Show Account Users" : "Show Stores", icon: <FaStore /> },
+      ] as MenuItem[],
+    },
+  ];
+};
 
 export default function RoboticPlatform(): React.ReactElement {
   // --- State Management (Fully Restored) ---
@@ -138,6 +142,7 @@ export default function RoboticPlatform(): React.ReactElement {
     media: true,
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [deviceStatuses, setDeviceStatuses] = useState<Record<string, { status: string; lastSync: string }>>({});
@@ -254,8 +259,9 @@ export default function RoboticPlatform(): React.ReactElement {
   // --- Auth & Initial Fetch (Fully Restored) ---
   useEffect(() => {
     const userRole = localStorage.getItem("userRole");
-    if (userRole === "superUser") {
-      toast.success("Welcome Super User!", {
+    setCurrentUserRole(userRole);
+    if (userRole === "superUser" || userRole === "reseller") {
+      toast.success(`Welcome ${userRole === "reseller" ? "Reseller" : "Super User"}!`, {
         style: { background: "#1e293b", color: "#fff" },
         duration: 2000,
       });
@@ -439,7 +445,7 @@ export default function RoboticPlatform(): React.ReactElement {
 
   // Helper to find label for Breadcrumbs
   const getActiveLabel = () => {
-    for (const section of menuSections) {
+    for (const section of getMenuSections(currentUserRole)) {
       for (const item of section.items) {
         if (item.key === selectedMenu) return item.label;
         if (item.subItems) {
@@ -606,7 +612,7 @@ export default function RoboticPlatform(): React.ReactElement {
 
           {/* Nav Links */}
           <nav className="flex-1 px-4 overflow-y-auto space-y-8 scrollbar-hide pb-10">
-            {menuSections.map((section) => (
+            {getMenuSections(currentUserRole).map((section) => (
               <div key={section.title}>
                 <h5 className="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-[0.15em] mb-3">
                   {section.title}
@@ -728,11 +734,11 @@ export default function RoboticPlatform(): React.ReactElement {
           <div className="flex items-center gap-4 md:gap-8">
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-bold text-slate-800 leading-none">Super User</p>
+                <p className="text-sm font-bold text-slate-800 leading-none">{currentUserRole === "reseller" ? "Reseller" : "Super User"}</p>
                 <p className="text-[11px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">Administrator</p>
               </div>
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200 overflow-hidden font-bold">
-                SU
+                {currentUserRole === "reseller" ? "RE" : "SU"}
               </div>
             </div>
           </div>

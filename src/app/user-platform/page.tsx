@@ -42,7 +42,8 @@ import { RiArrowDropDownLine, RiDashboardLine } from "react-icons/ri";
 import { MdOutlinePlaylistPlay, MdAnnouncement } from "react-icons/md";
 import { Device, MenuKey } from "@/components/Platform/types";
 import Image from "next/image";
-import { Search, Bell, User, Clock, PlayCircle, Music, FileText } from "lucide-react";
+import { Search, Bell, User, Clock, PlayCircle, Music, FileText, ArrowLeft } from "lucide-react";
+import { BsMusicNoteList } from "react-icons/bs";
 import Button from "@/components/Platform/Button";
 import Card from "@/components/Platform/Card";
 import DashboardView from "@/components/Platform/views/DashboardView";
@@ -137,6 +138,9 @@ type ExtendedMenuKey =
   | "calendarView"
   | "conflictAlerts"
   | "autoSchedule"
+
+  // Connected Media
+  | "connectedContent"
 
   // Reports
   | "playbackHistory"
@@ -234,6 +238,7 @@ const buildMenuSections = (role: string | null): MenuItem[] => {
         { key: "calendarView", label: "Calendar view", icon: <FaCalendarAlt /> },
       ],
     },
+
     {
       key: "settings",
       label: "Settings",
@@ -243,6 +248,277 @@ const buildMenuSections = (role: string | null): MenuItem[] => {
       ],
     },
   ];
+};
+
+// --- Connected Content View Component ---
+interface ConnectedContentViewProps {
+  onBack: () => void;
+}
+
+const ConnectedContentView: React.FC<ConnectedContentViewProps> = ({ onBack }) => {
+  const [devicesWithContent, setDevicesWithContent] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAllConnectedContent = async () => {
+      setIsLoading(true);
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) return;
+
+        // 1. Get assigned devices
+        const deviceRes = await fetch(`/api/assign-device?userId=${userId}`);
+        if (!deviceRes.ok) throw new Error("Failed to fetch devices");
+        const deviceData = await deviceRes.json();
+        
+        if (deviceData.success && Array.isArray(deviceData.data)) {
+          const deviceList = deviceData.data;
+          
+          // 2. For each device, fetch connected playlists and announcements
+          const enrichedDevices = await Promise.all(deviceList.map(async (assignment: any) => {
+            const devId = assignment.deviceId?._id;
+            if (!devId) return assignment;
+
+            try {
+              // Fetch playlists
+              const plRes = await fetch(`/api/connected-playlist?deviceId=${devId}`);
+              const plData = plRes.ok ? await plRes.json() : { playlistIds: [] };
+              
+              // Fetch full playlist details
+              const allPlRes = await fetch(`/api/playlists?userId=${userId}`);
+              const allPlData = allPlRes.ok ? await allPlRes.json() : [];
+              const connectedPls = allPlData.filter((p: any) => plData.playlistIds?.includes(p._id));
+
+              // Fetch announcements
+              const annRes = await fetch(`/api/announcement/device-announcement?deviceId=${devId}`);
+              const annData = annRes.ok ? await annRes.json() : { announcementPlaylistIds: [] };
+              
+              // Fetch full announcement details
+              const allAnnRes = await fetch(`/api/announcement/playlist?userId=${userId}`);
+              const allAnnData = allAnnRes.ok ? await allAnnRes.json() : { playlists: [] };
+              const connectedAnns = (allAnnData.playlists || []).filter((a: any) => 
+                annData.announcementPlaylistIds?.includes(a._id)
+              );
+
+              return {
+                ...assignment,
+                connectedPlaylists: connectedPls,
+                connectedAnnouncements: connectedAnns
+              };
+            } catch (err) {
+              console.error(`Error fetching content for device ${devId}:`, err);
+              return assignment;
+            }
+          }));
+          
+          setDevicesWithContent(enrichedDevices);
+        }
+      } catch (err) {
+        console.error("Error fetching connected content:", err);
+        toast.error("Failed to load connected media");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAllConnectedContent();
+  }, []);
+
+  const handleUnlinkPlaylist = async (deviceId: string, playlistId: string) => {
+    try {
+      const res = await fetch(`/api/device-playlists?deviceId=${deviceId}&playlistId=${playlistId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        toast.success("Playlist disconnected");
+        setDevicesWithContent(prev => prev.map(d => {
+          if (d.deviceId?._id === deviceId) {
+            return {
+              ...d,
+              connectedPlaylists: d.connectedPlaylists.filter((p: any) => p._id !== playlistId)
+            };
+          }
+          return d;
+        }));
+      } else throw new Error();
+    } catch {
+      toast.error("Failed to disconnect playlist");
+    }
+  };
+
+  const handleUnlinkAnnouncement = async (deviceId: string, annId: string) => {
+    try {
+      const res = await fetch(`/api/announcement/device-announcement?deviceId=${deviceId}&announcementPlaylistId=${annId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        toast.success("Announcement disconnected");
+        setDevicesWithContent(prev => prev.map(d => {
+          if (d.deviceId?._id === deviceId) {
+            return {
+              ...d,
+              connectedAnnouncements: d.connectedAnnouncements.filter((a: any) => a._id !== annId)
+            };
+          }
+          return d;
+        }));
+      } else throw new Error();
+    } catch {
+      toast.error("Failed to disconnect announcement");
+    }
+  };
+
+  return (
+    <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-white shadow-sm">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Connected Media Hub</h2>
+          <p className="text-gray-500 font-medium">Monitoring all active content across your robotics network</p>
+        </div>
+        <button 
+          onClick={onBack}
+          className="px-6 py-2.5 bg-[#07323C] text-white font-bold rounded-xl hover:bg-orange-600 transition-all shadow-md shadow-teal-900/10 flex items-center gap-2"
+        >
+          <ArrowLeft size={18} />
+          Dashboard
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white/30 backdrop-blur-md rounded-[2.5rem] border border-white/50 shadow-xl">
+           <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4" />
+           <p className="text-gray-500 font-bold animate-pulse">Syncing Content Status...</p>
+        </div>
+      ) : devicesWithContent.length === 0 ? (
+        <div className="bg-white/40 backdrop-blur-lg p-12 rounded-[2.5rem] border border-white shadow-xl text-center">
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <FaPlug className="text-gray-300 text-3xl" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">No Connected Media Found</h3>
+          <p className="text-gray-500 font-medium mb-8">You haven't connected any playlists or announcements to your devices yet.</p>
+          <button 
+            onClick={onBack}
+            className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6">
+          {devicesWithContent.map((item) => (
+            <div key={item._id} className="bg-white/70 backdrop-blur-md rounded-3xl border border-white shadow-xl overflow-hidden group hover:shadow-2xl transition-all duration-300 border-b-4 border-b-transparent hover:border-b-indigo-500">
+              <div className="p-8">
+                {/* Device Header */}
+                <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-100">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-50 to-blue-50 p-3 rounded-2xl border border-white shadow-inner flex items-center justify-center">
+                      <FaRobot className="text-indigo-500 text-2xl" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-1">{item.deviceId?.name}</h3>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded-md">SN: {item.deviceId?.serialNumber}</span>
+                        <span className="w-2 h-2 rounded-full bg-green-500 shadow-sm animate-pulse" />
+                        <span className="text-xs font-bold text-gray-400">Connected</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Playlists Column */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <div className="w-1.5 h-4 bg-emerald-500 rounded-full" />
+                        Connected Playlists
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
+                        {item.connectedPlaylists?.length || 0}
+                      </span>
+                    </div>
+                    
+                    {(!item.connectedPlaylists || item.connectedPlaylists.length === 0) ? (
+                      <div className="bg-slate-50/50 rounded-2xl p-6 border border-dashed border-slate-200 flex flex-col items-center justify-center opacity-60">
+                         <BsMusicNoteList className="text-slate-300 text-lg mb-2" />
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">No Active Playlist</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {item.connectedPlaylists.map((pl: any) => (
+                          <div key={pl._id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between group/item hover:border-emerald-200 transition-colors">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                <BsMusicNoteList size={18} />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800 text-sm">{pl.name}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{pl.contentType}</p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => handleUnlinkPlaylist(item.deviceId?._id, pl._id)}
+                              className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-all opacity-0 group-hover/item:opacity-100 shadow-sm"
+                              title="Disconnect Playlist"
+                            >
+                              <FaTimes size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Announcements Column */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <div className="w-1.5 h-4 bg-orange-500 rounded-full" />
+                        Active Announcements
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
+                        {item.connectedAnnouncements?.length || 0}
+                      </span>
+                    </div>
+                    
+                    {(!item.connectedAnnouncements || item.connectedAnnouncements.length === 0) ? (
+                      <div className="bg-slate-50/50 rounded-2xl p-6 border border-dashed border-slate-200 flex flex-col items-center justify-center opacity-60">
+                         <FaBullhorn className="text-slate-300 text-lg mb-2" />
+                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">No Active Announcement</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {item.connectedAnnouncements.map((ann: any) => (
+                          <div key={ann._id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between group/item hover:border-orange-200 transition-colors">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                                <FaBullhorn size={18} />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800 text-sm">{ann.name}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">{ann.schedule?.scheduleType}</p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => handleUnlinkAnnouncement(item.deviceId?._id, ann._id)}
+                              className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-all opacity-0 group-hover/item:opacity-100 shadow-sm"
+                              title="Disconnect Announcement"
+                            >
+                              <FaTimes size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default function UserPlatform(): React.ReactElement {
@@ -488,438 +764,8 @@ const toggleMenu = (key: string) => {
     window.location.href = "/login";
   };
 
-  // Device Card Component (matches style from your image)
-  // const DeviceCard = ({ device }: { device: Device }) => {
-  //   // Dummy placeholders for last sync and playlist playing info
-  //   const isConnected = device.status === "Connected" ||  "Online";
-  //   const lastSync = "5 min ago";
-  //   // Use device connectedPlaylists or mock if empty
-  //   const playingPlaylist = device.connectedPlaylists?.length
-  //     ? device.connectedPlaylists[0].name
-  //     : isConnected
-  //     ? "Soft Playlist"
-  //     : null;
-  //   const remainingTime = isConnected ? "30 min left" : null;
+  // --- Device State and Effects ---
 
-  //   return (
-  //     <div
-  //       className={`relative flex flex-col rounded-xl shadow-lg overflow-hidden w-72 cursor-pointer select-none transition-transform transform hover:scale-[1.02] ${
-  //         isConnected ? "bg-gradient-to-tr from-blue-200 to-blue-100" : "bg-gray-100"
-  //       }`}
-  //     >
-  //       {/* Device Image */}
-  //       <div className="relative h-44 w-full overflow-hidden rounded-t-xl">
-  //         <img
-  //           src={device.deviceId.imageUrl ?? "/default-device-image.png"}
-  //           alt={device.deviceId.name}
-  //           loading="lazy"
-  //           className="w-full h-full object-cover"
-  //         />
-  //         {/* Status Icon */}
-  //         <div className="absolute top-3 right-3">
-  //           {isConnected ? (
-  //             <div className="bg-orange-500 rounded-full p-2 shadow-lg" title="Playing">
-  //               <FaPlay className="text-white w-4 h-4" />
-  //             </div>
-  //           ) : (
-  //             <div className="bg-gray-500 rounded-full p-2 shadow-lg" title="Info">
-  //               <FaInfoCircle className="text-white w-4 h-4" />
-  //             </div>
-  //           )}
-  //         </div>
-  //       </div>
-  //       {/* Info Section */}
-  //       <div className="flex-1 p-4 flex flex-col justify-between">
-  //         <div>
-  //           <h3 className="font-semibold text-lg text-gray-900">{device.deviceId.name || "Device Name"}</h3>
-  //           <p className="text-xs text-gray-600 mt-1">
-  //             Type : Audio player
-  //             <span className="mx-1">|</span>
-  //             Zone : Entrance
-  //           </p>
-  //           {/* Status Details */}
-  //           <div className="mt-2 space-y-1 text-sm">
-  //             <p className="flex items-center gap-2">
-  //               <span
-  //                 className={`w-2 h-2 rounded-full inline-block ${
-  //                   isConnected ? "bg-green-500" : "bg-red-500"
-  //                 }`}
-  //               />{" "}
-  //               {isConnected ? "Connected" : "Online"}
-  //             </p>
-  //             <p className="flex items-center gap-2">
-  //               <FaSyncAlt className="inline" />
-  //               Last sync - {lastSync}
-  //             </p>
-  //             <p className="flex items-center gap-2 truncate">
-  //               {isConnected && playingPlaylist ? (
-  //                 <>
-  //                   <FaPlay className="inline text-orange-600" />
-  //                   Playing {playingPlaylist} | {remainingTime}
-  //                 </>
-  //               ) : (
-  //                 <>
-  //                   <FaPauseCircle className="inline text-red-600" />
-  //                   Playlist is not connected
-  //                 </>
-  //               )}
-  //             </p>
-  //           </div>
-  //         </div>
-  //       </div>
-
-  //       {/* Footer with actions */}
-  //       <div className="bg-slate-900 text-white flex justify-between rounded-b-xl px-4 py-2">
-  //         {isConnected ? (
-  //           <>
-  //             <button
-  //               onClick={() => handleEditDevice(device)}
-  //               className="text-sm hover:underline focus:outline-none"
-  //               title="Disconnect"
-  //             >
-  //               Disconnect
-  //             </button>
-  //             <button
-  //               onClick={() => alert("Restart device functionality")}
-  //               className="text-sm hover:underline focus:outline-none"
-  //               title="Restart"
-  //             >
-  //               Restart
-  //             </button>
-  //             <button
-  //               onClick={() => alert("Reassign device functionality")}
-  //               className="text-sm hover:underline focus:outline-none"
-  //               title="Reassign"
-  //             >
-  //               Reassign
-  //             </button>
-  //           </>
-  //         ) : (
-  //           <>
-  //             <button
-  //               onClick={() => handleEditDevice(device)}
-  //               className="text-sm hover:underline focus:outline-none"
-  //               title="Connect"
-  //             >
-  //               Connect
-  //             </button>
-  //             <button
-  //               onClick={() => alert("Restart device functionality")}
-  //               className="text-sm hover:underline focus:outline-none"
-  //               title="Restart"
-  //             >
-  //               Restart
-  //             </button>
-  //             <button
-  //               onClick={() => alert("Reassign device functionality")}
-  //               className="text-sm hover:underline focus:outline-none"
-  //               title="Reassign"
-  //             >
-  //               Reassign
-  //             </button>
-  //           </>
-  //         )}
-  //       </div>
-  //     </div>
-  //   );
-  // };
-// const DeviceCard = ({ device }: { device: Device }) => {
-//   const [deviceStatus, setDeviceStatus] = useState<"online" | "offline" | null>(null);
-//   const [lastSync, setLastSync] = useState<string>("");
-//   const previousStatus = useRef<"online" | "offline" | null>(null);
-//   const hasShownOfflineToast = useRef(false);
-
-//   useEffect(() => {
-//     if (!device?.deviceId?.serialNumber) return;
-
-//     const fetchDeviceStatus = async () => {
-//       try {
-//         const response = await fetch(
-//           `https://iot.centelon.com/api/status-check?serialNumber=${device.deviceId.serialNumber}`
-//         );
-//         const data = await response.json();
-
-//         if (data.success) {
-//           const currentStatus = data.status as "online" | "offline";
-//           const currentLastSync = data.lastConnection
-//             ? new Date(data.lastConnection).toLocaleString()
-//             : "";
-
-//           // ✅ Update only when data changed (prevents blinking)
-//           setDeviceStatus((prev) => (prev !== currentStatus ? currentStatus : prev));
-//           setLastSync((prev) => (prev !== currentLastSync ? currentLastSync : prev));
-
-//           // ✅ Trigger toast only once when goes offline
-//           if (previousStatus.current === "online" && currentStatus === "offline") {
-//             if (!hasShownOfflineToast.current) {
-//               toast.error("Device is offline");
-//               hasShownOfflineToast.current = true;
-//             }
-//           }
-
-//           // ✅ Reset toast flag if device comes back online
-//           if (currentStatus === "online") {
-//             hasShownOfflineToast.current = false;
-//           }
-
-//           previousStatus.current = currentStatus;
-//         }
-//       } catch (error) {
-//         console.error("Error fetching device status:", error);
-//       }
-//     };
-
-//     // Initial check
-//     fetchDeviceStatus();
-
-//     // Poll every 10 seconds
-//     const intervalId = setInterval(fetchDeviceStatus, 10000);
-//     return () => clearInterval(intervalId);
-//   }, [device?.deviceId?.serialNumber]);
-
-//   const isOnline = deviceStatus === "online";
-//   const playingPlaylist = device.connectedPlaylists?.length
-//     ? device.connectedPlaylists[0].name
-//     : isOnline
-//     ? "Soft Playlist"
-//     : null;
-//   const remainingTime = isOnline ? "30 min left" : null;
-
-//   return (
-//     <div
-//       className={`relative flex flex-col rounded-xl shadow-lg overflow-hidden w-72 cursor-pointer select-none transition-transform transform hover:scale-[1.02] ${
-//         isOnline ? "bg-gradient-to-tr from-blue-200 to-blue-100" : "bg-gray-100"
-//       }`}
-//     >
-//       {/* Device Image */}
-//       <div className="relative h-44 w-full overflow-hidden rounded-t-xl">
-//         <img
-//           src={device.deviceId.imageUrl ?? "/default-device-image.png"}
-//           alt={device.deviceId.name}
-//           loading="lazy"
-//           className="w-full h-full object-cover"
-//         />
-//         <div className="absolute top-3 right-3">
-//           {isOnline ? (
-//             <div className="bg-orange-500 rounded-full p-2 shadow-lg" title="Playing">
-//               <FaPlay className="text-white w-4 h-4" />
-//             </div>
-//           ) : (
-//             <div className="bg-gray-500 rounded-full p-2 shadow-lg" title="Offline">
-//               <FaInfoCircle className="text-white w-4 h-4" />
-//             </div>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Info Section */}
-//       <div className="flex-1 p-4 flex flex-col justify-between">
-//         <div>
-//           <h3 className="font-semibold text-lg text-gray-900">
-//             {device.deviceId.name || "Device Name"}
-//           </h3>
-//           <p className="text-xs text-gray-600 mt-1">
-//             Type : Audio player <span className="mx-1">|</span> Zone : Entrance
-//           </p>
-
-//           <div className="mt-2 space-y-1 text-sm">
-//             <p className="flex items-center gap-2">
-//               <span
-//                 className={`w-2 h-2 rounded-full inline-block ${
-//                   isOnline ? "bg-green-500" : "bg-red-500"
-//                 }`}
-//               />
-//               {isOnline ? "Online" : "Offline"}
-//             </p>
-//             <p className="flex items-center gap-2">
-//               <FaSyncAlt className="inline" />
-//               Last connection - {lastSync || "Fetching..."}
-//             </p>
-//             <p className="flex items-center gap-2 truncate">
-//               {isOnline && playingPlaylist ? (
-//                 <>
-//                   <FaPlay className="inline text-orange-600" />
-//                   Playing {playingPlaylist} | {remainingTime}
-//                 </>
-//               ) : (
-//                 <>
-//                   <FaPauseCircle className="inline text-red-600" />
-//                   Playlist is not connected
-//                 </>
-//               )}
-//             </p>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-// const DeviceCard = ({ device }: { device: Device }) => {
-//   const [deviceStatus, setDeviceStatus] = useState<"online" | "offline" | null>(null);
-//   const [lastSync, setLastSync] = useState<string>("");
-//   const previousStatus = useRef<"online" | "offline" | null>(null);
-
-//   useEffect(() => {
-//     if (!device?.deviceId?.serialNumber) return;
-
-//     const fetchDeviceStatus = async () => {
-//       try {
-//         console.log("Checking status for:", device.deviceId.serialNumber);
-//         const response = await fetch(
-//           `https://iot.centelon.com/api/status-check?serialNumber=${device.deviceId.serialNumber}`
-//         );
-//         const data = await response.json();
-//         console.log("API response:", data);
-
-//         if (data.success) {
-//           console.log("last",data);
-          
-//           const currentStatus = data.status as "online" | "offline";
-//           setDeviceStatus(currentStatus);
-//           setLastSync(data.lastConnection ? new Date(data.lastConnection).toLocaleString() : "");
-
-//           // Show toast immediately if device is offline at first load
-//           if (previousStatus.current === null && currentStatus === "offline") {
-//             toast.error(`The device ${device.deviceId.serialNumber} is offline.`);
-//           }
-
-//           // Show toast when status changes from online → offline
-//           if (previousStatus.current === "online" && currentStatus === "offline") {
-//             toast.error(`The device ${device.deviceId.serialNumber} is offline.`);
-//           }
-
-//           previousStatus.current = currentStatus;
-//         } else {
-//           console.warn("API failed:", data);
-//         }
-//       } catch (error) {
-//         console.error("Error fetching device status:", error);
-//       }
-//     };
-
-//     // Initial call
-//     fetchDeviceStatus();
-
-//     // Poll every 10 seconds
-//     const intervalId = setInterval(fetchDeviceStatus, 10000);
-//     return () => clearInterval(intervalId);
-//   }, [device?.deviceId?.serialNumber]);
-
-//   const isOnline = deviceStatus === "online";
-//   const playingPlaylist = device.connectedPlaylists?.length
-//     ? device.connectedPlaylists[0].name
-//     : isOnline
-//     ? "Soft Playlist"
-//     : null;
-//   const remainingTime = isOnline ? "30 min left" : null;
-
-//   return (
-//     <div
-//       className={`relative flex flex-col rounded-xl shadow-lg overflow-hidden w-72 cursor-pointer select-none transition-transform transform hover:scale-[1.02] ${
-//         isOnline ? "bg-gradient-to-tr from-blue-200 to-blue-100" : "bg-gray-100"
-//       }`}
-//     >
-//       {/* Device Image */}
-//       <div className="relative h-44 w-full overflow-hidden rounded-t-xl">
-//         <img
-//           src={device.deviceId.imageUrl ?? "/default-device-image.png"}
-//           alt={device.deviceId.name}
-//           loading="lazy"
-//           className="w-full h-full object-cover"
-//         />
-//         <div className="absolute top-3 right-3">
-//           {isOnline ? (
-//             <div className="bg-orange-500 rounded-full p-2 shadow-lg" title="Playing">
-//               <FaPlay className="text-white w-4 h-4" />
-//             </div>
-//           ) : (
-//             <div className="bg-gray-500 rounded-full p-2 shadow-lg" title="Offline">
-//               <FaInfoCircle className="text-white w-4 h-4" />
-//             </div>
-//           )}
-//         </div>
-//       </div>
-
-//       {/* Info Section */}
-//       <div className="flex-1 p-4 flex flex-col justify-between">
-//         <div>
-//           <h3 className="font-semibold text-lg text-gray-900">
-//             {device.deviceId.name || "Device Name"}
-//           </h3>
-//           <p className="text-xs text-gray-600 mt-1">
-//             Type : {device.deviceId?._id} <span className="mx-1">|</span> Zone :{" "}
-//             {device.deviceId?.serialNumber}
-//           </p>
-
-//           <div className="mt-2 space-y-1 text-sm">
-//             <p className="flex items-center gap-2">
-//               <span
-//                 className={`w-2 h-2 rounded-full inline-block ${
-//                   isOnline ? "bg-green-500" : "bg-red-500"
-//                 }`}
-//               />
-//               {isOnline ? "Online" : "Offline"}
-//             </p>
-
-//             <p className="flex items-center gap-2">
-//               <FaSyncAlt className="inline" />
-//               Last connection - {lastSync || "Fetching..."}
-//             </p>
-
-//             <p className="flex items-center gap-2 truncate">
-//               {isOnline && playingPlaylist ? (
-//                 <>
-//                   <FaPlay className="inline text-orange-600" />
-//                   Playing {playingPlaylist} | {remainingTime}
-//                 </>
-//               ) : (
-//                 <>
-//                   <FaPauseCircle className="inline text-red-600" />
-//                   Playlist is not connected
-//                 </>
-//               )}
-//             </p>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-// console.log("devices",devices);
-
-// useEffect(() => {
-//   // if (!device?.deviceId?.serialNumber) return;
-
-//   const fetchDeviceStatus = async () => {
-//     try {
-//       const response = await fetch(
-//         `https://iot.centelon.com/api/status-check?serialNumber=${devices.map((i)=>i.deviceId.serialNumber)}`
-//       );
-//       const data = await response.json();
-
-//       if (data.success) {
-//         const currentStatus = data.status as "online" | "offline";
-//         const currentLastSync = data.lastConnection
-//           ? new Date(data.lastConnection).toLocaleString()
-//           : "";
-
-//         // setDeviceStatus(currentStatus);
-//         // setLastSync(currentLastSync);
-
-//         // Toast show only once on first offline
-//         if (currentStatus === "offline") {
-//           toast.error(`The device  is offline.`);
-//         }
-//       }
-//     } catch (error) {
-//       console.error("Error fetching device status:", error);
-//     }
-//   };
-
-//   // Call API only once
-//   fetchDeviceStatus();
-
-// }, [devices]);
 const [deviceStatus, setDeviceStatus] = useState<"online" | "offline" | null>(null);
   const [lastSync, setLastSync] = useState<string>("");
   const previousStatus = useRef<"online" | "offline" | null>(null);
@@ -1138,42 +984,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
 //           </p>
 
 //           <div className="mt-2 space-y-1 text-sm">
-//             <p className="flex items-center gap-2">
-//               <span
-//                 className={`w-2 h-2 rounded-full inline-block ${
-//                   isOnline ? "bg-green-500" : "bg-red-500"
-//                 }`}
-//               />
-//               {isOnline ? "Online" : "Offline"}
-//             </p>
-
-//             <p className="flex items-center gap-2">
-//               <FaSyncAlt className="inline" />
-//               Last connection - {lastSync || "Fetching..."}
-//             </p>
-
-//             <p className="flex items-center gap-2 truncate">
-//               {isOnline && playingPlaylist ? (
-//                 <>
-//                   <FaPlay className="inline text-orange-600" />
-//                   Playing {playingPlaylist} | {remainingTime}
-//                 </>
-//               ) : (
-//                 <>
-//                   <FaPauseCircle className="inline text-red-600" />
-//                   Playlist is not connected
-//                 </>
-//               )}
-//             </p>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-
-
+  // --- Dashboard content matching image layout ---
   // Dashboard content matching image layout
   const DashboardContent = () => (
     <div className="flex flex-col space-y-8">
@@ -1353,10 +1164,10 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
   const SidebarContent = useMemo(() => {
     return (
       <div
-        className="flex flex-col h-full w-full text-white font-sans select-none will-change-transform"
-        style={{ backgroundColor: "#07323C", transform: "translateZ(0)" }}
+        className="flex flex-col h-full w-full text-white font-sans select-none"
+        style={{ backgroundColor: "#07323C" }}
       >
-        <div className="px-6 py-6 border-b border-teal-800 flex items-center gap-4">
+        <div className="flex-shrink-0 px-6 py-6 border-b border-teal-800 flex items-center gap-4">
           <Image
             src="/assets/centelon-logo.svg"
             alt="Centelon Logo"
@@ -1365,7 +1176,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
           />
           <span className="font-semibold text-[12px]">Centelon Robotics</span>
         </div>
-        <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-6 custom-scrollbar">
+        <nav className="min-h-0 flex-1 px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 custom-scrollbar">
           {buildMenuSections(userRole).map((section: MenuItem) => {
             const renderMenuItem = (item: MenuItem, depth = 0) => {
               const hasChildren = item.items && item.items.length > 0;
@@ -1426,7 +1237,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
             return renderMenuItem(section);
           })}
         </nav>
-        <div className="px-6 py-4 border-t border-teal-800 flex items-center gap-4">
+        <div className="flex-shrink-0 px-6 py-4 border-t border-teal-800 flex items-center gap-4">
           {userData ? (
             <>
               <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold select-none">
@@ -1500,6 +1311,8 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
         return <TTSCreator />;
       case "userSettings":
         return <UserSettings />;
+      case "connectedContent":
+        return <ConnectedContentView onBack={() => setSelectedMenu("dashboard")} />;
       default:
         return (
           <div className="p-4 text-center py-20">
@@ -1544,7 +1357,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
   return (
     <div className="flex h-screen bg-[#e6f2f7] text-gray-800 font-sans overflow-hidden">
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex lg:flex-shrink-0 w-80 shadow-2xl border-r border-teal-800/30">
+      <aside className="hidden lg:flex lg:flex-shrink-0 w-80 shadow-2xl border-r border-teal-800/30 h-full overflow-hidden">
         {SidebarContent}
       </aside>
 
@@ -1577,7 +1390,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
             leaveFrom="translate-x-0"
             leaveTo="-translate-x-full"
           >
-            <aside className="fixed inset-y-0 left-0 w-80 bg-teal-900 z-50 shadow-2xl overflow-hidden">
+            <aside className="fixed inset-y-0 left-0 w-80 bg-[#07323C] z-50 shadow-2xl overflow-hidden">
               {SidebarContent}
             </aside>
           </Transition.Child>
@@ -1636,7 +1449,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
           background: rgba(0,0,0,0.05);
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(20,184,166,0.3);
+          background: rgba(20,184,166,0.6);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {

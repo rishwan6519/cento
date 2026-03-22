@@ -66,6 +66,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export enum UserRole {
   User = 'user',
   SuperUser = 'superUser',
+  Reseller = 'reseller',
   Admin = 'admin',
   Developer = 'developer',
 }

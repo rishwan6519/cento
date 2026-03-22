@@ -134,6 +134,14 @@ export async function GET(req: NextRequest) {
         },
       },
       {
+        $lookup: {
+          from: "devicetypes",
+          localField: "deviceInfo.typeId",
+          foreignField: "_id",
+          as: "typeInfo",
+        },
+      },
+      {
         $project: {
           _id: 1,
           deviceId: {
@@ -142,6 +150,10 @@ export async function GET(req: NextRequest) {
             serialNumber: { $arrayElemAt: ["$deviceInfo.serialNumber", 0] },
             imageUrl: { $arrayElemAt: ["$deviceInfo.imageUrl", 0] },
             status: { $arrayElemAt: ["$deviceInfo.status", 0] },
+          },
+          typeId: {
+            _id: { $arrayElemAt: ["$typeInfo._id", 0] },
+            name: { $arrayElemAt: ["$typeInfo.name", 0] },
           },
           assignedBy: 1,
           assignedAt: 1,

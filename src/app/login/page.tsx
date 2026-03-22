@@ -42,8 +42,8 @@ export default function LoginPage() {
         toast.success("Login successful!", { duration: 2000 });
         if (data.user.role === "admin") {
           router.push("/admin"); // Redirect to admin page
-        }else if (data.user.role === "superUser") {
-          router.push("/platform"); // Redirect to superuser page
+        }else if (data.user.role === "superUser" || data.user.role === "reseller") {
+          router.push("/platform"); // Redirect to superuser or reseller page
         }else if (data.user.role === "user") {
 
           router.push("/home"); // Redirect to the platform page

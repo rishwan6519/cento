@@ -48,7 +48,7 @@ interface AssignDeviceProps {
   defaultAction?: 'assign' | 'disconnect';
 }
 
-export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: AssignDeviceProps) {
+export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: AssignDeviceProps): React.JSX.Element {
   const [step, setStep] = useState(1);
   const [users, setUsers] = useState<User[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -61,13 +61,25 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
   const [actionType, setActionType] = useState<'assign' | 'disconnect'>(defaultAction);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const superUserId = typeof window !== "undefined" ? localStorage.getItem('userId') : null;
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setCurrentUserId(localStorage.getItem('userId'));
+    setCurrentRole(localStorage.getItem('userRole'));
+    setIsMounted(true);
+  }, []);
+
+  const targetRole = currentRole === 'admin' ? 'reseller' : currentRole === 'reseller' ? 'superUser' : 'user';
+  const getRoleLabel = () => targetRole === 'user' ? 'Store' : targetRole === 'superUser' ? 'Account' : 'Reseller';
 
   // Fetch users
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch(`/api/user?controllerId=${superUserId}`);
+        const url = currentRole === 'admin' ? '/api/user' : `/api/user?controllerId=${currentUserId}`;
+        const response = await fetch(url);
         const data = await response.json();
         if (data.success) {
           setUsers(data.data);
@@ -76,15 +88,16 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
         setError('Failed to fetch users');
       }
     };
-    if (superUserId) fetchUsers();
-  }, [superUserId]);
+    if (currentUserId || currentRole === 'admin') fetchUsers();
+  }, [currentUserId, currentRole]);
 
   // Fetch available devices
   useEffect(() => {
     const fetchDevices = async () => {
       if (!selectedUser) return;
       try {
-        const response = await fetch(`/api/available-devices?id=${superUserId}`);
+        // First, check if there are available devices for current user
+        const response = await fetch(`/api/available-devices?id=${currentUserId}&role=${currentRole}`);
         const data = await response.json();
         if (data.success) {
           setDevices(data.data);
@@ -96,7 +109,7 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
     if (step === 2 && actionType === 'assign') {
       fetchDevices();
     }
-  }, [step, selectedUser, actionType, superUserId]);
+  }, [step, selectedUser, actionType, currentUserId]);
 
   // Fetch connected devices
   useEffect(() => {
@@ -134,7 +147,7 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
         payload = {
           userId: selectedUser,
           deviceId: actualDeviceId,
-          assignedBy: superUserId,
+          assignedBy: currentUserId,
           status: 'active'
         };
       } else {
@@ -177,7 +190,7 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
     }
   }, [showSuccess, onSuccess]);
 
-  const filteredUsers = users.filter(u => u.role === 'user' && u.username.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredUsers = users.filter(u => u.role === targetRole && u.username.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const renderStep = () => {
     switch (step) {
@@ -186,8 +199,8 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
                <div className="space-y-1">
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Step 1: Select Store</h3>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Select target store for connecting devices</p>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Step 1: Select {getRoleLabel()}</h3>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Select target {getRoleLabel().toLowerCase()} for connecting devices</p>
                </div>
                <div className="relative w-full sm:w-64 group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={16} />
@@ -320,7 +333,7 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
                   <div className="flex items-center gap-6">
                      <div className="w-16 h-16 rounded-[1.5rem] bg-white/10 backdrop-blur-md flex items-center justify-center text-white"><User size={28} /></div>
                      <div>
-                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Store</p>
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">{getRoleLabel()}</p>
                         <p className="text-2xl font-black text-white uppercase tracking-tight">{user?.username}</p>
                      </div>
                   </div>
@@ -361,8 +374,12 @@ export default function AssignDevice({ onSuccess, defaultAction = 'assign' }: As
             </div>
           </motion.div>
         );
+      default:
+        return <></>;
     }
   };
+
+  if (!isMounted) return <div className="min-h-[400px] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={32} /></div>;
 
   return (
     <Card className="max-w-3xl mx-auto overflow-hidden border-none shadow-[0_40px_100px_rgba(0,0,0,0.1)] bg-white/80 backdrop-blur-xl rounded-[4rem]">

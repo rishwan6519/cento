@@ -4,7 +4,9 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   Mic, Play, Pause, Trash2, Volume2, AudioLines, ArrowLeft, Send, Wifi, Bot, Languages, ChevronDown
 } from "lucide-react";
+import { FaFolder } from "react-icons/fa";
 import toast from "react-hot-toast";
+import Swal from "sweetalert2";
 
 // --- CONSTANTS --- //
 
@@ -40,7 +42,14 @@ interface AnnouncementFile {
   url: string;
   duration?: number;
   blob?: Blob;
-  type?: 'recorded' | 'uploaded' | 'tts';
+  type?: 'recorded' | 'uploaded' | 'tts' | 'group';
+  mediaUrls?: string[]; // Multiple URLs if it's a group
+}
+
+interface MediaGroup {
+  _id: string;
+  name: string;
+  mediaIds: { _id: string; name: string; url: string; type: string }[];
 }
 
 interface InstantaneousAnnouncementProps {
@@ -61,8 +70,9 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
   const [deviceStatus, setDeviceStatus] = useState<{ [deviceId: string]: 'idle' | 'announcing' }>({});
 
   // Step 2: Audio Selection
-  const [activeTab, setActiveTab] = useState<'record' | 'select' | 'tts'>('record');
+  const [activeTab, setActiveTab] = useState<'record' | 'select' | 'tts' | 'groups'>('record');
   const [existingAnnouncements, setExistingAnnouncements] = useState<AnnouncementFile[]>([]);
+  const [mediaGroups, setMediaGroups] = useState<MediaGroup[]>([]);
   const [selectedAudio, setSelectedAudio] = useState<AnnouncementFile | null>(null);
 
   // Recording State
@@ -115,16 +125,16 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
 
   useEffect(() => {
     if (step === 2 && userId) {
-      fetchExistingAnnouncements();
+      if (activeTab === 'select') fetchExistingAnnouncements();
+      if (activeTab === 'groups') fetchMediaGroups();
     }
-  }, [step, userId]);
+  }, [step, userId, activeTab]);
 
   useEffect(() => {
-    // Cleanup audio element on component unmount or when audio selection changes
+    // Cleanup audio element on component unmount
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src); // Revoke URL to prevent memory leaks
         audioRef.current = null;
       }
     };
@@ -161,6 +171,21 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       setAvailableDevices(formattedDevices);
     } catch (error) {
       toast.error("Failed to fetch available devices.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchMediaGroups = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/media-groups?userId=${userId}`);
+      if (!response.ok) throw new Error("Failed to fetch groups");
+      const data = await response.json();
+      setMediaGroups(data.groups || []);
+    } catch (error) {
+      console.error("Error fetching groups:", error);
+      toast.error("Failed to fetch media groups.");
     } finally {
       setIsLoading(false);
     }
@@ -375,18 +400,71 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       toast.error("Please select a device and an audio announcement.");
       return;
     }
+
+    // Check for Playlist conflict (Enhanced for User Request)
+    try {
+      const playlistRes = await fetch(`/api/connected-playlist?deviceId=${selectedDevice._id}`);
+      if (playlistRes.ok) {
+        const playlistData = await playlistRes.ok ? await playlistRes.json() : { playlistIds: [] };
+        if (playlistData.playlistIds && playlistData.playlistIds.length > 0) {
+          const result = await Swal.fire({
+            title: 'Playlist Conflict Warning!',
+            text: "This device has active playlists connected. Sending an instantaneous announcement will interrupt any currently playing playlist media. Do you want to proceed?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#07323C',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, proceed',
+            cancelButtonText: 'Cancel'
+          });
+          if (!result.isConfirmed) return;
+        }
+      }
+    } catch (err) {
+      console.error("Error checking playlist conflict:", err);
+    }
   
     setIsLoading(true);
-    let finalAudioUrl = selectedAudio.url;
-  
     try {
-      // If audio is a new recording or TTS, upload it to local folder first
+      // Handle Case: Playlist Group (Collection)
+      if (selectedAudio.type === 'group' && selectedAudio.mediaUrls) {
+        toast.loading(`Sending ${selectedAudio.mediaUrls.length} announcements...`, { id: 'group-send' });
+        
+        for (let i = 0; i < selectedAudio.mediaUrls.length; i++) {
+          const mUrl = selectedAudio.mediaUrls[i];
+          const response = await fetch("/api/instant-announcement/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              deviceId: selectedDevice.serialNumber,
+              audioUrl: mUrl,
+              announcementName: `${selectedAudio.name} (${i + 1})`,
+            }),
+          });
+
+          if (!response.ok) {
+            toast.error(`Failed to send part ${i + 1} of group`);
+            // Optional: abort or continue? Usually abort on first error.
+            throw new Error(`Failed to send ${selectedAudio.name} at item ${i + 1}`);
+          }
+          // Small delay between sends to allow backend to process?
+          await new Promise(r => setTimeout(r, 500));
+        }
+
+        toast.dismiss('group-send');
+        toast.success(`Sent ${selectedAudio.name} to ${selectedDevice.name}`);
+        onSuccess();
+        return;
+      }
+
+      // Handle Case: Single Audio (Record/TTS/Upload)
+      let finalAudioUrl = selectedAudio.url;
       if ((selectedAudio.type === 'recorded' || selectedAudio.type === 'tts') && selectedAudio.blob && userId) {
         const fileName = `${selectedAudio.name.replace(/ /g, '_')}.wav`;
         finalAudioUrl = await uploadAudioToLocal(selectedAudio.blob, fileName, userId, selectedAudio.type || 'recorded');
       }
   
-      // Send the announcement via your backend
       const response = await fetch("/api/instant-announcement/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -407,6 +485,7 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
       onSuccess();
   
     } catch (error) {
+      toast.dismiss('group-send');
       toast.error(error instanceof Error ? error.message : "An unknown error occurred.");
     } finally {
       setIsLoading(false);
@@ -504,20 +583,24 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
-            <button onClick={() => setActiveTab('record')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'record' ? 'bg-white shadow-sm text-red-600' : 'text-gray-600'}`}>
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto no-scrollbar">
+            <button onClick={() => setActiveTab('record')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all whitespace-nowrap ${activeTab === 'record' ? 'bg-white shadow-sm text-red-600' : 'text-gray-600'}`}>
               <Mic size={18} /> Record
             </button>
-             <button onClick={() => setActiveTab('tts')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'tts' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-600'}`}>
+             <button onClick={() => setActiveTab('tts')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all whitespace-nowrap ${activeTab === 'tts' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-600'}`}>
               <Bot size={18} /> TextToSpeech
             </button>
-            <button onClick={() => setActiveTab('select')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === 'select' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}>
+            <button onClick={() => setActiveTab('select')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all whitespace-nowrap ${activeTab === 'select' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}>
               <AudioLines size={18} /> Library
+            </button>
+            <button onClick={() => setActiveTab('groups')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all whitespace-nowrap ${activeTab === 'groups' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-600'}`}>
+              <FaFolder size={18} /> Groups
             </button>
           </div>
           {activeTab === 'record' && renderRecordTab()}
           {activeTab === 'tts' && renderTtsTab()}
           {activeTab === 'select' && renderSelectTab()}
+          {activeTab === 'groups' && renderGroupsTab()}
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4">
@@ -594,8 +677,8 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
   );
 
   const renderSelectTab = () => (
-    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-      {isLoading ? <p className="text-sm text-center text-gray-500 py-4">Loading announcements...</p> :
+    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+      {isLoading ? <p className="text-sm text-center text-gray-500 py-4 font-medium animate-pulse">Loading announcements...</p> :
         existingAnnouncements.map(file => (
           <div
             key={file.id}
@@ -607,6 +690,39 @@ const InstantaneousAnnouncement: React.FC<InstantaneousAnnouncementProps> = ({ o
           </div>
         ))}
       {existingAnnouncements.length === 0 && !isLoading && <p className="text-sm text-gray-500 text-center py-4">No existing announcements found.</p>}
+    </div>
+  );
+
+  const renderGroupsTab = () => (
+    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+      {isLoading ? <p className="text-sm text-center text-gray-500 py-4 font-medium animate-pulse">Loading groups...</p> :
+        mediaGroups.map(group => (
+          <div
+            key={group._id}
+            onClick={() => {
+              const audioGroup: AnnouncementFile = {
+                id: group._id,
+                name: `[Group] ${group.name}`,
+                url: group.mediaIds[0]?.url || "", // Preview URL
+                type: 'group',
+                mediaUrls: group.mediaIds.map(m => m.url)
+              };
+              setSelectedAudio(audioGroup);
+            }}
+            className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedAudio?.id === group._id ? 'bg-orange-50 border-orange-500 shadow-sm' : 'hover:border-gray-400'}`}
+          >
+             <div className="flex items-center gap-3">
+                <div className="bg-orange-100 p-2 rounded-lg">
+                  <FaFolder className="text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-gray-800">{group.name}</p>
+                  <p className="text-xs text-gray-500">{group.mediaIds.length} files in this group</p>
+                </div>
+             </div>
+          </div>
+        ))}
+      {mediaGroups.length === 0 && !isLoading && <p className="text-sm text-gray-500 text-center py-4">No playlist groups found.</p>}
     </div>
   );
 

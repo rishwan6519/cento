@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaUser, FaLock, FaUserPlus, FaCode, FaCamera, FaCogs, FaStore } from "react-icons/fa";
 import Card from "@/components/Platform/Card";
 import Button from "@/components/Platform/Button";
@@ -11,11 +11,32 @@ const CreateUser = () => {
     username: "",
     password: "",
     confirmPassword: "",
-    role: "user", // default role
     storeLocation: "" // new field for store location
   });
   const [useStoreAsUsername, setUseStoreAsUsername] = useState(true); // new state for checkbox
   const [loading, setLoading] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentUserRole(localStorage.getItem("userRole"));
+  }, []);
+
+  const getRoleLabel = () => {
+    switch(currentUserRole) {
+      case 'admin': return "Reseller";
+      case 'reseller': return "Account User";
+      case 'superUser': return "Store";
+      default: return "Store";
+    }
+  };
+
+  const getRoleIcon = () => {
+    switch(currentUserRole) {
+      case 'admin': return <FaUserPlus className="text-indigo-500" />;
+      case 'reseller': return <FaUser className="text-indigo-500" />;
+      default: return <FaStore className="text-indigo-500" />;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,10 +59,15 @@ const CreateUser = () => {
     try {
       const id = localStorage.getItem("userId");
       const currentRole = localStorage.getItem("userRole");
-      if (currentRole !== "superUser") {
+      if (currentRole !== "superUser" && currentRole !== "reseller" && currentRole !== "admin") {
         toast.error("You do not have permission to create a user");
         return;
       }
+
+      let targetRole = "";
+      if (currentRole === "admin") targetRole = "reseller";
+      else if (currentRole === "reseller") targetRole = "superUser";
+      else targetRole = "user";
 
       setLoading(true);
       const response = await fetch("/api/user", {
@@ -54,7 +80,7 @@ const CreateUser = () => {
           username: formData.username.trim(),
           password: formData.password,
           controllerId: id,
-          role: formData.role,
+          role: targetRole,
           platform: true, // Platform access is always enabled for all users
           storeLocation: formData.storeLocation // send store location
         }),
@@ -66,13 +92,12 @@ const CreateUser = () => {
         throw new Error(data.message || "Failed to create user");
       }
 
-      toast.success("User created successfully!");
+      toast.success(`${getRoleLabel()} created successfully!`);
       setFormData({ 
         storeName: "",
         username: "", 
         password: "", 
         confirmPassword: "", 
-        role: "user",
         storeLocation: "" // reset store location
       });
       setUseStoreAsUsername(true); // reset checkbox
@@ -116,25 +141,25 @@ const CreateUser = () => {
     <div className="container mx-auto px-4 py-8">
       <Card className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900">Create New Store</h2>
+          <h2 className="text-2xl font-semibold text-gray-900">Create New {getRoleLabel()}</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Store Name Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Store Name
+              {getRoleLabel()} Name
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaStore className="text-gray-400" />
+                {getRoleIcon()}
               </div>
               <input
                 type="text"
                 value={formData.storeName}
                 onChange={handleStoreNameChange}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter store name"
+                placeholder={`Enter ${getRoleLabel().toLowerCase()} name`}
                 required
               />
             </div>
@@ -150,7 +175,7 @@ const CreateUser = () => {
               className="form-checkbox h-4 w-4 text-indigo-600 rounded focus:ring-indigo-500 border-gray-300"
             />
             <label htmlFor="useStoreAsUsername" className="ml-2 text-sm text-gray-700">
-              Use store name as username
+              Use {getRoleLabel().toLowerCase()} name as username
             </label>
           </div>
 
@@ -212,18 +237,18 @@ const CreateUser = () => {
           </div>          {/* Store Location Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Store Location
+              {getRoleLabel()} Location
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaStore className="text-gray-400" />
+                {getRoleIcon()}
               </div>
               <input
                 type="text"
                 value={formData.storeLocation}
                 onChange={(e) => setFormData({ ...formData, storeLocation: e.target.value })}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter store location"
+                placeholder={`Enter ${getRoleLabel().toLowerCase()} location`}
               />
             </div>
           </div>
@@ -262,7 +287,7 @@ const CreateUser = () => {
                   Creating...
                 </span>
               ) : (
-                "Create Store"
+                `Create ${getRoleLabel()}`
               )}
             </Button>
           </div>
