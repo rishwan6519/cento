@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { ZoneEvent } from "@/models/ZoneEvent";
+import { EntranceEvent } from "@/models/EntranceEvent";
+import { Settings } from "@/models/Settings";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,9 +20,14 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    // 🔍 Fetch all documents for this camera
-    const documents = await ZoneEvent.find({ "metadata.camera_id": cameraId }).lean();
-    console.log(`[API] Found ${documents.length} documents for camera ${cameraId}`);
+    // 🔍 Fetch all documents for this camera from both collections just in case it transitioned
+    const searchIds = [cameraId, `camera${cameraId}`, Number(cameraId)].filter(Boolean);
+    const [zoneDocs, entranceDocs] = await Promise.all([
+        ZoneEvent.find({ "metadata.camera_id": { $in: searchIds } }).lean(),
+        EntranceEvent.find({ "metadata.camera_id": { $in: searchIds } }).lean()
+    ]);
+    const documents = [...zoneDocs, ...entranceDocs];
+    console.log(`[API] Found ${documents.length} combined documents for camera ${cameraId}`);
 
     // Get Today's local date range
     const now = new Date();
@@ -86,12 +93,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log("[API POST] Received count event:", body);
 
-    const { camera_id, zone_name, action, person_id, pi_id, timestamp } = body;
+    const { camera_id, action, pi_id, timestamp } = body;
+    const zoneName = body.zone_name || body.line_name;
+    const personId = body.person_id !== undefined ? body.person_id : Math.floor(Math.random() * 1000000);
 
     // Validate required fields
-    if (!camera_id || !zone_name || !action || person_id === undefined) {
+    if (!camera_id || !zoneName || !action) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields (camera_id, zone_name, action, person_id)" },
+        { success: false, error: "Missing required fields (camera_id, zone_name/line_name, action)" },
         { status: 400 }
       );
     }
@@ -102,17 +111,22 @@ export async function POST(request: NextRequest) {
     const newEvent = {
         metadata: {
             camera_id,
-            zone_name,
+            zone_name: zoneName,
             pi_id: pi_id || "unknown"
         },
         action, 
-        person_id,
+        person_id: personId,
         timestamp: timestamp || new Date().toISOString(),
         created_at: new Date()
     };
 
-    console.log("[API POST] Saving new event:", newEvent);
-    const result = await ZoneEvent.create(newEvent);
+    const entry = await Settings.findOne({ key: 'entrance_camera_id' });
+    const entranceIds = entry?.value ? entry.value.split(',') : [];
+    const isEntrance = entranceIds.includes(camera_id);
+    const ModelToUse = isEntrance ? EntranceEvent : ZoneEvent;
+
+    console.log(`[API POST] Saving new event (isEntrance: ${isEntrance}):`, newEvent);
+    const result = await ModelToUse.create(newEvent);
 
     return NextResponse.json({
         success: true,

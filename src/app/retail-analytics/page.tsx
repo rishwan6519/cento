@@ -37,6 +37,7 @@ interface Line {
   name: string;
   start: { x: number; y: number };
   end: { x: number; y: number };
+  swap?: boolean;
 }
 
 interface ZoneCount {
@@ -60,6 +61,7 @@ const Icons = {
   Refresh: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
   Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
   Home: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+  Warning: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
 };
 
 
@@ -79,7 +81,7 @@ const LoadingOverlay = ({ message }: { message: string }) => (
 
 export default function PeopleDetectionPage() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<"dashboard" | "setup" | "analytics" | "floorplan-upload" | "floorplan-config" | "heatmap" | "zone-config">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "setup" | "analytics" | "floorplan-upload" | "floorplan-config" | "heatmap" | "zone-config" | "entrance-config">("dashboard");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // MQTT & System State
@@ -97,9 +99,13 @@ export default function PeopleDetectionPage() {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [zoneCounts, setZoneCounts] = useState<Record<string, Record<string, ZoneCount>>>({});
 
-  const [entranceCameraId, setEntranceCameraId] = useState<string | null>(null);
+  // Status Tracking
+  const [isPiOnline, setIsPiOnline] = useState<boolean | null>(null);
+  const [offlineCameras, setOfflineCameras] = useState<string[]>([]);
+
+  const [entranceCameraIds, setEntranceCameraIds] = useState<string[]>([]);
   const [isEditingEntranceCam, setIsEditingEntranceCam] = useState(false);
-  const [tempEntranceCamId, setTempEntranceCamId] = useState<string>("");
+  const [tempEntranceCamIds, setTempEntranceCamIds] = useState<string[]>([]);
 
   // Form State
   // const [newCamId, setNewCamId] = useState(""); // ID is now auto-generated
@@ -131,6 +137,8 @@ export default function PeopleDetectionPage() {
   const tempCamerasRef = useRef<Camera[]>([]);
   const [startPos, setStartPos] = useState<{x: number, y: number} | null>(null);
   const [currentPos, setCurrentPos] = useState<{x: number, y: number} | null>(null);
+  const [activeShape, setActiveShape] = useState<{type: "zone" | "line", index: number} | null>(null);
+  const [dragHandle, setDragHandle] = useState<string | null>(null);
 
   // Analytics Detailed State
   const [analyticsFilter, setAnalyticsFilter] = useState({
@@ -166,8 +174,8 @@ export default function PeopleDetectionPage() {
           return analyticsFilter.cameraId;
       }
       // 2. Fallback to assigned Entrance Camera from Sidebar Settings
-      if (entranceCameraId) {
-          return entranceCameraId;
+      if (entranceCameraIds.length > 0) {
+          return entranceCameraIds.join(',');
       }
       // 3. Fallback to auto-detect by name
       const entranceCam = cameras.find(c => 
@@ -185,8 +193,22 @@ export default function PeopleDetectionPage() {
     try {
       const activeCamId = getActiveCameraId();
       let url = `/api/stats/hourly?interval=${analyticsFilter.chartInterval}&startDate=${analyticsFilter.startDate}&endDate=${analyticsFilter.endDate}&startTime=${analyticsFilter.startTime}&endTime=${analyticsFilter.endTime}`;
+      
+      let isEnt = false;
+      if (activeCamId && activeCamId !== 'all') {
+          const ids = activeCamId.split(',');
+          if (ids.some(id => entranceCameraIds.includes(id))) {
+              isEnt = true;
+          }
+      } else if (entranceCameraIds.length > 0) {
+          isEnt = true; 
+      }
+
       if (activeCamId) {
         url += `&cameraId=${activeCamId}`;
+      }
+      if (isEnt) {
+        url += `&isEntrance=true`;
       }
 
       const res = await fetch(url);
@@ -205,7 +227,7 @@ export default function PeopleDetectionPage() {
     if (activeTab === "dashboard") {
       fetchHourlyStats();
     }
-  }, [activeTab, cameras, analyticsFilter, entranceCameraId]);
+  }, [activeTab, cameras, analyticsFilter, entranceCameraIds]);
 
   // --- LOAD SETTINGS ---
   const fetchSettings = async () => {
@@ -218,8 +240,9 @@ export default function PeopleDetectionPage() {
           setTempPiId(data.data.pi_id);
         }
         if (data.data.entrance_camera_id) {
-          setEntranceCameraId(data.data.entrance_camera_id);
-          setTempEntranceCamId(data.data.entrance_camera_id);
+          const ids = data.data.entrance_camera_id.split(',').filter(Boolean);
+          setEntranceCameraIds(ids);
+          setTempEntranceCamIds(ids);
         }
       }
     } catch (err) {
@@ -249,10 +272,10 @@ export default function PeopleDetectionPage() {
     try {
       const res = await fetch('/api/settings', {
         method: 'POST',
-        body: JSON.stringify({ key: 'entrance_camera_id', value: tempEntranceCamId })
+        body: JSON.stringify({ key: 'entrance_camera_id', value: tempEntranceCamIds.join(',') })
       });
       if (res.ok) {
-        setEntranceCameraId(tempEntranceCamId);
+        setEntranceCameraIds(tempEntranceCamIds);
         setIsEditingEntranceCam(false);
         setToast({ show: true, message: "Entrance camera updated!", type: "success" });
         setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
@@ -339,7 +362,7 @@ export default function PeopleDetectionPage() {
     fetchCounts();
     const interval = setInterval(fetchCounts, 5000);
     return () => clearInterval(interval);
-  }, [activeTab, cameras, entranceCameraId, analyticsFilter.cameraId]);
+  }, [activeTab, cameras, entranceCameraIds, analyticsFilter.cameraId]);
 
   const fetchHistoricalData = async () => {
     if ((activeTab !== "analytics" && activeTab !== "dashboard") || cameras.length === 0) return;
@@ -375,6 +398,29 @@ export default function PeopleDetectionPage() {
     }
   }, [activeTab, analyticsFilter, cameras]);
 
+  // --- CAMERA STATUS POLLING VIA HTTP ---
+  useEffect(() => {
+    if (!piId) return;
+    const fetchCameraStatus = async () => {
+      try {
+        const res = await fetch(`https://iot.centelon.com/api/camera-status?pi_id=${piId}`);
+        const data = await res.json();
+        if (data && data.cameras && Array.isArray(data.cameras)) {
+          const disconnected = data.cameras
+            .filter((c: any) => c.status === 'Disconnected' || c.status === 'offline')
+            .map((c: any) => String(c.camera_id).replace('camera', ''));
+          setOfflineCameras(disconnected);
+        }
+      } catch (err) {
+        // Suppress errors for polling
+      }
+    };
+    
+    fetchCameraStatus();
+    const intervalId = setInterval(fetchCameraStatus, 10000);
+    return () => clearInterval(intervalId);
+  }, [piId]);
+
   // --- MQTT CONNECTION ---
   useEffect(() => {
     setLoadingMessage("INITIALIZING NEURAL LINK...");
@@ -400,10 +446,34 @@ export default function PeopleDetectionPage() {
       client.subscribe(`vision/${piId}/+/snapshot`);
       client.subscribe(`vision/${piId}/+/counts/update`);
       client.subscribe(`vision/${piId}/+/lines/full_data`);
+      client.subscribe(`vision/${piId}/pi_status`);
+      client.subscribe(`vision/${piId}/camera_status`);
     });
 
     client.on("message", (topic, payload) => {
       const msgStr = payload.toString();
+      
+      if (topic === `vision/${piId}/pi_status`) {
+          try {
+              const data = JSON.parse(msgStr);
+              setIsPiOnline(data.status === 'online');
+          } catch(e) {}
+          return;
+      }
+      
+      if (topic === `vision/${piId}/camera_status`) {
+          try {
+              const data = JSON.parse(msgStr);
+              if (data.cameras && Array.isArray(data.cameras)) {
+                  const disconnected = data.cameras
+                      .filter((c: any) => c.status === 'Disconnected' || c.status === 'offline')
+                      .map((c: any) => String(c.camera_id).replace('camera', ''));
+                  setOfflineCameras(disconnected);
+              }
+          } catch(e) {}
+          return;
+      }
+
       const topicParts = topic.split("/");
       // Structure: vision/node_id/CAMERA_ID/ACTION
       if (topicParts.length < 4) return;
@@ -675,14 +745,11 @@ export default function PeopleDetectionPage() {
      // 2. Send Lines
      if (currentLines.length > 0) {
          const linePayload = {
-             camera_id: editingCameraId,
              lines: currentLines.map(l => ({
                  name: l.name,
-                 x1: Math.round(l.start.x),
-                 y1: Math.round(l.start.y),
-                 x2: Math.round(l.end.x),
-                 y2: Math.round(l.end.y),
-                 swap: false
+                 start: [Math.round(l.start.x), Math.round(l.start.y)],
+                 end: [Math.round(l.end.x), Math.round(l.end.y)],
+                 swap: l.swap || false
              }))
          };
          mqttClient?.publish(
@@ -705,7 +772,8 @@ export default function PeopleDetectionPage() {
          lines: currentLines.map(l => ({
              name: l.name,
              start: { x: Math.round(l.start.x), y: Math.round(l.start.y) },
-             end: { x: Math.round(l.end.x), y: Math.round(l.end.y) }
+             end: { x: Math.round(l.end.x), y: Math.round(l.end.y) },
+             swap: l.swap || false
          }))
      };
 
@@ -798,8 +866,8 @@ export default function PeopleDetectionPage() {
       return { left: x * scaleX, top: y * scaleY, width: w * scaleX, height: h * scaleY };
   };
   
-    const getLineStyle = (start: {x:number, y:number}, end: {x:number, y:number}) => {
-        if (!imgRef.current) return {};
+    const getLineStyle = (start: {x:number, y:number}, end: {x:number, y:number}): {x1:number, y1:number, x2:number, y2:number} | null => {
+        if (!imgRef.current) return null;
         const rect = imgRef.current.getBoundingClientRect();
         const scaleX = rect.width / imgRef.current.naturalWidth;
         const scaleY = rect.height / imgRef.current.naturalHeight;
@@ -807,16 +875,73 @@ export default function PeopleDetectionPage() {
     };
 
   const onMouseDown = (e: React.MouseEvent) => {
+      if (dragHandle) return; // handled by handle's down event
+      setActiveShape(null); // Clicked in empty space
       if (drawingMode === "none" || !newItemName) return;
       const coords = getImgCoords(e);
       setStartPos(coords);
       setCurrentPos(coords);
   };
   const onMouseMove = (e: React.MouseEvent) => {
+      const coords = getImgCoords(e);
+      if (dragHandle && activeShape) {
+          if (activeShape.type === "zone") {
+              setCurrentZones(prev => prev.map((z, i) => {
+                  if (i !== activeShape.index) return z;
+                  const newZ = { ...z };
+                  if (dragHandle.includes('T')) newZ.y1 = coords.y;
+                  if (dragHandle.includes('B')) newZ.y2 = coords.y;
+                  if (dragHandle.includes('L')) newZ.x1 = coords.x;
+                  if (dragHandle.includes('R')) newZ.x2 = coords.x;
+                  // Handle full move
+                  if (dragHandle === "move" && currentPos) {
+                      const dx = coords.x - currentPos.x;
+                      const dy = coords.y - currentPos.y;
+                      newZ.x1 += dx; newZ.x2 += dx;
+                      newZ.y1 += dy; newZ.y2 += dy;
+                  }
+                  return newZ;
+              }));
+          } else if (activeShape.type === "line") {
+              setCurrentLines(prev => prev.map((l, i) => {
+                  if (i !== activeShape.index) return l;
+                  const newL = { ...l };
+                  if (dragHandle === "start") newL.start = coords;
+                  if (dragHandle === "end") newL.end = coords;
+                  if (dragHandle === "move" && currentPos) {
+                      const dx = coords.x - currentPos.x;
+                      const dy = coords.y - currentPos.y;
+                      newL.start = { x: newL.start.x + dx, y: newL.start.y + dy };
+                      newL.end = { x: newL.end.x + dx, y: newL.end.y + dy };
+                  }
+                  return newL;
+              }));
+          }
+          setCurrentPos(coords);
+          return;
+      }
+
       if (!startPos) return;
-      setCurrentPos(getImgCoords(e));
+      setCurrentPos(coords);
   };
   const onMouseUp = () => {
+      if (dragHandle) {
+          if (activeShape?.type === "zone") {
+              setCurrentZones(prev => prev.map((z, i) => {
+                  if (i !== activeShape.index) return z;
+                  return {
+                      ...z,
+                      x1: Math.min(z.x1, z.x2),
+                      x2: Math.max(z.x1, z.x2),
+                      y1: Math.min(z.y1, z.y2),
+                      y2: Math.max(z.y1, z.y2)
+                  };
+              }));
+          }
+          setDragHandle(null);
+          setCurrentPos(null);
+          return;
+      }
       if (!startPos || !currentPos) return;
       if (drawingMode === "zone") {
           const newZone: Zone = {
@@ -833,10 +958,30 @@ export default function PeopleDetectionPage() {
       }
       setStartPos(null); setCurrentPos(null); setNewItemName(""); setDrawingMode("none");
   };
+  
+  const handleHandleMouseDown = (e: React.MouseEvent, type: "zone"|"line", index: number, handle: string) => {
+      e.stopPropagation();
+      setActiveShape({ type, index });
+      setDragHandle(handle);
+      setCurrentPos(getImgCoords(e)); // For 'move' delta calculations
+  };
 
   // --- RENDER ---
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-indigo-500/30 selection:text-indigo-900 overflow-hidden flex">
+      {/* PI OFFLINE OVERLAY BLOCK */}
+      {isPiOnline === false && (
+          <div className="fixed inset-0 z-[100] grid place-items-center bg-gray-900/80 backdrop-blur-[2px] animate-in fade-in duration-300">
+              <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-lg mx-4 text-center flex flex-col items-center border border-gray-100/10">
+                  <div className="w-24 h-24 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-6 shadow-inner ring-8 ring-white">
+                      <Icons.Warning />
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-2">Connected Node is Offline</h2>
+                  <p className="text-gray-500 text-sm mb-8 leading-relaxed max-w-sm">The hardware perception node is currently unreachable. Turn on the PI device and wait for auto-reconnection to continue using the retail analytics platform.</p>
+                  <div className="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin shadow-sm" />
+              </div>
+          </div>
+      )}
       
       {/* SIDEBAR */}
       <aside className="w-72 bg-white border-r border-gray-200 flex flex-col z-20">
@@ -881,6 +1026,7 @@ export default function PeopleDetectionPage() {
                 <div className="pl-12 space-y-1 mt-1">
                     {[
                         { id: "zone-config", label: "Zone Config" },
+                        { id: "entrance-config", label: "Entrance Config" },
                         { id: "setup", label: "Device Add" },
                         { id: "floorplan-upload", label: "Upload Map" },
                         { id: "floorplan-config", label: "Map Config" },
@@ -924,35 +1070,6 @@ export default function PeopleDetectionPage() {
                  ) : (
                      <div className="text-xs text-gray-500 font-mono">NODE: {piId}</div>
                  )}
-                 
-                 <div className="mt-4 pt-4 border-t border-gray-200">
-                     <div className="flex items-center justify-between mb-2">
-                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Entrance Cam</span>
-                         <button onClick={() => setIsEditingEntranceCam(!isEditingEntranceCam)} className="text-gray-400 hover:text-indigo-600 transition-colors">
-                             <Icons.Edit />
-                         </button>
-                     </div>
-                     {isEditingEntranceCam ? (
-                         <div className="flex flex-col gap-2">
-                             <select
-                                 value={tempEntranceCamId}
-                                 onChange={(e) => setTempEntranceCamId(e.target.value)}
-                                 className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[10px] font-mono focus:ring-1 focus:ring-indigo-500 outline-none"
-                             >
-                                 <option value="">-- None --</option>
-                                 {cameras.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                             </select>
-                             <div className="flex gap-2">
-                                 <button onClick={saveEntranceCamera} className="flex-1 bg-indigo-600 text-white text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Save</button>
-                                 <button onClick={() => setIsEditingEntranceCam(false)} className="flex-1 bg-gray-200 text-gray-600 text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Cancel</button>
-                             </div>
-                         </div>
-                     ) : (
-                         <div className="text-[11px] text-indigo-600 font-bold truncate">
-                            {cameras.find(c => String(c.id) === entranceCameraId)?.name || 'Not Configured'}
-                         </div>
-                     )}
-                 </div>
              </div>
          </div>
       </aside>
@@ -966,6 +1083,23 @@ export default function PeopleDetectionPage() {
                   {systemMessage && <p className={`text-[10px] font-mono mt-1 ${systemStatus === "error" ? "text-rose-600" : systemStatus === "warning" ? "text-amber-600" : "text-indigo-600"}`}>{systemMessage}</p>}
               </div>
               <div className="flex items-center gap-4">
+                  <button 
+                      onClick={() => {
+                          if (mqttClient && isConnected && piId) {
+                              mqttClient.publish(`vision/${piId}/push_cameras`, JSON.stringify({ action: "request_status", timestamp: Date.now() }));
+                              setToast({ show: true, message: "Requested instant status from Node", type: "success" });
+                              setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
+                          } else {
+                              setToast({ show: true, message: "Node link not ready", type: "error" });
+                              setTimeout(() => setToast({ show: false, message: "", type: "error" }), 3000);
+                          }
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-bold transition-all shadow-sm border border-indigo-100 uppercase tracking-widest"
+                      title="Force status refresh from PI"
+                  >
+                      <Icons.Refresh />
+                      PING STATUS
+                  </button>
                   <div className="h-8 w-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                   </div>
@@ -1145,12 +1279,14 @@ export default function PeopleDetectionPage() {
 
                       {/* CAMERA LIST */}
                       <div className="col-span-12 xl:col-span-8 space-y-4">
-                          {cameras.map(cam => (
-                              <div key={cam.id} className="bg-white border border-gray-200 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 group hover:border-indigo-300 transition-all shadow-sm">
-                                  <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-colors">
+                          {cameras.map(cam => {
+                               const isOffline = offlineCameras.includes(String(cam.id));
+                               return (
+                              <div key={cam.id} className={`bg-white border rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 group transition-all shadow-sm ${isOffline ? 'border-rose-200' : 'border-gray-200 hover:border-indigo-300'}`}>
+                                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isOffline ? 'bg-rose-50 text-rose-500' : 'bg-gray-100 text-gray-400 group-hover:text-indigo-600 group-hover:bg-indigo-50'}`}>
                                       <Icons.Camera />
                                   </div>
-                                  <div className="flex-1 text-center md:text-left">
+                                  <div className={`flex-1 text-center md:text-left ${isOffline ? 'opacity-60' : ''}`}>
                                       <div className="flex items-center justify-center md:justify-start gap-3">
                                           <div className="flex items-center gap-2">
                                             <h4 className="text-xl font-bold text-gray-900">{cam.name}</h4>
@@ -1158,9 +1294,16 @@ export default function PeopleDetectionPage() {
                                                 <Icons.Edit />
                                             </button>
                                           </div>
-                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${cam.status === "active" ? "bg-emerald-50 text-emerald-600" : cam.status === "pending" ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"}`}>
-                                              {cam.status === 'active' ? 'CONNECTED' : cam.status}
-                                          </span>
+                                          <div className="flex items-center gap-2">
+                                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${cam.status === "active" ? "bg-emerald-50 text-emerald-600" : cam.status === "pending" ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"}`}>
+                                                  {cam.status === 'active' ? 'CONNECTED' : cam.status}
+                                              </span>
+                                              {isOffline && (
+                                                  <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1.5">
+                                                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" /> Offline
+                                                  </span>
+                                              )}
+                                          </div>
                                       </div>
                                       <div className="text-xs text-gray-500 font-mono mt-1">{cam.id} | {cam.ip} | Channel {cam.channel || 1}</div>
                                       <div className="text-[10px] text-gray-400 mt-1 font-mono truncate max-w-md">{cam.rtsp_url}</div>
@@ -1171,7 +1314,8 @@ export default function PeopleDetectionPage() {
                                       </button>
                                   </div>
                               </div>
-                          ))}
+                              );
+                           })}
                           {cameras.length === 0 && (
                               <div className="h-64 rounded-3xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400">
                                   <div className="bg-gray-100 p-4 rounded-full mb-4"><Icons.Camera /></div>
@@ -1258,13 +1402,20 @@ export default function PeopleDetectionPage() {
 
                                   return (
                                       <>
-                                          {displayCards.map(({ camId, zoneName, count }) => (
-                                              <div key={`${camId}-${zoneName}`} className="bg-white border border-gray-200 p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group hover:shadow-xl transition-all duration-500">
-                                                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+                                          {displayCards.map(({ camId, zoneName, count }) => {
+                                              const isEnt = entranceCameraIds.includes(String(camId));
+                                              return (
+                                              <div key={`${camId}-${zoneName}`} className={`bg-white border p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group hover:shadow-xl transition-all duration-500 ${isEnt ? 'border-amber-300 ring-4 ring-amber-100' : 'border-gray-200'}`}>
+                                                  <div className={`absolute top-0 left-0 w-full h-1.5 ${isEnt ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-indigo-500 to-violet-500'}`} />
                                                   <div className="flex justify-between items-start mb-8">
                                                       <div>
-                                                          <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em] mb-1">{cameras.find(c => c.id == camId)?.name || camId}</div>
-                                                          <div className="text-xl font-black text-gray-900 tracking-tight">{zoneName}</div>
+                                                          <div className="flex items-center gap-2 mb-1">
+                                                              <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em]">{cameras.find(c => String(c.id) === String(camId))?.name || camId}</div>
+                                                              {isEnt && <span className="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-black uppercase tracking-widest shadow-sm">Entrance</span>}
+                                                          </div>
+                                                          <div className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                                              {isEnt ? <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg> : null} {zoneName}
+                                                          </div>
                                                       </div>
                                                       <div className="flex items-center gap-2">
                                                           <button onClick={() => handlePreviewZone(camId, zoneName)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm group" title="Live Camera View">
@@ -1307,7 +1458,8 @@ export default function PeopleDetectionPage() {
                                                       </div>
                                                   </div>
                                               </div>
-                                          ))}
+                                              );
+                                          })}
                                           {cards.length > 5 && (
                                               <div className="col-span-full flex justify-center mt-4">
                                                   <button onClick={() => setShowAllZones(!showAllZones)} className="px-8 py-3 bg-white border border-gray-200 text-indigo-600 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-sm hover:border-indigo-600 hover:shadow-indigo-500/10 transition-all flex items-center gap-3">
@@ -1317,9 +1469,8 @@ export default function PeopleDetectionPage() {
                                           )}
                                       </>
                                   );
-                              })()
-                          )}
-                      </div>
+                              })())}
+                       </div>
 
                       {/* Event History Table */}
                       <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden">
@@ -1412,14 +1563,22 @@ export default function PeopleDetectionPage() {
                                </div>
                            </div>
                            
-                           {cameras.map(cam => (
-                               <div key={cam.id} className="bg-white border border-gray-200 rounded-3xl p-6 flex items-center justify-between group hover:border-sky-300 transition-all shadow-sm">
-                                   <div className="flex items-center gap-6">
-                                       <div className="w-14 h-14 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                           {cameras.filter(c => !entranceCameraIds.includes(String(c.id))).map(cam => {
+                               const isOffline = offlineCameras.includes(String(cam.id));
+                               return (
+                               <div key={cam.id} className={`bg-white border rounded-3xl p-6 flex items-center justify-between group transition-all shadow-sm ${isOffline ? 'border-rose-200' : 'border-gray-200 hover:border-sky-300'}`}>
+                                   <div className={`flex items-center gap-6 ${isOffline ? 'opacity-60 grayscale' : ''}`}>
+                                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isOffline ? 'bg-rose-50 text-rose-500' : 'bg-sky-50 text-sky-600'}`}>
                                            <Icons.Camera />
                                        </div>
                                        <div>
-                                           <h4 className="text-lg font-black text-gray-900">{cam.name}</h4>
+                                           <div className="flex items-center gap-2">
+                                               <h4 className="text-lg font-black text-gray-900">{cam.name}</h4>
+                                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${cam.status === "active" ? "bg-emerald-50 text-emerald-600" : cam.status === "pending" ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"}`}>
+                                                   {cam.status === 'active' ? 'CONNECTED' : cam.status}
+                                               </span>
+                                               {isOffline && <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" /> Offline</span>}
+                                           </div>
                                            <div className="flex items-center gap-3 mt-1">
                                                <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">{cam.ip}</span>
                                                <span className="w-1 h-1 rounded-full bg-gray-300" />
@@ -1427,22 +1586,128 @@ export default function PeopleDetectionPage() {
                                            </div>
                                        </div>
                                    </div>
-                                   <button onClick={() => handleConfigure(cam.id)} className="px-8 py-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-600 transition-all shadow-lg shadow-gray-900/10 hover:shadow-sky-500/20 active:scale-95">
+                                   <button onClick={() => handleConfigure(cam.id)} className={`px-8 py-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${isOffline ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'hover:bg-sky-600 shadow-gray-900/10 hover:shadow-sky-500/20'}`}>
                                        Configure Zones
                                    </button>
                                </div>
-                           ))}
+                               );
+                           })}
                            
-                           {cameras.length === 0 && (
+                           {cameras.filter(c => !entranceCameraIds.includes(String(c.id))).length === 0 && (
                                <div className="h-64 rounded-[2.5rem] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50/50">
-                                   <div className="p-4 rounded-full bg-white shadow-sm mb-4 text-gray-300"><Icons.Camera /></div>
-                                   <p className="text-gray-400 font-bold text-xs uppercase tracking-widest text-center">No hardware nodes found.<br/>Link a camera in 'Devices' to begin.</p>
+                               <div className="p-4 rounded-full bg-white shadow-sm mb-4 text-gray-300"><Icons.Camera /></div>
+                                   <p className="text-gray-400 font-bold text-xs uppercase tracking-widest text-center">
+                                       {cameras.length === 0 ? "No hardware nodes found." : "No standard zones available."}<br/>
+                                       {cameras.length === 0 ? "Link a camera in 'Devices' to begin." : "(Cameras are mapped as Entrance Nodes)"}
+                                   </p>
                                </div>
                            )}
                        </div>
-                   </div>
+                    </div>
                )}
                
+               {activeTab === "entrance-config" && (
+                   <div className="max-w-5xl mx-auto py-8">
+                       <div className="bg-white border border-gray-200 p-8 rounded-[2.5rem] shadow-sm">
+                           <h3 className="text-2xl font-black mb-6 uppercase tracking-tight text-gray-900">Entrance Configuration</h3>
+                           <p className="text-gray-500 mb-8 max-w-2xl">Select the cameras that monitor the entrances. These cameras will only allow line configuration, and their data will be processed specifically for footfall metrics using the EntranceEvent engine.</p>
+                           
+                           <div className="space-y-4">
+                               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Select Entrance Cameras</label>
+                               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                   {cameras.map(c => {
+                                       const isOffline = offlineCameras.includes(String(c.id));
+                                       return (
+                                       <label key={c.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${tempEntranceCamIds.includes(String(c.id)) ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} ${isOffline ? 'opacity-50 grayscale' : ''}`}>
+                                           <input 
+                                               type="checkbox" 
+                                               checked={tempEntranceCamIds.includes(String(c.id))}
+                                               onChange={(e) => {
+                                                   if (e.target.checked) {
+                                                       setTempEntranceCamIds([...tempEntranceCamIds, String(c.id)]);
+                                                   } else {
+                                                       setTempEntranceCamIds(tempEntranceCamIds.filter(id => id !== String(c.id)));
+                                                   }
+                                               }}
+                                               className="w-4 h-4 accent-indigo-600 cursor-pointer rounded"
+                                           />
+                                           <div className="flex flex-col">
+                                               <span className={`text-sm font-bold ${tempEntranceCamIds.includes(String(c.id)) ? 'text-indigo-900' : 'text-gray-700'}`}>{c.name}</span>
+                                               {isOffline && <span className="text-[8px] font-black uppercase text-rose-500">Offline</span>}
+                                           </div>
+                                       </label>
+                                       );
+                                   })}
+                               </div>
+                               
+                               <div className="pt-4 flex justify-end">
+                                   <button 
+                                      onClick={saveEntranceCamera} 
+                                      className="px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
+                                   >
+                                       Save Configuration
+                                   </button>
+                               </div>
+                           </div>
+                       </div>
+                       
+                       {entranceCameraIds.length > 0 && (
+                           <div className="mt-8 space-y-4">
+                               <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest pl-2">Configured Entrance Cameras</h4>
+                               {cameras.filter(c => entranceCameraIds.includes(String(c.id))).map(cam => {
+                                   const isOffline = offlineCameras.includes(String(cam.id));
+                                   return (
+                                   <div key={cam.id} className={`bg-white border rounded-3xl p-6 flex items-center justify-between group transition-all shadow-sm ${isOffline ? 'border-rose-200' : 'border-gray-200 hover:border-indigo-300'}`}>
+                                       <div className={`flex items-center gap-6 ${isOffline ? 'opacity-60 grayscale' : ''}`}>
+                                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isOffline ? 'bg-rose-50 text-rose-500' : 'bg-indigo-50 text-indigo-600'}`}>
+                                               <Icons.Camera />
+                                           </div>
+                                           <div>
+                                               <div className="flex items-center gap-2">
+                                                   <h4 className="text-lg font-black text-gray-900">{cam.name}</h4>
+                                                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${cam.status === "active" ? "bg-emerald-50 text-emerald-600" : cam.status === "pending" ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"}`}>
+                                                       {cam.status === 'active' ? 'CONNECTED' : cam.status}
+                                                   </span>
+                                                   {isOffline && <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" /> Offline</span>}
+                                               </div>
+                                               <div className="flex items-center gap-3 mt-1">
+                                                   <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">{cam.ip}</span>
+                                                   <span className="w-1 h-1 rounded-full bg-gray-300" />
+                                                   <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Channel {cam.channel}</span>
+                                               </div>
+                                           </div>
+                                       </div>
+                                       <div className="flex items-center gap-4">
+                                           <button onClick={async () => {
+                                               if (window.confirm(`Are you sure you want to remove ${cam.name} from entrance cameras?`)) {
+                                                   const newIds = entranceCameraIds.filter(id => id !== String(cam.id));
+                                                   
+                                                   try {
+                                                       await fetch('/api/settings', {
+                                                           method: 'POST',
+                                                           body: JSON.stringify({ key: 'entrance_camera_id', value: newIds.join(',') })
+                                                       });
+                                                       setEntranceCameraIds(newIds);
+                                                       setTempEntranceCamIds(newIds);
+                                                   } catch (err) {
+                                                       console.error('Failed to update settings', err);
+                                                   }
+                                               }
+                                           }} className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 transition-colors">
+                                               Remove
+                                           </button>
+                                           <button onClick={() => handleConfigure(cam.id)} className={`px-8 py-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${isOffline ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'hover:bg-indigo-600 shadow-gray-900/10 hover:shadow-indigo-500/20'}`}>
+                                               Configure Lines
+                                           </button>
+                                       </div>
+                                   </div>
+                               );
+                           })}
+                           </div>
+                       )}
+                   </div>
+               )}
+
                {activeTab === "floorplan-upload" && <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden"><FloorPlanUploader initialStep="upload" /></div>}
                {activeTab === "floorplan-config" && <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden"><FloorPlanUploader initialStep="list" /></div>}
               {activeTab === "heatmap" && <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden"><HeatmapViewer /></div>}
@@ -1472,8 +1737,8 @@ export default function PeopleDetectionPage() {
                          </div>
                          
                          <div className="grid grid-cols-2 gap-3 mb-8">
-                             <button onClick={() => setDrawingMode("zone")} disabled={!newItemName}
-                                className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${drawingMode === "zone" ? "border-indigo-500 bg-indigo-50 text-indigo-600" : "border-gray-200 bg-white hover:border-gray-300 text-gray-500"}`}>
+                             <button onClick={() => setDrawingMode("zone")} disabled={!newItemName || entranceCameraIds.includes(String(editingCameraId))}
+                                className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${drawingMode === "zone" ? "border-indigo-500 bg-indigo-50 text-indigo-600" : "border-gray-200 bg-white hover:border-gray-300 text-gray-500"} ${entranceCameraIds.includes(String(editingCameraId)) ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                  <div className="w-8 h-8 border-2 border-dashed border-current rounded" />
                                  <span className="text-[10px] font-bold uppercase">Zone</span>
                              </button>
@@ -1486,18 +1751,56 @@ export default function PeopleDetectionPage() {
 
                          <div className="space-y-2">
                              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Active Items</div>
-                             {currentZones.map((z, i) => (
-                                 <div key={i} className="flex justify-between p-3 rounded-lg bg-white border border-gray-200 shadow-sm">
-                                     <span className="text-sm font-medium text-gray-700">{z.name}</span>
-                                     <button onClick={() => setCurrentZones(p => p.filter((_, idx) => idx !== i))} className="text-rose-500 hover:text-rose-700"><Icons.X /></button>
+                             {entranceCameraIds.includes(String(editingCameraId)) && (
+                                <div className="text-[10px] text-amber-600 font-bold uppercase mb-2 px-3 py-2 bg-amber-50 rounded border border-amber-100 italic">
+                                    Entrance Camera: Lines mapping only
+                                </div>
+                             )}
+                             {currentZones.map((z, i) => {
+                                 const isActive = activeShape?.type === 'zone' && activeShape.index === i;
+                                 return (
+                                 <div key={i} 
+                                      className={`flex justify-between p-3 rounded-lg bg-white border shadow-sm transition-all cursor-pointer ${isActive ? 'border-amber-400 ring-2 ring-amber-100' : 'border-gray-200 hover:border-amber-200'}`}
+                                      onClick={() => setActiveShape({type: "zone", index: i})}
+                                 >
+                                     <span className={`text-sm font-medium ${isActive ? 'text-amber-700 font-bold' : 'text-gray-700'}`}>{z.name}</span>
+                                     <button onClick={(e) => {
+                                         e.stopPropagation();
+                                         if (window.confirm(`Are you sure you want to delete zone "${z.name}"?`)) {
+                                             if (editingCameraId) handleRemoveZone(editingCameraId, z.name);
+                                             setCurrentZones(p => p.filter((_, idx) => idx !== i));
+                                             if (isActive) setActiveShape(null);
+                                         }
+                                     }} className="text-rose-500 hover:text-rose-700 transition-colors bg-rose-50 p-1.5 rounded-md"><Icons.X /></button>
                                  </div>
-                             ))}
-                             {currentLines.map((l, i) => (
-                                 <div key={i} className="flex justify-between p-3 rounded-lg bg-white border border-gray-200 shadow-sm">
-                                     <span className="text-sm font-medium text-gray-700">{l.name}</span>
-                                     <button onClick={() => setCurrentLines(p => p.filter((_, idx) => idx !== i))} className="text-rose-500 hover:text-rose-700"><Icons.X /></button>
+                             )})}
+                             {currentLines.map((l, i) => {
+                                 const isActive = activeShape?.type === 'line' && activeShape.index === i;
+                                 return (
+                                 <div key={i} 
+                                      className={`flex flex-col gap-2 p-3 rounded-lg bg-white border shadow-sm transition-all cursor-pointer ${isActive ? 'border-amber-400 ring-2 ring-amber-100' : 'border-gray-200 hover:border-amber-200'}`}
+                                      onClick={() => setActiveShape({type: "line", index: i})}
+                                 >
+                                     <div className="flex justify-between items-center">
+                                         <span className={`text-sm font-medium ${isActive ? 'text-amber-700 font-bold' : 'text-gray-700'}`}>{l.name}</span>
+                                         <button onClick={(e) => {
+                                             e.stopPropagation();
+                                             if (window.confirm(`Are you sure you want to delete line "${l.name}"?`)) {
+                                                 if (editingCameraId) handleRemoveLine(editingCameraId, l.name);
+                                                 setCurrentLines(p => p.filter((_, idx) => idx !== i));
+                                                 if (isActive) setActiveShape(null);
+                                             }
+                                         }} className="text-rose-500 hover:text-rose-700 transition-colors bg-rose-50 p-1.5 rounded-md"><Icons.X /></button>
+                                     </div>
+                                     <label className="flex items-center gap-2 cursor-pointer mt-1 bg-gray-50/50 p-2 rounded border border-gray-100 select-none group" onClick={e => e.stopPropagation()}>
+                                         <input type="checkbox" checked={l.swap || false} onChange={e => {
+                                             const val = e.target.checked;
+                                             setCurrentLines(p => p.map((item, idx) => idx === i ? { ...item, swap: val } : item));
+                                         }} className="accent-indigo-600 w-4 h-4 cursor-pointer" />
+                                         <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider group-hover:text-indigo-600 transition-colors">Flip In/Out Direction</span>
+                                     </label>
                                  </div>
-                             ))}
+                             )})}
                          </div>
                          
                          <div className="mt-auto grid grid-cols-2 gap-3 pt-6 border-t border-gray-200">
@@ -1521,17 +1824,47 @@ export default function PeopleDetectionPage() {
                                  <img ref={imgRef} src={snapshotUrl} className="max-w-full max-h-[75vh] object-contain block opacity-90" draggable={false} onDragStart={e => e.preventDefault()} />
                                  
                                  {/* Overlays */}
-                                 {currentZones.map((z, i) => (
-                                     <div key={i} className="absolute border-2 border-indigo-500 bg-indigo-500/20" style={getStyle(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1)}>
-                                         <span className="absolute -top-6 left-0 bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase">{z.name}</span>
+                                 {currentZones.map((z, i) => {
+                                     const isActive = activeShape?.type === 'zone' && activeShape.index === i;
+                                     return (
+                                     <div key={i} 
+                                          onClick={(e) => { e.stopPropagation(); setActiveShape({type: "zone", index: i}); }}
+                                          onMouseDown={(e) => isActive ? handleHandleMouseDown(e, "zone", i, "move") : undefined}
+                                          className={`absolute border-2 ${isActive ? 'border-amber-500 bg-amber-500/20 cursor-move z-20' : 'border-indigo-500 bg-indigo-500/20 cursor-pointer z-10'}`} 
+                                          style={getStyle(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1)}
+                                     >
+                                         <span className={`absolute -top-6 left-0 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase ${isActive ? 'bg-amber-600' : 'bg-indigo-600'}`}>{z.name}</span>
+                                         {isActive && (
+                                            <>
+                                                <div className="absolute -top-2 -left-2 w-4 h-4 bg-white border-2 border-amber-500 cursor-nwse-resize rounded-full shadow-sm" onMouseDown={(e) => handleHandleMouseDown(e, "zone", i, "TL")} />
+                                                <div className="absolute -top-2 -right-2 w-4 h-4 bg-white border-2 border-amber-500 cursor-nesw-resize rounded-full shadow-sm" onMouseDown={(e) => handleHandleMouseDown(e, "zone", i, "TR")} />
+                                                <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-white border-2 border-amber-500 cursor-nesw-resize rounded-full shadow-sm" onMouseDown={(e) => handleHandleMouseDown(e, "zone", i, "BL")} />
+                                                <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-white border-2 border-amber-500 cursor-nwse-resize rounded-full shadow-sm" onMouseDown={(e) => handleHandleMouseDown(e, "zone", i, "BR")} />
+                                            </>
+                                         )}
                                      </div>
-                                 ))}
+                                 )})}
                                  {currentLines.map((l, i) => {
                                       const s = getLineStyle(l.start, l.end);
+                                      if (!s) return null;
+                                      const isActive = activeShape?.type === 'line' && activeShape.index === i;
                                       return (
-                                          <svg key={i} className="absolute inset-0 w-full h-full pointer-events-none">
-                                              <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="#10b981" strokeWidth="3" />
-                                              <circle cx={s.x1} cy={s.y1} r="3" fill="#10b981"/> <circle cx={s.x2} cy={s.y2} r="3" fill="#10b981"/>
+                                          <svg key={i} className={`absolute inset-0 w-full h-full pointer-events-none ${isActive ? 'z-20' : 'z-10'}`}>
+                                              {/* Invisible wide hit target for the line */}
+                                              <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="transparent" strokeWidth="16" className={`pointer-events-auto ${isActive ? 'cursor-move' : 'cursor-pointer'}`} onClick={(e) => { e.stopPropagation(); setActiveShape({type: "line", index: i}); }} onMouseDown={(e) => isActive ? handleHandleMouseDown(e, "line", i, "move") : undefined} />
+                                              <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={isActive ? "#f59e0b" : "#10b981"} strokeWidth="3" />
+                                              <text x={s.x1} y={s.y1 - 10} fill={isActive ? "#f59e0b" : "#10b981"} fontSize="12" fontWeight="bold" className="drop-shadow-sm">{l.name}</text>
+                                              
+                                              {isActive ? (
+                                                  <>
+                                                      <circle cx={s.x1} cy={s.y1} r="6" fill="#fff" stroke="#f59e0b" strokeWidth="2" className="pointer-events-auto cursor-move" onMouseDown={(e) => handleHandleMouseDown(e, "line", i, "start")} />
+                                                      <circle cx={s.x2} cy={s.y2} r="6" fill="#fff" stroke="#f59e0b" strokeWidth="2" className="pointer-events-auto cursor-move" onMouseDown={(e) => handleHandleMouseDown(e, "line", i, "end")} />
+                                                  </>
+                                              ) : (
+                                                  <>
+                                                      <circle cx={s.x1} cy={s.y1} r="3" fill="#10b981"/> <circle cx={s.x2} cy={s.y2} r="3" fill="#10b981"/>
+                                                  </>
+                                              )}
                                           </svg>
                                       );
                                  })}
@@ -1544,7 +1877,7 @@ export default function PeopleDetectionPage() {
                                  )}
                                  {drawingMode === "line" && startPos && currentPos && (
                                      <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                                         {(() => { const s = getLineStyle(startPos, currentPos); return <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="#3b82f6" strokeWidth="2" strokeDasharray="5,5" />; })()}
+                                         {(() => { const s = getLineStyle(startPos, currentPos); return s ? <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="#3b82f6" strokeWidth="2" strokeDasharray="5,5" /> : null; })()}
                                      </svg>
                                  )}
                              </div>

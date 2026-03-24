@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { ZoneEvent } from "@/models/ZoneEvent";
+import { EntranceEvent } from "@/models/EntranceEvent";
+import { Settings } from "@/models/Settings";
 import { ZoneCount } from "@/models/Camera/SaveCount";
 import { CameraConfig } from "@/models/Camera/CameraConfig";
 import CameraMarker from "@/models/CameraMarker";
@@ -69,9 +71,14 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    console.log("[API] Querying ZoneEvents for camera_id:", actualCameraId);
+    const entry = await Settings.findOne({ key: 'entrance_camera_id' });
+    const entranceIds = entry?.value ? entry.value.split(',') : [];
+    const isEntrance = entranceIds.includes(actualCameraId);
+    const ModelToUse = isEntrance ? EntranceEvent : ZoneEvent;
 
-    const documents = await ZoneEvent.find(query).lean();
+    console.log(`[API] Querying ZoneEvents (isEntrance: ${isEntrance}) for camera_id:`, actualCameraId);
+
+    const documents = await ModelToUse.find(query).lean();
     console.log(`[API] Found ${documents.length} documents`);
 
     // ✅ Aggregate counts 

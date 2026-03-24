@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { ZoneEvent } from "@/models/ZoneEvent";
+import { EntranceEvent } from "@/models/EntranceEvent";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     const endDateParam = searchParams.get('endDate');
     const startTimeParam = searchParams.get('startTime') || '00:00';
     const endTimeParam = searchParams.get('endTime') || '23:59';
+    const isEntrance = searchParams.get('isEntrance') === 'true';
 
     const now = new Date();
     let startDateTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
@@ -33,15 +35,13 @@ export async function GET(request: NextRequest) {
     };
     if (cameraId && cameraId !== 'all') {
       const ids = cameraId.split(',');
-      if (ids.length > 1) {
-        query["metadata.camera_id"] = { $in: ids };
-      } else {
-        query["metadata.camera_id"] = cameraId;
-      }
+      const searchIds = ids.flatMap(id => [id, `camera${id}`, Number(id)].filter(Boolean));
+      query["metadata.camera_id"] = { $in: searchIds };
     }
 
     // Fetch matching events
-    const events = await ZoneEvent.find(query).lean();
+    const ModelToUse = isEntrance ? EntranceEvent : ZoneEvent;
+    const events = await ModelToUse.find(query).lean();
 
     console.log(`[Stats API] Found ${events.length} events for query`);
 

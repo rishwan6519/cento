@@ -77,6 +77,7 @@ const CreateMedia: React.FC<CreateMediaProps> = ({ onCancel, onSuccess }) => {
       toast.error("Group name is required");
       return;
     }
+    
     setCreatingGroup(true);
     try {
       const response = await fetch("/api/media-groups", {
