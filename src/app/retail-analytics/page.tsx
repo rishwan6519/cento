@@ -178,8 +178,9 @@ export default function PeopleDetectionPage() {
       if (entranceCameraIds.length > 0) {
           return entranceCameraIds.join(',');
       }
-      // 3. Otherwise return all to show whatever is connected
-      return 'all';
+      // 3. Otherwise return 'none' to avoid showing the "entire zone graph" 
+      //    unintentionally before a proper entrance camera is mapped.
+      return 'none';
   };
 
   // --- FETCH HOURLY STATS ---

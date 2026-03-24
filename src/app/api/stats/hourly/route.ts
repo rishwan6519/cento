@@ -39,10 +39,16 @@ export async function GET(request: NextRequest) {
       query["metadata.camera_id"] = { $in: searchIds };
     }
 
-    // Fetch matching events from both to ensure we capture all camera activity 
-    // regardless of whether they are assigned as entrance or zone cameras.
-    const zoneEvents = await ZoneEvent.find(query).lean();
-    const entranceEvents = await EntranceEvent.find(query).lean();
+    // Fetch matching events from both collections to ensure the count is complete.
+    // This handles scenarios where data might be distributed across collections 
+    // due to camera reconfigurations or historical tracking differences.
+    const [zoneEvents, entranceEvents] = await Promise.all([
+        ZoneEvent.find(query).lean(),
+        EntranceEvent.find(query).lean()
+    ]);
+    
+    // If specifically querying for Entrance data, we combine both to be safe, 
+    // but in a strict configuration, only EntranceEvents should have data for these cameras.
     const events = [...zoneEvents, ...entranceEvents];
 
     console.log(`[Stats API] Found ${events.length} events for query`);
