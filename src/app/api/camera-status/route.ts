@@ -94,3 +94,33 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const pi_id = searchParams.get('pi_id');
+
+    if (!pi_id) {
+       return NextResponse.json({ success: false, error: "pi_id is required" }, { status: 400 });
+    }
+
+    await connectToDatabase();
+
+    const cameras = await AvailableCamera.find({ pi_id }).lean();
+    
+    return NextResponse.json({
+      success: true,
+      pi_id,
+      cameras: cameras.map((c: any) => ({
+        camera_id: c.camera_id,
+        status: c.status
+      }))
+    });
+  } catch(error: any) {
+    console.error("[API ERROR] Failed to fetch camera statuses:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}

@@ -397,11 +397,11 @@ export default function PeopleDetectionPage() {
     if (!piId) return;
     const fetchCameraStatus = async () => {
       try {
-        const res = await fetch(`https://iot.centelon.com/api/camera-status?pi_id=${piId}`);
+        const res = await fetch(`/api/camera-status?pi_id=${piId}`);
         const data = await res.json();
         if (data && data.cameras && Array.isArray(data.cameras)) {
           const disconnected = data.cameras
-            .filter((c: any) => c.status === 'Disconnected' || c.status === 'offline')
+            .filter((c: any) => c.status === 'inactive' || c.status?.toLowerCase() === 'disconnected' || c.status?.toLowerCase() === 'offline')
             .map((c: any) => String(c.camera_id).replace('camera', ''));
           setOfflineCameras(disconnected);
         }
