@@ -173,19 +173,13 @@ export default function PeopleDetectionPage() {
       if (analyticsFilter.cameraId && analyticsFilter.cameraId !== 'all') {
           return analyticsFilter.cameraId;
       }
-      // 2. Fallback to assigned Entrance Camera from Sidebar Settings
+      // 2. Default to Entrance Cameras if configured. This ensures the 
+      //    main graph shows true footfall "IN" rather than internal zone movements.
       if (entranceCameraIds.length > 0) {
           return entranceCameraIds.join(',');
       }
-      // 3. Fallback to auto-detect by name
-      const entranceCam = cameras.find(c => 
-        c.name?.toLowerCase() === "entrace camera" || 
-        c.name?.toLowerCase() === "entrance camera" ||
-        c.name?.toLowerCase() === "entrace" ||
-        c.name?.toLowerCase() === "entrance"
-      );
-      // Return 'none' if no valid camera is found, so it STRICTLY won't show all cameras
-      return entranceCam ? String(entranceCam.id) : 'none';
+      // 3. Otherwise return all to show whatever is connected
+      return 'all';
   };
 
   // --- FETCH HOURLY STATS ---
@@ -1125,9 +1119,14 @@ export default function PeopleDetectionPage() {
                       <div className="bg-white border border-gray-200 rounded-[2.5rem] p-8 shadow-sm">
                            {/* Header */}
                            <div className="flex justify-between items-center mb-6">
-                               <div className="flex items-center gap-3">
-                                   <div className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
-                                   <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Footfall Analysis Graph</span>
+                               <div className="flex items-center gap-4">
+                                   <div className="flex items-center gap-3">
+                                       <div className="w-3 h-3 rounded-full bg-indigo-600 animate-pulse" />
+                                       <span className="text-sm font-black text-gray-900 uppercase tracking-widest">Footfall Analysis Graph</span>
+                                   </div>
+                                   <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-lg text-xs font-black text-indigo-700 uppercase tracking-widest flex items-center gap-2">
+                                       TOTAL IN: <span className="text-lg">{todayUniqueIn}</span>
+                                   </span>
                                </div>
                                <div className="flex items-center gap-2">
                                    <select 
@@ -1848,6 +1847,21 @@ export default function PeopleDetectionPage() {
                                       const s = getLineStyle(l.start, l.end);
                                       if (!s) return null;
                                       const isActive = activeShape?.type === 'line' && activeShape.index === i;
+                                      
+                                      const dx = s.x2 - s.x1;
+                                      const dy = s.y2 - s.y1;
+                                      const len = Math.hypot(dx, dy);
+                                      const nx = len === 0 ? 0 : -dy / len;
+                                      const ny = len === 0 ? 0 : dx / len;
+                                      const mx = (s.x1 + s.x2) / 2;
+                                      const my = (s.y1 + s.y2) / 2;
+                                      
+                                      const dirLen = 25;
+                                      const inDirX = mx + nx * dirLen;
+                                      const inDirY = my + ny * dirLen;
+                                      const outDirX = mx - nx * dirLen;
+                                      const outDirY = my - ny * dirLen;
+
                                       return (
                                           <svg key={i} className={`absolute inset-0 w-full h-full pointer-events-none ${isActive ? 'z-20' : 'z-10'}`}>
                                               {/* Invisible wide hit target for the line */}
@@ -1855,6 +1869,20 @@ export default function PeopleDetectionPage() {
                                               <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={isActive ? "#f59e0b" : "#10b981"} strokeWidth="3" />
                                               <text x={s.x1} y={s.y1 - 10} fill={isActive ? "#f59e0b" : "#10b981"} fontSize="12" fontWeight="bold" className="drop-shadow-sm">{l.name}</text>
                                               
+                                              <defs>
+                                                 <marker id={`arrow-in-${i}`} viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+                                                     <path d="M 0 0 L 10 5 L 0 10 z" fill={isActive ? "#f59e0b" : "#10b981"} />
+                                                 </marker>
+                                              </defs>
+
+                                              <line x1={mx} y1={my} x2={l.swap ? outDirX : inDirX} y2={l.swap ? outDirY : inDirY} stroke={isActive ? "#f59e0b" : "#10b981"} strokeWidth="2" markerEnd={`url(#arrow-in-${i})`} />
+                                              <rect x={(l.swap ? outDirX : inDirX) - 10} y={(l.swap ? outDirY : inDirY) - 10} width="20" height="14" fill="rgba(0,0,0,0.5)" rx="2" />
+                                              <text x={l.swap ? outDirX : inDirX} y={l.swap ? outDirY : inDirY} fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" dy="2">IN</text>
+
+                                              <line x1={mx} y1={my} x2={l.swap ? inDirX : outDirX} y2={l.swap ? inDirY : outDirY} stroke={isActive ? "#f59e0b" : "#10b981"} strokeWidth="2" strokeDasharray="3,3" markerEnd={`url(#arrow-in-${i})`} />
+                                              <rect x={(l.swap ? inDirX : outDirX) - 13} y={(l.swap ? inDirY : outDirY) - 10} width="26" height="14" fill="rgba(0,0,0,0.5)" rx="2" />
+                                              <text x={l.swap ? inDirX : outDirX} y={l.swap ? inDirY : outDirY} fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" dy="2">OUT</text>
+
                                               {isActive ? (
                                                   <>
                                                       <circle cx={s.x1} cy={s.y1} r="6" fill="#fff" stroke="#f59e0b" strokeWidth="2" className="pointer-events-auto cursor-move" onMouseDown={(e) => handleHandleMouseDown(e, "line", i, "start")} />

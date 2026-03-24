@@ -39,9 +39,11 @@ export async function GET(request: NextRequest) {
       query["metadata.camera_id"] = { $in: searchIds };
     }
 
-    // Fetch matching events
-    const ModelToUse = isEntrance ? EntranceEvent : ZoneEvent;
-    const events = await ModelToUse.find(query).lean();
+    // Fetch matching events from both to ensure we capture all camera activity 
+    // regardless of whether they are assigned as entrance or zone cameras.
+    const zoneEvents = await ZoneEvent.find(query).lean();
+    const entranceEvents = await EntranceEvent.find(query).lean();
+    const events = [...zoneEvents, ...entranceEvents];
 
     console.log(`[Stats API] Found ${events.length} events for query`);
 
