@@ -81,7 +81,7 @@ const LoadingOverlay = ({ message }: { message: string }) => (
 
 export default function PeopleDetectionPage() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<"dashboard" | "setup" | "analytics" | "floorplan-upload" | "floorplan-config" | "heatmap" | "zone-config" | "entrance-config">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "setup" | "analytics" | "floorplan-upload" | "floorplan-config" | "heatmap" | "zone-config" | "entrance-config" | "event-log" | "zone-detail" | "pi-id-config">("dashboard");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // MQTT & System State
@@ -142,8 +142,8 @@ export default function PeopleDetectionPage() {
 
   // Analytics Detailed State
   const [analyticsFilter, setAnalyticsFilter] = useState({
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: "2020-01-01",
+    endDate: "2099-12-31",
     startTime: "00:00",
     endTime: "23:59",
     cameraId: "all",
@@ -152,6 +152,13 @@ export default function PeopleDetectionPage() {
   const [eventHistory, setEventHistory] = useState<any[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(50);
+  const [eventPage, setEventPage] = useState(1);
+  const [eventsPerPage] = useState(20);
+  const [selectedZoneDetail, setSelectedZoneDetail] = useState<{camId: string, zoneName: string, camName: string} | null>(null);
+  const [zoneDetailEvents, setZoneDetailEvents] = useState<any[]>([]);
+  const [isZoneDetailLoading, setIsZoneDetailLoading] = useState(false);
+  const [zoneDetailPage, setZoneDetailPage] = useState(1);
+  const [zoneDetailPerPage] = useState(15);
   const [hourlyStats, setHourlyStats] = useState<{hour: number | string, label?: string, in: number, out: number, occupancy: number}[]>(Array.from({length: 24}, (_, i) => ({hour: i, label: '', in: 0, out: 0, occupancy: 0})));
   const [todayUniqueIn, setTodayUniqueIn] = useState(0);
   const [todayUniqueOut, setTodayUniqueOut] = useState(0);
@@ -307,7 +314,7 @@ export default function PeopleDetectionPage() {
 
   // --- FETCH ANALYTICS DATA ---
   const fetchCounts = () => {
-    if ((activeTab !== 'analytics' && activeTab !== 'dashboard') || cameras.length === 0) return;
+    if ((activeTab !== 'analytics' && activeTab !== 'dashboard' && activeTab !== 'event-log') || cameras.length === 0) return;
     
     cameras.forEach(cam => {
       fetch(`/api/people-count?cameraId=${cam.id}`)
@@ -360,7 +367,7 @@ export default function PeopleDetectionPage() {
   }, [activeTab, cameras, entranceCameraIds, analyticsFilter.cameraId]);
 
   const fetchHistoricalData = async () => {
-    if ((activeTab !== "analytics" && activeTab !== "dashboard") || cameras.length === 0) return;
+    if ((activeTab !== "analytics" && activeTab !== "dashboard" && activeTab !== "event-log") || cameras.length === 0) return;
     setIsHistoryLoading(true);
     
     try {
@@ -388,10 +395,41 @@ export default function PeopleDetectionPage() {
   };
 
   useEffect(() => {
-    if (activeTab === 'analytics' || activeTab === 'dashboard') {
+    if (activeTab === 'analytics' || activeTab === 'dashboard' || activeTab === 'event-log') {
         fetchHistoricalData();
     }
   }, [activeTab, analyticsFilter, cameras]);
+
+  // Fetch ALL events for a specific zone (no date filter) when entering zone-detail
+  useEffect(() => {
+    if (activeTab === 'zone-detail' && selectedZoneDetail && cameras.length > 0) {
+      const fetchZoneAllEvents = async () => {
+        setIsZoneDetailLoading(true);
+        try {
+          const cam = cameras.find(c => String(c.id) === selectedZoneDetail.camId);
+          if (!cam) { setIsZoneDetailLoading(false); return; }
+          const url = `/api/zones?cameraId=${cam.id}&startDate=2020-01-01&endDate=2099-12-31&startTime=00:00&endTime=23:59`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.events) {
+            const filtered = data.events
+              .filter((e: any) => e.zone_name === selectedZoneDetail.zoneName)
+              .map((e: any) => ({ ...e, cameraName: cam.name }))
+              .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            setZoneDetailEvents(filtered);
+          } else {
+            setZoneDetailEvents([]);
+          }
+        } catch (e) {
+          console.error('Failed to fetch zone events', e);
+          setZoneDetailEvents([]);
+        } finally {
+          setIsZoneDetailLoading(false);
+        }
+      };
+      fetchZoneAllEvents();
+    }
+  }, [activeTab, selectedZoneDetail, cameras]);
 
   // --- CAMERA STATUS POLLING VIA HTTP ---
   useEffect(() => {
@@ -1007,6 +1045,13 @@ export default function PeopleDetectionPage() {
                 <span className="relative z-10 text-sm font-medium tracking-wide">Heatmap</span>
                 {activeTab === "heatmap" && <div className="absolute left-0 top-0 w-1 h-full bg-indigo-600" />}
             </button>
+            <button onClick={() => { setActiveTab("event-log"); setEventPage(1); }}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-200 group relative overflow-hidden
+                ${activeTab === "event-log" || activeTab === "zone-detail" ? "bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}>
+                <div className={`relative z-10 transition-colors ${activeTab === "event-log" || activeTab === "zone-detail" ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}><Icons.Map /></div>
+                <span className="relative z-10 text-sm font-medium tracking-wide">Event Log</span>
+                {(activeTab === "event-log" || activeTab === "zone-detail") && <div className="absolute left-0 top-0 w-1 h-full bg-indigo-600" />}
+            </button>
 
             <button onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                 className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-200 group relative overflow-hidden text-gray-500 hover:text-gray-900 hover:bg-gray-100`}>
@@ -1025,6 +1070,7 @@ export default function PeopleDetectionPage() {
                         { id: "setup", label: "Device Add" },
                         { id: "floorplan-upload", label: "Upload Map" },
                         { id: "floorplan-config", label: "Map Config" },
+                        { id: "pi-id-config", label: "PI ID" },
                     ].map(item => (
                         <button key={item.id} onClick={() => setActiveTab(item.id as any)}
                             className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${activeTab === item.id ? "text-indigo-600 bg-indigo-50 shadow-sm ring-1 ring-indigo-200" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"}`}>
@@ -1038,33 +1084,11 @@ export default function PeopleDetectionPage() {
          <div className="p-6">
              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 relative overflow-hidden">
                  <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-transparent to-white/40 rounded-bl-full pointer-events-none`} />
-                 <div className="flex items-center justify-between mb-2">
-                     <div className="flex items-center gap-3">
-                         <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-rose-500 shadow-sm animate-pulse"}`} />
-                         <span className={`text-[10px] font-bold tracking-widest uppercase ${isConnected ? "text-emerald-600" : "text-rose-600"}`}>{isConnected ? "ONLINE" : "OFFLINE"}</span>
-                     </div>
-                     <button onClick={() => setIsEditingPiId(!isEditingPiId)} className="text-gray-400 hover:text-indigo-600 transition-colors">
-                         <Icons.Edit />
-                     </button>
+                 <div className="flex items-center gap-3">
+                     <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-rose-500 shadow-sm animate-pulse"}`} />
+                     <span className={`text-[10px] font-bold tracking-widest uppercase ${isConnected ? "text-emerald-600" : "text-rose-600"}`}>{isConnected ? "ONLINE" : "OFFLINE"}</span>
                  </div>
-                 {isEditingPiId ? (
-                     <div className="flex flex-col gap-2">
-                         <input 
-                             type="text" 
-                             value={tempPiId} 
-                             onChange={(e) => setTempPiId(e.target.value)}
-                             className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-[10px] font-mono focus:ring-1 focus:ring-indigo-500 outline-none"
-                             placeholder="Enter PI ID"
-                             autoFocus
-                         />
-                         <div className="flex gap-2">
-                             <button onClick={savePiId} className="flex-1 bg-indigo-600 text-white text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Save</button>
-                             <button onClick={() => setIsEditingPiId(false)} className="flex-1 bg-gray-200 text-gray-600 text-[8px] font-bold py-1 rounded-md uppercase tracking-wider">Cancel</button>
-                         </div>
-                     </div>
-                 ) : (
-                     <div className="text-xs text-gray-500 font-mono">NODE: {piId}</div>
-                 )}
+                 <div className="text-xs text-gray-500 font-mono mt-1">NODE: {piId}</div>
              </div>
          </div>
       </aside>
@@ -1203,6 +1227,99 @@ export default function PeopleDetectionPage() {
                            </div>
                       </div>
 
+                      {/* Zone / Line Summary Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                          {Object.values(zoneCounts).every(z => Object.keys(z).length === 0) ? (
+                               <div className="col-span-full h-48 flex items-center justify-center flex-col text-gray-400 bg-white border border-gray-200 rounded-[2.5rem]">
+                                   <Icons.Analytics />
+                                   <span className="mt-4 text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Live Stream...</span>
+                               </div>
+                          ) : (
+                              (() => {
+                                  const cards: any[] = [];
+                                  Object.entries(zoneCounts).forEach(([camId, zones]) => {
+                                      Object.entries(zones).forEach(([zoneName, count]: [string, any]) => {
+                                          cards.push({ camId, zoneName, count, traffic: (count.todayIn || 0) + (count.todayOut || 0) + (count.allIn || 0) + (count.allOut || 0) });
+                                      });
+                                  });
+                                  cards.sort((a, b) => b.traffic - a.traffic);
+                                  const displayCards = showAllZones ? cards : cards.slice(0, 4);
+                                  return (
+                                      <>
+                                          {displayCards.map(({ camId, zoneName, count }) => {
+                                              const isEnt = entranceCameraIds.includes(String(camId));
+                                              return (
+                                              <div key={`${camId}-${zoneName}`} 
+                                                   onClick={() => {
+                                                       const camName = cameras.find(c => String(c.id) === String(camId))?.name || camId;
+                                                       setSelectedZoneDetail({ camId: String(camId), zoneName, camName });
+                                                       setZoneDetailPage(1);
+                                                       setActiveTab("zone-detail");
+                                                   }}
+                                                   className={`bg-white border p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group hover:shadow-xl transition-all duration-500 cursor-pointer ${isEnt ? 'border-amber-300 ring-4 ring-amber-100' : 'border-gray-200 hover:border-indigo-300'}`}>
+                                                  <div className={`absolute top-0 left-0 w-full h-1.5 ${isEnt ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-indigo-500 to-violet-500'}`} />
+                                                  <div className="flex justify-between items-start mb-8">
+                                                      <div>
+                                                          <div className="flex items-center gap-2 mb-1">
+                                                              <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em]">{cameras.find(c => String(c.id) === String(camId))?.name || camId}</div>
+                                                              {isEnt && <span className="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-black uppercase tracking-widest shadow-sm">Entrance</span>}
+                                                          </div>
+                                                          <div className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                                              {isEnt ? <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg> : null} {zoneName}
+                                                          </div>
+                                                      </div>
+                                                      <div className="flex items-center gap-2">
+                                                          <button onClick={(e) => { e.stopPropagation(); handlePreviewZone(camId, zoneName); }} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm group" title="Live Camera View">
+                                                              <Icons.Camera />
+                                                          </button>
+                                                          <div className="p-3 bg-gray-50 text-gray-400 rounded-xl"><Icons.Analytics /></div>
+                                                      </div>
+                                                  </div>
+                                                  <div className="flex flex-col gap-4">
+                                                      <div className="bg-slate-50 border border-slate-100 p-4 rounded-3xl">
+                                                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Live Stats (Today)</div>
+                                                          <div className="flex gap-3">
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black text-emerald-600">{count.todayIn}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-emerald-600/40">In</div>
+                                                              </div>
+                                                              <div className="w-px h-8 bg-slate-200 self-center" />
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black text-rose-600">{count.todayOut}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-rose-600/40">Out</div>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                      <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-500/20">
+                                                          <div className="text-[8px] font-black text-indigo-200 uppercase tracking-widest mb-3 text-center">Life-Time Yield</div>
+                                                          <div className="flex gap-3">
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black">{count.allIn}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-indigo-300">Total In</div>
+                                                              </div>
+                                                              <div className="w-px h-8 bg-indigo-500/50 self-center" />
+                                                              <div className="flex-1 text-center">
+                                                                  <div className="text-2xl font-black">{count.allOut}</div>
+                                                                  <div className="text-[7px] uppercase font-black text-indigo-300">Total Out</div>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                              );
+                                          })}
+                                          {cards.length > 5 && (
+                                              <div className="col-span-full flex justify-center mt-4">
+                                                  <button onClick={() => setShowAllZones(!showAllZones)} className="px-8 py-3 bg-white border border-gray-200 text-indigo-600 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-sm hover:border-indigo-600 hover:shadow-indigo-500/10 transition-all flex items-center gap-3">
+                                                      {showAllZones ? "View Less" : "View More"}
+                                                  </button>
+                                              </div>
+                                          )}
+                                      </>
+                                  );
+                              })())}
+                       </div>
+
                   </div>
               )}
 
@@ -1327,8 +1444,8 @@ export default function PeopleDetectionPage() {
               )}
 
               {/* ANALYTICS TAB */}
-              {(activeTab === "analytics" || activeTab === "dashboard") && (
-                  <div className={`space-y-6 ${activeTab === "dashboard" ? "w-full max-w-7xl mx-auto mt-6" : ""}`}>
+              {(activeTab === "event-log") && (
+                  <div className={`space-y-6`}>
                       {/* Detailed Filters */}
                       <div className="bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm space-y-6">
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1340,9 +1457,12 @@ export default function PeopleDetectionPage() {
                               </h3>
                               <div className="flex items-center gap-2">
                                   <button onClick={() => {
+                                      setAnalyticsFilter(p => ({ ...p, startDate: "2020-01-01", endDate: "2099-12-31", startTime: "00:00", endTime: "23:59" }));
+                                  }} className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors uppercase tracking-widest ${analyticsFilter.startDate === "2020-01-01" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>All Time</button>
+                                  <button onClick={() => {
                                       const today = new Date().toISOString().split('T')[0];
                                       setAnalyticsFilter(p => ({ ...p, startDate: today, endDate: today, startTime: "00:00", endTime: "23:59" }));
-                                  }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors uppercase tracking-widest">Today</button>
+                                  }} className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors uppercase tracking-widest ${analyticsFilter.startDate !== "2020-01-01" && analyticsFilter.startDate === analyticsFilter.endDate ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"}`}>Today</button>
                                   <button onClick={fetchHistoricalData} className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-indigo-600 transition-colors uppercase tracking-widest flex items-center gap-2">
                                       <Icons.Refresh /> Refresh
                                   </button>
@@ -1381,96 +1501,6 @@ export default function PeopleDetectionPage() {
                           </div>
                       </div>
 
-                      {/* Summary Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                          {Object.values(zoneCounts).every(z => Object.keys(z).length === 0) ? (
-                               <div className="col-span-full h-48 flex items-center justify-center flex-col text-gray-400 bg-white border border-gray-200 rounded-[2.5rem]">
-                                   <Icons.Analytics />
-                                   <span className="mt-4 text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Live Stream...</span>
-                               </div>
-                          ) : (
-                              (() => {
-                                  const cards: any[] = [];
-                                  Object.entries(zoneCounts).forEach(([camId, zones]) => {
-                                      Object.entries(zones).forEach(([zoneName, count]: [string, any]) => {
-                                          cards.push({ camId, zoneName, count, traffic: (count.todayIn || 0) + (count.todayOut || 0) + (count.allIn || 0) + (count.allOut || 0) });
-                                      });
-                                  });
-                                  cards.sort((a, b) => b.traffic - a.traffic);
-                                  
-                                  const displayCards = showAllZones ? cards : cards.slice(0, 4);
-
-                                  return (
-                                      <>
-                                          {displayCards.map(({ camId, zoneName, count }) => {
-                                              const isEnt = entranceCameraIds.includes(String(camId));
-                                              return (
-                                              <div key={`${camId}-${zoneName}`} className={`bg-white border p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden group hover:shadow-xl transition-all duration-500 ${isEnt ? 'border-amber-300 ring-4 ring-amber-100' : 'border-gray-200'}`}>
-                                                  <div className={`absolute top-0 left-0 w-full h-1.5 ${isEnt ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-indigo-500 to-violet-500'}`} />
-                                                  <div className="flex justify-between items-start mb-8">
-                                                      <div>
-                                                          <div className="flex items-center gap-2 mb-1">
-                                                              <div className="text-[9px] text-gray-400 font-black uppercase tracking-[0.3em]">{cameras.find(c => String(c.id) === String(camId))?.name || camId}</div>
-                                                              {isEnt && <span className="text-[8px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-black uppercase tracking-widest shadow-sm">Entrance</span>}
-                                                          </div>
-                                                          <div className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-                                                              {isEnt ? <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg> : null} {zoneName}
-                                                          </div>
-                                                      </div>
-                                                      <div className="flex items-center gap-2">
-                                                          <button onClick={() => handlePreviewZone(camId, zoneName)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm group" title="Live Camera View">
-                                                              <Icons.Camera />
-                                                          </button>
-                                                          <div className="p-3 bg-gray-50 text-gray-400 rounded-xl"><Icons.Analytics /></div>
-                                                      </div>
-                                                  </div>
-                                                  <div className="flex flex-col gap-4">
-                                                      {/* Today Section */}
-                                                      <div className="bg-slate-50 border border-slate-100 p-4 rounded-3xl">
-                                                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Live Stats (Today)</div>
-                                                          <div className="flex gap-3">
-                                                              <div className="flex-1 text-center">
-                                                                  <div className="text-2xl font-black text-emerald-600">{count.todayIn}</div>
-                                                                  <div className="text-[7px] uppercase font-black text-emerald-600/40">In</div>
-                                                              </div>
-                                                              <div className="w-px h-8 bg-slate-200 self-center" />
-                                                              <div className="flex-1 text-center">
-                                                                  <div className="text-2xl font-black text-rose-600">{count.todayOut}</div>
-                                                                  <div className="text-[7px] uppercase font-black text-rose-600/40">Out</div>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-
-                                                      {/* All Time Section */}
-                                                      <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-500/20">
-                                                          <div className="text-[8px] font-black text-indigo-200 uppercase tracking-widest mb-3 text-center">Life-Time Yield</div>
-                                                          <div className="flex gap-3">
-                                                              <div className="flex-1 text-center">
-                                                                  <div className="text-2xl font-black">{count.allIn}</div>
-                                                                  <div className="text-[7px] uppercase font-black text-indigo-300">Total In</div>
-                                                              </div>
-                                                              <div className="w-px h-8 bg-indigo-500/50 self-center" />
-                                                              <div className="flex-1 text-center">
-                                                                  <div className="text-2xl font-black">{count.allOut}</div>
-                                                                  <div className="text-[7px] uppercase font-black text-indigo-300">Total Out</div>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-                                              </div>
-                                              );
-                                          })}
-                                          {cards.length > 5 && (
-                                              <div className="col-span-full flex justify-center mt-4">
-                                                  <button onClick={() => setShowAllZones(!showAllZones)} className="px-8 py-3 bg-white border border-gray-200 text-indigo-600 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-sm hover:border-indigo-600 hover:shadow-indigo-500/10 transition-all flex items-center gap-3">
-                                                      {showAllZones ? "View Less" : "View More"}
-                                                  </button>
-                                              </div>
-                                          )}
-                                      </>
-                                  );
-                              })())}
-                       </div>
 
                       {/* Event History Table */}
                       <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden">
@@ -1494,7 +1524,11 @@ export default function PeopleDetectionPage() {
                                       <Icons.Analytics />
                                       <p className="mt-4 text-sm font-bold uppercase tracking-widest">No movement clusters detected</p>
                                   </div>
-                              ) : (
+                              ) : (() => {
+                                  const totalPages = Math.ceil(eventHistory.length / eventsPerPage);
+                                  const paginatedEvents = eventHistory.slice((eventPage - 1) * eventsPerPage, eventPage * eventsPerPage);
+                                  return (
+                                      <>
                                   <table className="w-full text-left">
                                       <thead>
                                           <tr className="bg-gray-50/50 border-b border-gray-100">
@@ -1506,7 +1540,7 @@ export default function PeopleDetectionPage() {
                                           </tr>
                                       </thead>
                                       <tbody className="divide-y divide-gray-50">
-                                          {eventHistory.slice(0, visibleHistoryCount).map((ev, i) => (
+                                          {paginatedEvents.map((ev, i) => (
                                               <tr key={i} className="hover:bg-indigo-50/30 transition-colors group">
                                                   <td className="px-8 py-4">
                                                       <div className="text-sm font-bold text-gray-900">{new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
@@ -1533,22 +1567,218 @@ export default function PeopleDetectionPage() {
                                           ))}
                                       </tbody>
                                   </table>
-                              )}
-                              {eventHistory.length > visibleHistoryCount && (
-                                  <div className="p-8 border-t border-gray-100 bg-gray-50/30 flex justify-center">
-                                      <button 
-                                          onClick={() => setVisibleHistoryCount(prev => prev + 50)}
-                                          className="px-8 py-3 bg-white border border-gray-200 text-indigo-600 rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-sm hover:border-indigo-600 hover:shadow-indigo-500/10 transition-all flex items-center gap-3 group"
-                                      >
-                                          Next Batch 
-                                          <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                                      </button>
-                                  </div>
-                              )}
+                                  {totalPages > 1 && (
+                                      <div className="px-8 py-5 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                              Page {eventPage} of {totalPages} &middot; {eventHistory.length} total
+                                          </span>
+                                          <div className="flex items-center gap-2">
+                                              <button onClick={() => setEventPage(1)} disabled={eventPage === 1} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">First</button>
+                                              <button onClick={() => setEventPage(p => Math.max(1, p - 1))} disabled={eventPage === 1} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+                                              </button>
+                                              {Array.from({ length: Math.min(5, totalPages) }, (_, idx) => {
+                                                  let pageNum: number;
+                                                  if (totalPages <= 5) pageNum = idx + 1;
+                                                  else if (eventPage <= 3) pageNum = idx + 1;
+                                                  else if (eventPage >= totalPages - 2) pageNum = totalPages - 4 + idx;
+                                                  else pageNum = eventPage - 2 + idx;
+                                                  return (
+                                                      <button key={pageNum} onClick={() => setEventPage(pageNum)}
+                                                          className={`w-9 h-9 rounded-lg text-xs font-black transition-all ${eventPage === pageNum ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-white border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'}`}>
+                                                          {pageNum}
+                                                      </button>
+                                                  );
+                                              })}
+                                              <button onClick={() => setEventPage(p => Math.min(totalPages, p + 1))} disabled={eventPage === totalPages} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                                              </button>
+                                              <button onClick={() => setEventPage(totalPages)} disabled={eventPage === totalPages} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">Last</button>
+                                          </div>
+                                      </div>
+                                  )}
+                                      </>
+                                  );
+                              })()}
                           </div>
                       </div>
                   </div>
               )}
+
+              {/* ZONE DETAIL DRILL-DOWN VIEW */}
+              {activeTab === "zone-detail" && selectedZoneDetail && (() => {
+                  const zoneEvents = zoneDetailEvents;
+                  const totalZP = Math.ceil(zoneEvents.length / zoneDetailPerPage);
+                  const pgEvents = zoneEvents.slice((zoneDetailPage - 1) * zoneDetailPerPage, zoneDetailPage * zoneDetailPerPage);
+                  return (
+                      <div className="space-y-6">
+                          {isZoneDetailLoading && (
+                              <div className="h-64 flex flex-col items-center justify-center space-y-4 bg-white rounded-[2.5rem] border border-gray-200">
+                                  <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Loading All Zone Events...</p>
+                              </div>
+                          )}
+                          {!isZoneDetailLoading && (
+                          <>
+                          <div className="flex items-center gap-4">
+                              <button onClick={() => setActiveTab("event-log")} className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm">
+                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+                              </button>
+                              <div>
+                                  <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase flex items-center gap-3">
+                                      {selectedZoneDetail.zoneName}
+                                      <span className="text-xs px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 font-black uppercase tracking-widest">{selectedZoneDetail.camName}</span>
+                                  </h2>
+                                  <p className="text-xs text-gray-400 font-medium mt-1">Camera ID: {selectedZoneDetail.camId}</p>
+                              </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
+                                  <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Events</div>
+                                  <div className="text-3xl font-black text-gray-900">{zoneEvents.length}</div>
+                              </div>
+                              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center">
+                                  <div className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-2">Entered</div>
+                                  <div className="text-3xl font-black text-emerald-600">{zoneEvents.filter(e => e.action === 'Entered').length}</div>
+                              </div>
+                              <div className="bg-rose-50 border border-rose-100 rounded-2xl p-6 text-center">
+                                  <div className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-2">Exited</div>
+                                  <div className="text-3xl font-black text-rose-600">{zoneEvents.filter(e => e.action === 'Exited').length}</div>
+                              </div>
+                          </div>
+                          <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden">
+                              <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                                  <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight flex items-center gap-3">
+                                      <span className="p-2 rounded-lg bg-indigo-600 text-white"><Icons.Map /></span>
+                                      {selectedZoneDetail.zoneName} — Event Log
+                                  </h3>
+                                  <span className="px-4 py-1.5 rounded-full bg-white text-[10px] font-black text-gray-500 border border-gray-200 shadow-sm uppercase tracking-widest">{zoneEvents.length} Records</span>
+                              </div>
+                              <div className="overflow-x-auto">
+                                  {zoneEvents.length === 0 ? (
+                                      <div className="h-64 flex flex-col items-center justify-center text-gray-400 grayscale opacity-40">
+                                          <Icons.Analytics />
+                                          <p className="mt-4 text-sm font-bold uppercase tracking-widest">No events for this zone</p>
+                                      </div>
+                                  ) : (
+                                      <>
+                                          <table className="w-full text-left">
+                                              <thead><tr className="bg-gray-50/50 border-b border-gray-100">
+                                                  <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Timestamp</th>
+                                                  <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Person ID</th>
+                                                  <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Action</th>
+                                                  <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Zone / Line</th>
+                                              </tr></thead>
+                                              <tbody className="divide-y divide-gray-50">
+                                                  {pgEvents.map((ev, i) => (
+                                                      <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
+                                                          <td className="px-8 py-4">
+                                                              <div className="text-sm font-bold text-gray-900">{new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                                                              <div className="text-[10px] text-gray-400 font-medium">{new Date(ev.timestamp).toLocaleDateString()}</div>
+                                                          </td>
+                                                          <td className="px-8 py-4">
+                                                              <div className="flex items-center gap-2">
+                                                                  <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-black">#</div>
+                                                                  <span className="text-sm font-mono font-black text-indigo-600">{ev.person_id}</span>
+                                                              </div>
+                                                          </td>
+                                                          <td className="px-8 py-4">
+                                                              <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${ev.action === 'Entered' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{ev.action}</span>
+                                                          </td>
+                                                          <td className="px-8 py-4"><span className="text-sm font-bold text-gray-700">{ev.zone_name}</span></td>
+                                                      </tr>
+                                                  ))}
+                                              </tbody>
+                                          </table>
+                                          {totalZP > 1 && (
+                                              <div className="px-8 py-5 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                                                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Page {zoneDetailPage} of {totalZP} &middot; {zoneEvents.length} total</span>
+                                                  <div className="flex items-center gap-2">
+                                                      <button onClick={() => setZoneDetailPage(1)} disabled={zoneDetailPage === 1} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">First</button>
+                                                      <button onClick={() => setZoneDetailPage(p => Math.max(1, p - 1))} disabled={zoneDetailPage === 1} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                                                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+                                                      </button>
+                                                      {Array.from({ length: Math.min(5, totalZP) }, (_, idx) => {
+                                                          let pn: number;
+                                                          if (totalZP <= 5) pn = idx + 1;
+                                                          else if (zoneDetailPage <= 3) pn = idx + 1;
+                                                          else if (zoneDetailPage >= totalZP - 2) pn = totalZP - 4 + idx;
+                                                          else pn = zoneDetailPage - 2 + idx;
+                                                          return (
+                                                              <button key={pn} onClick={() => setZoneDetailPage(pn)}
+                                                                  className={`w-9 h-9 rounded-lg text-xs font-black transition-all ${zoneDetailPage === pn ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-white border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'}`}>{pn}</button>
+                                                          );
+                                                      })}
+                                                      <button onClick={() => setZoneDetailPage(p => Math.min(totalZP, p + 1))} disabled={zoneDetailPage === totalZP} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                                                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                                                      </button>
+                                                      <button onClick={() => setZoneDetailPage(totalZP)} disabled={zoneDetailPage === totalZP} className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed">Last</button>
+                                                  </div>
+                                              </div>
+                                          )}
+                                      </>
+                                  )}
+                              </div>
+                          </div>
+                          </>
+                          )}
+                      </div>
+                  );
+              })()}
+
+               {/* PI ID CONFIG PAGE */}
+               {activeTab === "pi-id-config" && (
+                   <div className="max-w-xl mx-auto py-12">
+                       <div className="bg-white border border-gray-200 rounded-[2.5rem] p-10 shadow-sm">
+                           <div className="flex items-center gap-4 mb-8">
+                               <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                   <Icons.Settings />
+                               </div>
+                               <div>
+                                   <h2 className="text-2xl font-black text-gray-900 tracking-tight">PI ID Configuration</h2>
+                                   <p className="text-sm text-gray-400 font-medium">Change the Raspberry Pi node identifier</p>
+                               </div>
+                           </div>
+
+                           <div className="space-y-6">
+                               <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6">
+                                   <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest block mb-2">Current PI ID</label>
+                                   <div className="text-lg font-mono font-bold text-gray-900 flex items-center gap-3">
+                                       <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-rose-500 animate-pulse"}`} />
+                                       {piId}
+                                   </div>
+                               </div>
+
+                               <div>
+                                   <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest block mb-2 ml-1">New PI ID</label>
+                                   <input
+                                       type="text"
+                                       value={tempPiId}
+                                       onChange={(e) => setTempPiId(e.target.value)}
+                                       className="w-full bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 text-sm font-mono font-bold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                       placeholder="Enter new PI ID (e.g. pi-003)"
+                                   />
+                               </div>
+
+                               <div className="flex gap-3 pt-2">
+                                   <button
+                                       onClick={() => { savePiId(); setActiveTab("dashboard"); }}
+                                       disabled={!tempPiId.trim() || tempPiId === piId}
+                                       className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                   >
+                                       Save & Apply
+                                   </button>
+                                   <button
+                                       onClick={() => { setTempPiId(piId); setActiveTab("dashboard"); }}
+                                       className="px-8 py-4 bg-gray-100 text-gray-600 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-gray-200 transition-all"
+                                   >
+                                       Cancel
+                                   </button>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               )}
 
                {activeTab === "zone-config" && (
                    <div className="max-w-5xl mx-auto py-8">

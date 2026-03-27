@@ -143,6 +143,10 @@ const HeatmapViewer: React.FC = () => {
   const [viewState, setViewState] = useState<"config" | "heatmap">("config");
   const [imgNaturalSize, setImgNaturalSize] = useState({ w: 0, h: 0 });
   const [showControls, setShowControls] = useState<boolean>(true);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   
   const floorPlanImageRef = useRef<HTMLImageElement>(null);
 
@@ -428,8 +432,17 @@ const HeatmapViewer: React.FC = () => {
       </div>
 
       {/* Full Screen Viewport Area */}
-      <div className="flex-1 w-full h-full flex items-center justify-center p-4">
-        <div className="relative group max-w-full max-h-full">
+      <div className="flex-1 w-full h-full flex items-center justify-center p-4"
+           onWheel={(e) => {
+               e.preventDefault();
+               setZoomLevel(prev => Math.min(5, Math.max(0.5, prev + (e.deltaY < 0 ? 0.15 : -0.15))));
+           }}
+           onMouseDown={(e) => { if (e.button === 0 && zoomLevel > 1) { setIsPanning(true); setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y }); } }}
+           onMouseMove={(e) => { if (isPanning) { setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y }); } }}
+           onMouseUp={() => setIsPanning(false)}
+           onMouseLeave={() => setIsPanning(false)}
+      >
+        <div className="relative group max-w-full max-h-full" style={{ transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`, transition: isPanning ? 'none' : 'transform 0.2s ease-out', cursor: zoomLevel > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}>
           {/* Floor Plan Container */}
           <div className="relative bg-white p-2 rounded-[40px] shadow-[0_64px_128px_-32px_rgba(0,0,0,0.15)] ring-1 ring-black/5">
             <div className="relative overflow-hidden rounded-[32px] bg-slate-50">
@@ -502,9 +515,9 @@ const HeatmapViewer: React.FC = () => {
                               zIndex: 30,
                             }}
                           >
-                             <div className="bg-white/95 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl border border-white flex flex-col items-center min-w-[60px] transform hover:scale-125 transition-transform">
-                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{definedZone.name}</span>
-                                <span className="text-lg font-black text-slate-900">{totalCount}</span>
+                             <div className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg shadow-lg border border-white/80 flex flex-col items-center" style={{ minWidth: '36px' }}>
+                                <span className="text-[7px] font-black text-slate-500 uppercase tracking-wider leading-none">{definedZone.name}</span>
+                                <span className="text-sm font-black text-slate-900 leading-none mt-0.5">{totalCount}</span>
                              </div>
                           </div>
                         </React.Fragment>
@@ -527,6 +540,14 @@ const HeatmapViewer: React.FC = () => {
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
         </button>
       )}
+
+      {/* Zoom Controls */}
+      <div className={`absolute bottom-8 left-8 z-50 flex flex-col gap-2 transition-all duration-500 ${showControls ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0'}`}>
+          <button onClick={() => setZoomLevel(prev => Math.min(5, prev + 0.25))} className="w-10 h-10 bg-white shadow-xl rounded-xl flex items-center justify-center text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all text-lg font-black border border-gray-100">+</button>
+          <button onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.25))} className="w-10 h-10 bg-white shadow-xl rounded-xl flex items-center justify-center text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all text-lg font-black border border-gray-100">−</button>
+          <button onClick={() => { setZoomLevel(1); setPanOffset({ x: 0, y: 0 }); }} className="w-10 h-10 bg-white shadow-xl rounded-xl flex items-center justify-center text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all text-[9px] font-black border border-gray-100 uppercase">Fit</button>
+          <div className="text-center text-[9px] font-black text-slate-400 mt-1">{Math.round(zoomLevel * 100)}%</div>
+      </div>
     </div>
   );
 };
