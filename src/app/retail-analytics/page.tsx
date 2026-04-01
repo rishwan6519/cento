@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import mqtt from "mqtt";
 import { motion, AnimatePresence } from "framer-motion";
 import FloorMapUploader from "@/components/FloorMapUploader/FloorMapUploader";
@@ -194,7 +194,8 @@ export default function PeopleDetectionPage() {
   const fetchHourlyStats = async () => {
     try {
       const activeCamId = getActiveCameraId();
-      let url = `/api/stats/hourly?interval=${analyticsFilter.chartInterval}&startDate=${analyticsFilter.startDate}&endDate=${analyticsFilter.endDate}&startTime=${analyticsFilter.startTime}&endTime=${analyticsFilter.endTime}`;
+      const today = new Date().toISOString().split('T')[0];
+      let url = `/api/stats/hourly?interval=${analyticsFilter.chartInterval}&startDate=${today}&endDate=${today}&startTime=00:00&endTime=23:59`;
       
       let isEnt = false;
       if (activeCamId && activeCamId !== 'all') {
@@ -313,8 +314,8 @@ export default function PeopleDetectionPage() {
   }, []);
 
   // --- FETCH ANALYTICS DATA ---
-  const fetchCounts = () => {
-    if ((activeTab !== 'analytics' && activeTab !== 'dashboard' && activeTab !== 'event-log') || cameras.length === 0) return;
+  const fetchCounts = useCallback(() => {
+    if (activeTab !== 'dashboard' || cameras.length === 0) return;
     
     cameras.forEach(cam => {
       fetch(`/api/people-count?cameraId=${cam.id}`)
@@ -358,16 +359,16 @@ export default function PeopleDetectionPage() {
         })
         .catch(err => console.error(`Failed to fetch counts for ${cam.id}`, err));
     });
-  };
-
+  }, [activeTab, cameras]);
   useEffect(() => {
+    if (activeTab !== 'dashboard') return;
     fetchCounts();
-    const interval = setInterval(fetchCounts, 5000);
+    const interval = setInterval(fetchCounts, 30000);
     return () => clearInterval(interval);
-  }, [activeTab, cameras, entranceCameraIds, analyticsFilter.cameraId]);
+  }, [activeTab, cameras, fetchCounts]);
 
-  const fetchHistoricalData = async () => {
-    if ((activeTab !== "analytics" && activeTab !== "dashboard" && activeTab !== "event-log") || cameras.length === 0) return;
+  const fetchHistoricalData = useCallback(async () => {
+    if (activeTab !== "event-log" || cameras.length === 0) return;
     setIsHistoryLoading(true);
     
     try {
@@ -392,13 +393,13 @@ export default function PeopleDetectionPage() {
     } finally {
         setIsHistoryLoading(false);
     }
-  };
+  }, [activeTab, cameras, analyticsFilter]);
 
   useEffect(() => {
-    if (activeTab === 'analytics' || activeTab === 'dashboard' || activeTab === 'event-log') {
+    if (activeTab === 'event-log') {
         fetchHistoricalData();
     }
-  }, [activeTab, analyticsFilter, cameras]);
+  }, [activeTab, analyticsFilter, cameras, fetchHistoricalData]);
 
   // Fetch ALL events for a specific zone (no date filter) when entering zone-detail
   useEffect(() => {
@@ -450,7 +451,7 @@ export default function PeopleDetectionPage() {
     };
     
     fetchCameraStatus();
-    const intervalId = setInterval(fetchCameraStatus, 10000);
+    const intervalId = setInterval(fetchCameraStatus, 30000);
     return () => clearInterval(intervalId);
   }, [piId]);
 
