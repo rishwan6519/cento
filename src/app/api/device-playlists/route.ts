@@ -98,6 +98,11 @@ export async function POST(req: NextRequest) {
       });
       await existing.save();
 
+      // Update PlaylistConfig
+      for (const [pid, prio] of Object.entries(priorities)) {
+        await PlaylistConfig.findByIdAndUpdate(pid, { priority: prio as number }, { new: true });
+      }
+
       return NextResponse.json(existing);
     } else {
       // No record, create new
@@ -108,6 +113,11 @@ export async function POST(req: NextRequest) {
         userId,
         updatedAt: new Date()
       });
+
+      // Update PlaylistConfig
+      for (const [pid, prio] of Object.entries(priorities)) {
+        await PlaylistConfig.findByIdAndUpdate(pid, { priority: prio as number }, { new: true });
+      }
 
       return NextResponse.json(newDevicePlaylist);
     }
@@ -238,6 +248,8 @@ export async function PATCH(req: NextRequest) {
     existing.priorities.set(playlistId, priority);
     
     await existing.save();
+
+    await PlaylistConfig.findByIdAndUpdate(playlistId, { priority }, { new: true });
 
     return NextResponse.json({ success: true, message: "Priority updated successfully" });
   } catch (error) {

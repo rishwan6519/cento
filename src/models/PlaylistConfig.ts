@@ -27,6 +27,7 @@ const playlistConfigSchema = new mongoose.Schema({
   startDate: { type: String, required: false },
   endDate: { type: String, required: false },
   daysOfWeek: [{ type: String, required: false }],
+  priority: { type: Number, required: false, default: 0 },
   files: [playlistFileSchema],
   status: { 
     type: String, 
