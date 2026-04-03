@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
         shuffle: p.shuffle,
         priority: devicePlaylist.priorities ? (devicePlaylist.priorities.get(p._id.toString()) || 0) : 0,
         files: p.files.map((f: any) => ({
-          path: `${f.path}`,
+          path: `https://iot.centelon.com${f.path}`,
           displayOrder: f.displayOrder,
           type: f.type,
           delay: f.delay,
