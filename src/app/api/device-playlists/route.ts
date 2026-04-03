@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     const body = await req.json();
-    const { deviceId, playlistIds, userId } = body;
+    const { deviceId, playlistIds, userId, priorities = {} } = body;
 
     if (!deviceId || !playlistIds || playlistIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -92,6 +92,10 @@ export async function POST(req: NextRequest) {
       existing.playlistIds = updatedPlaylistIds;
       existing.userId = userId; // Update user just in case it was an empty remnant from another user
       existing.updatedAt = new Date();
+      if (!existing.priorities) existing.priorities = new Map();
+      Object.entries(priorities).forEach(([pid, prio]) => {
+         existing.priorities.set(pid, prio as number);
+      });
       await existing.save();
 
       return NextResponse.json(existing);
@@ -100,6 +104,7 @@ export async function POST(req: NextRequest) {
       const newDevicePlaylist = await DevicePlaylist.create({
         deviceId,
         playlistIds,
+        priorities,
         userId,
         updatedAt: new Date()
       });

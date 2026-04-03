@@ -1913,17 +1913,19 @@ const PlaylistSetup: React.FC<ConnectPlaylistProps> = ({
     const [error, setError] = useState<string | null>(null);
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
       const [userData, setUserData] = useState<UserData | null>(null);
+      const [playlistPriorities, setPlaylistPriorities] = useState<Record<string, number>>({});
       
         const handleDisconnect = async (playlistId: string) => {
-          if (!selectedDeviceForPlaylist?.deviceId._id) {
+          if (!selectedDeviceForPlaylist?.deviceId?._id && !selectedDeviceForPlaylist?._id) {
             toast.error("No device selected.");
             return;
           }
       
           setIsDisconnecting(playlistId);
           try {
+            const deviceIdToUse = selectedDeviceForPlaylist.deviceId?._id || selectedDeviceForPlaylist._id;
             const response = await fetch(
-              `/api/device-playlists?deviceId=${selectedDeviceForPlaylist.deviceId._id}&playlistId=${playlistId}`,
+              `/api/device-playlists?deviceId=${deviceIdToUse}&playlistId=${playlistId}`,
               {
                 method: "DELETE",
               }
@@ -1939,9 +1941,7 @@ const PlaylistSetup: React.FC<ConnectPlaylistProps> = ({
             // Update the UI
             setConnectedPlaylists((prev) => ({
               ...prev,
-              [selectedDeviceForPlaylist.deviceId._id]: prev[
-                selectedDeviceForPlaylist.deviceId._id
-              ]?.filter((id) => id !== playlistId),
+              [deviceIdToUse]: prev[deviceIdToUse]?.filter((id) => id !== playlistId),
             }));
           } catch (error) {
             console.error("Error disconnecting playlist:", error);
@@ -2104,8 +2104,9 @@ const PlaylistSetup: React.FC<ConnectPlaylistProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          deviceId: selectedDeviceForPlaylist.deviceId._id,
+          deviceId: selectedDeviceForPlaylist.deviceId?._id || selectedDeviceForPlaylist._id,
           playlistIds: selectedPlaylistsForDevice,
+          priorities: playlistPriorities,
           userId,
         }),
       });
@@ -3406,7 +3407,7 @@ playlistConfig.files.map((file, index) => (
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-10">
   {availableDevices.map((device) => {
-    const deviceName = device.deviceId?.name || device.name;
+    const deviceName = device.deviceId?.name || device.name || "";
     let iconPath = "/placeholder.jpg";
     if (deviceName.toLowerCase().includes("tv")) {
       iconPath = "/assets/video.svg";
@@ -3484,15 +3485,15 @@ playlistConfig.files.map((file, index) => (
     {/* Device Icon */}
     <div className="flex justify-center mb-3">
       <img
-        src={selectedDeviceForPlaylist.deviceId.imageUrl}
-        alt={selectedDeviceForPlaylist.deviceId.name}
+        src={selectedDeviceForPlaylist?.deviceId?.imageUrl || "/placeholder.jpg"}
+        alt={selectedDeviceForPlaylist?.deviceId?.name || "Device"}
         className="w-14 h-14"
       />
     </div>
 
     {/* Device Name */}
     <p className="text-base font-semibold text-[#00353E] mb-1">
-      {selectedDeviceForPlaylist.deviceId.name}
+      {selectedDeviceForPlaylist?.deviceId?.name || selectedDeviceForPlaylist?.name || "Unknown Device"}
     </p>
 
     {/* Device Type & Zone */}
@@ -3502,10 +3503,10 @@ playlistConfig.files.map((file, index) => (
     {/* Status Info */}
     <div className="flex justify-center items-center gap-3 text-xs mb-4">
       <span className="flex items-center gap-1 text-green-600">
-        <span className="w-2 h-2 bg-green-600 rounded-full"></span>  {selectedDeviceForPlaylist.deviceId.status}
+        <span className="w-2 h-2 bg-green-600 rounded-full"></span>  {selectedDeviceForPlaylist?.deviceId?.status || "Unknown"}
       </span>
       <span className="flex items-center gap-1 text-orange-500">
-         {selectedDeviceForPlaylist.deviceId.serialNumber}
+         {selectedDeviceForPlaylist?.deviceId?.serialNumber || "N/A"}
       </span>
     </div>
 
@@ -3531,7 +3532,7 @@ playlistConfig.files.map((file, index) => (
               <div className="space-y-3">
                {playlists.map((playlist) => {
                   const isConnected = connectedPlaylists[
-                    selectedDeviceForPlaylist?.deviceId._id || ""
+                    selectedDeviceForPlaylist?.deviceId?._id || selectedDeviceForPlaylist?._id || ""
                   ]?.includes(playlist._id || "");
 
                   const isCurrentlyDisconnecting = isDisconnecting === playlist._id;
@@ -3544,38 +3545,54 @@ playlistConfig.files.map((file, index) => (
                     <div>
                       <p className="font-medium">{playlist.name}</p>
                       <p className="text-xs text-gray-500">
-                         {playlist.files.length} Tracks
+                         {playlist.files?.length || 0} Tracks
                       </p>
                       <p className="text-xs text-gray-500">
-  Schedule: {Array.isArray(playlist.daysOfWeek) ? playlist.daysOfWeek.join(" | ") : playlist.daysOfWeek}
+  Schedule: {Array.isArray(playlist.daysOfWeek) ? playlist.daysOfWeek.join(" | ") : (playlist.daysOfWeek || "Not set")}
 </p>
 
                     </div>
-                    {isConnected ? (
-                            <button
-                              onClick={() => handleDisconnect(playlist._id!)}
-                              disabled={isCurrentlyDisconnecting}
-                              className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 disabled:opacity-50 disabled:cursor-wait"
-                            >
-                              {isCurrentlyDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-                            </button>
-                          ) : (
-                            <input
-                              type="checkbox"
-                              checked={selectedPlaylistsForDevice.includes(
-                                playlist._id || ""
-                              )}
-                              onChange={() => {
-                                const playlistId = playlist._id || "";
-                                setSelectedPlaylistsForDevice((prev) =>
-                                  prev.includes(playlistId)
-                                    ? prev.filter((id) => id !== playlistId)
-                                    : [...prev, playlistId]
-                                );
-                              }}
-                               className="accent-[#FF4500] w-5 h-5 rounded"
-                            />
-                          )}
+                    <div className="flex items-center gap-4">
+                      {/* Priority Selector */}
+                      <select
+                        value={playlistPriorities[playlist._id || ""] ?? 0}
+                        onChange={(e) =>
+                          setPlaylistPriorities((prev) => ({
+                            ...prev,
+                            [playlist._id || ""]: parseInt(e.target.value),
+                          }))
+                        }
+                        className="text-xs p-1 rounded border"
+                      >
+                        <option value={0}>Low Priority</option>
+                        <option value={2}>Medium Priority</option>
+                        <option value={1}>High Priority</option>
+                      </select>
+
+                      {isConnected ? (
+                        <button
+                          onClick={() => handleDisconnect(playlist._id!)}
+                          disabled={isCurrentlyDisconnecting}
+                          className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 disabled:opacity-50 disabled:cursor-wait"
+                        >
+                          {isCurrentlyDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                        </button>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={selectedPlaylistsForDevice.includes(playlist._id || "")}
+                          onChange={() => {
+                            const playlistId = playlist._id || "";
+                            setSelectedPlaylistsForDevice((prev) =>
+                              prev.includes(playlistId)
+                                ? prev.filter((id) => id !== playlistId)
+                                : [...prev, playlistId]
+                            );
+                          }}
+                          className="accent-[#FF4500] w-5 h-5 rounded"
+                        />
+                      )}
+                    </div>
                     
                   </div>
                   );

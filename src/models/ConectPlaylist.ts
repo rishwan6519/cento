@@ -15,6 +15,11 @@ const devicePlaylistSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PlaylistConfig'
   }],
+  priorities: {
+    type: Map,
+    of: Number,
+    default: {}
+  },
   createdAt: {
     type: Date,
     default: Date.now
