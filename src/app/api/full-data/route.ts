@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
         shuffle: p.shuffle,
         priority: devicePlaylist.priorities ? (devicePlaylist.priorities.get(p._id.toString()) || 0) : 0,
         files: p.files.map((f: any) => ({
-          path: `https://iot.centelon.com${f.path}`,
+          path: `https://iot.centelon.com/${(f.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
           displayOrder: f.displayOrder,
           type: f.type,
           delay: f.delay,
@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
             if (!a.file) return null;
             return {
               name: a.file.name,
-              path: `https://iot.centelon.com${a.file.path}`,
+              path: `https://iot.centelon.com/${(a.file.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
               displayOrder: a.displayOrder,
               delay: a.delay
             };
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
       const mediaUrls = populatedGroup?.mediaIds.map((media: any) => ({
         id: media._id,
         name: media.name,
-        url: `https://iot.centelon.com${media.url}`,
+        url: `https://iot.centelon.com/${(media.url || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
         type: media.type,
         createdAt: media.createdAt
       })) || [];
