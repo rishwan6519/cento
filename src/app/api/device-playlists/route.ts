@@ -214,4 +214,36 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    
+    const body = await req.json();
+    const { deviceId, playlistId, priority } = body;
+    
+    if (!deviceId || !playlistId || priority === undefined) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const existing = await DevicePlaylist.findOne({ deviceId });
+    
+    if (!existing) {
+      return NextResponse.json({ error: 'Device connection not found' }, { status: 404 });
+    }
+
+    if (!existing.priorities) {
+      existing.priorities = new Map();
+    }
+    
+    existing.priorities.set(playlistId, priority);
+    
+    await existing.save();
+
+    return NextResponse.json({ success: true, message: "Priority updated successfully" });
+  } catch (error) {
+    console.error('Error updating priority:', error);
+    return NextResponse.json({ error: 'Failed to update priority' }, { status: 500 });
+  }
+}
+
 

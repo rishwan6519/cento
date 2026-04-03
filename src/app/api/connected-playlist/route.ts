@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     const devicePlaylists = await DevicePlaylist.findOne({ deviceId });
 
     return NextResponse.json({
-      playlistIds: devicePlaylists?.playlistIds || []
+      playlistIds: devicePlaylists?.playlistIds || [],
+      priorities: devicePlaylists?.priorities || {}
     });
   } catch (error) {
     console.error('Error fetching device playlists:', error);

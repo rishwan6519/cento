@@ -55,6 +55,7 @@ interface DeviceDetailsProps {
 
 const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
   const [connectedPlaylists, setConnectedPlaylists] = useState<Playlist[]>([]);
+  const [playlistPriorities, setPlaylistPriorities] = useState<Record<string, number>>({});
   const [connectedAnnouncements, setConnectedAnnouncements] = useState<AnnouncementPlaylist[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -112,6 +113,9 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
         playlistData.playlistIds?.includes(playlist._id)
       );
       setConnectedPlaylists(connectedPlaylistDetails);
+      if (playlistData.priorities) {
+        setPlaylistPriorities(playlistData.priorities);
+      }
 
       // Fetch connected announcements
       const announcementResponse = await fetch(`/api/announcement/device-announcement?deviceId=${device.deviceId._id}`);
@@ -139,6 +143,25 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
       toast.error("Failed to load connected details");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePriorityChange = async (playlistId: string, newPriority: number) => {
+    setPlaylistPriorities(prev => ({ ...prev, [playlistId]: newPriority }));
+    try {
+      const response = await fetch('/api/device-playlists', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: device.deviceId._id,
+          playlistId,
+          priority: newPriority
+        })
+      });
+      if (!response.ok) throw new Error('Failed to update priority');
+      toast.success('Priority updated');
+    } catch (error) {
+      toast.error('Failed to update priority');
     }
   };
 
@@ -376,6 +399,20 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                       </div>
                     </div>
                     <div className="flex items-center">
+                      <select 
+                        value={playlistPriorities[playlist._id] ?? 0}
+                        onChange={(e) => {
+                           e.stopPropagation();
+                           handlePriorityChange(playlist._id, parseInt(e.target.value));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs p-1 rounded border mr-4 outline-none"
+                      >
+                         <option value={0}>Low Priority</option>
+                         <option value={2}>Medium Priority</option>
+                         <option value={1}>High Priority</option>
+                      </select>
+
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2">
                         {playlist.daysOfWeek?.slice(0, 2).join(", ") || "No schedule"}
                         {playlist.daysOfWeek?.length > 2 ? ` +${playlist.daysOfWeek.length - 2}` : ""}
