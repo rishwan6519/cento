@@ -25,6 +25,7 @@ interface Playlist {
   startDate?: string;
   endDate?: string;
   status?: 'active' | 'inactive';
+  priority?: number;
 }
 
 interface AnnouncementFile {
@@ -148,6 +149,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
 
   const handlePriorityChange = async (playlistId: string, newPriority: number) => {
     setPlaylistPriorities(prev => ({ ...prev, [playlistId]: newPriority }));
+    setConnectedPlaylists(prev => prev.map(p => p._id === playlistId ? { ...p, priority: newPriority } : p));
     try {
       const response = await fetch('/api/device-playlists', {
         method: 'PATCH',
@@ -399,20 +401,6 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                       </div>
                     </div>
                     <div className="flex items-center">
-                      <select 
-                        value={playlistPriorities[playlist._id] ?? 0}
-                        onChange={(e) => {
-                           e.stopPropagation();
-                           handlePriorityChange(playlist._id, parseInt(e.target.value));
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs p-1 rounded border mr-4 outline-none"
-                      >
-                         <option value={0}>Low Priority</option>
-                         <option value={2}>Medium Priority</option>
-                         <option value={1}>High Priority</option>
-                      </select>
-
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2">
                         {playlist.daysOfWeek?.slice(0, 2).join(", ") || "No schedule"}
                         {playlist.daysOfWeek?.length > 2 ? ` +${playlist.daysOfWeek.length - 2}` : ""}
@@ -444,6 +432,18 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                             }`}>
                               {playlist.status === 'active' ? 'Active' : 'Inactive'}
                             </span>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="text-gray-500 w-28">Priority:</span>
+                            <select 
+                              value={playlist.priority ?? playlistPriorities[playlist._id] ?? 0}
+                              onChange={(e) => handlePriorityChange(playlist._id, parseInt(e.target.value))}
+                              className="text-xs p-1.5 rounded border border-gray-300 outline-none w-32 font-medium"
+                            >
+                              <option value={0}>Low Priority</option>
+                              <option value={2}>Medium Priority</option>
+                              <option value={1}>High Priority</option>
+                            </select>
                           </div>
                           <div className="flex">
                             <span className="text-gray-500 w-28">Schedule:</span>
