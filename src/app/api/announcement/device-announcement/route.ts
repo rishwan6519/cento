@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const connection = await AnnouncementConnection.findOne({ deviceId });
 
     if (!connection) {
-      return NextResponse.json({ announcementPlaylistIds: [] }, { status: 404 });
+      return NextResponse.json({ announcementPlaylistIds: [] }, { status: 200 });
     }
 
     return NextResponse.json(

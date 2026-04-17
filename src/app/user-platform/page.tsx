@@ -521,6 +521,107 @@ const ConnectedContentView: React.FC<ConnectedContentViewProps> = ({ onBack }) =
   );
 };
 
+const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
+  const serial = device.deviceId.serialNumber;
+  const deviceState = deviceStatuses[serial] || {};
+  const isOnline = deviceState.status === "online";
+  const lastSync = deviceState.lastSync || "None";
+  const imageUrl = device.deviceId.imageUrl || "/default-device-image.png";
+  const remainingTime = isOnline ? device.deviceId.status : null;
+
+  const [activePlaylists, setActivePlaylists] = useState<number | null>(null);
+  const [activeAnnouncements, setActiveAnnouncements] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const devId = device.deviceId?._id;
+      if (!devId) return;
+      try {
+        const plRes = await fetch(`/api/connected-playlist?deviceId=${devId}`);
+        const plData = plRes.ok ? await plRes.json() : { playlistIds: [] };
+        setActivePlaylists(plData.playlistIds?.length || 0);
+
+        const annRes = await fetch(`/api/announcement/device-announcement?deviceId=${devId}`);
+        const annData = annRes.ok ? await annRes.json() : { announcementPlaylistIds: [] };
+        setActiveAnnouncements(annData.announcementPlaylistIds?.length || 0);
+      } catch (err) {
+        console.error(err);
+        setActivePlaylists(0);
+        setActiveAnnouncements(0);
+      }
+    };
+    fetchCounts();
+  }, [device.deviceId?._id]);
+
+  return (
+    <div
+      className={`relative flex flex-col rounded-2xl shadow-sm border overflow-hidden w-full h-auto min-h-[190px] cursor-pointer select-none transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg ${
+        isOnline
+          ? "bg-gradient-to-br from-[#f8fbff] to-[#eef5ff] border-blue-200"
+          : "bg-white border-gray-200"
+      }`}
+      onClick={onClick}
+    >
+      {/* Decorative side accent */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${isOnline ? 'bg-blue-500' : 'bg-gray-300'}`} />
+      
+      <div className="flex-1 p-5 pl-7 flex flex-col justify-between relative">
+        {/* Top-right Status Pill */}
+        <div className="absolute top-5 right-5 flex items-center gap-2 bg-white/80 backdrop-blur-sm py-1.5 px-3 rounded-full border shadow-sm">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" : "bg-red-500"
+            }`}
+          />
+          <span className="text-[11px] font-bold text-gray-600 tracking-widest uppercase">
+            {isOnline ? "Online" : "Offline"}
+          </span>
+        </div>
+
+        <div className="w-full">
+          <h3 className="font-bold text-xl text-gray-900 mb-1.5 pr-28 truncate">
+            {device.deviceId.name || "Device Name"}
+          </h3>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 font-medium mb-3">
+            <span className="bg-white px-2.5 py-1 rounded-md border border-gray-100 shadow-sm">
+               Type: <span className="text-gray-800">{device.deviceId?.name || "Unknown"}</span>
+            </span>
+            <span className="bg-white px-2.5 py-1 rounded-md border border-gray-100 shadow-sm">
+               SN: <span className="text-gray-800">{serial}</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-auto pt-3 border-t border-gray-200/60">
+          <p className="flex items-center gap-2 text-sm text-gray-600 font-medium">
+            <FaSyncAlt className={`inline ${isOnline ? "text-blue-500" : "text-gray-400"}`} />
+            <span>Last Sync:</span> <span className="text-gray-900 bg-white/50 px-2 py-0.5 rounded">{lastSync}</span>
+          </p>
+          <div className="flex gap-3 mt-3">
+             <div className="flex-1 bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex flex-col items-center justify-center">
+                 <span className="text-[10px] text-gray-500 font-bold uppercase mb-1">Playlists</span>
+                 {activePlaylists === null ? (
+                   <span className="text-lg font-black text-gray-300 animate-pulse">...</span>
+                 ) : (
+                   <span className="text-lg font-black text-gray-800">{activePlaylists}</span>
+                 )}
+             </div>
+             <div className="flex-1 bg-white p-2 rounded-lg border border-gray-100 shadow-sm flex flex-col items-center justify-center text-center">
+                 <span className="text-[10px] text-gray-500 font-bold uppercase mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full">Announcements</span>
+                 {activeAnnouncements === null ? (
+                   <span className="text-lg font-black text-gray-300 animate-pulse">...</span>
+                 ) : (
+                   <span className="text-lg font-black text-gray-800">{activeAnnouncements}</span>
+                 )}
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function UserPlatform(): React.ReactElement {
   const [selectedMenu, setSelectedMenu] = useState<ExtendedMenuKey>("dashboard");
   const [sliderData, setSliderData] = useState<{ url: string; description: string; _id: string }[]>([]);
@@ -889,64 +990,7 @@ useEffect(() => {
 
 // }, [devices]);
 // const DeviceCard = ({ device, deviceStatuses }) => {
-const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
-  const serial = device.deviceId.serialNumber;
-  const deviceState = deviceStatuses[serial] || {};
-  const isOnline = deviceState.status === "online";
-  const lastSync = deviceState.lastSync || "None";
-  const imageUrl = device.deviceId.imageUrl || "/default-device-image.png";
-  const remainingTime = isOnline ? device.deviceId.status : null;
-
-  return (
-    <div
-      className={`relative flex flex-col rounded-2xl shadow-sm border overflow-hidden w-full h-[160px] cursor-pointer select-none transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg ${
-        isOnline
-          ? "bg-gradient-to-br from-[#f8fbff] to-[#eef5ff] border-blue-200"
-          : "bg-white border-gray-200"
-      }`}
-      onClick={onClick}
-    >
-      {/* Decorative side accent */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${isOnline ? 'bg-blue-500' : 'bg-gray-300'}`} />
-      
-      <div className="flex-1 p-5 pl-7 flex flex-col justify-between relative">
-        {/* Top-right Status Pill */}
-        <div className="absolute top-5 right-5 flex items-center gap-2 bg-white/80 backdrop-blur-sm py-1.5 px-3 rounded-full border shadow-sm">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" : "bg-red-500"
-            }`}
-          />
-          <span className="text-[11px] font-bold text-gray-600 tracking-widest uppercase">
-            {isOnline ? "Online" : "Offline"}
-          </span>
-        </div>
-
-        <div className="w-full">
-          <h3 className="font-bold text-xl text-gray-900 mb-1.5 pr-28 truncate">
-            {device.deviceId.name || "Device Name"}
-          </h3>
-
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 font-medium mb-3">
-            <span className="bg-white px-2.5 py-1 rounded-md border border-gray-100 shadow-sm">
-               Type: <span className="text-gray-800">{device.deviceId?.name || "Unknown"}</span>
-            </span>
-            <span className="bg-white px-2.5 py-1 rounded-md border border-gray-100 shadow-sm">
-               SN: <span className="text-gray-800">{serial}</span>
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-auto pt-3 border-t border-gray-200/60">
-          <p className="flex items-center gap-2 text-sm text-gray-600 font-medium">
-            <FaSyncAlt className={`inline ${isOnline ? "text-blue-500" : "text-gray-400"}`} />
-            <span>Last Sync:</span> <span className="text-gray-900 bg-white/50 px-2 py-0.5 rounded">{lastSync}</span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Device card moved to top level
 
 
 
@@ -986,7 +1030,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
 //           <div className="mt-2 space-y-1 text-sm">
   // --- Dashboard content matching image layout ---
   // Dashboard content matching image layout
-  const DashboardContent = () => (
+  const renderDashboardContent = () => (
     <div className="flex flex-col space-y-8">
      
         <header className="px-6 pt-4 pb-3 border-b border-gray-200 bg-[#E6F9FD] flex items-center justify-between">
@@ -1024,63 +1068,29 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
       {/* Right: Slider (rendered visually on the right via flex-row-reverse) */}
   {/* Enhanced Slider */}
   
-<div className="relative w-full max-w-[320px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-2xl group bg-gray-900">
-  {slides.length > 0 ? (
-    <>
-      {slides.map((slide, index) => (
-        <div
-          key={slide.id}
-          className={`absolute inset-0 w-full h-full transition-all duration-1000 ease-in-out transform ${
-            index === currentIndex
-              ? "opacity-100 scale-100 z-10"
-              : "opacity-0 scale-110 z-0"
-          }`}
-        >
-          <img
-            src={slide.src}
-            alt={slide.alt}
-            className="w-full h-full object-cover"
-          />
-          {/* Stylish Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-        </div>
-      ))}
-
-      {/* Content Overlay (Text) */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 p-8 text-white">
-        <div 
-          className="transform transition-all duration-700 ease-out translate-y-0 opacity-100"
-          key={currentIndex} // Key change triggers animation reset
-        >
-          <h3 className="text-lg md:text-xl font-bold mb-2 drop-shadow-md">
-             {/* Fallback title if description is empty, or show description */}
-            {slides[currentIndex]?.description || "Featured Highlight"}
-          </h3>
-        </div>
-      </div>
-
-      {/* Navigation Indicators (Pill Style) */}
-      <div className="absolute bottom-6 right-6 z-20 flex gap-2">
-        {slides.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => setCurrentIndex(idx)}
-            className={`h-2 rounded-full transition-all duration-500 ${
-              idx === currentIndex
-                ? "w-8 bg-orange-500"
-                : "w-2 bg-white/50 hover:bg-white"
-            }`}
-            aria-label={`Go to slide ${idx + 1}`}
-          />
-        ))}
-      </div>
-    </>
-  ) : (
-    // Loading Skeleton if no slides
-    <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center text-gray-400">
-      Loading visuals...
+{/* Quick Actions Panel */}
+<div className="w-full max-w-[320px] shrink-0">
+  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <h2 className="text-[20px] font-bold text-gray-900 mb-5 font-sans tracking-tight">Quick Actions</h2>
+    <div className="flex flex-col gap-3">
+      <button 
+        onClick={() => setSelectedMenu("setupPlaylist")}
+        className="w-full flex items-center bg-[#FF4500] hover:bg-[#E63E00] text-white px-4 py-[14px] rounded-xl transition-colors"
+      >
+        <MdOutlinePlaylistPlay size={22} className="mr-3 shrink-0" />
+        <span className="font-semibold text-[15px] flex-1 text-left flex items-center">Create Playlist</span>
+        <span className="text-2xl font-light leading-none -mt-1">+</span>
+      </button>
+      <button 
+        onClick={() => setSelectedMenu("createAnnouncement")}
+        className="w-full flex items-center bg-[#07323C] hover:bg-[#0A4A59] text-white px-4 py-[14px] rounded-xl transition-colors"
+      >
+        <FaBullhorn size={16} className="mr-3 shrink-0 ml-1" />
+        <span className="font-semibold text-[15px] flex-1 text-left flex items-center">Create Announcement</span>
+        <span className="text-2xl font-light leading-none -mt-1">+</span>
+      </button>
     </div>
-  )}
+  </div>
 </div>
 
 
@@ -1168,13 +1178,13 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
         style={{ backgroundColor: "#07323C" }}
       >
         <div className="flex-shrink-0 px-6 py-6 border-b border-teal-800 flex items-center gap-4">
-          <Image
+          {/* <Image
             src="/assets/centelon-logo.svg"
             alt="Centelon Logo"
             width={30}
             height={30}
-          />
-          <span className="font-semibold text-[12px]">Centelon Robotics</span>
+          /> */}
+          <span className="font-semibold text-[12px]">StoreSPARC Multimedia Platform</span>
         </div>
         <nav className="min-h-0 flex-1 px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 custom-scrollbar">
           {buildMenuSections(userRole).map((section: MenuItem) => {
@@ -1351,7 +1361,7 @@ const DeviceCard = ({ device, deviceStatuses, onClick }: DeviceCardProps) => {
     );
   }
 
-  return <DashboardContent />;
+  return renderDashboardContent();
 };
 
   return (
