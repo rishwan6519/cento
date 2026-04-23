@@ -11,42 +11,69 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     const body = await req.json();
-    const { 
-      name, 
-      type, 
-      startTime, 
-      endTime, 
-      files, 
-      backgroundAudio 
+    const {
+      name,
+      type,
+      category,       // alias for type (from CreateInstantPlaylist)
+      startTime,
+      endTime,
+      startDate,
+      endDate,
+      files,
+      mediaIds,       // alias for files (array of IDs or filenames)
+      backgroundAudio,
+      userId,
+      deviceIds,
+      daysOfWeek,
+      globalMinVolume,
+      globalMaxVolume,
+      selectedDeviceId,
+      description,
     } = body;
 
-    // Validate required fields
-    if (!name || !type || !startTime || !endTime || !files) {
+    // Resolve type — accept either 'type' or 'category'
+    const resolvedType = type || category || 'media';
+
+    // Validate only name is required
+    if (!name) {
       return NextResponse.json(
-        { error: 'All required fields must be provided' },
+        { error: 'Playlist name is required' },
         { status: 400 }
       );
     }
 
-    // Validate files array
-    if (!Array.isArray(files) || files.length === 0) {
-      return NextResponse.json(
-        { error: 'At least one file is required' },
-        { status: 400 }
-      );
+    // Resolve files — accept either 'files' array or 'mediaIds' array
+    let resolvedFiles: any[] = [];
+    if (Array.isArray(files) && files.length > 0) {
+      resolvedFiles = files.map((file: any, index: number) => ({
+        ...file,
+        displayOrder: index + 1,
+        delay: file.delay || 0
+      }));
+    } else if (Array.isArray(mediaIds) && mediaIds.length > 0) {
+      resolvedFiles = mediaIds.map((id: any, index: number) => ({
+        fileId: id,
+        displayOrder: index + 1,
+        delay: 0
+      }));
     }
 
     // Create new playlist
     const playlist = await PlaylistConfig.create({
       name,
-      type,
-      startTime,
-      endTime,
-      files: files.map((file, index) => ({
-        ...file,
-        displayOrder: index + 1,
-        delay: file.delay || 0
-      })),
+      type: resolvedType,
+      startTime: startTime || null,
+      endTime: endTime || null,
+      startDate: startDate || null,
+      endDate: endDate || null,
+      daysOfWeek: daysOfWeek || [],
+      globalMinVolume: globalMinVolume ?? 30,
+      globalMaxVolume: globalMaxVolume ?? 80,
+      selectedDeviceId: selectedDeviceId || null,
+      deviceIds: deviceIds || [],
+      description: description || '',
+      userId: userId || null,
+      files: resolvedFiles,
       backgroundAudio: {
         enabled: backgroundAudio?.enabled || false,
         file: backgroundAudio?.file || null,
@@ -54,16 +81,82 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    return NextResponse.json(playlist, { status: 201 });
+    return NextResponse.json({ success: true, data: playlist }, { status: 201 });
 
   } catch (error) {
     console.error('Error creating playlist:', error);
     return NextResponse.json(
-      { error: 'Failed to create playlist' },
+      { error: 'Failed to create playlist', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
 }
+
+export async function PUT(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    const body = await req.json();
+    const {
+      id,
+      name,
+      type,
+      startTime,
+      endTime,
+      startDate,
+      endDate,
+      mediaIds,
+      daysOfWeek,
+      globalMinVolume,
+      globalMaxVolume,
+      selectedDeviceId
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Playlist ID is required' }, { status: 400 });
+    }
+
+    // Only update files if mediaIds were explicitly provided
+    const updateFields: any = {
+      name,
+      type: type || 'media',
+      startTime: startTime || null,
+      endTime: endTime || null,
+      startDate: startDate || null,
+      endDate: endDate || null,
+      daysOfWeek: daysOfWeek || [],
+      globalMinVolume: globalMinVolume ?? 30,
+      globalMaxVolume: globalMaxVolume ?? 80,
+      selectedDeviceId: selectedDeviceId || null,
+    };
+
+    if (Array.isArray(mediaIds) && mediaIds.length > 0) {
+      updateFields.files = mediaIds.map((mediaId: any, index: number) => ({
+        fileId: mediaId,
+        displayOrder: index + 1,
+        delay: 0
+      }));
+    }
+
+    const playlist = await PlaylistConfig.findByIdAndUpdate(
+      id,
+      { $set: updateFields },
+      { new: true }
+    );
+
+    if (!playlist) {
+      return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: playlist });
+  } catch (error) {
+    console.error('Error updating playlist:', error);
+    return NextResponse.json(
+      { error: 'Failed to update playlist', details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
+  }
+}
+
 
 export async function GET(req: NextRequest) {
   try {

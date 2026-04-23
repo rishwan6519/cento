@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
     let currentAnnouncement = null;
 
     for (let i = 0; i < playlists.length; i++) {
-      const playlist = playlists[i];
+      const playlist = playlists[i] as any;
 
       // Check date range
       if (
@@ -103,6 +103,8 @@ export async function GET(req: NextRequest) {
 
       // Check time range
       if (
+        playlist.startTime &&
+        playlist.endTime &&
         currentTime >= playlist.startTime &&
         currentTime < playlist.endTime
       ) {

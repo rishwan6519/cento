@@ -1,6 +1,6 @@
 // app/login/page.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Lock, User, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -13,6 +13,21 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("userRole");
+    if (token && role) {
+      if (role === "admin") router.push("/admin");
+      else if (role === "reseller") router.push("/reseller");
+      else if (role === "superUser") router.push("/platform");
+      else if (role === "user") router.push("/home");
+      else if (role === "developer") router.push("/block-code");
+      else if (role === "account_admin") router.push("/account_admin");
+      else if (role === "account_marketing") router.push("/account_marketing");
+      else if (role === "store") router.push("/store");
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,13 +57,20 @@ export default function LoginPage() {
         toast.success("Login successful!", { duration: 2000 });
         if (data.user.role === "admin") {
           router.push("/admin"); // Redirect to admin page
-        }else if (data.user.role === "superUser" || data.user.role === "reseller") {
-          router.push("/platform"); // Redirect to superuser or reseller page
+        }else if (data.user.role === "reseller") {
+          router.push("/reseller"); // Redirect to reseller page
+        }else if (data.user.role === "superUser") {
+          router.push("/platform"); // Redirect to superuser page
         }else if (data.user.role === "user") {
-
           router.push("/home"); // Redirect to the platform page
         }else if (data.user.role === "developer") {
           router.push("/block-code"); // Redirect to the platform page
+        } else if (data.user.role === "account_admin") {
+          router.push("/account_admin"); // Redirect to account admin page
+        } else if (data.user.role === "account_marketing") {
+          router.push("/account_marketing"); // Redirect to account marketing page
+        } else if (data.user.role === "store") {
+          router.push("/store"); // Redirect to store page
         }
       }
     } catch (error) {

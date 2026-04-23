@@ -69,6 +69,9 @@ export enum UserRole {
   Reseller = 'reseller',
   Admin = 'admin',
   Developer = 'developer',
+  AccountAdmin = 'account_admin',
+  AccountMarketing = 'account_marketing',
+  Store = 'store',
 }
 
 export interface UserDocument extends Document {
@@ -79,8 +82,18 @@ export interface UserDocument extends Document {
   blockCoding?: boolean;
   peopleDetection?: boolean;
   platform?: boolean;
-  storeName?: string;        // Added storeName field
-  storeLocation?: string;    // Added storeLocation field
+  storeName?: string;
+  storeLocation?: string;
+  customerId?: mongoose.Types.ObjectId;
+  operatorName?: string;
+  phone?: string;
+  email?: string;
+  companyName?: string;
+  location?: string;
+  hasAllStoreAccess?: boolean;
+  assignedStoreId?: mongoose.Types.ObjectId;
+  mediaProvisioning?: boolean;
+  provisionedFiles?: { name: string; url: string }[];
 }
 
 const UserSchema: Schema = new Schema({
@@ -114,19 +127,50 @@ const UserSchema: Schema = new Schema({
     type: String,
     required: false
   },
-  storeLocation: {           // Added storeLocation field
+  storeLocation: {
     type: String,
+    required: false
+  },
+  operatorName: { type: String, required: false },
+  phone: { type: String, required: false },
+  email: { type: String, required: false },
+  companyName: { type: String, required: false },
+  location: { type: String, required: false },
+  customerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Customer',
     required: false
   },
   role: { 
     type: String, 
     enum: Object.values(UserRole), 
     default: UserRole.User
+  },
+  hasAllStoreAccess: {
+    type: Boolean,
+    default: false
+  },
+  assignedStoreId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
+  },
+  mediaProvisioning: {
+    type: Boolean,
+    default: false
+  },
+  provisionedFiles: {
+    type: [{ name: String, url: String }],
+    default: []
   }
 }, { 
   timestamps: true 
 });
 
-const User = mongoose.models.User || mongoose.model<UserDocument>('User', UserSchema);
+// Delete cached model to force re-registration with updated schema (needed for enum changes in dev)
+if (mongoose.models.User) {
+  delete (mongoose.models as any).User;
+}
+const User = mongoose.model<UserDocument>('User', UserSchema);
 
 export default User;

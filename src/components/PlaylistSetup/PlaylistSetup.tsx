@@ -1980,7 +1980,7 @@ const PlaylistSetup: React.FC<ConnectPlaylistProps> = ({
           
    useEffect(() => {
       const userRole = localStorage.getItem("userRole");
-      if (userRole !== "user" && userRole !== "superUser" && userRole !== "reseller") {
+      if (userRole !== "user" && userRole !== "superUser" && userRole !== "reseller" && userRole !== "store") {
         toast.error("You are not authorized to access this page.");
         window.location.href = "/login";
         return;

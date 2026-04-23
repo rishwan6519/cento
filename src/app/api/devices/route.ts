@@ -61,14 +61,50 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
 
-    const devices = await Device.find({})
+    const { searchParams } = new URL(req.url);
+    const resellerId = searchParams.get("resellerId");
+    const customerId = searchParams.get("customerId");
+
+    const mongoose = (await import('mongoose')).default;
+
+    if (customerId && customerId !== 'undefined' && customerId !== 'null') {
+      const devices = await Device.find({ customerId: customerId })
+        .populate('typeId', 'name imageUrl')
+        .sort({ createdAt: -1 });
+      return NextResponse.json(devices);
+    }
+
+    if (!resellerId) {
+      // No filter — return all devices (admin use)
+      const devices = await Device.find({})
+        .populate('typeId', 'name imageUrl')
+        .sort({ createdAt: -1 });
+      return NextResponse.json(devices);
+    }
+
+
+    const resellerObjectId = new mongoose.Types.ObjectId(resellerId);
+
+    // Import Customer model to find customers belonging to this reseller
+    const Customer = (await import('@/models/Customer')).default;
+    const customers = await Customer.find({ resellerId: resellerObjectId }, '_id');
+    const customerIds = customers.map((c: any) => c._id);
+
+    // Find devices where resellerId matches OR customerId is one of the reseller's customers
+    const orConditions: any[] = [{ resellerId: resellerObjectId }];
+    if (customerIds.length > 0) {
+      orConditions.push({ customerId: { $in: customerIds } });
+    }
+
+    const devices = await Device.find({ $or: orConditions })
       .populate('typeId', 'name imageUrl')
       .sort({ createdAt: -1 });
 
+    console.log(`GET /api/devices: resellerId=${resellerId}, customers=${customerIds.length}, found=${devices.length}`);
     return NextResponse.json(devices);
   } catch (error) {
     console.error('Error in GET /api/devices:', error);
@@ -113,7 +149,8 @@ export async function DELETE(req: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     await connectToDatabase();
-    const { id, name, imageUrl, color, status } = await request.json();
+    const mongoose = (await import('mongoose')).default;
+    const { id, name, imageUrl, color, status, customerId, resellerId } = await request.json();
 
     if (!id) {
       return NextResponse.json({ success: false, message: "Device ID is required" }, { status: 400 });
@@ -125,6 +162,15 @@ export async function PATCH(request: NextRequest) {
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     if (color !== undefined) updateData.color = color;
     if (status !== undefined) updateData.status = status;
+    // Explicitly cast to ObjectId or allow null (for disconnect)
+    if (customerId !== undefined) {
+      updateData.customerId = customerId ? new mongoose.Types.ObjectId(customerId) : null;
+    }
+    if (resellerId !== undefined) {
+      updateData.resellerId = resellerId ? new mongoose.Types.ObjectId(resellerId) : null;
+    }
+
+    console.log('PATCH /api/devices updateData:', JSON.stringify(updateData));
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ success: false, message: "No fields to update" }, { status: 400 });

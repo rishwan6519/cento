@@ -34,6 +34,16 @@ const deviceSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive', 'maintenance'],
     default: 'active'
+  },
+  customerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Customer',
+    required: false
+  },
+  resellerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
   }
 }, {
   timestamps: true

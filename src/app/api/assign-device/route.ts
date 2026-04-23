@@ -2,38 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import AssignedDevice from '@/models/AssignDevice';
 import Device from '@/models/Device';
-import { DeviceType } from '@/models/DeviceTypes'; // Import the named export
+import { DeviceType } from '@/models/DeviceTypes';
+import User from '@/models/User';
 
 export async function GET(request: Request) {
   try {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const customerId = searchParams.get('customerId');
    console.log('User ID:', userId);
     
-    if (!userId) {
+    if (!userId && !customerId) {
       return NextResponse.json({
         success: false,
-        message: 'User ID is required'
+        message: 'userId or customerId is required'
       }, { status: 400 });
     }
 
-    // Update the query to populate device details and include status check
+    const query: any = { status: 'active' };
+    if (userId) {
+      query.userId = userId;
+    } else if (customerId) {
+      const customerDevices = await Device.find({ customerId }).select('_id');
+      const deviceIds = customerDevices.map(d => d._id);
+      query.deviceId = { $in: deviceIds };
+    }
 
+    const assignments = await AssignedDevice.find(query)
+      .populate({
+        path: 'deviceId',
+        model: Device,
+        select: 'name serialNumber status imageUrl color typeId',
+        populate: {
+          path: 'typeId',
+          model: DeviceType,
+          select: 'name blcockCodingEnabled handMovements bodyMovements screenSize'
+        }
+      })
+      .populate({
+        path: 'userId',
+        model: User,
+        select: 'username storeName storeLocation'
+      });
 
-    const assignments = await AssignedDevice.find({
-      userId,
-      status: 'active'
-    }).populate({
-  path: 'deviceId',
-  model: Device,
-  select: 'name serialNumber status imageUrl color typeId',
-  populate: {
-    path: 'typeId',
-    model: DeviceType,
-    select: 'name blcockCodingEnabled handMovements bodyMovements screenSize'
-  }
-});
 
 console.log('Assignments:', assignments);
  
@@ -76,10 +88,9 @@ export async function POST(request: Request) {
       }, { status: 404 });
     }
 
-    // Check if device is already assigned by this parent
+    // Check if device is already assigned
     const existingAssignment = await AssignedDevice.findOne({
       deviceId,
-      assignedBy,
       status: 'active'
     });
 
@@ -127,25 +138,33 @@ export async function POST(request: Request) {
 export async function DELETE(request: NextRequest) {
   try {
     await connectToDatabase();
-   const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    // Read from JSON body (not query params)
+    const body = await request.json();
+    const { deviceId, userId } = body;
 
-    if (!userId) {
+    if (!deviceId) {
       return NextResponse.json({
         success: false,
-        message: 'Assigned device ID is required'
+        message: 'deviceId is required'
       }, { status: 400 });
     }
 
-    // Attempt to delete the assignment
-    const deletedAssignment = await AssignedDevice.findByIdAndDelete(userId);
+    // Find the active assignment for this device (optionally scoped to userId)
+    const query: any = { deviceId, status: 'active' };
+    if (userId) query.userId = userId;
 
-    if (!deletedAssignment) {
+    const assignment = await AssignedDevice.findOne(query);
+
+    if (!assignment) {
       return NextResponse.json({
         success: false,
-        message: 'Assigned device not found'
+        message: 'Active assignment not found for this device'
       }, { status: 404 });
     }
+
+    // Mark as inactive (soft delete) instead of hard delete for audit
+    assignment.status = 'inactive';
+    await assignment.save();
 
     return NextResponse.json({
       success: true,

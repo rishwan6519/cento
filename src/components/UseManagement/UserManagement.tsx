@@ -7,12 +7,22 @@ interface User {
   username: string;
   role: string;
   controllerId?: string;
+  operatorName?: string;
+  email?: string;
+  phone?: string;
+  companyName?: string;
+  location?: string;
 }
 
 interface UserFormData {
   username: string;
   password: string;
   role: string;
+  operatorName: string;
+  email: string;
+  phone: string;
+  companyName: string;
+  location: string;
 }
 
 export default function UserManagement() {
@@ -22,7 +32,12 @@ export default function UserManagement() {
   const [formData, setFormData] = useState<UserFormData>({
     username: '',
     password: '',
-    role: 'reseller'
+    role: 'reseller',
+    operatorName: '',
+    email: '',
+    phone: '',
+    companyName: '',
+    location: ''
   });
 
   useEffect(() => {
@@ -71,7 +86,7 @@ export default function UserManagement() {
         toast.success('User created successfully');
         fetchUsers();
         setIsAddingUser(false);
-        setFormData({ username: '', password: '', role: 'reseller' });
+        setFormData({ username: '', password: '', role: 'reseller', operatorName: '', email: '', phone: '', companyName: '', location: '' });
       } else {
         throw new Error(data.message);
       }
@@ -93,7 +108,7 @@ export default function UserManagement() {
         toast.success('User updated successfully');
         fetchUsers();
         setEditingUser(null);
-        setFormData({ username: '', password: '', role: 'reseller' });
+        setFormData({ username: '', password: '', role: 'reseller', operatorName: '', email: '', phone: '', companyName: '', location: '' });
       } else {
         throw new Error(data.message);
       }
@@ -125,19 +140,21 @@ export default function UserManagement() {
   // Add the component to your page
   return (
     <div className="bg-white/50 backdrop-blur-md rounded-[2rem] p-8 min-h-full">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Identity Access</h2>
-          <p className="text-slate-500 font-medium">Control operational permissions and system roles.</p>
-        </div>
-        <button
-          onClick={() => setIsAddingUser(true)}
-          className="flex items-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-slate-900/20"
-        >
-          <UserPlus size={20} />
-          Onboard User
-        </button>
-      </div>
+      {!isAddingUser ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div>
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight">Identity Access</h2>
+              <p className="text-slate-500 font-medium">Control operational permissions and system roles.</p>
+            </div>
+            <button
+              onClick={() => setIsAddingUser(true)}
+              className="flex items-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-slate-900/20"
+            >
+              <UserPlus size={20} />
+              Onboard User
+            </button>
+          </div>
 
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -145,6 +162,8 @@ export default function UserManagement() {
             <thead className="bg-[#07323C] text-white">
               <tr>
                 <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Username</th>
+                <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Contact Info</th>
+                <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Organization</th>
                 <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Access Role</th>
                 <th className="px-8 py-5 text-right text-[10px] font-bold uppercase tracking-[0.2em]">Operations</th>
               </tr>
@@ -162,10 +181,63 @@ export default function UserManagement() {
                       />
                     ) : (
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400">
-                          {user.username.charAt(0).toUpperCase()}
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 shrink-0">
+                          {user.operatorName ? user.operatorName.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
                         </div>
-                        <div className="text-sm font-bold text-slate-900">{user.username}</div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-900">{user.operatorName || user.username}</span>
+                          {user.operatorName && <span className="text-xs font-medium text-slate-400">@{user.username}</span>}
+                        </div>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-8 py-6 whitespace-nowrap">
+                    {editingUser === user._id ? (
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          value={formData.email}
+                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="Email..."
+                          className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 focus:border-blue-500 outline-none w-full"
+                        />
+                        <input
+                          type="text"
+                          value={formData.phone}
+                          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                          placeholder="Phone..."
+                          className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 focus:border-blue-500 outline-none w-full"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <div className="text-sm font-medium text-slate-900">{user.email || 'N/A'}</div>
+                        <div className="text-xs text-slate-500">{user.phone || 'N/A'}</div>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-8 py-6 whitespace-nowrap">
+                    {editingUser === user._id ? (
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          value={formData.companyName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                          placeholder="Company Name..."
+                          className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 focus:border-blue-500 outline-none w-full"
+                        />
+                        <input
+                          type="text"
+                          value={formData.location}
+                          onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                          placeholder="Location..."
+                          className="bg-white border-2 border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 focus:border-blue-500 outline-none w-full"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <div className="text-sm font-medium text-slate-900">{user.companyName || 'N/A'}</div>
+                        <div className="text-xs text-slate-500">{user.location || 'N/A'}</div>
                       </div>
                     )}
                   </td>
@@ -191,7 +263,7 @@ export default function UserManagement() {
                           <button
                             onClick={() => {
                               setEditingUser(null);
-                              setFormData({ username: '', password: '', role: 'reseller' });
+                              setFormData({ username: '', password: '', role: 'reseller', operatorName: '', email: '', phone: '', companyName: '', location: '' });
                             }}
                             className="px-4 py-2 bg-slate-100 text-slate-400 rounded-xl font-bold text-xs"
                           >
@@ -203,7 +275,7 @@ export default function UserManagement() {
                           <button
                             onClick={() => {
                               setEditingUser(user._id);
-                              setFormData({ username: user.username, password: '', role: user.role });
+                              setFormData({ username: user.username, password: '', role: user.role, operatorName: (user as any).operatorName || '', email: (user as any).email || '', phone: (user as any).phone || '', companyName: (user as any).companyName || '', location: (user as any).location || '' });
                             }}
                             className="p-2.5 bg-white text-slate-400 hover:text-blue-500 hover:shadow-sm rounded-xl border border-slate-100 transition-all"
                           >
@@ -225,55 +297,111 @@ export default function UserManagement() {
           </table>
         </div>
       </div>
-
-      {isAddingUser && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-lg shadow-2xl animate-in fade-in zoom-in duration-300">
-            <div className="mb-8 text-center">
-               <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                  <UserPlus size={40} />
+      </>
+      ) : (
+        <div className="animate-in fade-in zoom-in duration-300 w-full max-w-4xl mx-auto py-4">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+               <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-3xl flex items-center justify-center">
+                  <UserPlus size={32} />
                </div>
-               <h3 className="text-2xl font-black text-slate-900">Provision Account</h3>
-               <p className="text-slate-500 font-medium">Create a new organizational identity.</p>
+               <div>
+                 <h3 className="text-2xl font-black text-slate-900">Provision Account</h3>
+                 <p className="text-slate-500 font-medium">Create a new organizational identity.</p>
+               </div>
             </div>
+          </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">System Username</label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all text-sm sm:text-base"
+                    placeholder="e.g. op_728"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Operator Full Name</label>
+                  <input
+                    type="text"
+                    value={formData.operatorName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, operatorName: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all text-sm sm:text-base"
+                    placeholder="Sarah Mitchell"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Security Key</label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all text-sm sm:text-base"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Operational Rank</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all appearance-none text-sm sm:text-base"
+                  >
+                     <option value="reseller">Reseller</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all text-sm sm:text-base"
+                    placeholder="reseller@domain.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Phone Number</label>
+                  <input
+                    type="text"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all text-sm sm:text-base"
+                    placeholder="+1 234 567 890"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Company Name</label>
+                  <input
+                    type="text"
+                    value={formData.companyName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all text-sm sm:text-base"
+                    placeholder="TechResell Inc."
+                  />
+                </div>
+              </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Username Identity</label>
+                <label className="block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Location</label>
                 <input
                   type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all"
-                  placeholder="e.g. system_operator"
-                  required
+                  value={formData.location}
+                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-4 py-3 sm:px-6 sm:py-4 font-bold text-slate-900 outline-none transition-all text-sm sm:text-base"
+                  placeholder="Sydney, Australia"
                 />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Security Key</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Operational Rank</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all appearance-none"
-                >
-                   <option value="reseller">Reseller</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-4 pt-8">
                 <button
                   type="submit"
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-extrabold shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-95"
+                  className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-extrabold shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-95"
                 >
                   Confirm Provisioning
                 </button>
@@ -281,15 +409,14 @@ export default function UserManagement() {
                   type="button"
                   onClick={() => {
                     setIsAddingUser(false);
-                    setFormData({ username: '', password: '', role: 'reseller' });
+                    setFormData({ username: '', password: '', role: 'reseller', operatorName: '', email: '', phone: '', companyName: '', location: '' });
                   }}
-                  className="w-full py-2 text-slate-400 font-bold hover:text-slate-900 transition-colors"
+                  className="px-8 py-4 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors rounded-2xl"
                 >
                   Cancel
                 </button>
               </div>
             </form>
-          </div>
         </div>
       )}
     </div>

@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const device = await Device.findOne({ serialNumber }).populate('typeId');
+    const device = await Device.findOne({ 
+      serialNumber: { $regex: new RegExp(`^${serialNumber}$`, 'i') }
+    }).populate('typeId');
 
     if (!device) {
       return NextResponse.json(

@@ -13,11 +13,18 @@ export async function POST(req: NextRequest) {
       password, 
       role, 
       controllerId, 
+      customerId,
       blockCoding, 
       peopleDetection, 
       platform,
-      storeName,      // Added storeName field
-      storeLocation   // Added storeLocation field
+      storeName,
+      storeLocation,
+      phone,
+      email,
+      companyName,
+      location,
+      hasAllStoreAccess,
+      assignedStoreId
     } = await req.json();
     
     if (!username?.trim() || !password) {
@@ -47,9 +54,16 @@ export async function POST(req: NextRequest) {
       blockCoding: blockCoding || false,
       peopleDetection: peopleDetection || false,
       platform: platform || false,
-      storeName: storeName || undefined,      // Added storeName field
-      storeLocation: storeLocation || undefined,  // Added storeLocation field
+      storeName: storeName || undefined,
+      storeLocation: storeLocation || undefined,
+      phone: phone || undefined,
+      email: email || undefined,
+      companyName: companyName || undefined,
+      location: location || undefined,
       controllerId: controllerId ? mongoose.Types.ObjectId.createFromHexString(controllerId) : undefined,
+      customerId: customerId ? mongoose.Types.ObjectId.createFromHexString(customerId) : undefined,
+      hasAllStoreAccess: hasAllStoreAccess !== undefined ? hasAllStoreAccess : false,
+      assignedStoreId: assignedStoreId ? mongoose.Types.ObjectId.createFromHexString(assignedStoreId) : undefined,
     });
 
     try {
@@ -97,11 +111,17 @@ export async function GET(req: NextRequest) {
 
     const query: any = {};
     if (controllerId) {
-      if (mongoose.Types.ObjectId.isValid(controllerId)) {
-        query.controllerId = mongoose.Types.ObjectId.createFromHexString(controllerId);
-      } else {
-        query.controllerId = controllerId;
-      }
+      query.controllerId = controllerId;
+    }
+    
+    const customerIdParam = searchParams.get("customerId");
+    if (customerIdParam) {
+      query.customerId = customerIdParam;
+    }
+    
+    const userId = searchParams.get("userId");
+    if (userId) {
+      query._id = userId;
     }
 
     // Find all users (or match controllerId), exclude password field
@@ -144,7 +164,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const { username, password, currentPassword, storeName, storeLocation } = await req.json(); // Added new fields
+    const { username, password, currentPassword, storeName, storeLocation, phone, email, companyName, location, mediaProvisioning } = await req.json();
 
     const user = await User.findById(userId);
     if (!user) {
@@ -174,6 +194,11 @@ export async function PUT(req: NextRequest) {
     if (username !== undefined) user.username = username;
     if (storeName !== undefined) user.storeName = storeName;
     if (storeLocation !== undefined) user.storeLocation = storeLocation;
+    if (phone !== undefined) user.phone = phone;
+    if (email !== undefined) user.email = email;
+    if (companyName !== undefined) user.companyName = companyName;
+    if (location !== undefined) user.location = location;
+    if (mediaProvisioning !== undefined) (user as any).mediaProvisioning = mediaProvisioning;
 
     await user.save();
 
