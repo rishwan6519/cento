@@ -164,7 +164,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const { username, password, currentPassword, storeName, storeLocation, phone, email, companyName, location, mediaProvisioning } = await req.json();
+    const { username, password, currentPassword, storeName, storeLocation, phone, email, companyName, location, mediaProvisioning, hasAllStoreAccess, assignedStoreId } = await req.json();
 
     const user = await User.findById(userId);
     if (!user) {
@@ -199,6 +199,8 @@ export async function PUT(req: NextRequest) {
     if (companyName !== undefined) user.companyName = companyName;
     if (location !== undefined) user.location = location;
     if (mediaProvisioning !== undefined) (user as any).mediaProvisioning = mediaProvisioning;
+    if (hasAllStoreAccess !== undefined) (user as any).hasAllStoreAccess = hasAllStoreAccess;
+    if (assignedStoreId !== undefined) (user as any).assignedStoreId = assignedStoreId ? mongoose.Types.ObjectId.createFromHexString(assignedStoreId) : null;
 
     await user.save();
 

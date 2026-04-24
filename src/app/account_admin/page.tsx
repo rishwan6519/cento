@@ -297,28 +297,47 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
   );
 };
 
-const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId }: { setActiveView: (v: string) => void, setSelectedStore: (s: any) => void, accountAdminId?: string }) => {
+const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit }: { setActiveView: (v: string) => void, setSelectedStore: (s: any) => void, accountAdminId?: string, onEdit?: (s: any) => void }) => {
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchStores = async () => {
     if (!accountAdminId) return;
-    const fetchStores = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/user?controllerId=${accountAdminId}`);
-        const data = await res.json();
-        if (data.success && Array.isArray(data.data)) {
-          setStores(data.data.filter((u:any) => u.role === 'store'));
-        }
-      } catch (err) {
-        console.error("Failed to fetch stores", err);
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/user?controllerId=${accountAdminId}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setStores(data.data.filter((u: any) => u.role === "store"));
       }
-    };
+    } catch (err) {
+      console.error("Failed to fetch stores", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchStores();
   }, [accountAdminId]);
+
+  const handleDelete = async (storeId: string) => {
+    if (!confirm("Are you sure you want to delete this store? All associated data will be lost.")) return;
+    try {
+      const res = await fetch(`/api/user?userId=${storeId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Store deleted successfully");
+        fetchStores();
+      } else {
+        toast.error(data.message || "Failed to delete store");
+      }
+    } catch (err) {
+      toast.error("An error occurred");
+    }
+  };
 
   return (
   <div className="pb-12">
@@ -391,11 +410,36 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId }: { se
                 <Clock size={14} />
                 <span>{new Date(store.createdAt).toLocaleDateString()}</span>
               </div>
-              <div className="flex items-center gap-4 text-[#00BCD4]">
-                <button title="View" onClick={(e) => { e.stopPropagation(); setSelectedStore(store); setActiveView("store_detail"); }}><ListIcon size={18} className="text-[#00BCD4]" /></button>
-                <button title="Edit" onClick={(e) => e.stopPropagation()}><Edit size={18} className="text-orange-400" /></button>
-                <button title="Delete" onClick={(e) => e.stopPropagation()}><Trash2 size={18} className="text-red-400" /></button>
-              </div>
+                  <div className="flex items-center gap-4 text-[#00BCD4]">
+                    <button
+                      title="View"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStore(store);
+                        setActiveView("store_detail");
+                      }}
+                    >
+                      <ListIcon size={18} className="text-[#00BCD4]" />
+                    </button>
+                    <button
+                      title="Edit"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit?.(store);
+                      }}
+                    >
+                      <Edit size={18} className="text-orange-400" />
+                    </button>
+                    <button
+                      title="Delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(store._id);
+                      }}
+                    >
+                      <Trash2 size={18} className="text-red-400" />
+                    </button>
+                  </div>
             </div>
           </div>
         </div>
@@ -1018,33 +1062,318 @@ const OnboardUserView = ({ accountAdminId, customerId, onComplete }: { accountAd
   );
 };
 
-const ViewUsersView = ({ accountAdminId }: { accountAdminId?: string }) => {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
+const EditUserView = ({ user, accountAdminId, customerId, onComplete }: { user: any, accountAdminId?: string, customerId?: string, onComplete?: () => void }) => {
+  const [stores, setStores] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+    password: '',
+    confirmPassword: '',
+    hasAllStoreAccess: user?.hasAllStoreAccess || false,
+    assignedStoreId: user?.assignedStoreId || ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   useEffect(() => {
     if (!accountAdminId) return;
-    const fetchUsers = async () => {
+    const fetchStores = async () => {
       try {
         const res = await fetch(`/api/user?controllerId=${accountAdminId}`);
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
-          setUsers(data.data.filter((u:any) => u.role === 'account_marketing'));
+          setStores(data.data.filter((u:any) => u.role === 'store'));
         }
       } catch (err) {
         console.error(err);
-      } finally {
-        setLoading(false);
       }
     };
+    fetchStores();
+  }, [accountAdminId]);
+
+  const handleSubmit = async () => {
+    if (!formData.username || !formData.email) {
+      toast.error('Username and Email are required');
+      return;
+    }
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const body: any = {
+        username: formData.username,
+        email: formData.email,
+        hasAllStoreAccess: formData.hasAllStoreAccess,
+        assignedStoreId: formData.hasAllStoreAccess ? null : formData.assignedStoreId
+      };
+      
+      if (formData.password) {
+        body.password = formData.password;
+      }
+
+      const res = await fetch(`/api/user?userId=${user._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('User updated successfully!');
+        if (onComplete) onComplete();
+      } else {
+        toast.error(data.message || 'Error updating user');
+      }
+    } catch (err) {
+      toast.error('Failed to update user');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="pb-12 max-w-[1000px]">
+      <div className="flex items-center gap-4 mb-2">
+        <button onClick={() => onComplete && onComplete()} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+          <ArrowRight className="rotate-180" size={20} />
+        </button>
+        <h1 className="text-3xl font-bold text-gray-900">Edit Account Marketing User</h1>
+      </div>
+      <p className="text-gray-600 mb-8 ml-12">Update detail for {user.username}</p>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-[#EBF5F6] flex items-center justify-center text-[#FF5722]">
+            <User size={20} />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900">User Information</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Username <span className="text-red-500">*</span></label>
+            <input type="text" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Email ID <span className="text-red-500">*</span></label>
+            <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          
+          <div className="md:col-span-2">
+            <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-100 mb-4">
+              <p className="text-sm text-orange-800 font-medium flex items-center gap-2">
+                <AlertTriangle size={16} /> Leave password fields blank to keep current password.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
+            <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password</label>
+            <input type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">Give access to all stores <span className="text-red-500">*</span></label>
+            <div className="flex items-center gap-6">
+              <label onClick={() => setFormData({...formData, hasAllStoreAccess: true, assignedStoreId: ''})} className="flex items-center gap-2 cursor-pointer">
+                <div className={`w-4 h-4 rounded-full ${formData.hasAllStoreAccess ? 'border-[5px] border-[#FF5722]' : 'border-2 border-gray-300'}`}></div>
+                <span className="text-sm font-medium">Yes</span>
+              </label>
+              <label onClick={() => setFormData({...formData, hasAllStoreAccess: false})} className="flex items-center gap-2 cursor-pointer">
+                <div className={`w-4 h-4 rounded-full ${!formData.hasAllStoreAccess ? 'border-[5px] border-[#FF5722]' : 'border-2 border-gray-300'}`}></div>
+                <span className="text-sm font-medium">No</span>
+              </label>
+            </div>
+          </div>
+          {!formData.hasAllStoreAccess && (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Select store <span className="text-red-500">*</span></label>
+              <select value={formData.assignedStoreId} onChange={e => setFormData({...formData, assignedStoreId: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+                <option value="">-- Choose a store --</option>
+                {stores.map((s:any) => (
+                  <option key={s._id} value={s._id}>{s.storeName || s.username || 'Store'}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4 border-t border-gray-100 pt-6">
+          <button disabled={isSubmitting} onClick={handleSubmit} className="flex items-center gap-2 px-6 py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 disabled:bg-gray-300 disabled:shadow-none">
+            <Save size={18} />
+            {isSubmitting ? "Updating..." : "Save Changes"}
+          </button>
+          <button onClick={() => { if(onComplete) onComplete() }} className="px-6 py-3 bg-[#F4F7F8] hover:bg-gray-100 text-gray-700 rounded-xl font-bold transition-all">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { store: any, accountAdminId?: string, customerId?: string, onComplete?: () => void }) => {
+  const [formData, setFormData] = useState({
+    storeName: store?.storeName || '',
+    location: store?.storeLocation || store?.location || '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!formData.storeName || !formData.location) {
+      toast.error('Store name and location are required');
+      return;
+    }
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const body: any = {
+        storeName: formData.storeName,
+        storeLocation: formData.location,
+        username: formData.storeName // Keep username synced with store name
+      };
+      if (formData.password) body.password = formData.password;
+
+      const res = await fetch(`/api/user?userId=${store._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Store "${formData.storeName}" updated successfully!`);
+        if (onComplete) onComplete();
+      } else {
+        toast.error(data.message || 'Failed to update store');
+      }
+    } catch (err) {
+      toast.error('An error occurred while updating store');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="pb-12 max-w-[1000px]">
+      <div className="flex items-center gap-4 mb-2">
+        <button onClick={() => onComplete && onComplete()} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+          <ArrowRight className="rotate-180" size={20} />
+        </button>
+        <h1 className="text-3xl font-bold text-gray-900">Edit Store</h1>
+      </div>
+      <p className="text-gray-600 mb-8 ml-12">Update detail for {store.storeName || store.username}</p>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF5722]">
+            <Store size={20} />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900">Store Information</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Store name <span className="text-red-500">*</span></label>
+            <input type="text" value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Location <span className="text-red-500">*</span></label>
+            <input type="text" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          
+          <div className="md:col-span-2">
+            <div className="p-4 bg-orange-50/50 rounded-xl border border-orange-100 mb-4">
+              <p className="text-sm text-orange-800 font-medium flex items-center gap-2">
+                <AlertTriangle size={16} /> Leave password fields blank to keep current password.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
+            <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password</label>
+            <input type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-6 py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 disabled:bg-gray-300 disabled:shadow-none"
+          >
+            <Save size={18} />
+            {isSubmitting ? "Saving..." : "Save Changes"}
+          </button>
+          <button onClick={() => { if(onComplete) onComplete() }} className="px-6 py-3 bg-white hover:bg-gray-50 text-gray-600 rounded-xl font-bold border border-gray-200 transition-all">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, onEdit?: (u: any) => void }) => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    if (!accountAdminId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/user?controllerId=${accountAdminId}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setUsers(data.data.filter((u: any) => u.role === "account_marketing"));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchUsers();
   }, [accountAdminId]);
+
+  const handleDelete = async (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    try {
+      const res = await fetch(`/api/user?userId=${userId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("User deleted successfully");
+        fetchUsers();
+      } else {
+        toast.error(data.message || "Failed to delete user");
+      }
+    } catch (err) {
+      toast.error("An error occurred");
+    }
+  };
 
   return (
     <div className="pb-12 max-w-[1200px]">
       <h1 className="text-3xl font-bold text-gray-900 mb-1">Account Marketing User</h1>
       <p className="text-sm text-gray-500 mb-8">List of all your account marketing user</p>
-      
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-[#EBF5F6] flex items-center justify-center text-[#FF5722]">
@@ -1060,9 +1389,9 @@ const ViewUsersView = ({ accountAdminId }: { accountAdminId?: string }) => {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 flex gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by username, name, or location..." 
+          <input
+            type="text"
+            placeholder="Search by username, name, or location..."
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50"
           />
         </div>
@@ -1085,29 +1414,51 @@ const ViewUsersView = ({ accountAdminId }: { accountAdminId?: string }) => {
               </tr>
             </thead>
             <tbody className="text-sm font-medium">
-              {users.map(u => (
+              {users.map((u) => (
                 <tr key={u._id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-6 py-6 text-gray-800">{u.username}</td>
-                  <td className="px-6 py-6 text-gray-800">{u.hasAllStoreAccess ? 'All Stores' : (u.assignedStoreId ? '1' : '0')}</td>
+                  <td className="px-6 py-6 text-gray-800">
+                    {u.hasAllStoreAccess ? "All Stores" : u.assignedStoreId ? "1" : "0"}
+                  </td>
                   <td className="px-6 py-6 flex items-center justify-end gap-4">
-                    <button className="text-[#00BCD4] hover:text-[#00ACC1]"><Edit size={18} /></button>
-                    <button className="text-red-500 hover:text-red-600"><Trash2 size={18} /></button>
+                    <button
+                      onClick={() => onEdit?.(u)}
+                      className="text-[#00BCD4] hover:text-[#00ACC1]"
+                      title="Edit"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(u._id)}
+                      className="text-red-500 hover:text-red-600"
+                      title="Delete"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </td>
                 </tr>
               ))}
               {users.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-gray-500">No account marketing users found</td>
+                  <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                    No account marketing users found
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-          <span>Showing {users.length} of {users.length} account marketing user</span>
+          <span>
+            Showing {users.length} of {users.length} account marketing user
+          </span>
           <div className="flex gap-2">
-            <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Previous</button>
-            <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Next</button>
+            <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">
+              Previous
+            </button>
+            <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">
+              Next
+            </button>
           </div>
         </div>
       </div>
@@ -1274,6 +1625,7 @@ export default function AccountAdminDashboard() {
   const [expandedMenu, setExpandedMenu] = useState<string>("stores");
   const [activeView, setActiveView] = useState("dashboard"); // Default
   const [selectedStore, setSelectedStore] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
@@ -1309,15 +1661,7 @@ export default function AccountAdminDashboard() {
 
   const sidebarLinks = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { 
-      id: "campaigns", 
-      label: "Campaign Management", 
-      icon: Megaphone,
-      subItems: [
-        { id: "create_announcement", label: "Create Announcement", icon: Plus },
-        { id: "view_announcements", label: "View Announcements", icon: ListIcon }
-      ]
-    },
+  
     { 
       id: "stores", 
       label: "Store Management", 
@@ -1359,12 +1703,14 @@ export default function AccountAdminDashboard() {
     switch (activeView) {
       case "dashboard": return <DashboardView setActiveView={setActiveView} userData={userData} />;
       case "onboard_store": return <OnboardStoreView accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;
-      case "all_stores": return <AllStoresView setActiveView={setActiveView} setSelectedStore={setSelectedStore} accountAdminId={userData?._id} />;
+      case "all_stores": return <AllStoresView setActiveView={setActiveView} setSelectedStore={setSelectedStore} accountAdminId={userData?._id} onEdit={(s) => { setSelectedStore(s); setActiveView("edit_store"); }} />;
+      case "edit_store": return <EditStoreView store={selectedStore} accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;
       case "store_detail": return <StoreDetailView store={selectedStore} setActiveView={setActiveView} />;
       case "connect_devices": return <AssignDeviceView customerId={userData?.customerId} accountAdminId={userData?._id} />;
       case "all_devices": return <AllDevicesView customerId={userData?.customerId} setActiveView={setActiveView} />;
       case "onboard_user": return <OnboardUserView accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_users")} />;
-      case "all_users": return <ViewUsersView accountAdminId={userData?._id} />;
+      case "all_users": return <ViewUsersView accountAdminId={userData?._id} onEdit={(u) => { setSelectedUser(u); setActiveView("edit_user"); }} />;
+      case "edit_user": return <EditUserView user={selectedUser} accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_users")} />;
       case "create_announcement": return (
         <div className="pb-12">
           <h1 className="text-3xl font-bold text-[#10353C] mb-1">Create announcement</h1>
