@@ -5,13 +5,33 @@ import { FiSearch, FiEdit2, FiTrash2 } from "react-icons/fi";
 const ViewAnnouncements: React.FC = () => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const MOCK_ANNOUNCEMENTS = [
-    { id: 1, name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", preview: "[Display file link uploaded by A/c user]", status: "Paused" },
-    { id: 2, name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", preview: "[Display file link uploaded by A/c user]", status: "Running" },
-    { id: 3, name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", preview: "[Display file link uploaded by A/c user]", status: "Upcoming" },
-    { id: 4, name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", preview: "[Display file link uploaded by A/c user]", status: "Running" },
-  ];
+  React.useEffect(() => {
+    const fetchAnnouncements = async () => {
+      const userId = localStorage.getItem("userId");
+      if (!userId) return;
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/playlists?userId=${userId}`);
+        const data = await res.json();
+        if (data && Array.isArray(data)) {
+          setAnnouncements(data.filter((item: any) => item.type === 'offer' || item.type === 'alert' || item.type === 'info' || item.type === 'announcement' || item.type === 'Instant Announcement'));
+        } else if (data && data.data && Array.isArray(data.data)) {
+          setAnnouncements(data.data.filter((item: any) => item.type === 'offer' || item.type === 'alert' || item.type === 'info' || item.type === 'announcement' || item.type === 'Instant Announcement'));
+        } else {
+          setAnnouncements([]);
+        }
+      } catch (err) {
+        console.error(err);
+        setAnnouncements([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAnnouncements();
+  }, []);
 
   const getStatusColor = (s: string) => {
     if (s === "Paused") return "#EF4444";
@@ -19,6 +39,12 @@ const ViewAnnouncements: React.FC = () => {
     if (s === "Upcoming") return "#EAB308";
     return "#64748b";
   };
+
+  const filteredAnnouncements = announcements.filter(a => {
+    const matchesSearch = a.name?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = status ? (a.status === status) : true;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div style={{ fontFamily: "Inter, sans-serif" }}>
@@ -105,20 +131,35 @@ const ViewAnnouncements: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {MOCK_ANNOUNCEMENTS.map((item, idx) => (
-                <tr key={item.id} style={{ borderBottom: idx !== MOCK_ANNOUNCEMENTS.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-                  <td style={{ padding: "18px 20px", color: "#475569" }}>{item.name}</td>
-                  <td style={{ padding: "18px 20px", color: "#475569" }}>{item.schedule}</td>
-                  <td style={{ padding: "18px 20px", color: "#475569" }}>{item.preview}</td>
-                  <td style={{ padding: "18px 20px", color: getStatusColor(item.status), fontWeight: 500 }}>{item.status}</td>
-                  <td style={{ padding: "18px 20px" }}>
-                    <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
-                      <button style={{ background: "none", border: "none", cursor: "pointer", color: "#06b6d4" }}><FiEdit2 size={16} /></button>
-                      <button style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}><FiTrash2 size={16} /></button>
-                    </div>
-                  </td>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: "32px", textAlign: "center", color: "#64748B" }}>Loading...</td>
                 </tr>
-              ))}
+              ) : filteredAnnouncements.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: "32px", textAlign: "center", color: "#64748B", fontStyle: "italic" }}>Not announcement file available</td>
+                </tr>
+              ) : filteredAnnouncements.map((item, idx) => {
+                const scheduleStr = item.daysOfWeek?.join(".") + " | " + (item.startTime || "") + " to " + (item.endTime || "");
+                return (
+                  <tr key={item._id} style={{ borderBottom: idx !== filteredAnnouncements.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+                    <td style={{ padding: "18px 20px", color: "#475569", fontWeight: 600 }}>{item.name}</td>
+                    <td style={{ padding: "18px 20px", color: "#475569" }}>{scheduleStr === " |  to " ? "Immediate" : scheduleStr}</td>
+                    <td style={{ padding: "18px 20px", color: "#475569" }}>
+                      {item.mediaIds && item.mediaIds.length > 0 ? (
+                        <span style={{color: '#06b6d4', textDecoration: 'underline', cursor: 'pointer'}}>Preview Audio</span>
+                      ) : "[No media]"}
+                    </td>
+                    <td style={{ padding: "18px 20px", color: getStatusColor(item.status || "Running"), fontWeight: 600 }}>{item.status || "Running"}</td>
+                    <td style={{ padding: "18px 20px" }}>
+                      <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
+                        <button style={{ background: "none", border: "none", cursor: "pointer", color: "#06b6d4" }}><FiEdit2 size={16} /></button>
+                        <button style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}><FiTrash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -1301,7 +1301,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [toggling, setToggling] = useState<string | null>(null);
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1355,27 +1355,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
     fetchData();
   }, []);
 
-  const toggleProvisioning = async (userId: string, currentStatus: boolean) => {
-    setToggling(userId);
-    try {
-      const res = await fetch(`/api/user?userId=${userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mediaProvisioning: !currentStatus })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setRows(prev => prev.map(r => r.userId === userId ? { ...r, provisioned: !currentStatus } : r));
-        toast.success(!currentStatus ? "Access granted!" : "Access revoked!");
-      } else {
-        toast.error("Failed to update provisioning status");
-      }
-    } catch {
-      toast.error("Network error");
-    } finally {
-      setToggling(null);
-    }
-  };
+
 
   const filtered = rows.filter(r =>
     r.customerName.toLowerCase().includes(search.toLowerCase()) ||
@@ -1476,29 +1456,17 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {row.provisioned ? (
-                          <>
-                            <button 
-                              onClick={() => onCreateCampaign(row)}
-                              className="px-4 py-2 bg-[#FF5722] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#F4511E] transition-colors text-center"
-                            >
-                              Create<br/>campaign
-                            </button>
-                            <button
-                              onClick={() => toggleProvisioning(row.userId, row.provisioned)}
-                              disabled={toggling === row.userId}
-                              className="px-4 py-2 bg-red-50 text-red-500 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors disabled:opacity-50"
-                            >
-                              {toggling === row.userId ? "..." : "Revoke"}
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => toggleProvisioning(row.userId, row.provisioned)}
-                            disabled={toggling === row.userId}
-                            className="px-5 py-2 bg-[#00BCD4] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#00ACC1] transition-colors disabled:opacity-50"
+                          <button 
+                            onClick={() => onCreateCampaign(row)}
+                            className="px-6 py-2.5 bg-[#FF5722] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#F4511E] transition-colors text-center"
                           >
-                            {toggling === row.userId ? "..." : "Grant access"}
+                            Create campaign
                           </button>
+                        ) : (
+                          <div className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-400 rounded-xl text-xs font-bold border border-gray-200 cursor-not-allowed">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            Access Locked
+                          </div>
                         )}
                       </div>
                     </td>

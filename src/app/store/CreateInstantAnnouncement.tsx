@@ -1,19 +1,7 @@
 "use client";
 import React from "react";
-import InstantaneousAnnouncement from "@/components/InstantaneousAnnouncement/InstantaneousAnnouncement";
+import CreateAnnouncement from "../store_user/CreateAnnouncement";
 
-interface CreateInstantAnnouncementProps {
-  onNavigate?: (view: any) => void;
+export default function CreateInstantAnnouncement(props: any) {
+  return <CreateAnnouncement {...props} isInstant={true} />;
 }
-
-const CreateInstantAnnouncement: React.FC<CreateInstantAnnouncementProps> = ({ onNavigate }) => {
-  const handleCancel = () => {
-    onNavigate ? onNavigate("dashboard") : window.history.back();
-  };
-  const handleSuccess = () => {
-    // Stay on page — component handles success internally
-  };
-  return <InstantaneousAnnouncement onCancel={handleCancel} onSuccess={handleSuccess} />;
-};
-
-export default CreateInstantAnnouncement;

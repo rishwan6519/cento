@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
+import ViewAnnouncements from '../store/ViewAnnouncements';
 import {
   LayoutDashboard,
   Store,
@@ -279,9 +280,21 @@ const ViewStoreCampaignsView = ({ userData }: { userData?: any }) => {
                   <td className="px-6 py-6 text-gray-800">{store.storeLocation || store.location || "N/A"}</td>
                   <td className="px-6 py-6 text-gray-800">0</td>
                   <td className="px-6 py-6 text-right">
-                    <button className="px-6 py-2.5 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20">
-                      Request status
-                    </button>
+                    {store.email ? (
+                      <a
+                        href={`mailto:${store.email}`}
+                        className="inline-block px-6 py-2.5 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20"
+                      >
+                        Request status
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => toast.error("No email address found for this store")}
+                        className="px-6 py-2.5 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20"
+                      >
+                        Request status
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -377,7 +390,7 @@ const CreateCentralCampaignMenuView = ({ setActiveView }: { setActiveView: (v: s
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">View announcements</h3>
               <p className="text-sm text-gray-500 mb-8 h-10">Review and manage existing announcements</p>
-              <button className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
+              <button onClick={() => setActiveView("view_announcement")} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
                 View announcements
               </button>
             </div>
@@ -387,7 +400,7 @@ const CreateCentralCampaignMenuView = ({ setActiveView }: { setActiveView: (v: s
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Instant announcements</h3>
               <p className="text-sm text-gray-500 mb-8 h-10">Send urgent messages using instant announcements</p>
-              <button className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
+              <button onClick={() => setActiveView("create_instant_announcement")} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
                 Instant announcements
               </button>
             </div>
@@ -966,7 +979,54 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
   );
 };
 
-const ViewPlaylistView = () => {
+const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView?: any, setEditingCampaign?: any }) => {
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPlaylists = async () => {
+    const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : "";
+    if(!currentUserId) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/playlists?userId=${currentUserId}`);
+      const data = await res.json();
+      setPlaylists(Array.isArray(data) ? data : []);
+    } catch(err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPlaylists(); }, []);
+
+  const handleDelete = async (id: string) => {
+    if(!confirm("Are you sure you want to delete this playlist?")) return;
+    try {
+      const res = await fetch("/api/playlists", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if(data.success) {
+        toast.success("Playlist deleted");
+        fetchPlaylists();
+      } else {
+        toast.error("Failed to delete");
+      }
+    } catch(err) {
+      toast.error("Error deleting playlist");
+    }
+  };
+
+  const renderSchedule = (row: any) => {
+    if (!row.daysOfWeek || row.daysOfWeek.length === 0) return "Not Scheduled";
+    const days = row.daysOfWeek.join(",");
+    const times = row.startTime && row.endTime ? `${row.startTime} to ${row.endTime}` : "All day";
+    return `${days} | ${times}`;
+  };
+
   return (
     <div className="pb-12 max-w-[1200px]">
       <h1 className="text-3xl font-bold text-gray-900 mb-1">View playlist</h1>
@@ -1002,20 +1062,36 @@ const ViewPlaylistView = () => {
               </tr>
             </thead>
             <tbody className="text-sm font-medium">
-              {[
-                { name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", status: "Paused", statusColor: "text-red-500" },
-                { name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", status: "Running", statusColor: "text-green-500" },
-                { name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", status: "Upcoming", statusColor: "text-yellow-500" },
-                { name: "Playlist name", schedule: "Mon.Tue | 9am to 11am", status: "Running", statusColor: "text-green-500" }
-              ].map((row, i) => (
-                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  <td className="px-6 py-6 text-gray-800">{row.name}</td>
-                  <td className="px-6 py-6 text-gray-800">{row.schedule}</td>
-                  <td className="px-6 py-6 text-gray-500">[Display file link uploaded by A/c user]</td>
-                  <td className={`px-6 py-6 ${row.statusColor}`}>{row.status}</td>
+              {loading ? (
+                <tr><td colSpan={5} className="p-6 text-center text-gray-500">Loading playlists...</td></tr>
+              ) : playlists.length === 0 ? (
+                <tr><td colSpan={5} className="p-6 text-center text-gray-500">No playlists found</td></tr>
+              ) : playlists.map((row, i) => (
+                <tr key={row._id || i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <td className="px-6 py-6 text-gray-800">
+                    <p className="font-bold">{row.name}</p>
+                    <p className="text-xs text-[#FF5722] uppercase">{row.type || 'media'}</p>
+                  </td>
+                  <td className="px-6 py-6 text-gray-800">{renderSchedule(row)}</td>
+                  <td className="px-6 py-6 text-gray-500 text-sm">
+                    {row.files && row.files.length > 0 
+                      ? `${row.files.length} file(s)` 
+                      : "No files"}
+                  </td>
+                  <td className={`px-6 py-6 text-green-500 font-medium`}>Active</td>
                   <td className="px-6 py-6 flex items-center justify-end gap-5">
-                    <button className="text-[#00BCD4] hover:text-[#00ACC1]"><Edit size={18} /></button>
-                    <button className="text-red-500 hover:text-red-600"><Trash2 size={18} /></button>
+                    <button 
+                      onClick={() => {
+                        if (setActiveView && setEditingCampaign) {
+                          setEditingCampaign(row);
+                          setActiveView("create_central_campaign_form");
+                        }
+                      }}
+                      className="text-[#00BCD4] hover:text-[#00ACC1]"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-600"><Trash2 size={18} /></button>
                   </td>
                 </tr>
               ))}
@@ -1027,7 +1103,66 @@ const ViewPlaylistView = () => {
   );
 };
 
-const CreateInstantPlaylistView = () => {
+const CreateInstantPlaylistView = ({ userData }: { userData?: any }) => {
+  const [stores, setStores] = useState<any[]>([]);
+  const [selectedStores, setSelectedStores] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!userData) return;
+    const fetchStores = async () => {
+      try {
+        if (userData.hasAllStoreAccess) {
+          const res = await fetch(`/api/user?controllerId=${userData.controllerId}`);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.data)) {
+            setStores(data.data.filter((u: any) => u.role === 'store'));
+          }
+        } else if (userData.assignedStoreId) {
+          const res = await fetch(`/api/user?userId=${userData.assignedStoreId}`);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+            setStores([data.data[0]]);
+          } else if (data.success && data.data && !Array.isArray(data.data)) {
+            setStores([data.data]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch stores", err);
+      }
+    };
+    fetchStores();
+  }, [userData]);
+
+  const [mediaItems, setMediaItems] = useState<any[]>([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [playlistItems, setPlaylistItems] = useState<any[]>([]);
+
+  const addToPlaylist = (item: any) => {
+    setPlaylistItems(prev => [...prev, item]);
+  };
+
+  const removeFromPlaylist = (index: number) => {
+    setPlaylistItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    const fetchMedia = async () => {
+      const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : "";
+      if (!currentUserId) return;
+      setLoadingMedia(true);
+      try {
+        const res = await fetch(`/api/media?userId=${currentUserId}`);
+        const data = await res.json();
+        setMediaItems(data.media || data.mediaFiles || data.data || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingMedia(false);
+      }
+    };
+    fetchMedia();
+  }, []);
+
   return (
     <div className="pb-12 max-w-[1200px]">
       <h1 className="text-3xl font-bold text-gray-900 mb-1">Create New Instant Playlist</h1>
@@ -1050,11 +1185,11 @@ const CreateInstantPlaylistView = () => {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">End date <span className="text-red-500">*</span></label>
-              <input type="text" placeholder="dd-mm-yyyy" className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+              <input type="date" className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 uppercase text-gray-700" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">End time <span className="text-red-500">*</span></label>
-              <input type="text" placeholder="--:--" className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+              <input type="time" className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 uppercase text-gray-700" />
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
@@ -1077,40 +1212,75 @@ const CreateInstantPlaylistView = () => {
              </div>
              
              <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-               {[
-                 { name: "summer_sale_2024.mp4", duration: "0:45", icon: Video, color: "text-[#FF5722]", bg: "bg-orange-50" },
-                 { name: "product_showcase.mp4", duration: "1:30", icon: Video, color: "text-[#FF5722]", bg: "bg-orange-50" },
-                 { name: "background_music.mp3", duration: "3:24", icon: Music, color: "text-amber-500", bg: "bg-amber-50" },
-                 { name: "brand_logo.png", duration: "5s", icon: ImageIcon, color: "text-[#FF5722]", bg: "bg-orange-50" },
-                 { name: "seasonal_promo.jpg", duration: "8s", icon: ImageIcon, color: "text-[#FF5722]", bg: "bg-orange-50" },
-               ].map((item, idx) => (
-                 <div key={idx} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-[#00BCD4]/30 bg-gray-50 group cursor-pointer transition-colors">
-                   <div className="flex items-center gap-3">
-                     <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center ${item.color}`}>
-                       <item.icon size={18} />
+               {loadingMedia ? (
+                 <p className="text-sm text-gray-500 text-center py-4">Loading media...</p>
+               ) : mediaItems.length === 0 ? (
+                 <p className="text-sm text-gray-500 text-center py-4">No media files found</p>
+               ) : mediaItems.map((item, idx) => {
+                 const isVideo = item.type === 'video';
+                 const isAudio = item.type === 'audio';
+                 const Icon = isVideo ? Video : isAudio ? Music : ImageIcon;
+                 const color = isVideo ? "text-[#FF5722]" : isAudio ? "text-amber-500" : "text-[#00BCD4]";
+                 const bg = isVideo ? "bg-orange-50" : isAudio ? "bg-amber-50" : "bg-cyan-50";
+                 
+                 return (
+                   <div key={item._id || idx} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-[#00BCD4]/30 bg-gray-50 group cursor-pointer transition-colors">
+                     <div className="flex items-center gap-3">
+                       <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center ${color}`}>
+                         <Icon size={18} />
+                       </div>
+                       <div>
+                         <p className="font-semibold text-gray-900 text-sm truncate max-w-[200px]">{item.name}</p>
+                         <p className="text-xs text-gray-500 uppercase">{item.type || 'Media'}</p>
+                       </div>
                      </div>
-                     <div>
-                       <p className="font-semibold text-gray-900 text-sm">{item.name}</p>
-                       <p className="text-xs text-gray-500">{item.duration}</p>
-                     </div>
+                     <button onClick={() => addToPlaylist(item)} className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-[#00BCD4] group-hover:bg-[#00BCD4] group-hover:border-[#00BCD4] group-hover:text-white transition-colors">
+                       <Plus size={14} />
+                     </button>
                    </div>
-                   <button className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-[#00BCD4] group-hover:bg-[#00BCD4] group-hover:border-[#00BCD4] group-hover:text-white transition-colors">
-                     <Plus size={14} />
-                   </button>
-                 </div>
-               ))}
+                 );
+               })}
              </div>
           </div>
           
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col h-[400px]">
-            <h3 className="font-bold text-gray-900 mb-6">Playlist Items (0)</h3>
-            <div className="border-2 border-dashed border-gray-200 rounded-xl flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-50 text-gray-400">
-               <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
-                 <Plus size={20} className="text-gray-300" />
-               </div>
-               <p className="font-medium text-gray-600 mb-1">No items added yet</p>
-               <p className="text-sm">Add media from the left panel</p>
-            </div>
+            <h3 className="font-bold text-gray-900 mb-6">Playlist Items ({playlistItems.length})</h3>
+            {playlistItems.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-200 rounded-xl flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-50 text-gray-400">
+                 <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mb-4">
+                   <Plus size={20} className="text-gray-300" />
+                 </div>
+                 <p className="font-medium text-gray-600 mb-1">No items added yet</p>
+                 <p className="text-sm">Add media from the left panel</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                {playlistItems.map((item, idx) => {
+                 const isVideo = item.type === 'video';
+                 const isAudio = item.type === 'audio';
+                 const Icon = isVideo ? Video : isAudio ? Music : ImageIcon;
+                 const color = isVideo ? "text-[#FF5722]" : isAudio ? "text-amber-500" : "text-[#00BCD4]";
+                 const bg = isVideo ? "bg-orange-50" : isAudio ? "bg-amber-50" : "bg-cyan-50";
+                 
+                 return (
+                   <div key={idx} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-[#00BCD4]/30 bg-gray-50 group cursor-pointer transition-colors">
+                     <div className="flex items-center gap-3">
+                       <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center ${color}`}>
+                         <Icon size={18} />
+                       </div>
+                       <div>
+                         <p className="font-semibold text-gray-900 text-sm truncate max-w-[200px]">{item.name}</p>
+                         <p className="text-xs text-gray-500 uppercase">{item.type || 'Media'}</p>
+                       </div>
+                     </div>
+                     <button onClick={() => removeFromPlaylist(idx)} className="w-6 h-6 rounded-full border border-gray-300 flex items-center justify-center text-red-500 hover:bg-red-50 hover:border-red-500 transition-colors">
+                       <Trash2 size={14} />
+                     </button>
+                   </div>
+                 );
+               })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1121,21 +1291,27 @@ const CreateInstantPlaylistView = () => {
                <h3 className="font-bold text-gray-900">Select stores</h3>
                <p className="text-sm text-gray-500">Choose which store will play this announcement</p>
              </div>
-             <button className="px-6 py-2 border border-[#FF5722] text-[#FF5722] rounded-lg font-bold text-sm hover:bg-orange-50">Select All</button>
+             <button onClick={() => setSelectedStores(stores.length === selectedStores.length ? [] : stores.map(s => s._id))} className="px-6 py-2 border border-[#FF5722] text-[#FF5722] rounded-lg font-bold text-sm hover:bg-orange-50">{stores.length === selectedStores.length && stores.length > 0 ? 'Deselect All' : 'Select All'}</button>
            </div>
            
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-             {[1, 2, 3, 4, 5, 6].map((idx) => {
-               const isActive = idx === 2;
+             {stores.length === 0 ? (
+               <p className="text-sm text-gray-500 col-span-full">No stores found</p>
+             ) : stores.map((store) => {
+               const isActive = selectedStores.includes(store._id);
                return (
-               <div key={idx} className={`border ${isActive ? 'border-[#FF5722] shadow-sm bg-orange-50/20' : 'border-gray-200 bg-white'} rounded-xl p-6 flex items-start gap-4 cursor-pointer relative`}>
+               <div 
+                 key={store._id} 
+                 onClick={() => setSelectedStores(prev => prev.includes(store._id) ? prev.filter(id => id !== store._id) : [...prev, store._id])}
+                 className={`border ${isActive ? 'border-[#FF5722] shadow-sm bg-orange-50/20' : 'border-gray-200 bg-white hover:border-[#FF5722]/50'} rounded-xl p-6 flex items-start gap-4 cursor-pointer relative transition-colors`}
+               >
                  {isActive && <div className="absolute top-4 right-4 text-[#FF5722]"><CheckCircle2 size={20} /></div>}
                  <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-[#FF5722] shrink-0">
                    <Store size={20} />
                  </div>
-                 <div>
-                   <h4 className="font-bold text-gray-900 flex items-center gap-2">Store name <span className="w-2 h-2 rounded-full bg-green-500"></span></h4>
-                   <p className="text-xs text-gray-500 mb-1">123 Main St, Sale, VIC 3850</p>
+                 <div className="overflow-hidden">
+                   <h4 className="font-bold text-gray-900 flex items-center gap-2 truncate">{store.storeName || store.username || 'Store'} <span className="w-2 h-2 rounded-full bg-green-500 shrink-0"></span></h4>
+                   <p className="text-xs text-gray-500 mb-1 truncate">{store.storeLocation || store.location || 'Location not set'}</p>
                    <span className="text-xs font-bold text-green-600">Active</span>
                  </div>
                </div>
@@ -1144,10 +1320,10 @@ const CreateInstantPlaylistView = () => {
            
            <div className="flex justify-between items-center pt-6 border-t border-gray-100">
              <div>
-               <p className="font-bold text-gray-900 text-sm">1 store selected</p>
+               <p className="font-bold text-gray-900 text-sm">{selectedStores.length} store{selectedStores.length !== 1 ? 's' : ''} selected</p>
                <p className="text-xs text-gray-500">Ready to broadcast announcement</p>
              </div>
-             <button className="text-red-500 font-bold text-sm hover:text-red-600">Clear Selection</button>
+             <button onClick={() => setSelectedStores([])} className="text-red-500 font-bold text-sm hover:text-red-600 disabled:opacity-50" disabled={selectedStores.length === 0}>Clear Selection</button>
            </div>
         </div>
 
@@ -1164,7 +1340,9 @@ const CreateInstantPlaylistView = () => {
       </div>
     </div>
   );
-};const CreateAnnouncementView = ({ userData, setActiveView }: { userData: any, setActiveView: (view: any) => void }) => {
+};
+
+const CreateAnnouncementView = ({ userData, setActiveView }: { userData: any, setActiveView: (view: any) => void }) => {
   return (
     <div className="pb-12">
       <h1 className="text-3xl font-bold text-[#10353C] mb-1">Create announcement</h1>
@@ -1179,7 +1357,23 @@ const CreateInstantPlaylistView = () => {
     </div>
   );
 };
-;
+
+const CreateInstantAnnouncementView = ({ userData, setActiveView }: { userData: any, setActiveView: (view: any) => void }) => {
+  return (
+    <div className="pb-12">
+      <h1 className="text-3xl font-bold text-[#10353C] mb-1">Create New Instant announcement</h1>
+      <p className="text-sm text-[#64748B] mb-8">Mission control for immediate broadcast announcements</p>
+      
+      <CreateAnnouncementWizard 
+        userId={userData?._id}
+        customerId={userData?.customerId}
+        userRole="account_marketing"
+        onNavigate={setActiveView}
+        isInstant={true}
+      />
+    </div>
+  );
+};
 
 const MediaProvisioningView = () => {
   const [loading, setLoading] = useState(true);
@@ -1288,20 +1482,20 @@ const MediaProvisioningView = () => {
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-green-800 mb-1">Provisioning Access Granted</h3>
-              <p className="text-sm text-green-700">Your media provisioning access has been granted by the reseller. You can now upload and manage media content.</p>
+              <p className="text-sm text-green-700">You have successfully granted media provisioning access to your reseller. They can now create and manage campaigns on your behalf.</p>
               {provisionedSince && <p className="text-xs text-green-600 mt-2">Access granted since: <span className="font-bold">{provisionedSince}</span></p>}
             </div>
           </div>
 
           {/* Info Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-            <h3 className="font-bold text-gray-900 text-lg mb-4">What you can do with provisioning access:</h3>
+            <h3 className="font-bold text-gray-900 text-lg mb-4">What your reseller can do:</h3>
             <ul className="space-y-3">
               {[
-                "Upload new media files (image, video, audio)",
-                "Manage existing media library",
-                "Create and schedule central level campaigns",
-                "View all uploaded media across stores"
+                "Upload new media files to your account",
+                "Manage your existing media library",
+                "Create and schedule central level campaigns for you",
+                "View all uploaded media across your stores"
               ].map((item, i) => (
                 <li key={i} className="flex items-center gap-3 text-sm text-gray-700">
                   <span className="w-2 h-2 rounded-full bg-[#FF5722] shrink-0"></span>
@@ -1314,7 +1508,7 @@ const MediaProvisioningView = () => {
           {/* Remove Provision */}
           <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-8">
             <h3 className="font-bold text-gray-900 mb-2">Remove provisioning access</h3>
-            <p className="text-sm text-gray-500 mb-6">This will revoke your media upload and management permissions. The reseller will need to re-grant access.</p>
+            <p className="text-sm text-gray-500 mb-6">This will revoke the reseller's ability to create and manage campaigns on your behalf. You can re-grant access at any time.</p>
             <button
               onClick={handleRemove}
               disabled={saving}
@@ -1332,8 +1526,8 @@ const MediaProvisioningView = () => {
           <div className="flex items-start gap-4 p-4 bg-orange-50 border border-orange-100 rounded-xl">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF5722" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
             <div>
-              <p className="text-sm font-bold text-orange-800">Access not yet granted</p>
-              <p className="text-xs text-orange-600 mt-1">Your reseller has not yet granted media provisioning access. You can request it below.</p>
+              <p className="text-sm font-bold text-orange-800">Access currently locked</p>
+              <p className="text-xs text-orange-600 mt-1">You have not granted media provisioning access to your reseller yet.</p>
             </div>
           </div>
 
@@ -1565,6 +1759,7 @@ export default function AccountMarketingDashboard() {
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
+    toast.dismiss(); // Clear any persistent login toasts on mount
     const role = typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
     if (role && role !== "account_marketing" && role !== "account_admin") {
       router.push("/login");
@@ -1642,9 +1837,11 @@ export default function AccountMarketingDashboard() {
       case "create_central_campaign": return <CreateCentralCampaignMenuView setActiveView={setActiveView} />;
       case "create_central_campaign_form": return <CreateCentralCampaignFormView userData={userData} editData={editingCampaign} setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "view_central_campaigns": return <ViewCentralCampaignsView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
-      case "view_playlist": return <ViewPlaylistView />;
-      case "create_instant_playlist": return <CreateInstantPlaylistView />;
-      case "create_announcement": return <CreateAnnouncementView userData={userData} setActiveView={setActiveView} />;
+      case "create_instant_announcement": return <CreateInstantAnnouncementView userData={userData} setActiveView={setActiveView} />;
+      case "view_announcement": return <ViewAnnouncements />;
+      case "view_playlist": return <ViewPlaylistView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
+      case "create_instant_playlist": return <CreateInstantPlaylistView userData={userData} />;
+      case "create_announcement": return <CreateAnnouncementWizard userRole="account_marketing" userId={userData?._id || (typeof window !== "undefined" ? localStorage.getItem("userId") : "")} customerId={userData?.customerId} onNavigate={setActiveView} />;
       case "media_provisioning": return <MediaProvisioningView />;
       case "profile": return <ProfileView userData={userData} />;
       default: return <div className="text-gray-500 font-medium">This module is under development.</div>;

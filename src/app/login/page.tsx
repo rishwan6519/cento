@@ -25,7 +25,8 @@ export default function LoginPage() {
       else if (role === "developer") router.push("/block-code");
       else if (role === "account_admin") router.push("/account_admin");
       else if (role === "account_marketing") router.push("/account_marketing");
-      else if (role === "store") router.push("/store");
+      else if (role === "store") router.push("/store_user");
+      else if (role === "store") router.push("/store_user");
     }
   }, [router]);
 
@@ -70,7 +71,9 @@ export default function LoginPage() {
         } else if (data.user.role === "account_marketing") {
           router.push("/account_marketing"); // Redirect to account marketing page
         } else if (data.user.role === "store") {
-          router.push("/store"); // Redirect to store page
+          router.push("/store_user"); // Redirect to store page
+        } else if (data.user.role === "store_user") {
+          router.push("/store_user"); // Redirect to store user page
         }
       }
     } catch (error) {

@@ -32,7 +32,8 @@ import {
   Check,
   Hash,
   Music,
-  List as ListIcon
+  List as ListIcon,
+  Mail
 } from "lucide-react";
 import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
 import { useRouter } from "next/navigation";
@@ -198,6 +199,7 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
 const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountAdminId?: string, customerId?: string, onComplete?: () => void }) => {
   const [formData, setFormData] = useState({
     storeName: '',
+    email: '',
     location: '',
     password: '',
     confirmPassword: ''
@@ -205,7 +207,7 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!formData.storeName || !formData.location || !formData.password) {
+    if (!formData.storeName || !formData.email || !formData.location || !formData.password) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -227,6 +229,7 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
           password: formData.password,
           role: 'store',
           storeName: formData.storeName,
+          email: formData.email,
           storeLocation: formData.location,
           controllerId: accountAdminId,
           customerId: customerId,
@@ -235,7 +238,7 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
       const data = await res.json();
       if (data.success) {
         toast.success(`Store "${username}" created successfully!`);
-        setFormData({ storeName: '', location: '', password: '', confirmPassword: '' });
+        setFormData({ storeName: '', email: '', location: '', password: '', confirmPassword: '' });
         if (onComplete) onComplete();
       } else {
         toast.error(data.message || 'Failed to create store');
@@ -264,6 +267,10 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Store name <span className="text-red-500">*</span></label>
           <input type="text" value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Email ID <span className="text-red-500">*</span></label>
+          <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
         </div>
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Location <span className="text-red-500">*</span></label>
@@ -400,8 +407,8 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit
                 <span>{store.primaryPhone || "N/A"}</span>
               </div>
               <div className="flex items-center gap-3">
-                <MonitorSmartphone size={18} className="text-gray-400 shrink-0" />
-                <span>{store.email}</span>
+                <Mail size={18} className="text-gray-400 shrink-0" />
+                <span>{store.email || "No email provided"}</span>
               </div>
             </div>
             
@@ -1219,6 +1226,7 @@ const EditUserView = ({ user, accountAdminId, customerId, onComplete }: { user: 
 const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { store: any, accountAdminId?: string, customerId?: string, onComplete?: () => void }) => {
   const [formData, setFormData] = useState({
     storeName: store?.storeName || '',
+    email: store?.email || '',
     location: store?.storeLocation || store?.location || '',
     password: '',
     confirmPassword: ''
@@ -1226,8 +1234,8 @@ const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { stor
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!formData.storeName || !formData.location) {
-      toast.error('Store name and location are required');
+    if (!formData.storeName || !formData.email || !formData.location) {
+      toast.error('Store name, email and location are required');
       return;
     }
     if (formData.password && formData.password !== formData.confirmPassword) {
@@ -1239,6 +1247,7 @@ const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { stor
     try {
       const body: any = {
         storeName: formData.storeName,
+        email: formData.email,
         storeLocation: formData.location,
         username: formData.storeName // Keep username synced with store name
       };
@@ -1285,6 +1294,10 @@ const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { stor
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Store name <span className="text-red-500">*</span></label>
             <input type="text" value={formData.storeName} onChange={e => setFormData({...formData, storeName: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Email ID <span className="text-red-500">*</span></label>
+            <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Location <span className="text-red-500">*</span></label>

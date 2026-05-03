@@ -234,9 +234,17 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    await connectToDatabase();
+    let id = req.nextUrl.searchParams.get('id');
+    
+    if (!id) {
+      try {
+        const body = await req.json();
+        id = body.id;
+      } catch (e) {
+        // Body might be empty or not JSON
+      }
+    }
 
-    const { id } = await req.json();
     if (!id) {
       return NextResponse.json(
         { error: 'Playlist ID is required' },
@@ -244,6 +252,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    await connectToDatabase();
     const playlist = await PlaylistConfig.findByIdAndDelete(id);
     if (!playlist) {
       return NextResponse.json(
