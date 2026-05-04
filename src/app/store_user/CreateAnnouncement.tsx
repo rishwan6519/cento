@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { FaUpload, FaMicrophone, FaVolumeUp, FaFolderOpen, FaDesktop, FaCheck, FaStop, FaRedo } from "react-icons/fa";
+import { FaUpload, FaMicrophone, FaVolumeUp, FaFolderOpen, FaDesktop, FaCheck, FaStop, FaRedo, FaStore, FaArrowLeft } from "react-icons/fa";
 import { ViewKey } from "./page";
 
 interface Props { 
@@ -85,8 +85,10 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         const individualDevices = assignments.map((a: any) => ({
           _id: a.deviceId?._id || a._id,
           name: a.deviceId?.name || "Unknown Device",
+          storeName: a.userId?.storeName || a.userId?.username || "Store",
           address: a.userId?.storeLocation || "123 Main St, Sale, VIC 3850",
           status: a.deviceId?.status || "inactive",
+          serialNumber: a.deviceId?.serialNumber || "N/A",
           deviceIds: [a.deviceId?._id || a._id]
         }));
         setDevices(individualDevices);
@@ -294,8 +296,13 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
 
   return (
     <div className="su-ca-view">
-      <h1 className="su-ca-title">{isInstant ? "Create Instant Announcement" : "Create announcement"}</h1>
-      <p className="su-ca-subtitle">{isInstant ? "Mission control for immediate broadcast announcements" : "Create new announcement campaign"}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
+        <button onClick={() => onNavigate("mediaManagement")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+          <FaArrowLeft size={18} />
+        </button>
+        <h1 className="su-ca-title" style={{ margin: 0 }}>{isInstant ? "Create Instant Announcement" : "Create announcement"}</h1>
+      </div>
+      <p className="su-ca-subtitle" style={{ marginLeft: "30px" }}>{isInstant ? "Mission control for immediate broadcast announcements" : "Create new announcement campaign"}</p>
 
       <div className="su-ca-main-grid">
         {/* Left Column */}
@@ -405,11 +412,12 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
               const isOnline = (s.status || "").toLowerCase() === "online";
               return (
                 <div key={s._id} className={`su-ip-store-card2 ${isSelected ? "su-ip-store-card2--sel" : ""}`} onClick={() => toggleStore(s._id)}>
-                  <div className="su-ip-sicon"><FaDesktop size={14} /></div>
+                  <div className="su-ip-sicon"><FaStore size={16} /></div>
                   <div style={{flex:1,minWidth:0}}>
-                    <p className="su-ip-sname">{s.name} <span style={{color: isOnline ? "#16A34A" : "#DC2626", fontSize: 10}}>●</span></p>
+                    <p className="su-ip-sname">{s.storeName} <span style={{color: isOnline ? "#16A34A" : "#DC2626", fontSize: 10}}>●</span></p>
+                    <p className="su-ip-sdev" style={{fontSize:'0.75rem',color:'#64848D',marginBottom:2}}>{s.name} ({s.serialNumber})</p>
                     <p className="su-ip-saddr">{s.address}</p>
-                    <p style={{fontSize:"0.7rem",fontWeight:700,color:isOnline ? "#16A34A" : "#DC2626",marginTop:4}}>{s.status || "Inactive"}</p>
+                    <p style={{fontSize:"0.7rem",fontWeight:700,color:isOnline ? "#16A34A" : "#DC2626",marginTop:4}}>{isOnline ? "Active" : "Offline"}</p>
                   </div>
                   {isSelected && <div className="su-ip-scheck"><FaCheck size={8} /></div>}
                 </div>

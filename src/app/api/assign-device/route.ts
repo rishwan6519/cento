@@ -13,20 +13,33 @@ export async function GET(request: Request) {
     const customerId = searchParams.get('customerId');
    console.log('User ID:', userId);
     
-    if (!userId && !customerId) {
+    const assignedBy = searchParams.get('assignedBy');
+    
+    if (!userId && !customerId && !assignedBy) {
       return NextResponse.json({
         success: false,
-        message: 'userId or customerId is required'
+        message: 'userId, customerId or assignedBy is required'
       }, { status: 400 });
     }
 
     const query: any = { status: 'active' };
     if (userId) {
       query.userId = userId;
+    } else if (assignedBy) {
+      query.assignedBy = assignedBy;
     } else if (customerId) {
+      // Find all users (stores) belonging to this customer
+      const customerUsers = await User.find({ customerId }).select('_id');
+      const userIds = customerUsers.map(u => u._id);
+      
+      // Find all devices belonging to this customer
       const customerDevices = await Device.find({ customerId }).select('_id');
       const deviceIds = customerDevices.map(d => d._id);
-      query.deviceId = { $in: deviceIds };
+      
+      query.$or = [
+        { userId: { $in: userIds } },
+        { deviceId: { $in: deviceIds } }
+      ];
     }
 
     const assignments = await AssignedDevice.find(query)

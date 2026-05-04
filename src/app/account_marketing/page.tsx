@@ -165,7 +165,10 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
               </div>
               <h3 className="text-sm font-medium text-gray-800 mb-4 h-5">Stores with no active campaigns</h3>
               <div className="text-4xl font-bold text-gray-900 mb-6">{stats.storesNoCampaigns}</div>
-              <button className="text-[#FF5722] text-sm flex items-center justify-center gap-2 font-bold hover:gap-3 transition-all">
+              <button 
+                onClick={() => setActiveView("view_store_campaigns")}
+                className="text-[#FF5722] text-sm flex items-center justify-center gap-2 font-bold hover:gap-3 transition-all"
+              >
                 Check now <ArrowRight size={16} />
               </button>
             </div>
@@ -1384,6 +1387,14 @@ const MediaProvisioningView = () => {
   const [endDate, setEndDate] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // New states for provisioning management
+  const [campaignType, setCampaignType] = useState("");
+  const [campaignStartDate, setCampaignStartDate] = useState("");
+  const [campaignEndDate, setCampaignEndDate] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isFormSubmitting, setIsFormSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const fetchStatus = async () => {
       const id = localStorage.getItem("userId");
@@ -1482,7 +1493,7 @@ const MediaProvisioningView = () => {
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-green-800 mb-1">Provisioning Access Granted</h3>
-              <p className="text-sm text-green-700">You have successfully granted media provisioning access to your reseller. They can now create and manage campaigns on your behalf.</p>
+              <p className="text-sm text-green-700">Your platform vendor can now upload & manage media content.</p>
               {provisionedSince && <p className="text-xs text-green-600 mt-2">Access granted since: <span className="font-bold">{provisionedSince}</span></p>}
             </div>
           </div>
@@ -1518,18 +1529,205 @@ const MediaProvisioningView = () => {
               {saving ? "Removing..." : "Remove Provision"}
             </button>
           </div>
+
+          {/* ---- NEW CAMPAIGN SECTION ---- */}
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Campaign Information Form */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">Campaign Information</h3>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Campaign type <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <select 
+                      value={campaignType}
+                      onChange={(e) => setCampaignType(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50 cursor-pointer"
+                    >
+                      <option value="">Select type</option>
+                      <option value="announcement">Announcement</option>
+                      <option value="playlist">Media Playlist</option>
+                    </select>
+                    <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Start date <span className="text-red-500">*</span></label>
+                    <input 
+                      type="date"
+                      value={campaignStartDate}
+                      onChange={(e) => setCampaignStartDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">End date <span className="text-red-500">*</span></label>
+                    <input 
+                      type="date"
+                      value={campaignEndDate}
+                      onChange={(e) => setCampaignEndDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Upload files</label>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={(e) => {
+                      const newFiles = Array.from(e.target.files || []);
+                      setSelectedFiles(prev => [...prev, ...newFiles]);
+                    }}
+                    className="hidden"
+                    multiple
+                    accept="image/*,video/*,audio/*"
+                  />
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-slate-50 rounded-xl p-6 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors"
+                  >
+                    {selectedFiles.length > 0 ? (
+                      <div className="w-full space-y-3">
+                        {selectedFiles.map((file, idx) => (
+                          <div key={idx} className="flex items-center justify-between w-full px-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-blue-50 text-blue-500 rounded-lg">
+                                <ImageIcon size={18} />
+                              </div>
+                              <span className="text-sm font-bold text-gray-700 truncate max-w-[200px]">{file.name}</span>
+                            </div>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}
+                              className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="pt-2 text-center">
+                           <p className="text-xs text-[#FF5722] font-bold">+ Click to add more files</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload size={32} className="text-orange-500 mb-2" />
+                        <p className="text-sm font-bold text-gray-600">Click to upload or drag and drop</p>
+                        <p className="text-xs text-gray-400 mt-1">Image, Video or Audio files</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-4 flex items-center justify-between bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+                  <span className="text-sm font-bold text-[#FF5722]">
+                    {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
+                  </span>
+                  <div className="flex gap-3">
+                    <button 
+                      disabled={selectedFiles.length === 0}
+                      className="px-6 py-2 bg-white text-[#FF5722] border border-[#FF5722] rounded-lg font-bold text-sm hover:bg-orange-50 transition-colors disabled:opacity-50"
+                    >
+                      Preview media
+                    </button>
+                    <button 
+                      disabled={selectedFiles.length === 0}
+                      className="px-6 py-2 bg-[#FF5722] text-white rounded-lg font-bold text-sm hover:bg-[#F4511E] transition-colors disabled:opacity-50"
+                    >
+                      Confirm selection
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* What you can do card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+              <h4 className="font-bold text-gray-900 mb-6 text-lg">What you can do with provisioning access:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
+                {[
+                  "Upload new media files (image, video, audio)",
+                  "Manage existing media library",
+                  "Create and schedule central level campaigns",
+                  "View all uploaded media across stores"
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-4 text-sm text-gray-700 font-semibold bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="w-3 h-3 rounded-full bg-cyan-500 shrink-0 shadow-sm"></div>
+                    {item}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-12 pt-8 border-t border-gray-100">
+                <button 
+                  onClick={async () => {
+                    if (selectedFiles.length === 0 || !campaignType) return;
+                    setIsFormSubmitting(true);
+                    const loadingToast = toast.loading("Saving campaign provisioning...");
+                    try {
+                      const userId = localStorage.getItem("userId");
+                      
+                      // 1. Upload files
+                      const formData = new FormData();
+                      formData.append("userId", userId || "");
+                      formData.append("userRole", "account_marketing");
+                      selectedFiles.forEach((file, i) => {
+                        formData.append(`files[${i}]`, file);
+                        formData.append(`fileNames[${i}]`, file.name);
+                      });
+
+                      const uploadRes = await fetch("/api/media/upload", {
+                        method: "POST",
+                        body: formData
+                      });
+                      const uploadData = await uploadRes.json();
+                      
+                      if (!uploadData.success) throw new Error(uploadData.message || "Upload failed");
+
+                      // 2. Update user with provisioned files
+                      const provisionedFiles = uploadData.files.map((f: any) => ({
+                        name: f.name,
+                        url: f.url
+                      }));
+
+                      const userRes = await fetch(`/api/user?userId=${userId}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ 
+                          mediaProvisioning: true,
+                          provisionedFiles 
+                        })
+                      });
+                      const userData = await userRes.json();
+
+                      if (userData.success) {
+                        toast.success("Media provisioning saved and shared with reseller!", { id: loadingToast });
+                        // Optionally refresh or close
+                      } else {
+                        throw new Error(userData.message || "Failed to update user");
+                      }
+                    } catch (err: any) {
+                      toast.error(err.message || "Something went wrong", { id: loadingToast });
+                    } finally {
+                      setIsFormSubmitting(false);
+                    }
+                  }}
+                  disabled={selectedFiles.length === 0 || !campaignType || isFormSubmitting}
+                  className="px-12 py-4 bg-[#FF5722] hover:bg-[#F4511E] disabled:bg-slate-300 text-white rounded-2xl font-bold transition-all shadow-lg shadow-[#FF5722]/20 disabled:shadow-none active:scale-95"
+                >
+                  {isFormSubmitting ? "Saving..." : "Save and close"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         /* ---- NOT YET GRANTED STATE ---- */
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-8">
           {/* Status Banner */}
-          <div className="flex items-start gap-4 p-4 bg-orange-50 border border-orange-100 rounded-xl">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF5722" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            <div>
-              <p className="text-sm font-bold text-orange-800">Access currently locked</p>
-              <p className="text-xs text-orange-600 mt-1">You have not granted media provisioning access to your reseller yet.</p>
-            </div>
-          </div>
 
           {/* Request Access */}
           <div>
@@ -1586,13 +1784,47 @@ const MediaProvisioningView = () => {
 };
 
 const ProfileView = ({ userData }: { userData?: any }) => {
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
+  const [updating, setUpdating] = useState(false);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwords.new !== passwords.confirm) return toast.error("New passwords do not match");
+    if (passwords.new.length < 6) return toast.error("Password must be at least 6 characters");
+    
+    setUpdating(true);
+    try {
+      const res = await fetch(`/api/user?userId=${userData._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          password: passwords.new
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Password updated successfully!");
+        setShowPasswordModal(false);
+        setPasswords({ current: "", new: "", confirm: "" });
+      } else {
+        toast.error(data.message || "Failed to update password");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const userName = userData?.operatorName || userData?.username || "Unknown User";
   const initial = userName.charAt(0).toUpperCase();
   const email = userData?.email || "-";
   const phone = userData?.phone || "-";
   const company = userData?.companyName || "-";
   const location = userData?.location || "-";
-  const roleName = userData?.role === "account_marketing" ? "Account marketing" : (userData?.role || "Unknown Role");
+  const roleName = userData?.role === "account_marketing" ? "Central marketing" : (userData?.role || "Unknown Role");
   
   const lastLogin = userData?.updatedAt || userData?.createdAt ? new Date(userData.updatedAt || userData.createdAt).toLocaleString() : "-";
   const accountCreated = userData?.createdAt ? new Date(userData.createdAt).toLocaleDateString() : "-";
@@ -1742,10 +1974,78 @@ const ProfileView = ({ userData }: { userData?: any }) => {
         <button className="px-8 py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20">
           Edit Profile
         </button>
-        <button className="px-8 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors">
+        <button 
+          onClick={() => setShowPasswordModal(true)}
+          className="px-8 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors"
+        >
           Change Password
         </button>
       </div>
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="bg-[#0E3B43] px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold">Change Password</h3>
+              <button onClick={() => setShowPasswordModal(false)} className="text-white/70 hover:text-white transition-colors">
+                <ChevronDown size={24} className="rotate-90" />
+              </button>
+            </div>
+            <form onSubmit={handlePasswordChange} className="p-8 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">Current Password</label>
+                <input 
+                  type="password" 
+                  required
+                  value={passwords.current}
+                  onChange={e => setPasswords({...passwords, current: e.target.value})}
+                  placeholder="••••••••" 
+                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">New Password</label>
+                <input 
+                  type="password" 
+                  required
+                  value={passwords.new}
+                  onChange={e => setPasswords({...passwords, new: e.target.value})}
+                  placeholder="••••••••" 
+                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">Confirm New Password</label>
+                <input 
+                  type="password" 
+                  required
+                  value={passwords.confirm}
+                  onChange={e => setPasswords({...passwords, confirm: e.target.value})}
+                  placeholder="••••••••" 
+                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
+                />
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={updating}
+                  className="flex-1 py-3 bg-[#FF5722] text-white rounded-xl font-bold hover:bg-[#F4511E] transition-all shadow-md shadow-[#FF5722]/20 disabled:opacity-50"
+                >
+                  {updating ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
@@ -1819,7 +2119,7 @@ export default function AccountMarketingDashboard() {
 
   const handleMenuClick = (linkId: string, hasSubItems: boolean) => {
     if (linkId === "support") {
-      window.location.href = "mailto:support@centelon.com";
+      window.location.href = "mailto:contact@centelonrobotics.tech";
       return;
     }
     if (hasSubItems) {
@@ -1850,7 +2150,6 @@ export default function AccountMarketingDashboard() {
 
   return (
     <div className="flex h-screen bg-[#EBF5F6] font-sans overflow-hidden">
-      <Toaster position="top-right" />
       {/* Sidebar */}
       <aside className="w-[260px] bg-[#122A30] flex flex-col h-full text-white/80 shrink-0 shadow-xl z-20">
         <div className="p-6 flex items-center gap-3">
@@ -1859,7 +2158,7 @@ export default function AccountMarketingDashboard() {
           </div>
           <div>
             <h1 className="text-white font-bold text-lg leading-tight">DeviceHub</h1>
-            <p className="text-[#00BCD4] text-[10px]">Account marketing user</p>
+            <p className="text-[#00BCD4] text-[10px]">Central marketing user</p>
           </div>
         </div>
 
@@ -1955,7 +2254,7 @@ export default function AccountMarketingDashboard() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-gray-900">{userName}</h3>
-                <p className="text-[10px] font-bold text-gray-500 tracking-wider">Account marketing user</p>
+                <p className="text-[10px] font-bold text-gray-500 tracking-wider">Central marketing user</p>
               </div>
               <ChevronDown size={14} className="text-gray-400 ml-2" />
             </div>

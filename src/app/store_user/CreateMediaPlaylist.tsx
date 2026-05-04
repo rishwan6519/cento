@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ViewKey } from "./page";
-import { FaUpload, FaPlay, FaTrash, FaDesktop, FaCheck } from "react-icons/fa";
+import { FaUpload, FaPlay, FaTrash, FaDesktop, FaCheck, FaArrowLeft } from "react-icons/fa";
 
 interface Props { 
   onNavigate: (view: ViewKey) => void; 
@@ -128,9 +128,14 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       if (data.success) onNavigate("dashboard");
     } catch {} finally { setSubmitting(false); }
   };
-
   return (
     <div className="store-create-playlist-view">
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+        <button onClick={() => onNavigate("mediaManagement")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+          <FaArrowLeft size={18} />
+        </button>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#162B30", margin: 0 }}>Create New Media Playlist</h1>
+      </div>
       {/* Step 1: Select Media */}
       <div className="store-step-card">
         <div className="store-step-header">

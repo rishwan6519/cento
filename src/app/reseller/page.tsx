@@ -36,7 +36,9 @@ import {
   Video,
   ArrowLeft,
   List,
-  Trash
+  Trash,
+  Eye,
+  X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -120,6 +122,7 @@ const DashboardView = ({ setActiveView }: { setActiveView: (view: string) => voi
       <h1 className="text-3xl font-bold mb-2">Welcome to your dashboard</h1>
       <p className="text-white/80 mb-8">Here's what's happening with your accounts today.</p>
       
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white/10 rounded-2xl p-6 border border-white/10 relative overflow-hidden">
           <div className="flex items-center justify-between mb-4">
@@ -144,7 +147,7 @@ const DashboardView = ({ setActiveView }: { setActiveView: (view: string) => voi
 
         <div className="bg-white/10 rounded-2xl p-6 border border-white/10 relative overflow-hidden">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-[#A1F4FD]">Account admins</h3>
+            <h3 className="font-medium text-[#A1F4FD]">Customer Account Admins</h3>
             <UserCog size={20} className="text-[#A1F4FD]" />
           </div>
           <h2 className="text-5xl font-bold text-white">{loading ? "-" : stats.admins}</h2>
@@ -247,7 +250,7 @@ const DashboardView = ({ setActiveView }: { setActiveView: (view: string) => voi
               <div className="bg-gray-50 p-2 rounded-lg text-[#FF5722]">
                 <UserCog size={20} />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Account Admins</h3>
+              <h3 className="text-lg font-bold text-gray-900">Customer Account Admins</h3>
             </div>
             
             <div className="bg-[#EBF7F8] rounded-2xl p-4 flex items-center justify-between mb-4 border border-[#00BCD4]/20">
@@ -414,34 +417,187 @@ const OnboardCustomerView = () => {
   );
 };
 
-const AllCustomersView = () => {
+const AllCustomersView = ({ setActiveView }: { setActiveView: (v: string) => void }) => {
   const [customers, setCustomers] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [viewingCustomer, setViewingCustomer] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
 
   useEffect(() => {
     const resellerId = localStorage.getItem("userId");
     const query = resellerId ? `?resellerId=${resellerId}` : '';
     
-    fetch(`/api/customers${query}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.customers)) {
-          setCustomers(data.customers);
-        }
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setIsLoading(false);
-      });
+    Promise.all([
+      fetch(`/api/customers${query}`).then(r => r.json()),
+      fetch(`/api/user?controllerId=${resellerId}`).then(r => r.json()),
+      fetch(`/api/devices?resellerId=${resellerId}`).then(r => r.json()),
+    ]).then(([cData, uData, dData]) => {
+      if (cData.success && Array.isArray(cData.customers)) setCustomers(cData.customers);
+      if (uData.success && Array.isArray(uData.data)) setAdmins(uData.data);
+      if (Array.isArray(dData)) setDevices(dData);
+      setIsLoading(false);
+    }).catch(err => { console.error(err); setIsLoading(false); });
   }, []);
+
+  const handleDeleteCustomer = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this customer? This will also remove their associated data.")) return;
+    try {
+      const res = await fetch(`/api/customers?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Customer deleted successfully");
+        setCustomers(customers.filter(c => c._id !== id));
+      } else {
+        toast.error(data.error || "Failed to delete customer");
+      }
+    } catch (err) {
+      toast.error("Internal Server Error");
+    }
+  };
+
+  const uniqueLocations = Array.from(new Set(customers.map(c => c.city).filter(Boolean)));
+
+  const getCustomerStatus = (c: any) => {
+    const hasAdmin = admins.some(a => a.customerId === c._id);
+    const hasDevice = devices.some(d => d.customerId === c._id);
+    if (!hasAdmin) return { label: "Account admin to be created", color: "text-orange-500", bg: "bg-orange-50", action: "create" };
+    if (!hasDevice) return { label: "Device to be assigned", color: "text-amber-500", bg: "bg-amber-50", action: "assign" };
+    return { label: "Active", color: "text-emerald-600", bg: "bg-emerald-50", action: "view" };
+  };
+
+  const filteredCustomers = customers.filter(c => {
+    const name = (c.organizationName || c.contactName || "").toLowerCase();
+    const loc = (c.city || "").toLowerCase();
+    const matchesSearch = !searchQuery || name.includes(searchQuery.toLowerCase()) || loc.includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    
+    // Status Filter
+    if (statusFilter !== "all") {
+      const status = getCustomerStatus(c);
+      if (statusFilter === "no_admin" && status.action !== "create") return false;
+      if (statusFilter === "no_device" && status.action !== "assign") return false;
+      if (statusFilter === "active" && status.action !== "view") return false;
+    }
+
+    // Location Filter
+    if (locationFilter !== "all" && c.city !== locationFilter) return false;
+
+    return true;
+  });
+
+  // --- Account Detail View ---
+  if (viewingCustomer) {
+    const custAdmins = admins.filter(a => a.customerId === viewingCustomer._id);
+    const custDevices = devices.filter(d => d.customerId === viewingCustomer._id);
+    return (
+    <div className="pb-12">
+      <button onClick={() => setViewingCustomer(null)} className="flex items-center gap-2 text-[#00BCD4] font-bold mb-6 hover:gap-3 transition-all">
+        <ArrowLeft size={18} /> Back to all customers
+      </button>
+      <div className="bg-gradient-to-r from-[#175C56] to-[#124B46] rounded-3xl p-8 text-white shadow-xl mb-8">
+        <h1 className="text-3xl font-bold mb-1">{viewingCustomer.organizationName || viewingCustomer.contactName}</h1>
+        <p className="text-white/70 text-sm">{viewingCustomer.city || "N/A"}{viewingCustomer.pinCode ? `, ${viewingCustomer.pinCode}` : ""}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+          <div className="bg-white/10 rounded-xl p-4 border border-white/10">
+            <p className="text-white/60 text-xs mb-1">Contact</p>
+            <p className="font-bold">{viewingCustomer.contactName || "N/A"}</p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-4 border border-white/10">
+            <p className="text-white/60 text-xs mb-1">Email</p>
+            <p className="font-bold text-sm">{viewingCustomer.email || "N/A"}</p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-4 border border-white/10">
+            <p className="text-white/60 text-xs mb-1">Phone</p>
+            <p className="font-bold">{viewingCustomer.phone || "N/A"}</p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-4 border border-white/10">
+            <p className="text-white/60 text-xs mb-1">Created</p>
+            <p className="font-bold">{new Date(viewingCustomer.createdAt).toLocaleDateString()}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500"><UserCog size={20} /></div>
+              <h3 className="font-bold text-gray-900">Customer Account Admins</h3>
+            </div>
+            <span className="text-xs font-bold bg-purple-50 text-purple-600 px-3 py-1 rounded-full">{custAdmins.length}</span>
+          </div>
+          {custAdmins.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-gray-400 text-sm mb-3">No admin created yet</p>
+              <button onClick={() => setActiveView("onboard_admin")} className="px-5 py-2 bg-[#FF5722] text-white rounded-xl text-sm font-bold hover:bg-[#E64A19] transition-colors">Create now</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {custAdmins.map((a: any) => (
+                <div key={a._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{a.operatorName || a.username}</p>
+                    <p className="text-xs text-gray-500">{a.email || "No email"}</p>
+                  </div>
+                  <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full font-bold">{a.role}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500"><Monitor size={20} /></div>
+              <h3 className="font-bold text-gray-900">Assigned Devices</h3>
+            </div>
+            <span className="text-xs font-bold bg-blue-50 text-blue-600 px-3 py-1 rounded-full">{custDevices.length}</span>
+          </div>
+          {custDevices.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-gray-400 text-sm mb-3">No devices assigned yet</p>
+              <button onClick={() => setActiveView("assign_device")} className="px-5 py-2 bg-[#FF5722] text-white rounded-xl text-sm font-bold hover:bg-[#E64A19] transition-colors">Assign now</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {custDevices.map((d: any) => (
+                <div key={d._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{d.name}</p>
+                    <p className="text-xs text-gray-500">SN: {d.serialNumber}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-bold ${d.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>{d.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h3 className="font-bold text-gray-900 mb-4">Address</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div><p className="text-gray-400 text-xs mb-1">Address Line 1</p><p className="text-gray-900 font-medium">{viewingCustomer.addressLine1 || "N/A"}</p></div>
+          <div><p className="text-gray-400 text-xs mb-1">Address Line 2</p><p className="text-gray-900 font-medium">{viewingCustomer.addressLine2 || "N/A"}</p></div>
+          <div><p className="text-gray-400 text-xs mb-1">City</p><p className="text-gray-900 font-medium">{viewingCustomer.city || "N/A"}</p></div>
+          <div><p className="text-gray-400 text-xs mb-1">PIN Code</p><p className="text-gray-900 font-medium">{viewingCustomer.pinCode || "N/A"}</p></div>
+        </div>
+      </div>
+    </div>
+    );
+  }
 
   return (
   <>
   <div className="pb-12">
     <h1 className="text-3xl font-bold text-gray-900 mb-1">All Customers</h1>
-    <p className="text-sm text-gray-500 mb-8">Manage all account users in the system</p>
+    <p className="text-sm text-gray-500 mb-8">Manage all customer accounts in the system</p>
     
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
       <div className="flex items-center gap-4">
@@ -460,12 +616,23 @@ const AllCustomersView = () => {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
         <input 
           type="text" 
-          placeholder="Search by username, name, or location..." 
+          placeholder="Search by name or location..." 
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50"
         />
       </div>
-      <select className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
-        <option>Status</option>
+      <select value={locationFilter} onChange={e => setLocationFilter(e.target.value)} className="w-52 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+        <option value="all">All Locations</option>
+        {uniqueLocations.map(loc => (
+          <option key={loc} value={loc}>{loc}</option>
+        ))}
+      </select>
+      <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-52 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+        <option value="all">All Status</option>
+        <option value="no_admin">Admin not created</option>
+        <option value="no_device">Device not assigned</option>
+        <option value="active">Active</option>
       </select>
     </div>
 
@@ -480,40 +647,57 @@ const AllCustomersView = () => {
               <th className="px-6 py-4">Name</th>
               <th className="px-6 py-4">Location</th>
               <th className="px-6 py-4">Created at</th>
-              <th className="px-6 py-4">Action</th>
+              <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="text-sm">
             {isLoading ? (
                <tr>
-                 <td colSpan={4} className="px-6 py-8 text-center text-gray-400">Loading customers...</td>
+                 <td colSpan={5} className="px-6 py-8 text-center text-gray-400">Loading customers...</td>
                </tr>
-            ) : customers.length === 0 ? (
+            ) : filteredCustomers.length === 0 ? (
                <tr>
-                 <td colSpan={4} className="px-6 py-12 text-center">
+                 <td colSpan={5} className="px-6 py-12 text-center">
                     <Users size={32} className="text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500 font-medium">No customers found.</p>
                  </td>
                </tr>
             ) : (
-               customers.map((c) => (
+               filteredCustomers.map((c) => {
+                 const status = getCustomerStatus(c);
+                 return (
                  <tr key={c._id} className="border-b border-gray-50 hover:bg-gray-50/50">
                    <td className="px-6 py-4 font-medium">{c.organizationName || c.contactName}</td>
-                   <td className="px-6 py-4 text-gray-500">{c.city || 'N/A'}, {c.pinCode || ''}</td>
+                   <td className="px-6 py-4 text-gray-500">{c.city || 'N/A'}{c.pinCode ? `, ${c.pinCode}` : ''}</td>
                    <td className="px-6 py-4 text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
-                   <td className="px-6 py-4 flex items-center gap-3">
-                     <button className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold">View account</button>
-                     <button onClick={() => setEditingCustomer(c)} className="text-[#00BCD4] hover:text-[#00ACC1]"><Edit size={16} /></button>
-                     <button className="text-red-500 hover:text-red-600"><Trash2 size={16} /></button>
+                   <td className="px-6 py-4">
+                     <span className={`inline-block text-xs font-bold px-3 py-1.5 rounded-full ${status.bg} ${status.color}`}>{status.label}</span>
+                   </td>
+                   <td className="px-6 py-4">
+                     <div className="flex items-center justify-end gap-3">
+                       {status.action === "create" && (
+                         <button onClick={() => setActiveView("onboard_admin")} className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold hover:bg-[#E64A19] transition-colors">Create now</button>
+                       )}
+                       {status.action === "assign" && (
+                         <button onClick={() => setActiveView("assign_device")} className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold hover:bg-[#E64A19] transition-colors">Assign now</button>
+                       )}
+                       {status.action === "view" && (
+                         <button onClick={() => setViewingCustomer(c)} className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold hover:bg-[#E64A19] transition-colors">View account</button>
+                       )}
+                       <button onClick={() => setEditingCustomer(c)} className="text-[#00BCD4] hover:text-[#00ACC1] transition-colors"><Edit size={16} /></button>
+                       <button onClick={() => handleDeleteCustomer(c._id)} className="text-red-500 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
+                     </div>
                    </td>
                  </tr>
-               ))
+                 );
+               })
             )}
           </tbody>
         </table>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-        <span>Showing {customers.length} customers</span>
+        <span>Showing {filteredCustomers.length} of {customers.length} customers</span>
         <div className="flex gap-2">
           <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Previous</button>
           <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Next</button>
@@ -586,6 +770,7 @@ const AllCustomersView = () => {
   );
 };
 
+
 const OnboardAdminView = () => {
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -620,7 +805,7 @@ const OnboardAdminView = () => {
     }
 
     setIsLoading(true);
-    const loadingToast = toast.loading("Creating account admin...");
+    const loadingToast = toast.loading("Creating Customer Account Admin...");
     try {
       const resellerId = localStorage.getItem("userId");
       const res = await fetch('/api/auth/register-admin', {
@@ -630,10 +815,10 @@ const OnboardAdminView = () => {
       });
       const data = await res.json();
       if(data.success) {
-        toast.success("Account admin created successfully!", { id: loadingToast });
+        toast.success("Customer Account Admin created successfully!", { id: loadingToast });
         setFormData({ customerId: '', username: '', email: '', location: '', password: '', confirmPassword: ''});
       } else {
-        toast.error(data.error || "Failed to create account admin", { id: loadingToast });
+        toast.error(data.error || "Failed to create Customer Account Admin", { id: loadingToast });
       }
     } catch(e) {
       toast.error("Network or Server error", { id: loadingToast });
@@ -644,7 +829,7 @@ const OnboardAdminView = () => {
 
   return (
   <div className="pb-12 max-w-[1000px]">
-    <h1 className="text-3xl font-bold text-gray-900 mb-2">Onboard New Account Admin</h1>
+    <h1 className="text-3xl font-bold text-gray-900 mb-2">Onboard New Customer Account Admin</h1>
     <p className="text-gray-600 mb-8">Please fill in the below required information.</p>
 
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -666,7 +851,7 @@ const OnboardAdminView = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Account admin username <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Customer Account Admin username <span className="text-red-500">*</span></label>
           <input type="text" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
         </div>
         <div>
@@ -690,7 +875,7 @@ const OnboardAdminView = () => {
       <div className="flex items-center gap-4">
         <button onClick={handleSubmit} disabled={isLoading} className="flex items-center gap-2 px-6 py-3 bg-[#FF5722] hover:bg-[#F4511E] disabled:bg-gray-400 text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 disabled:shadow-none">
           <Save size={18} />
-          {isLoading ? "Enrolling..." : "Create account admin"}
+          {isLoading ? "Enrolling..." : "Create Customer Account Admin"}
         </button>
         <button onClick={() => setFormData({customerId: '', username: '', email: '', location: '', password: '', confirmPassword: ''})} className="px-6 py-3 bg-[#F8FAFC] hover:bg-gray-100 text-gray-600 rounded-xl font-bold border border-gray-200 transition-all">
           Cancel
@@ -701,36 +886,88 @@ const OnboardAdminView = () => {
   );
 };
 
-const AllAdminsView = () => {
+const AllAdminsView = ({ setActiveView }: { setActiveView: (view: string) => void }) => {
   const [admins, setAdmins] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingAdmin, setEditingAdmin] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [deviceFilter, setDeviceFilter] = useState("all");
 
   useEffect(() => {
     const resellerId = localStorage.getItem("userId");
-    const query = resellerId ? `?controllerId=${resellerId}` : '';
-    
-    fetch(`/api/user${query}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.data)) {
-          // Filter to show only account admins
-          const fetchedAdmins = data.data.filter((u: any) => u.role === 'admin' || u.role === 'account_admin' || u.role === 'user' || u.customerId);
-          setAdmins(fetchedAdmins);
-        }
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setIsLoading(false);
-      });
+    if (!resellerId) return;
+
+    Promise.all([
+      fetch(`/api/user?controllerId=${resellerId}`).then(r => r.json()),
+      fetch(`/api/customers?resellerId=${resellerId}`).then(r => r.json()),
+      fetch(`/api/devices?resellerId=${resellerId}`).then(r => r.json())
+    ]).then(([uData, cData, dData]) => {
+      if (uData.success && Array.isArray(uData.data)) {
+        setAdmins(uData.data.filter((u: any) => u.role === 'admin' || u.role === 'account_admin' || u.role === 'user' || u.customerId));
+      }
+      if (cData.success && Array.isArray(cData.customers)) setCustomers(cData.customers);
+      if (Array.isArray(dData)) setDevices(dData);
+      setIsLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setIsLoading(false);
+    });
   }, []);
+
+  const handleDeleteAdmin = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this Customer Account Admin?")) return;
+    try {
+      const res = await fetch(`/api/user?userId=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Admin deleted successfully");
+        setAdmins(admins.filter(a => a._id !== id));
+      } else {
+        toast.error(data.message || "Failed to delete admin");
+      }
+    } catch (err) {
+      toast.error("Internal Server Error");
+    }
+  };
+
+  const getAdminStats = (admin: any) => {
+    const customer = customers.find(c => c._id === admin.customerId);
+    const deviceCount = devices.filter(d => d.customerId === admin.customerId).length;
+    return {
+      customerName: customer ? customer.organizationName : "Not Assigned",
+      deviceCount
+    };
+  };
+
+  const uniqueLocations = Array.from(new Set(admins.map(a => a.location).filter(Boolean)));
+
+  const filteredAdmins = admins.filter(a => {
+    const stats = getAdminStats(a);
+    const name = (a.operatorName || a.username || "").toLowerCase();
+    const loc = (a.location || "").toLowerCase();
+    const cust = stats.customerName.toLowerCase();
+    
+    const matchesSearch = !searchQuery || name.includes(searchQuery.toLowerCase()) || loc.includes(searchQuery.toLowerCase()) || cust.includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (locationFilter !== "all" && a.location !== locationFilter) return false;
+    
+    if (deviceFilter !== "all") {
+      if (deviceFilter === "none" && stats.deviceCount > 0) return false;
+      if (deviceFilter === "has_devices" && stats.deviceCount === 0) return false;
+    }
+
+    return true;
+  });
 
   return (
   <>
   <div className="pb-12">
-    <h1 className="text-3xl font-bold text-gray-900 mb-1">All Account Admin</h1>
-    <p className="text-sm text-gray-500 mb-8">Manage all account admins in the system</p>
+    <h1 className="text-3xl font-bold text-gray-900 mb-1">All Customer Account Admins</h1>
+    <p className="text-sm text-gray-500 mb-8">Manage all Customer Account Admins in the system</p>
     
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
       <div className="flex items-center gap-4">
@@ -738,7 +975,7 @@ const AllAdminsView = () => {
           <Users size={24} />
         </div>
         <div>
-          <p className="text-sm text-gray-500 mb-1">Total account admins</p>
+          <p className="text-sm text-gray-500 mb-1">Total Customer Account Admins</p>
           <p className="text-3xl font-bold text-[#0E3B43]">{admins.length}</p>
         </div>
       </div>
@@ -749,12 +986,22 @@ const AllAdminsView = () => {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
         <input 
           type="text" 
-          placeholder="Search by username, name, or location..." 
+          placeholder="Search by name, customer, or location..." 
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50"
         />
       </div>
-      <select className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
-        <option>No of devices</option>
+      <select value={locationFilter} onChange={e => setLocationFilter(e.target.value)} className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+        <option value="all">All Locations</option>
+        {uniqueLocations.map(loc => (
+          <option key={loc} value={loc}>{loc}</option>
+        ))}
+      </select>
+      <select value={deviceFilter} onChange={e => setDeviceFilter(e.target.value)} className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+        <option value="all">No of devices</option>
+        <option value="none">0 Devices</option>
+        <option value="has_devices">Has Devices</option>
       </select>
     </div>
 
@@ -767,44 +1014,53 @@ const AllAdminsView = () => {
           <thead>
             <tr className="border-b border-gray-100 text-xs font-bold text-gray-900 uppercase">
               <th className="px-6 py-4">Account Admin</th>
-              <th className="px-6 py-4">Email</th>
+              <th className="px-6 py-4">Customer</th>
               <th className="px-6 py-4">Location</th>
-              <th className="px-6 py-4">Customer ID</th>
-              <th className="px-6 py-4">Action</th>
+              <th className="px-6 py-4">No of Devices</th>
+              <th className="px-6 py-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="text-sm">
             {isLoading ? (
                <tr>
-                 <td colSpan={5} className="px-6 py-8 text-center text-gray-400">Loading account admins...</td>
+                 <td colSpan={5} className="px-6 py-8 text-center text-gray-400">Loading Customer Account Admins...</td>
                </tr>
             ) : admins.length === 0 ? (
                <tr>
                  <td colSpan={5} className="px-6 py-12 text-center">
                     <UserCog size={32} className="text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">No account admins found.</p>
+                    <p className="text-gray-500 font-medium">No Customer Account Admins found.</p>
                  </td>
                </tr>
-            ) : (
-               admins.map((admin) => (
-                 <tr key={admin._id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                   <td className="px-6 py-4 font-medium">{admin.operatorName || admin.username}</td>
-                   <td className="px-6 py-4 text-gray-600">{admin.email || 'N/A'}</td>
-                   <td className="px-6 py-4 text-gray-600">{admin.location || 'N/A'}</td>
-                   <td className="px-6 py-4 text-[#00BCD4] font-medium">{admin.customerId ? "Mapped" : "None"}</td>
-                   <td className="px-6 py-4 flex items-center gap-3">
-                     <button className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold w-24">Assign now</button>
-                     <button onClick={() => setEditingAdmin(admin)} className="text-[#00BCD4]"><Edit size={16} /></button>
-                     <button className="text-red-500"><Trash2 size={16} /></button>
-                   </td>
-                 </tr>
-               ))
-            )}
+             ) : (
+                filteredAdmins.map((admin) => {
+                  const stats = getAdminStats(admin);
+                  return (
+                  <tr key={admin._id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <td className="px-6 py-4 font-medium">{admin.operatorName || admin.username}</td>
+                    <td className="px-6 py-4 text-gray-600">{stats.customerName}</td>
+                    <td className="px-6 py-4 text-gray-600">{admin.location || 'N/A'}</td>
+                    <td className="px-6 py-4 text-[#00BCD4] font-bold">{stats.deviceCount}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-3">
+                        {stats.deviceCount === 0 ? (
+                          <button onClick={() => setActiveView("assign_device")} className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold w-32 hover:bg-[#F4511E] transition-all">Assign now</button>
+                        ) : (
+                          <button className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold w-32 hover:bg-[#F4511E] transition-all">Check status</button>
+                        )}
+                        <button onClick={() => setEditingAdmin(admin)} className="text-[#00BCD4] hover:text-[#00ACC1] transition-colors"><Edit size={16} /></button>
+                        <button onClick={() => handleDeleteAdmin(admin._id)} className="text-red-500 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                  );
+                })
+             )}
           </tbody>
         </table>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-        <span>Showing {admins.length} account admin</span>
+        <span>Showing {admins.length} Customer Account Admin(s)</span>
         <div className="flex gap-2">
           <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Previous</button>
           <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Next</button>
@@ -1340,7 +1596,8 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
                 marketingUser: u.operatorName || u.username || "-",
                 provisioned: !!u.mediaProvisioning,
                 uploadedFiles: u.provisionedFiles || [],
-                userId: u._id
+                userId: u._id,
+                email: u.email
               });
             });
         });
@@ -1366,7 +1623,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
   return (
     <div className="pb-12 max-w-[1200px]">
       <h1 className="text-3xl font-bold text-gray-900 mb-1">Media provisioning</h1>
-      <p className="text-sm text-gray-500 mb-8">Access control for account marketing users to upload media.</p>
+      <p className="text-sm text-gray-500 mb-8">Access control for central marketing users to upload media.</p>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 flex gap-4">
         <div className="flex-1 relative">
@@ -1395,7 +1652,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
             <thead>
               <tr className="border-b border-gray-100 text-xs font-bold text-gray-900 uppercase bg-white">
                 <th className="px-6 py-4">Customer</th>
-                <th className="px-6 py-4">Account Marketing User</th>
+                <th className="px-6 py-4">Central Marketing User</th>
                 <th className="px-6 py-4 whitespace-nowrap">Location</th>
                 <th className="px-6 py-4 whitespace-nowrap">Media Provisioning</th>
                 <th className="px-6 py-4">Document Upload By Account User</th>
@@ -1411,7 +1668,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center">
                     <ImageIcon size={32} className="text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">No account marketing users found.</p>
+                    <p className="text-gray-500 font-medium">No central marketing users found.</p>
                   </td>
                 </tr>
               ) : (
@@ -1444,7 +1701,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
                             ))}
                           </div>
                         ) : (
-                          <span className="text-gray-400 italic text-xs">Awaiting files from Account User</span>
+                          <span className="text-gray-400 italic text-xs block">Awaiting files from Account User</span>
                         )
                       ) : (
                         <div className="flex items-center gap-2 text-gray-400">
@@ -1456,16 +1713,25 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {row.provisioned ? (
-                          <button 
-                            onClick={() => onCreateCampaign(row)}
-                            className="px-6 py-2.5 bg-[#FF5722] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#F4511E] transition-colors text-center"
-                          >
-                            Create campaign
-                          </button>
+                          row.uploadedFiles.length > 0 ? (
+                            <button 
+                              onClick={() => onCreateCampaign(row)}
+                              className="px-6 py-2.5 bg-[#FF5722] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#F4511E] transition-colors text-center w-32"
+                            >
+                              Create campaign
+                            </button>
+                          ) : (
+                            <a 
+                              href={`mailto:${row.email}?subject=Media Request for Campaign&body=Hello ${row.marketingUser},%0D%0A%0D%0APlease upload the media files for the campaign provisioning.`}
+                              className="px-6 py-2.5 bg-[#FF5722] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#F4511E] transition-colors text-center w-32 inline-block"
+                            >
+                              Request files
+                            </a>
+                          )
                         ) : (
-                          <div className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-400 rounded-xl text-xs font-bold border border-gray-200 cursor-not-allowed">
+                          <div className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 text-gray-400 rounded-xl text-xs font-bold border border-gray-200 cursor-not-allowed w-32 justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                            Access Locked
+                            Locked
                           </div>
                         )}
                       </div>
@@ -1502,6 +1768,7 @@ const ResellerCreateCampaignFormView = ({ actingUser, onBack }: { actingUser: an
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [globalVol, setGlobalVol] = useState({ min: 30, max: 80 });
+  const [previewMedia, setPreviewMedia] = useState<any>(null);
 
   useEffect(() => {
     if (!actingUser) return;
@@ -1631,24 +1898,22 @@ const ResellerCreateCampaignFormView = ({ actingUser, onBack }: { actingUser: an
             <div className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
                 <div 
-                  onClick={() => { setSourceMode("upload"); fileInputRef.current?.click(); }}
-                  className={`border-2 border-dashed ${sourceMode === "upload" ? "border-[#FF5722] bg-orange-50/50" : "border-gray-200 hover:bg-gray-50"} rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all`}
+                  onClick={() => setSourceMode("existing")}
+                  className={`border-2 border-dashed ${sourceMode === "existing" ? "border-[#00BCD4] bg-cyan-50/50" : "border-gray-200 hover:bg-gray-50"} rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all`}
                 >
-                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-[#FF5722] mb-4">
+                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-[#00BCD4] mb-4">
+                    <ImageIcon size={28} />
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-1">Use provided media</h3>
+                  <p className="text-xs text-gray-500 font-medium">Select from files uploaded by the marketing user</p>
+                </div>
+
+                <div className="border-2 border-dashed border-gray-100 bg-gray-50/50 rounded-2xl p-10 flex flex-col items-center justify-center text-center opacity-60 cursor-not-allowed transition-all">
+                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-gray-300 mb-4">
                     <Upload size={28} />
                   </div>
-                  <h3 className="font-bold text-gray-900 mb-1">Upload new</h3>
-                  <p className="text-xs text-gray-500 font-medium">Add media from your device</p>
-                </div>
-                <div 
-                  onClick={() => setSourceMode("existing")}
-                  className={`border-2 border-dashed ${sourceMode === "existing" ? "border-[#FF5722] bg-orange-50/50" : "border-gray-200 hover:bg-gray-50"} rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all`}
-                >
-                  <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-[#FF5722] mb-4">
-                    <ListIcon size={28} />
-                  </div>
-                  <h3 className="font-bold text-gray-900 mb-1">Select from existing list</h3>
-                  <p className="text-xs text-gray-500 font-medium">Choose from previously uploaded media</p>
+                  <h3 className="font-bold text-gray-400 mb-1">Upload restricted</h3>
+                  <p className="text-xs text-gray-400 font-medium">Resellers cannot upload files for provisioning</p>
                 </div>
               </div>
 
@@ -1689,6 +1954,7 @@ const ResellerCreateCampaignFormView = ({ actingUser, onBack }: { actingUser: an
                             <th className="p-4 w-12 text-center">Select</th>
                             <th className="p-4">Media Name</th>
                             <th className="p-4">Type</th>
+                            <th className="p-4 text-center">Preview</th>
                           </tr>
                         </thead>
                         <tbody className="font-medium text-gray-700">
@@ -1699,6 +1965,14 @@ const ResellerCreateCampaignFormView = ({ actingUser, onBack }: { actingUser: an
                               </td>
                               <td className="p-4 font-bold">{m.name}</td>
                               <td className="p-4"><span className="px-2 py-0.5 bg-gray-100 rounded text-[10px] uppercase font-bold">{m.type}</span></td>
+                              <td className="p-4 text-center">
+                                <button 
+                                  onClick={() => setPreviewMedia(m)}
+                                  className="p-2 text-[#00BCD4] hover:bg-cyan-50 rounded-lg transition-colors"
+                                >
+                                  <Eye size={18} />
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1855,6 +2129,45 @@ const ResellerCreateCampaignFormView = ({ actingUser, onBack }: { actingUser: an
           </div>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewMedia && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200 text-left">
+            <div className="bg-[#0E3B43] px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold truncate pr-4">{previewMedia.name}</h3>
+              <button onClick={() => setPreviewMedia(null)} className="text-white/70 hover:text-white transition-colors p-1">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-8 bg-gray-50 flex items-center justify-center min-h-[300px]">
+              {previewMedia.type === 'image' && (
+                <img src={previewMedia.url} alt={previewMedia.name} className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-lg" />
+              )}
+              {previewMedia.type === 'video' && (
+                <video src={previewMedia.url} controls autoPlay className="max-w-full max-h-[60vh] rounded-xl shadow-lg" />
+              )}
+              {previewMedia.type === 'audio' && (
+                <div className="w-full bg-white p-12 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-6 text-center">
+                  <div className="w-20 h-20 bg-cyan-50 text-[#00BCD4] rounded-full flex items-center justify-center">
+                    <Music size={40} />
+                  </div>
+                  <audio src={previewMedia.url} controls autoPlay className="w-full" />
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Audio Preview</p>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end bg-white">
+              <button 
+                onClick={() => setPreviewMedia(null)}
+                className="px-8 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+              >
+                Close preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2065,11 +2378,11 @@ export default function ResellerDashboard() {
     },
     { 
       id: "admins", 
-      label: "A/c admin Management", 
+      label: "Customer Account Admin", 
       icon: UserCog,
       subItems: [
-        { id: "onboard_admin", label: "Onboard new a/c admin", icon: Plus },
-        { id: "all_admins", label: "View all a/c admins", icon: ListIcon }
+        { id: "onboard_admin", label: "Onboard new Customer Account Admin", icon: Plus },
+        { id: "all_admins", label: "View all Customer Account Admins", icon: ListIcon }
       ]
     },
     { 
@@ -2082,7 +2395,6 @@ export default function ResellerDashboard() {
       ]
     },
     { id: "media", label: "Media provisioning", icon: ImageIcon },
-    { id: "profile", label: "Profile", icon: User },
     { id: "support", label: "Support", icon: HeadphonesIcon },
   ];
 
@@ -2103,9 +2415,9 @@ export default function ResellerDashboard() {
     switch (activeView) {
       case "dashboard": return <DashboardView setActiveView={setActiveView} />;
       case "onboard_customer": return <OnboardCustomerView />;
-      case "all_customers": return <AllCustomersView />;
+      case "all_customers": return <AllCustomersView setActiveView={setActiveView} />;
       case "onboard_admin": return <OnboardAdminView />;
-      case "all_admins": return <AllAdminsView />;
+      case "all_admins": return <AllAdminsView setActiveView={setActiveView} />;
       case "assign_device": return <AssignDeviceView setActiveView={setActiveView} />;
       case "view_devices": return <AllDevicesView />;
       case "media": return <MediaProvisioningView onCreateCampaign={(u) => { setActiveUserForCampaign(u); setActiveView("create_campaign"); }} />;
@@ -2117,7 +2429,6 @@ export default function ResellerDashboard() {
 
   return (
     <div className="flex h-screen bg-[#EBF5F6] font-sans overflow-hidden">
-      <Toaster position="top-right" />
       {/* Sidebar */}
       <aside className="w-[260px] bg-[#0E3B43] flex flex-col h-full text-white/80 shrink-0 shadow-xl z-20">
         <div className="p-6 flex items-center gap-3">

@@ -21,7 +21,12 @@ export default function RootLayout({
       </head>
       <body className="antialiased font-sans">
         {children}
-        <Toaster position="top-right" />
+        <Toaster 
+          position="top-right" 
+          toastOptions={{
+            duration: 3000,
+          }}
+        />
       </body>
     </html>
   );

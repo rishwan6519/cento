@@ -75,7 +75,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isActive = (view: ViewKey) => activeView === view;
   const isMediaActive =
     activeView === "mediaManagement" ||
-    activeView === "viewAllCampaigns" ||
     activeView === "createMediaPlaylist" ||
     activeView === "createAnnouncementPlaylist" ||
     activeView === "instantPlaylist" ||
@@ -119,31 +118,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span>Dashboard</span>
           </button>
 
-          <div>
-            <button
-              className={`store-nav-item ${isMediaActive ? "store-nav-item--active" : ""}`}
-              onClick={() => { setMediaOpen(!mediaOpen); if (!mediaOpen) onNavigate("mediaManagement"); }}
-            >
-              <BsMusicNoteList className="store-nav-item__icon" />
-              <span>Media management</span>
-              <span className="store-nav-item__chevron">
-                {mediaOpen ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
-              </span>
-            </button>
-            {mediaOpen && (
-              <div className="store-nav-submenu">
-                <button className={`store-nav-sub-item ${isActive("createMediaPlaylist")||isActive("mediaManagement") ? "store-nav-sub-item--active" : ""}`} onClick={() => onNavigate("mediaManagement")}>
-                  <FaPlus size={10} /><span>Create media playlist</span>
-                </button>
-                <button className={`store-nav-sub-item ${isActive("createAnnouncementPlaylist")||isActive("createAnnouncement") ? "store-nav-sub-item--active" : ""}`} onClick={() => onNavigate("mediaManagement")}>
-                  <FaPlus size={10} /><span>Create announcement playlist</span>
-                </button>
-                <button className={`store-nav-sub-item ${isActive("viewAllCampaigns") ? "store-nav-sub-item--active" : ""}`} onClick={() => onNavigate("viewAllCampaigns")}>
-                  <MdCampaign size={12} /><span>View all active campaigns</span>
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            className={`store-nav-item ${isMediaActive ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("mediaManagement")}
+          >
+            <BsMusicNoteList className="store-nav-item__icon" />
+            <span>Create New Store Campaign</span>
+          </button>
+
+          <button
+            className={`store-nav-item ${isActive("viewAllCampaigns") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("viewAllCampaigns")}
+          >
+            <MdCampaign className="store-nav-item__icon" />
+            <span>View all active campaigns</span>
+          </button>
 
           <button
             className={`store-nav-item ${isActive("profile") ? "store-nav-item--active" : ""}`}
@@ -153,18 +142,13 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span>Profile</span>
           </button>
 
-          <div>
-            <button
-              className={`store-nav-item ${isActive("support") ? "store-nav-item--active" : ""}`}
-              onClick={() => setSupportOpen(!supportOpen)}
-            >
-              <FaHeadset className="store-nav-item__icon" />
-              <span>Support</span>
-              <span className="store-nav-item__chevron">
-                {supportOpen ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
-              </span>
-            </button>
-          </div>
+          <button
+            className={`store-nav-item ${isActive("support") ? "store-nav-item--active" : ""}`}
+            onClick={() => { window.location.href = "mailto:contact@centelonrobotics.tech"; }}
+          >
+            <FaHeadset className="store-nav-item__icon" />
+            <span>Support</span>
+          </button>
 
           <button
             className="store-nav-item store-nav-item--logout"
@@ -328,7 +312,11 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
                           Type : {device.type} | SN : {device.sn}
                         </p>
                         <p className="store-device-card__sync">Last sync : {device.lastSync}</p>
-                        <button className="store-device-card__raise-btn" style={{ color: isOnline ? '#16A34A' : '#F05A28' }}>
+                        <button 
+                          className="store-device-card__raise-btn" 
+                          style={{ color: isOnline ? '#16A34A' : '#F05A28' }}
+                          onClick={() => { window.location.href = "mailto:contact@centelonrobotics.tech"; }}
+                        >
                           {isOnline ? 'View Details' : 'Raise issue'} <FaArrowRight size={10} />
                         </button>
                       </div>
@@ -456,7 +444,6 @@ export default function StoreUserPage() {
     setMobileOpen(false);
     if (
       view === "mediaManagement" ||
-      view === "viewAllCampaigns" ||
       view === "createMediaPlaylist" ||
       view === "createAnnouncementPlaylist" ||
       view === "instantPlaylist" ||
@@ -501,6 +488,7 @@ export default function StoreUserPage() {
           />
         );
       case "createAnnouncement":
+      case "createInstantAnnouncement":
         return (
           <CreateAnnouncement
             onNavigate={handleNavigate}
@@ -585,23 +573,9 @@ export default function StoreUserPage() {
         }
         .store-nav-item:hover { background: rgba(255,255,255,0.05); color: #d6eff4; }
         .store-nav-item--active { background: #F05A28 !important; color: #fff !important; font-weight: 600; }
-        .store-nav-item--media-active { color: #d6eff4; }
         .store-nav-item--logout { margin-top: auto; margin-bottom: 10px; }
         .store-nav-item--logout:hover { background: rgba(240,90,40,0.1); color: #F05A28; }
         .store-nav-item__icon { font-size: 1.05rem; flex-shrink: 0; }
-        .store-nav-item__chevron { margin-left: auto; color: #8CABB3; }
-
-        /* Submenu */
-        .store-nav-submenu { padding: 4px 0 4px 34px; display: flex; flex-direction: column; gap: 2px; border-left: 1px dashed rgba(255,255,255,0.15); margin-left: 20px; }
-        .store-nav-sub-item {
-          display: flex; align-items: center; gap: 10px;
-          padding: 8px 10px; border-radius: 6px;
-          background: none; border: none; cursor: pointer;
-          color: #8CABB3; font-size: 0.82rem; font-weight: 500;
-          text-align: left; width: 100%; transition: all 0.15s ease;
-        }
-        .store-nav-sub-item:hover { background: rgba(255,255,255,0.05); color: #c8e8ee; }
-        .store-nav-sub-item--active { color: #F05A28 !important; font-weight: 600; }
 
         /* Version */
         .store-sidebar__version {

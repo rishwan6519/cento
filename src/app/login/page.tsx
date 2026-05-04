@@ -26,7 +26,6 @@ export default function LoginPage() {
       else if (role === "account_admin") router.push("/account_admin");
       else if (role === "account_marketing") router.push("/account_marketing");
       else if (role === "store") router.push("/store_user");
-      else if (role === "store") router.push("/store_user");
     }
   }, [router]);
 
@@ -55,7 +54,7 @@ export default function LoginPage() {
         localStorage.setItem("token", data.token);
         localStorage.setItem("userId", data.user.id); // Save user ID for later use
         localStorage.setItem("userRole", data.user.role); // Save user role for later use
-        toast.success("Login successful!", { duration: 2000 });
+        toast.success("Login successful!", { duration: 3000 });
         if (data.user.role === "admin") {
           router.push("/admin"); // Redirect to admin page
         }else if (data.user.role === "reseller") {
@@ -70,10 +69,8 @@ export default function LoginPage() {
           router.push("/account_admin"); // Redirect to account admin page
         } else if (data.user.role === "account_marketing") {
           router.push("/account_marketing"); // Redirect to account marketing page
-        } else if (data.user.role === "store") {
-          router.push("/store_user"); // Redirect to store page
-        } else if (data.user.role === "store_user") {
-          router.push("/store_user"); // Redirect to store user page
+        } else if (data.user.role === "store" || data.user.role === "store_user") {
+          router.push("/store_user");
         }
       }
     } catch (error) {

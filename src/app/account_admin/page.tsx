@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   LayoutDashboard,
@@ -33,7 +33,9 @@ import {
   Hash,
   Music,
   List as ListIcon,
-  Mail
+  Mail,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
 import { useRouter } from "next/navigation";
@@ -116,7 +118,7 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
 
         <div className="bg-white/10 rounded-2xl p-6 border border-white/10 relative overflow-hidden">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-[#A1F4FD]">Account marketing users</h3>
+            <h3 className="font-medium text-[#A1F4FD]">Central marketing users</h3>
             <User size={20} className="text-[#A1F4FD]" />
           </div>
           <h2 className="text-5xl font-bold text-white">{loading ? "-" : stats.marketingUsers}</h2>
@@ -136,7 +138,7 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
             <h2 className="text-xl font-bold text-gray-900">Attention Required</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4 max-w-md">
             <div className="bg-white rounded-3xl p-6 border-l-4 border-l-[#FF5722] shadow-sm hover:shadow-md transition-shadow">
               <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-6">
                 <Monitor className="text-[#FF5722]" size={20} />
@@ -144,17 +146,6 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
               <h3 className="text-sm font-medium text-gray-800 mb-4 h-10">Stores with no devices assigned</h3>
               <div className="text-4xl font-bold text-gray-900 mb-6">{stats.storesNoDevices}</div>
               <button onClick={() => setActiveView("all_stores")} className="text-[#FF5722] text-sm flex items-center gap-2 font-bold hover:gap-3 transition-all">
-                Check now <ArrowRight size={16} />
-              </button>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 border-l-4 border-l-[#FF5722] shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mb-6">
-                <Monitor className="text-[#FF5722]" size={20} />
-              </div>
-              <h3 className="text-sm font-medium text-gray-800 mb-4 h-10">Devices with no stores assigned</h3>
-              <div className="text-4xl font-bold text-gray-900 mb-6">{stats.devicesNoStores}</div>
-              <button onClick={() => setActiveView("connect_devices")} className="text-[#FF5722] text-sm flex items-center gap-2 font-bold hover:gap-3 transition-all">
                 Check now <ArrowRight size={16} />
               </button>
             </div>
@@ -185,7 +176,7 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
               onClick={() => setActiveView("onboard_user")}
               className="w-full py-4 px-6 bg-white border-2 border-gray-100 text-gray-900 rounded-2xl font-bold hover:border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-between group"
             >
-              <span className="text-left w-full mr-2">Assign new account marketing user</span>
+              <span className="text-left w-full mr-2">Assign new central marketing user</span>
               <Plus size={20} className="group-hover:scale-125 transition-transform shrink-0" />
             </button>
           </div>
@@ -529,17 +520,19 @@ const StoreDetailView = ({ store, setActiveView }: { store: any, setActiveView: 
           {devices.map((device: any) => {
             const isOnline = device.status === 'active' || device.status === 'online';
             const isVideo = (device.typeId?.name || '').toLowerCase().includes('video');
+            const isAudio = (device.typeId?.name || '').toLowerCase().includes('audio');
             return (
               <div key={device._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
                 <div className="p-6 pb-4">
                   <div className="flex justify-between items-start mb-6">
                     <div className="w-12 h-12 bg-[#1A454D] rounded-xl flex items-center justify-center text-[#00BCD4] shadow-sm">
-                      {isVideo ? <Monitor size={24} /> : <MonitorSmartphone size={24} />}
+                      {isVideo ? <Monitor size={24} /> : isAudio ? <Volume2 size={24} /> : <MonitorSmartphone size={24} />}
                     </div>
-                    <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${
+                    <span className={`flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                       isOnline ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'
                     }`}>
-                      {isOnline ? '📶 online' : '📵 offline'}
+                      {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+                      {isOnline ? 'online' : 'offline'}
                     </span>
                   </div>
                   <h3 className="font-bold text-gray-900 mb-4 text-lg line-clamp-1">{device.name}</h3>
@@ -587,20 +580,28 @@ const AssignDeviceView = ({ customerId, accountAdminId }: { customerId?: string,
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     if (!customerId || !accountAdminId) return;
     Promise.all([
       fetch(`/api/user?controllerId=${accountAdminId}`).then(r => r.json()),
-      fetch(`/api/devices?customerId=${customerId}`).then(r => r.json())
-    ]).then(([uData, dData]) => {
+      fetch(`/api/devices?customerId=${customerId}`).then(r => r.json()),
+      fetch(`/api/assign-device?customerId=${customerId}`).then(r => r.json()).catch(() => ({ success: true, data: [] }))
+    ]).then(([uData, dData, aData]) => {
       if (uData.success && Array.isArray(uData.data)) {
         setStores(uData.data.filter((u:any) => u.role === 'store'));
       }
       if (Array.isArray(dData)) {
-        setDevices(dData);
+        const assignments = aData.data || aData.assignments || [];
+        const assignedDeviceIds = new Set(assignments.map((a: any) => a.deviceId?._id || a.deviceId));
+        const unassignedDevices = dData.filter(d => !assignedDeviceIds.has(d._id));
+        setDevices(unassignedDevices);
       }
     });
   }, [customerId, accountAdminId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const toggleDevice = (id: string) => {
     setSelectedDevices(prev => 
@@ -634,6 +635,7 @@ const AssignDeviceView = ({ customerId, accountAdminId }: { customerId?: string,
       toast.success("Assignment complete", { id: loadingToast });
       setSelectedStore('');
       setSelectedDevices([]);
+      fetchData(); // Refresh the list to remove assigned devices
     } catch (err) {
       toast.error("An error occurred during assignment", { id: loadingToast });
     } finally {
@@ -680,6 +682,8 @@ const AssignDeviceView = ({ customerId, accountAdminId }: { customerId?: string,
               ) : (
                 devices.map((device:any) => {
                   const isSelected = selectedDevices.includes(device._id);
+                  const isVideo = (device.typeId?.name || '').toLowerCase().includes('video');
+                  const isAudio = (device.typeId?.name || '').toLowerCase().includes('audio');
                   return (
                     <div 
                       key={device._id} 
@@ -688,7 +692,7 @@ const AssignDeviceView = ({ customerId, accountAdminId }: { customerId?: string,
                     >
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSelected ? 'bg-orange-50 text-[#FF5722]' : 'bg-[#EBF5F6] text-[#00BCD4]'}`}>
-                          <Monitor size={20} />
+                          {isVideo ? <Monitor size={20} /> : isAudio ? <Volume2 size={20} /> : <MonitorSmartphone size={20} />}
                         </div>
                         <div>
                           <h4 className="font-bold text-gray-900">{device.name}</h4>
@@ -856,23 +860,25 @@ const AllDevicesView = ({ customerId, setActiveView }: { customerId?: string, se
             const isConnected = !!assignment;
             const isOnline = device.status === 'active' || device.status === 'online';
             const isVideo = (device.typeId?.name || '').toLowerCase().includes('video');
+            const isAudio = (device.typeId?.name || '').toLowerCase().includes('audio');
             const store = assignment?.userId; // populated with storeName, username
             return (
               <div key={device._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
                 <div className="p-6 pb-4">
                   <div className="flex justify-between items-start mb-5">
                     <div className="w-12 h-12 bg-[#1A454D] rounded-xl flex items-center justify-center text-[#00BCD4] shadow-sm">
-                      {isVideo ? <Monitor size={24} /> : <MonitorSmartphone size={24} />}
+                      {isVideo ? <Monitor size={24} /> : isAudio ? <Volume2 size={24} /> : <MonitorSmartphone size={24} />}
                     </div>
                     {!isConnected ? (
                       <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full text-orange-500 bg-orange-50">
                         📍 Unmapped
                       </span>
                     ) : (
-                      <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${
+                      <span className={`flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                         isOnline ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'
                       }`}>
-                        {isOnline ? '📶 online' : '📵 offline'}
+                        {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+                        {isOnline ? 'online' : 'offline'}
                       </span>
                     )}
                   </div>
@@ -935,7 +941,7 @@ const OnboardUserView = ({ accountAdminId, customerId, onComplete }: { accountAd
     password: '',
     confirmPassword: '',
     hasAllStoreAccess: false,
-    assignedStoreId: ''
+    assignedStoreIds: [] as string[]
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -964,8 +970,8 @@ const OnboardUserView = ({ accountAdminId, customerId, onComplete }: { accountAd
       toast.error('Passwords do not match');
       return;
     }
-    if (!formData.hasAllStoreAccess && !formData.assignedStoreId) {
-      toast.error('Please select a store or give all store access');
+    if (!formData.hasAllStoreAccess && formData.assignedStoreIds.length === 0) {
+      toast.error('Please select at least one store or give all store access');
       return;
     }
 
@@ -982,12 +988,12 @@ const OnboardUserView = ({ accountAdminId, customerId, onComplete }: { accountAd
           controllerId: accountAdminId,
           customerId: customerId,
           hasAllStoreAccess: formData.hasAllStoreAccess,
-          assignedStoreId: formData.hasAllStoreAccess ? undefined : formData.assignedStoreId
+          assignedStoreIds: formData.hasAllStoreAccess ? [] : formData.assignedStoreIds
         })
       });
       const data = await res.json();
       if (data.success) {
-        toast.success('Account Marketing User created!');
+        toast.success('Central Marketing User created!');
         if (onComplete) onComplete();
       } else {
         toast.error(data.message || 'Error creating user');
@@ -1001,8 +1007,8 @@ const OnboardUserView = ({ accountAdminId, customerId, onComplete }: { accountAd
 
   return (
     <div className="pb-12 max-w-[1000px]">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">Onboard Account Marketing User</h1>
-      <p className="text-gray-600 mb-8">Onboard your new account marketing user here</p>
+      <h1 className="text-3xl font-bold text-gray-900 mb-2">Onboard Central Marketing User</h1>
+      <p className="text-gray-600 mb-8">Onboard your new central marketing user here</p>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="flex items-center gap-3 mb-8">
@@ -1032,7 +1038,7 @@ const OnboardUserView = ({ accountAdminId, customerId, onComplete }: { accountAd
           <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-gray-700 mb-3">Give access to all stores <span className="text-red-500">*</span></label>
             <div className="flex items-center gap-6">
-              <label onClick={() => setFormData({...formData, hasAllStoreAccess: true, assignedStoreId: ''})} className="flex items-center gap-2 cursor-pointer">
+              <label onClick={() => setFormData({...formData, hasAllStoreAccess: true, assignedStoreIds: []})} className="flex items-center gap-2 cursor-pointer">
                 <div className={`w-4 h-4 rounded-full ${formData.hasAllStoreAccess ? 'border-[5px] border-[#FF5722]' : 'border-2 border-gray-300'}`}></div>
                 <span className="text-sm font-medium">Yes</span>
               </label>
@@ -1044,13 +1050,28 @@ const OnboardUserView = ({ accountAdminId, customerId, onComplete }: { accountAd
           </div>
           {!formData.hasAllStoreAccess && (
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Select store <span className="text-red-500">*</span></label>
-              <select value={formData.assignedStoreId} onChange={e => setFormData({...formData, assignedStoreId: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
-                <option value="">-- Choose a store --</option>
-                {stores.map((s:any) => (
-                  <option key={s._id} value={s._id}>{s.storeName || s.username || 'Store'}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Select stores <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {stores.map((s:any) => {
+                  const isChecked = formData.assignedStoreIds.includes(s._id);
+                  return (
+                    <label key={s._id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isChecked ? 'border-[#FF5722] bg-orange-50/20' : 'border-gray-100 hover:border-gray-200 bg-gray-50/30'}`}>
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded text-[#FF5722] focus:ring-[#FF5722]"
+                        checked={isChecked}
+                        onChange={() => {
+                          const newIds = isChecked 
+                            ? formData.assignedStoreIds.filter(id => id !== s._id)
+                            : [...formData.assignedStoreIds, s._id];
+                          setFormData({...formData, assignedStoreIds: newIds});
+                        }}
+                      />
+                      <span className="text-sm font-medium text-gray-700">{s.storeName || s.username}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -1077,7 +1098,7 @@ const EditUserView = ({ user, accountAdminId, customerId, onComplete }: { user: 
     password: '',
     confirmPassword: '',
     hasAllStoreAccess: user?.hasAllStoreAccess || false,
-    assignedStoreId: user?.assignedStoreId || ''
+    assignedStoreIds: user?.assignedStoreIds || (user?.assignedStoreId ? [user.assignedStoreId] : []) as string[]
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -1113,7 +1134,7 @@ const EditUserView = ({ user, accountAdminId, customerId, onComplete }: { user: 
         username: formData.username,
         email: formData.email,
         hasAllStoreAccess: formData.hasAllStoreAccess,
-        assignedStoreId: formData.hasAllStoreAccess ? null : formData.assignedStoreId
+        assignedStoreIds: formData.hasAllStoreAccess ? [] : formData.assignedStoreIds
       };
       
       if (formData.password) {
@@ -1145,7 +1166,7 @@ const EditUserView = ({ user, accountAdminId, customerId, onComplete }: { user: 
         <button onClick={() => onComplete && onComplete()} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ArrowRight className="rotate-180" size={20} />
         </button>
-        <h1 className="text-3xl font-bold text-gray-900">Edit Account Marketing User</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Edit Central Marketing User</h1>
       </div>
       <p className="text-gray-600 mb-8 ml-12">Update detail for {user.username}</p>
 
@@ -1186,7 +1207,7 @@ const EditUserView = ({ user, accountAdminId, customerId, onComplete }: { user: 
           <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-gray-700 mb-3">Give access to all stores <span className="text-red-500">*</span></label>
             <div className="flex items-center gap-6">
-              <label onClick={() => setFormData({...formData, hasAllStoreAccess: true, assignedStoreId: ''})} className="flex items-center gap-2 cursor-pointer">
+              <label onClick={() => setFormData({...formData, hasAllStoreAccess: true, assignedStoreIds: []})} className="flex items-center gap-2 cursor-pointer">
                 <div className={`w-4 h-4 rounded-full ${formData.hasAllStoreAccess ? 'border-[5px] border-[#FF5722]' : 'border-2 border-gray-300'}`}></div>
                 <span className="text-sm font-medium">Yes</span>
               </label>
@@ -1198,13 +1219,28 @@ const EditUserView = ({ user, accountAdminId, customerId, onComplete }: { user: 
           </div>
           {!formData.hasAllStoreAccess && (
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Select store <span className="text-red-500">*</span></label>
-              <select value={formData.assignedStoreId} onChange={e => setFormData({...formData, assignedStoreId: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
-                <option value="">-- Choose a store --</option>
-                {stores.map((s:any) => (
-                  <option key={s._id} value={s._id}>{s.storeName || s.username || 'Store'}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Select stores <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {stores.map((s:any) => {
+                  const isChecked = formData.assignedStoreIds.includes(s._id);
+                  return (
+                    <label key={s._id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isChecked ? 'border-[#FF5722] bg-orange-50/20' : 'border-gray-100 hover:border-gray-200 bg-gray-50/30'}`}>
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded text-[#FF5722] focus:ring-[#FF5722]"
+                        checked={isChecked}
+                        onChange={() => {
+                          const newIds = isChecked 
+                            ? formData.assignedStoreIds.filter((id: string) => id !== s._id)
+                            : [...formData.assignedStoreIds, s._id];
+                          setFormData({...formData, assignedStoreIds: newIds});
+                        }}
+                      />
+                      <span className="text-sm font-medium text-gray-700">{s.storeName || s.username}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -1384,8 +1420,8 @@ const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, on
 
   return (
     <div className="pb-12 max-w-[1200px]">
-      <h1 className="text-3xl font-bold text-gray-900 mb-1">Account Marketing User</h1>
-      <p className="text-sm text-gray-500 mb-8">List of all your account marketing user</p>
+      <h1 className="text-3xl font-bold text-gray-900 mb-1">Central Marketing User</h1>
+      <p className="text-sm text-gray-500 mb-8">List of all your central marketing user</p>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="flex items-center gap-4">
@@ -1393,7 +1429,7 @@ const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, on
             <Users size={24} />
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">Total account marketing users</p>
+            <p className="text-sm text-gray-500 mb-1">Total central marketing users</p>
             <p className="text-3xl font-bold text-[#0E3B43]">{loading ? "-" : users.length}</p>
           </div>
         </div>
@@ -1421,7 +1457,7 @@ const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, on
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-100 text-xs font-bold text-gray-900 uppercase">
-                <th className="px-6 py-4">ACCOUNT MARKETING USER</th>
+                <th className="px-6 py-4">CENTRAL MARKETING USER</th>
                 <th className="px-6 py-4">NO OF STORES</th>
                 <th className="px-6 py-4 text-right">ACTION</th>
               </tr>
@@ -1431,7 +1467,7 @@ const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, on
                 <tr key={u._id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-6 py-6 text-gray-800">{u.username}</td>
                   <td className="px-6 py-6 text-gray-800">
-                    {u.hasAllStoreAccess ? "All Stores" : u.assignedStoreId ? "1" : "0"}
+                    {u.hasAllStoreAccess ? "All Stores" : (u.assignedStoreIds?.length || (u.assignedStoreId ? "1" : "0"))}
                   </td>
                   <td className="px-6 py-6 flex items-center justify-end gap-4">
                     <button
@@ -1454,7 +1490,7 @@ const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, on
               {users.length === 0 && !loading && (
                 <tr>
                   <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                    No account marketing users found
+                    No central marketing users found
                   </td>
                 </tr>
               )}
@@ -1463,7 +1499,7 @@ const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, on
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
           <span>
-            Showing {users.length} of {users.length} account marketing user
+            Showing {users.length} of {users.length} central marketing user
           </span>
           <div className="flex gap-2">
             <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">
@@ -1481,6 +1517,9 @@ const ViewUsersView = ({ accountAdminId, onEdit }: { accountAdminId?: string, on
 
 const ProfileView = ({ userData }: { userData: any }) => {
   const [customer, setCustomer] = useState<any>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwords, setPasswords] = useState({ new: '', confirm: '' });
+  const [submitting, setSubmitting] = useState(false);
   
   useEffect(() => {
     if (!userData?.customerId) return;
@@ -1497,6 +1536,37 @@ const ProfileView = ({ userData }: { userData: any }) => {
     };
     fetchCustomer();
   }, [userData]);
+
+  const handlePasswordChange = async () => {
+    if (!passwords.new || !passwords.confirm) {
+      toast.error("Please fill in all password fields");
+      return;
+    }
+    if (passwords.new !== passwords.confirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/user?userId=${userData._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwords.new })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Password updated successfully");
+        setIsChangingPassword(false);
+        setPasswords({ new: '', confirm: '' });
+      } else {
+        toast.error(data.message || "Failed to update password");
+      }
+    } catch (err) {
+      toast.error("An error occurred");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const userName = userData?.operatorName || userData?.username || "Admin";
   const userInitials = userName.charAt(0).toUpperCase();
@@ -1619,11 +1689,55 @@ const ProfileView = ({ userData }: { userData: any }) => {
       </div>
     </div>
     
+    {isChangingPassword && (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8 animate-in slide-in-from-top-4 duration-300">
+        <h3 className="font-bold text-gray-900 mb-6 text-lg">Change Password</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
+            <input 
+              type="password" 
+              value={passwords.new} 
+              onChange={e => setPasswords({...passwords, new: e.target.value})}
+              className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password</label>
+            <input 
+              type="password" 
+              value={passwords.confirm} 
+              onChange={e => setPasswords({...passwords, confirm: e.target.value})}
+              className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
+            />
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            disabled={submitting} 
+            onClick={handlePasswordChange}
+            className="px-6 py-2.5 bg-[#00BCD4] text-white rounded-lg font-bold hover:bg-[#00ACC1] transition-colors disabled:bg-gray-300"
+          >
+            {submitting ? "Updating..." : "Update Password"}
+          </button>
+          <button 
+            onClick={() => setIsChangingPassword(false)}
+            className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )}
+    
     <div className="flex gap-4">
       <button className="px-8 py-3 bg-[#FF5722] text-white rounded-xl font-bold hover:bg-[#E64A19] transition-colors shadow-md shadow-[#FF5722]/20">
         Edit Profile
       </button>
-      <button className="px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors">
+      <button 
+        onClick={() => setIsChangingPassword(!isChangingPassword)}
+        className={`px-6 py-3 border rounded-xl font-bold transition-all ${isChangingPassword ? 'bg-[#0E3B43] text-white border-[#0E3B43]' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+      >
         Change Password
       </button>
     </div>
@@ -1691,8 +1805,8 @@ export default function AccountAdminDashboard() {
       label: "User Management", 
       icon: Users,
       subItems: [
-        { id: "onboard_user", label: "Onboard a/c marketing user", icon: Plus },
-        { id: "all_users", label: "View a/c marketing user", icon: ListIcon }
+        { id: "onboard_user", label: "Onboard Central marketing user", icon: Plus },
+        { id: "all_users", label: "View Central marketing user", icon: ListIcon }
       ]
     },
     { id: "profile", label: "Profile", icon: User },
@@ -1701,7 +1815,7 @@ export default function AccountAdminDashboard() {
 
   const handleMenuClick = (linkId: string, hasSubItems: boolean) => {
     if (linkId === "support") {
-      window.location.href = "mailto:support@centelon.com";
+      window.location.href = "mailto:contact@centelonrobotics.tech";
       return;
     }
     if (hasSubItems) {
@@ -1743,7 +1857,6 @@ export default function AccountAdminDashboard() {
 
   return (
     <div className="flex h-screen bg-[#EBF5F6] font-sans overflow-hidden">
-      <Toaster position="top-right" />
       {/* Sidebar */}
       <aside className="w-[260px] bg-[#122A30] flex flex-col h-full text-white/80 shrink-0 shadow-xl z-20">
         <div className="p-6 flex items-center gap-3">

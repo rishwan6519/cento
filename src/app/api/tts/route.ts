@@ -2,7 +2,7 @@ import ApiKey from '@/models/ApiKey';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 
-const MODEL_NAME = "gemini-2.5-flash-preview-tts";
+const MODEL_NAME = "gemini-1.5-flash-latest";
 const GEMINI_TTS_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
 
 export async function POST(req: NextRequest) {
@@ -16,13 +16,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
 
+    let apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+
     const keyDoc = await ApiKey.findOne({ userId });
     console.log("Fetched API key document:", keyDoc);
-    if (!keyDoc) {
-      return NextResponse.json({ error: "API key not found for this user." }, { status: 404 });
+    
+    if (keyDoc) {
+      apiKey = keyDoc.apiKey;
     }
 
-    const apiKey = keyDoc.apiKey;
+    if (!apiKey) {
+      return NextResponse.json({ error: "API key not found. Please configure GEMINI_API_KEY in .env.local" }, { status: 404 });
+    }
 
     if (!text || !voice) {
       return NextResponse.json(
@@ -32,7 +37,6 @@ export async function POST(req: NextRequest) {
     }
 
     const requestBody = {
-      model: MODEL_NAME,
       contents: [
         {
           parts: [{ text }],
@@ -55,7 +59,23 @@ export async function POST(req: NextRequest) {
     });
 
     if (!apiResponse.ok) {
-      const errorData = await apiResponse.json();
+      const errorData = await apiResponse.json().catch(() => ({}));
+      console.warn("Gemini TTS failed, using fallback:", errorData.error?.message);
+      
+      const fallbackUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
+      const fallbackRes = await fetch(fallbackUrl);
+      
+      if (fallbackRes.ok) {
+        const audioBuffer = await fallbackRes.arrayBuffer();
+        return new NextResponse(Buffer.from(audioBuffer), {
+          status: 200,
+          headers: {
+            "Content-Type": "audio/mpeg",
+            "Content-Disposition": "attachment; filename=tts.mp3",
+          },
+        });
+      }
+
       return NextResponse.json(
         { error: errorData.error?.message || "Failed to generate audio" },
         { status: apiResponse.status }
@@ -66,6 +86,15 @@ export async function POST(req: NextRequest) {
     const audioData = responseJson.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
     if (!audioData) {
+      const fallbackUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
+      const fallbackRes = await fetch(fallbackUrl);
+      if (fallbackRes.ok) {
+         const audioBuffer = await fallbackRes.arrayBuffer();
+         return new NextResponse(Buffer.from(audioBuffer), {
+           status: 200,
+           headers: { "Content-Type": "audio/mpeg" },
+         });
+      }
       throw new Error("No audio data returned from Gemini API.");
     }
 

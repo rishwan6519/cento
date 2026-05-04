@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, Mic, Volume2, FolderOpen, Store, AlertTriangle, Check, ChevronDown, Clock, Calendar, Hash, Music, Search, Zap, Megaphone, Type, Library, AlertCircle } from "lucide-react";
+import { Upload, Mic, Volume2, FolderOpen, Store, AlertTriangle, Check, ChevronDown, Clock, Calendar, Hash, Music, Search, Zap, Megaphone, Type, Library, AlertCircle, Save } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface CreateAnnouncementWizardProps {
@@ -31,9 +31,17 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
   const [method, setMethod] = useState<"upload" | "record" | "tts" | "library">(isInstant ? "record" : "upload");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [isUploadingOnly, setIsUploadingOnly] = useState(false);
+  const [isFilesSaved, setIsFilesSaved] = useState(false);
+  const [savedMediaIds, setSavedMediaIds] = useState<string[]>([]);
   
   // TTS State
   const [ttsText, setTtsText] = useState("");
+  const [ttsLanguage, setTtsLanguage] = useState("English – USA");
+  const [ttsGender, setTtsGender] = useState("Male");
+  const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
+  const [isGeneratingTts, setIsGeneratingTts] = useState(false);
+  const [isTtsSaved, setIsTtsSaved] = useState(false);
 
   // Library State
   const [libraryMedia, setLibraryMedia] = useState<any[]>([]);
@@ -56,7 +64,9 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
     setLoadingDevices(true);
     
     let url = `/api/assign-device?userId=${userId}`;
-    if ((userRole === "account_admin" || userRole === "account_marketing") && customerId) {
+    if (userRole === "account_admin") {
+       url = `/api/assign-device?assignedBy=${userId}`;
+    } else if (userRole === "account_marketing" && customerId) {
        url = `/api/assign-device?customerId=${customerId}`;
     }
 
@@ -138,9 +148,31 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
     }
   };
 
-  const handleSaveRecording = () => {
-    setIsRecordingSaved(true);
-    toast.success("Recording saved. Ready to broadcast.");
+  const handleSaveRecording = async () => {
+    if (!recordedBlob) return;
+    setIsUploadingOnly(true);
+    try {
+      const formData = new FormData();
+      formData.append("userId", userId);
+      formData.append("userRole", userRole);
+      const fileName = `recorded_announcement_${Date.now()}.webm`;
+      formData.append(`files[0]`, new File([recordedBlob], fileName, { type: 'audio/webm' }));
+      formData.append(`fileNames[0]`, fileName);
+
+      const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
+      const upData = await upRes.json();
+      if (upData.success) {
+        toast.success("Recording uploaded and saved to library!");
+        setIsRecordingSaved(true);
+        setSavedMediaIds(upData.files.map((f: any) => f._id || f.id));
+      } else {
+        toast.error(upData.message || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("An error occurred during upload");
+    } finally {
+      setIsUploadingOnly(false);
+    }
   };
 
   const formatDuration = (seconds: number) => {
@@ -158,6 +190,105 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setSelectedFiles(files);
+    setIsFilesSaved(false);
+  };
+
+  const handleGenerateTts = async () => {
+    if (!ttsText) {
+      toast.error("Please enter text for the announcement.");
+      return;
+    }
+    setIsGeneratingTts(true);
+    setIsTtsSaved(false);
+    try {
+      // Mapping for Gemini TTS voices
+      const voiceMapping: any = {
+        "Male": "Puck",
+        "Female": "Charon"
+      };
+
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: ttsText,
+          voice: voiceMapping[ttsGender] || "Puck",
+          userId
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to generate audio");
+      }
+
+      const blob = await res.blob();
+      if (ttsAudioUrl) URL.revokeObjectURL(ttsAudioUrl);
+      const url = URL.createObjectURL(blob);
+      setTtsAudioUrl(url);
+      toast.success("Preview generated successfully!");
+    } catch (err) {
+      console.error("TTS Error:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to generate preview");
+    } finally {
+      setIsGeneratingTts(false);
+    }
+  };
+
+  const handleSaveTts = async () => {
+    if (!ttsAudioUrl) return;
+    setIsUploadingOnly(true);
+    try {
+      const audioBlob = await fetch(ttsAudioUrl).then(r => r.blob());
+      const formData = new FormData();
+      formData.append("userId", userId);
+      formData.append("userRole", userRole);
+      const fileName = `tts_announcement_${Date.now()}.wav`;
+      formData.append(`files[0]`, new File([audioBlob], fileName, { type: 'audio/wav' }));
+      formData.append(`fileNames[0]`, fileName);
+
+      const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
+      const upData = await upRes.json();
+      if (upData.success) {
+        toast.success("TTS saved to library!");
+        setIsTtsSaved(true);
+        setSavedMediaIds(upData.files.map((f: any) => f._id || f.id));
+      } else {
+        toast.error(upData.message || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("An error occurred during save");
+    } finally {
+      setIsUploadingOnly(false);
+    }
+  };
+
+  const handleUploadOnly = async () => {
+    if (selectedFiles.length === 0) return;
+    setIsUploadingOnly(true);
+    try {
+      const formData = new FormData();
+      formData.append("userId", userId);
+      formData.append("userRole", userRole);
+      selectedFiles.forEach((file, i) => {
+        formData.append(`files[${i}]`, file);
+        formData.append(`fileNames[${i}]`, file.name);
+      });
+
+      const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
+      const upData = await upRes.json();
+      if (upData.success) {
+        toast.success("Media uploaded and saved to library!");
+        setIsFilesSaved(true);
+        setSavedMediaIds(upData.files.map((f: any) => f._id || f.id));
+      } else {
+        toast.error(upData.message || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("An error occurred during upload");
+    } finally {
+      setIsUploadingOnly(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -182,35 +313,63 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
       if (method === "library" && selectedLibraryId) {
         mediaIds = [selectedLibraryId];
       } else if (method === "upload" && selectedFiles.length > 0) {
-        const formData = new FormData();
-        formData.append("userId", userId);
-        formData.append("userRole", userRole);
-        selectedFiles.forEach((file, i) => {
-          formData.append(`files[${i}]`, file);
-          formData.append(`fileNames[${i}]`, file.name);
-        });
-
-        const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
-        const upData = await upRes.json();
-        if (upData.success) {
-          mediaIds = upData.files.map((f: any) => f._id || f.id);
+        if (isFilesSaved && savedMediaIds.length > 0) {
+          mediaIds = savedMediaIds;
         } else {
-          throw new Error(upData.message || "Upload failed");
+          const formData = new FormData();
+          formData.append("userId", userId);
+          formData.append("userRole", userRole);
+          selectedFiles.forEach((file, i) => {
+            formData.append(`files[${i}]`, file);
+            formData.append(`fileNames[${i}]`, file.name);
+          });
+
+          const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
+          const upData = await upRes.json();
+          if (upData.success) {
+            mediaIds = upData.files.map((f: any) => f._id || f.id);
+          } else {
+            throw new Error(upData.message || "Upload failed");
+          }
         }
       } else if (method === "record" && recordedBlob && isRecordingSaved) {
-        const formData = new FormData();
-        formData.append("userId", userId);
-        formData.append("userRole", userRole);
-        const fileName = `recorded_announcement_${Date.now()}.webm`;
-        formData.append(`files[0]`, new File([recordedBlob], fileName, { type: 'audio/webm' }));
-        formData.append(`fileNames[0]`, fileName);
-
-        const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
-        const upData = await upRes.json();
-        if (upData.success) {
-          mediaIds = upData.files.map((f: any) => f._id || f.id);
+        if (savedMediaIds.length > 0) {
+          mediaIds = savedMediaIds;
         } else {
-          throw new Error(upData.message || "Upload failed");
+          const formData = new FormData();
+          formData.append("userId", userId);
+          formData.append("userRole", userRole);
+          const fileName = `recorded_announcement_${Date.now()}.webm`;
+          formData.append(`files[0]`, new File([recordedBlob], fileName, { type: 'audio/webm' }));
+          formData.append(`fileNames[0]`, fileName);
+
+          const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
+          const upData = await upRes.json();
+          if (upData.success) {
+            mediaIds = upData.files.map((f: any) => f._id || f.id);
+          } else {
+            throw new Error(upData.message || "Upload failed");
+          }
+        }
+      } else if (method === "tts" && ttsAudioUrl && isTtsSaved) {
+        if (savedMediaIds.length > 0) {
+          mediaIds = savedMediaIds;
+        } else {
+          const audioBlob = await fetch(ttsAudioUrl).then(r => r.blob());
+          const formData = new FormData();
+          formData.append("userId", userId);
+          formData.append("userRole", userRole);
+          const fileName = `tts_announcement_${Date.now()}.wav`;
+          formData.append(`files[0]`, new File([audioBlob], fileName, { type: 'audio/wav' }));
+          formData.append(`fileNames[0]`, fileName);
+
+          const upRes = await fetch("/api/media/upload", { method: "POST", body: formData });
+          const upData = await upRes.json();
+          if (upData.success) {
+            mediaIds = upData.files.map((f: any) => f._id || f.id);
+          } else {
+            throw new Error(upData.message || "Upload failed");
+          }
         }
       } else {
          toast.error("Please provide media (upload or library selection) before connecting.");
@@ -322,9 +481,16 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
                     </button>
                     <button 
                       onClick={handleSaveRecording}
+                      disabled={isUploadingOnly}
                       className="px-8 py-3 bg-[#FF5722] text-white rounded-[12px] font-bold shadow-md hover:bg-[#F4511E] shadow-[#FF5722]/30 active:scale-95 transition-all text-[13px] flex items-center gap-2"
                     >
-                      <Check size={16} /> Save
+                      {isUploadingOnly ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <Check size={16} /> Save
+                        </>
+                      )}
                     </button>
                   </>
                 )
@@ -367,30 +533,73 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Language & Accent</label>
                 <div className="relative">
-                  <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
-                    <option>English (US)</option>
-                    <option>English (UK)</option>
+                  <select 
+                    value={ttsLanguage}
+                    onChange={(e) => setTtsLanguage(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer"
+                  >
+                    <option>English – Australian</option>
+                    <option>English – Indian</option>
+                    <option>English – USA</option>
+                    <option>English – UK</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Voice style</label>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Gender of Voice</label>
                 <div className="relative">
-                  <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
-                    <option>Professional Male</option>
-                    <option>Warm Female</option>
+                  <select 
+                    value={ttsGender}
+                    onChange={(e) => setTtsGender(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer"
+                  >
+                    <option>Male</option>
+                    <option>Female</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
               </div>
             </div>
 
+            {ttsAudioUrl && (
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Music size={14} /> Preview ready
+                  </span>
+                  {isTtsSaved && (
+                    <span className="text-[10px] font-bold text-green-600 flex items-center gap-1">
+                      <Check size={12} /> Saved to Library
+                    </span>
+                  )}
+                </div>
+                <audio controls src={ttsAudioUrl} className="w-full h-10" />
+                {!isTtsSaved && (
+                  <button 
+                    onClick={handleSaveTts}
+                    disabled={isUploadingOnly}
+                    className="w-full mt-3 py-2 bg-[#FF5722] text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#F4511E] transition-all"
+                  >
+                    {isUploadingOnly ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Check size={14} /> Save to Library</>}
+                  </button>
+                )}
+              </div>
+            )}
+
             <button 
-              onClick={() => toast.success("Generating preview...")}
-              className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors text-[13px] shadow-md"
+              onClick={handleGenerateTts}
+              disabled={isGeneratingTts}
+              className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-all text-[13px] shadow-md flex items-center justify-center gap-2 active:scale-[0.98]"
             >
-              Generate & Preview
+              {isGeneratingTts ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Generating...
+                </>
+              ) : (
+                "Generate & Preview"
+              )}
             </button>
           </div>
         );
@@ -436,8 +645,7 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
       default:
         return (
           <div 
-            className="bg-white rounded-[20px] border-2 border-dashed border-[#E2E8F0] p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:border-cyan-400 transition-colors group shadow-sm"
-            onClick={() => fileInputRef.current?.click()}
+            className="bg-white rounded-[20px] border-2 border-dashed border-[#E2E8F0] p-10 flex flex-col items-center justify-center text-center hover:border-cyan-400 transition-colors group shadow-sm"
           >
             <div className="w-16 h-16 bg-[#FFF5F2] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
               <Upload size={32} className="text-[#FF5722]" />
@@ -448,9 +656,34 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
             <p className="text-slate-500 text-[13px] mb-6 max-w-xs">
               Add media from your device. Audio, video, image. Size up to 5kb
             </p>
-            <button className="bg-[#FF5722] text-white px-8 py-2.5 rounded-xl font-bold shadow-md hover:bg-[#F4511E] transition-colors">
-              {selectedFiles.length > 0 ? "Change selection" : "Start uploading"}
-            </button>
+            <div className="flex gap-3">
+              <button 
+                onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                className="bg-white border border-[#E2E8F0] text-slate-700 px-8 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-colors text-[13px]"
+              >
+                {selectedFiles.length > 0 ? "Change selection" : "Select file"}
+              </button>
+              {selectedFiles.length > 0 && !isFilesSaved && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleUploadOnly(); }}
+                  disabled={isUploadingOnly}
+                  className="bg-[#FF5722] text-white px-8 py-2.5 rounded-xl font-bold shadow-md hover:bg-[#F4511E] transition-all text-[13px] flex items-center gap-2"
+                >
+                  {isUploadingOnly ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <Save size={16} /> Save
+                    </>
+                  )}
+                </button>
+              )}
+              {isFilesSaved && (
+                <div className="flex items-center gap-2 text-green-600 font-bold text-[13px] bg-green-50 px-4 py-2 rounded-xl border border-green-100">
+                  <Check size={16} /> Saved to Library
+                </div>
+              )}
+            </div>
             <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
           </div>
         );

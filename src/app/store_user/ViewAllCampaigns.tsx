@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { FaEdit, FaTrash, FaPlus, FaSearch } from "react-icons/fa";
+import { FaEdit, FaTrash, FaPlus, FaSearch, FaArrowLeft } from "react-icons/fa";
 import { ViewKey } from "./page";
 
 interface Props { 
@@ -12,6 +12,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
   const [search, setSearch] = useState("");
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
 
@@ -29,6 +30,21 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
     const t = (p.type || "").toLowerCase();
     if (filter === "media" && t === "announcement") return false;
     if (filter === "announcement" && t !== "announcement") return false;
+    
+    // End Date Filter
+    if (dateFilter && p.endDate) {
+      const d = new Date(p.endDate);
+      if (!isNaN(d.getTime())) {
+        const pYear = d.getFullYear();
+        const pMonth = String(d.getMonth() + 1).padStart(2, '0');
+        const pDay = String(d.getDate()).padStart(2, '0');
+        const formattedPDate = `${pYear}-${pMonth}-${pDay}`;
+        if (formattedPDate !== dateFilter) return false;
+      } else {
+        return false; // If date is invalid but filter is set, don't show
+      }
+    }
+
     if (search && !(p.name || "").toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -50,8 +66,13 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
 
   return (
     <div className="su-vc-view">
-      <h1 className="su-vc-title">View campaigns</h1>
-      <p className="su-vc-subtitle">View your playlists and announcements here</p>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
+        <button onClick={() => onNavigate("dashboard")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+          <FaArrowLeft size={18} />
+        </button>
+        <h1 className="su-vc-title" style={{ margin: 0 }}>View All Campaigns</h1>
+      </div>
+      <p className="su-vc-subtitle" style={{ marginLeft: "30px" }}>View your playlists and announcements here</p>
 
       {/* Top Bar */}
       <div className="su-vc-top">
@@ -61,10 +82,15 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
             <input type="text" placeholder="Search by name..." value={search} onChange={e => setSearch(e.target.value)} className="su-vc-search" />
           </div>
           <select className="su-vc-filter-select" value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="all">All types</option>
-            <option value="media">Media playlists</option>
-            <option value="announcement">Announcements</option>
+            <option value="all">Campaign Type</option>
+            <option value="media">Media Playlist</option>
+            <option value="announcement">Announcement Playlist</option>
           </select>
+          <div className="su-vc-date-filter">
+            <span className="su-vc-date-label">End Date:</span>
+            <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="su-vc-filter-select" />
+            {dateFilter && <button onClick={() => setDateFilter("")} className="su-vc-clear-date">Clear</button>}
+          </div>
         </div>
         <button className="su-vc-create-btn" onClick={() => onNavigate("mediaManagement")}>
           <FaPlus size={12} /> Create new
@@ -81,9 +107,9 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
         ) : (
           <>
             <table className="su-vc-table">
-              <thead><tr>
-                <th>NAME</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
-              </tr></thead>
+               <thead><tr>
+                 <th>CAMPAIGN TYPE</th><th>NAME</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
+               </tr></thead>
               <tbody>
                 {filtered.map(p => {
                   const id = p._id || p.id;
@@ -93,8 +119,13 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                   const schedule = [days, time].filter(Boolean).join(" | ") || "—";
                   const preview = p.mediaIds?.length ? `Display file link - uploaded by ${p.userId?.username || "user"}` : "—";
                   return (
-                    <tr key={id}>
-                      <td style={{fontWeight:600,color:"#162B30"}}>{p.name || "Playlist name"}</td>
+                     <tr key={id}>
+                       <td>
+                         <span className={`su-vc-type-badge ${p.type === 'announcement' ? 'su-vc-type--ann' : 'su-vc-type--media'}`}>
+                           {p.type === 'announcement' ? 'Announcement' : 'Media'}
+                         </span>
+                       </td>
+                       <td style={{fontWeight:600,color:"#162B30"}}>{p.name || "Playlist name"}</td>
                       <td>{schedule}</td>
                       <td style={{fontSize:".8rem",color:"#64848D"}}>{preview}</td>
                       <td><span className="su-vc-status" style={{color:getStatusColor(status),background:status==="Running"?"#F0FDF4":status==="Completed"?"#F8FAFB":"#FFFBEB"}}>{status}</span></td>
@@ -142,6 +173,12 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
         .su-vc-action-btn--del{background:#FFF2F2;color:#DC2626}
         .su-vc-footer{padding:14px 24px;border-top:1px solid #EAEFEF;font-size:.82rem;color:#A4B6B9}
         .su-vc-empty{padding:48px;text-align:center;color:#A4B6B9;font-size:.9rem}
+        .su-vc-type-badge{padding:4px 10px;border-radius:6px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+        .su-vc-type--ann{background:#FFF2F2;color:#DC2626;border:1px solid #FEE2E2}
+        .su-vc-type--media{background:#EAF6F8;color:#11B5BB;border:1px solid #CFE9EC}
+        .su-vc-date-filter{display:flex;align-items:center;gap:8px}
+        .su-vc-date-label{font-size:.8rem;font-weight:600;color:#64848D}
+        .su-vc-clear-date{background:none;border:none;color:#DC2626;font-size:.75rem;font-weight:600;cursor:pointer}
       `}</style>
     </div>
   );

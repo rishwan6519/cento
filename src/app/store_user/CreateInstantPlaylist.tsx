@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { FaPlus, FaTrash, FaMusic, FaVideo, FaImage, FaDesktop, FaCheck } from "react-icons/fa";
+import { FaPlus, FaTrash, FaMusic, FaVideo, FaImage, FaDesktop, FaCheck, FaStore, FaArrowLeft } from "react-icons/fa";
 import { ViewKey } from "./page";
 
 interface MediaItem {
@@ -156,8 +156,13 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
 
   return (
     <div className="su-instant-playlist-view">
-      <h1 className="su-ip-title">Create New Instant Playlist</h1>
-      <p className="su-ip-subtitle">Build instant playlist by selecting and ordering media files</p>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
+        <button onClick={() => onNavigate("mediaManagement")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+          <FaArrowLeft size={18} />
+        </button>
+        <h1 className="su-ip-title" style={{ margin: 0 }}>Create New Instant Playlist</h1>
+      </div>
+      <p className="su-ip-subtitle" style={{ marginLeft: "30px" }}>Build instant playlist by selecting and ordering media files</p>
 
       {/* Instant Playlist Information */}
       <div className="su-ip-card">
@@ -296,12 +301,13 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
               return (
                 <div key={d._id} className={`su-ip-store-card ${isSel ? "su-ip-store-card--sel" : ""}`} onClick={() => toggleDevice(d._id)}>
                   <div className="su-ip-store-icon">
-                    <FaDesktop size={14} />
+                    <FaStore size={14} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className="su-ip-store-name">{d.storeName || d.name} <span style={{ color: isOnline ? "#16A34A" : "#DC2626", fontSize: 10 }}>●</span></p>
+                    <p className="su-ip-store-name">{d.storeName} <span style={{ color: isOnline ? "#16A34A" : "#DC2626", fontSize: 10 }}>●</span></p>
+                    <p style={{ fontSize: "0.75rem", color: "#64848D", marginBottom: 2 }}>{d.name} ({d.serialNumber})</p>
                     <p className="su-ip-store-addr">{d.address}</p>
-                    <p style={{ fontSize: "0.7rem", fontWeight: 700, color: isOnline ? "#16A34A" : "#DC2626", marginTop: 4 }}>{d.status || "Inactive"}</p>
+                    <p style={{ fontSize: "0.7rem", fontWeight: 700, color: isOnline ? "#16A34A" : "#DC2626", marginTop: 4 }}>{isOnline ? "Active" : "Offline"}</p>
                   </div>
                   {isSel && (
                     <div className="su-ip-store-check">
