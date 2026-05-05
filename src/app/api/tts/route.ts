@@ -2,7 +2,7 @@ import ApiKey from '@/models/ApiKey';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 
-const MODEL_NAME = "gemini-1.5-flash-latest";
+const MODEL_NAME = "gemini-1.5-flash";
 const GEMINI_TTS_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
 
 export async function POST(req: NextRequest) {
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     console.log("Received TTS request");
     await connectToDatabase();
 
-    const { text, voice, userId } = await req.json();
+    const { text, voice, userId, language } = await req.json();
     console.log("Request parameters:", { text, voice, userId });
     if (!userId) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       apiKey = keyDoc.apiKey;
     }
 
+    console.log("Using API Key:", apiKey ? (apiKey.substring(0, 5) + "...") : "MISSING");
     if (!apiKey) {
       return NextResponse.json({ error: "API key not found. Please configure GEMINI_API_KEY in .env.local" }, { status: 404 });
     }
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     const requestBody = {
       contents: [
         {
-          parts: [{ text }],
+          parts: [{ text: `Speak as a ${voice === "Puck" || voice === "Fenrir" ? "man" : "woman"} with a ${language ? language.replace("English – ", "") : "American"} accent. Text: ${text}` }],
         },
       ],
       generationConfig: {
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
       const errorData = await apiResponse.json().catch(() => ({}));
       console.warn("Gemini TTS failed, using fallback:", errorData.error?.message);
       
+      console.warn("FALLBACK ACTIVATED: Gemini TTS failed. Please check your API key.");
       const fallbackUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
       const fallbackRes = await fetch(fallbackUrl);
       
@@ -86,6 +88,7 @@ export async function POST(req: NextRequest) {
     const audioData = responseJson.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
     if (!audioData) {
+      console.warn("FALLBACK ACTIVATED: Gemini TTS failed. Please check your API key.");
       const fallbackUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
       const fallbackRes = await fetch(fallbackUrl);
       if (fallbackRes.ok) {

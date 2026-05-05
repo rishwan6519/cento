@@ -272,13 +272,12 @@ const ChangePasswordModal: React.FC<PasswordModalProps> = ({ userId, onClose }) 
 
     setLoading(true);
     try {
-      const res = await fetch("/api/user", {
+      const res = await fetch(`/api/user?userId=${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
           currentPassword: formData.currentPassword,
-          newPassword: formData.newPassword,
+          password: formData.newPassword,
         }),
       });
       const data = await res.json();

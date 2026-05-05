@@ -488,6 +488,13 @@ export default function StoreUserPage() {
           />
         );
       case "createAnnouncement":
+        return (
+          <CreateAnnouncement
+            onNavigate={handleNavigate}
+            isInstant={false}
+            editingPlaylist={editingPlaylist}
+          />
+        );
       case "createInstantAnnouncement":
         return (
           <CreateAnnouncement

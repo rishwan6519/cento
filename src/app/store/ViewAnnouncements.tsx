@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { FiSearch, FiEdit2, FiTrash2 } from "react-icons/fi";
 
-const ViewAnnouncements: React.FC = () => {
+const ViewAnnouncements: React.FC<{ onEdit?: (item: any) => void }> = ({ onEdit }) => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -38,6 +38,26 @@ const ViewAnnouncements: React.FC = () => {
     if (s === "Running") return "#22C55E";
     if (s === "Upcoming") return "#EAB308";
     return "#64748b";
+  };
+
+    const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this announcement?")) return;
+    try {
+      const res = await fetch("/api/playlists", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        // toast.success("Announcement deleted"); // We need toast import
+        setAnnouncements(prev => prev.filter(a => a._id !== id));
+      } else {
+        alert("Failed to delete");
+      }
+    } catch (err) {
+      alert("Error deleting announcement");
+    }
   };
 
   const filteredAnnouncements = announcements.filter(a => {
@@ -153,8 +173,8 @@ const ViewAnnouncements: React.FC = () => {
                     <td style={{ padding: "18px 20px", color: getStatusColor(item.status || "Running"), fontWeight: 600 }}>{item.status || "Running"}</td>
                     <td style={{ padding: "18px 20px" }}>
                       <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
-                        <button style={{ background: "none", border: "none", cursor: "pointer", color: "#06b6d4" }}><FiEdit2 size={16} /></button>
-                        <button style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}><FiTrash2 size={16} /></button>
+                        <button onClick={() => onEdit?.(item)} style={{ background: "none", border: "none", cursor: "pointer", color: "#06b6d4" }}><FiEdit2 size={16} /></button>
+                        <button onClick={() => handleDelete(item._id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444" }}><FiTrash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -169,3 +189,4 @@ const ViewAnnouncements: React.FC = () => {
 };
 
 export default ViewAnnouncements;
+

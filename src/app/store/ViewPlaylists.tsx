@@ -362,10 +362,11 @@ const ViewPlaylists: React.FC<ViewPlaylistsProps> = ({
       .then(r => r.json())
       .then(d => {
         let all = Array.isArray(d) ? d : (d.playlists || d.data || []);
+        const annTypes = ['announcement', 'Instant Announcement', 'offer', 'alert', 'info'];
         if (type === 'announcement') {
-          all = all.filter((p: any) => p.type === 'announcement');
+          all = all.filter((p: any) => annTypes.includes(p.type));
         } else if (type === 'media') {
-          all = all.filter((p: any) => p.type !== 'announcement');
+          all = all.filter((p: any) => !annTypes.includes(p.type));
         }
         setPlaylists(all);
       })
@@ -389,7 +390,8 @@ const ViewPlaylists: React.FC<ViewPlaylistsProps> = ({
 
   const filtered = playlists.filter(p => {
     const matchSearch = search ? (p.name || "").toLowerCase().includes(search.toLowerCase()) : true;
-    const matchStatus = statusFilter ? (p.status || "").toLowerCase() === statusFilter.toLowerCase() : true;
+    const currentStatus = p.status || "Running";
+    const matchStatus = statusFilter ? currentStatus.toLowerCase() === statusFilter.toLowerCase() : true;
     return matchSearch && matchStatus;
   });
 
@@ -500,7 +502,7 @@ const ViewPlaylists: React.FC<ViewPlaylistsProps> = ({
                       </td>
                       <td style={{ padding: "18px 20px" }}>
                         <span style={{ background: sc.bg, color: sc.color, padding: "3px 10px", borderRadius: "20px", fontWeight: 600, fontSize: "0.78rem" }}>
-                          {item.status || "Active"}
+                          {item.status || "Running"}
                         </span>
                       </td>
                       <td style={{ padding: "18px 20px" }}>

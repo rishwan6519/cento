@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ViewKey } from "./page";
-import { FaUpload, FaPlay, FaTrash, FaDesktop, FaCheck, FaArrowLeft } from "react-icons/fa";
+import { FaUpload, FaPlay, FaTrash, FaDesktop, FaCheck, FaArrowLeft, FaEye } from "react-icons/fa";
 
 interface Props { 
   onNavigate: (view: ViewKey) => void; 
@@ -30,6 +30,10 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   const [loadingDevices, setLoadingDevices] = useState(true);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [selectionConfirmed, setSelectionConfirmed] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
+  const [previewMediaName, setPreviewMediaName] = useState("");
 
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
 
@@ -174,15 +178,46 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
           {selectionMode === "upload" && (
             <div className="store-upload-file-section">
               <label className="store-input-label">Upload files</label>
-              <div className="store-file-input-wrapper" onClick={()=>fileInputRef.current?.click()} style={{cursor:'pointer'}}>
-                <input type="text" value={selectedFiles.length>0?selectedFiles.map(f=>f.name).join(', '):''} placeholder="Select a file..." readOnly className="store-file-input-display" />
-                <input ref={fileInputRef} type="file" multiple hidden onChange={e=>setSelectedFiles(Array.from(e.target.files||[]))} />
+              <div className="store-file-dropzone" onClick={()=>fileInputRef.current?.click()}>
+                <FaUpload size={24} style={{marginBottom:12, opacity:0.5}} />
+                <p>Click to browse or drag and drop files</p>
+                <span style={{fontSize:'.75rem', color:'#A4B6B9'}}>Audio, Video or Images</span>
+                <input ref={fileInputRef} type="file" multiple hidden onChange={e=>{
+                  const newFiles = Array.from(e.target.files||[]);
+                  setSelectedFiles(prev => [...prev, ...newFiles]);
+                  setSelectionConfirmed(false);
+                }} />
               </div>
+
+              {selectedFiles.length > 0 && (
+                <div className="store-selected-files-list">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} className="store-selected-file-item">
+                      <div className="store-file-info">
+                        <div className="store-file-icon-sm">
+                          {file.type.startsWith('image/') ? <FaDesktop /> : <FaPlay size={10} />}
+                        </div>
+                        <span className="store-file-name">{file.name}</span>
+                      </div>
+                      <div className="store-file-actions">
+                        <button className="store-file-action-btn" title="Preview" onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}>
+                          <FaEye size={12} />
+                        </button>
+                        <button className="store-file-action-btn store-file-action-btn--remove" title="Remove" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}>
+                          <FaTrash size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="store-upload-actions-bar">
                 <span className="store-file-selected-text">{selectedFiles.length} file{selectedFiles.length!==1?'s':''} selected</span>
                 <div className="store-upload-actions-right">
-                  <button className="store-btn-text-orange">Preview media</button>
-                  <button className="store-btn-solid-orange">Confirm selection</button>
+                  <button className="store-btn-solid-orange" onClick={() => { if(selectedFiles.length>0) setSelectionConfirmed(true); else alert("Please select files first"); }}>
+                    {selectionConfirmed ? "✓ Selection Confirmed" : "Confirm selection"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -234,7 +269,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                       <td style={{fontWeight:500,color:'#445459'}}>{media.name}</td>
                       <td><span className={`store-type-badge store-type-badge--${badge}`}>{media.type||'Media'}</span></td>
                       <td style={{color:'#445459'}}>{media.createdAt?new Date(media.createdAt).toLocaleDateString('en-US',{month:'long',year:'numeric'}):'—'}</td>
-                      <td><button className="store-preview-btn"><FaPlay size={10}/> Preview</button></td>
+                      <td><button className="store-preview-btn" onClick={() => { setPreviewMediaUrl(media.url || media.fileUrl); setPreviewMediaName(media.name); }}><FaPlay size={10}/> Preview</button></td>
                       <td><button className="store-table-action-btn store-table-action-btn--delete"><FaTrash /></button></td>
                     </tr>
                   );
@@ -324,7 +359,76 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         </div>
       </div>
 
+      {/* Preview Modal */}
+      {previewFile && (
+        <div className="store-modal-overlay" onClick={() => setPreviewFile(null)}>
+          <div className="store-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="store-modal-header">
+              <h3>Preview: {previewFile.name}</h3>
+              <button className="store-modal-close" onClick={() => setPreviewFile(null)}>×</button>
+            </div>
+            <div className="store-modal-body">
+              {previewFile.type.startsWith('image/') ? (
+                <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{maxWidth:'100%', borderRadius:8}} />
+              ) : previewFile.type.startsWith('audio/') ? (
+                <audio src={URL.createObjectURL(previewFile)} controls style={{width:'100%'}} autoPlay />
+              ) : previewFile.type.startsWith('video/') ? (
+                <video src={URL.createObjectURL(previewFile)} controls style={{maxWidth:'100%', borderRadius:8}} autoPlay />
+              ) : (
+                <div style={{padding:40, textAlign:'center', color:'#64848D'}}>
+                  Preview not available for this file type ({previewFile.type})
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Media Preview Modal */}
+      {previewMediaUrl && (
+        <div className="store-modal-overlay" onClick={() => setPreviewMediaUrl(null)}>
+          <div className="store-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="store-modal-header">
+              <h3>Preview: {previewMediaName}</h3>
+              <button className="store-modal-close" onClick={() => setPreviewMediaUrl(null)}>×</button>
+            </div>
+            <div className="store-modal-body">
+              {previewMediaUrl.match(/\.(mp3|wav|ogg)$/i) || previewMediaUrl.includes('audio') ? (
+                <audio src={previewMediaUrl} controls style={{width:'100%'}} autoPlay />
+              ) : previewMediaUrl.match(/\.(mp4|webm|ogg)$/i) || previewMediaUrl.includes('video') ? (
+                <video src={previewMediaUrl} controls style={{maxWidth:'100%', borderRadius:8}} autoPlay />
+              ) : (
+                <img src={previewMediaUrl} alt="Preview" style={{maxWidth:'100%', borderRadius:8}} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        .store-modal-overlay {
+          position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+          display: flex; align-items: center; justify-content: center; z-index: 1000;
+          backdrop-filter: blur(4px);
+        }
+        .store-preview-modal {
+          background: #fff; width: 90%; max-width: 600px; border-radius: 16px;
+          overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+        .store-modal-header {
+          padding: 16px 24px; border-bottom: 1px solid #EAEFEF;
+          display: flex; justify-content: space-between; align-items: center;
+        }
+        .store-modal-header h3 { font-size: 1rem; font-weight: 700; color: #162B30; margin: 0; }
+        .store-modal-close {
+          background: none; border: none; font-size: 1.5rem; color: #A4B6B9;
+          cursor: pointer; line-height: 1;
+        }
+        .store-modal-body {
+          padding: 24px; display: flex; align-items: center; justify-content: center;
+          background: #F8FAFB; min-height: 200px;
+        }
+        
         .store-create-playlist-view {
           display: flex; flex-direction: column; gap: 24px;
         }
@@ -374,14 +478,44 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         .store-media-option-box p { font-size: 0.8rem; color: #64848D; }
 
         .store-upload-file-section {
-          margin-top: 16px; display: flex; flex-direction: column; gap: 8px;
+          margin-top: 16px; display: flex; flex-direction: column; gap: 12px;
         }
+        .store-file-dropzone {
+          width: 100%; padding: 32px; border: 2px dashed #D6E6E9; border-radius: 12px;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          background: #F8FAFB; color: #64848D; cursor: pointer; transition: 0.2s;
+        }
+        .store-file-dropzone:hover { border-color: #F05A28; background: #FFF8F5; color: #F05A28; }
+        .store-file-dropzone p { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; }
+
+        .store-selected-files-list {
+          display: flex; flex-direction: column; gap: 8px; margin-top: 8px;
+          max-height: 240px; overflow-y: auto; padding-right: 4px;
+        }
+        .store-selected-file-item {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 16px; background: #fff; border: 1px solid #EAEFEF; border-radius: 10px;
+          transition: 0.2s;
+        }
+        .store-selected-file-item:hover { border-color: #D6E6E9; background: #F8FAFB; }
+        .store-file-info { display: flex; align-items: center; gap: 12px; }
+        .store-file-icon-sm {
+          width: 32px; height: 32px; border-radius: 6px; background: #EAF6F8;
+          display: flex; align-items: center; justify-content: center; color: #F05A28;
+        }
+        .store-file-name { font-size: 0.85rem; font-weight: 600; color: #162B30; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        
+        .store-file-actions { display: flex; gap: 8px; }
+        .store-file-action-btn {
+          width: 28px; height: 28px; border-radius: 6px; border: none;
+          background: #F1F6F8; color: #11B5BB; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .store-file-action-btn:hover { background: #11B5BB; color: #fff; }
+        .store-file-action-btn--remove { color: #DC2626; background: #FFF2F2; }
+        .store-file-action-btn--remove:hover { background: #DC2626; color: #fff; }
+
         .store-input-label { font-size: 0.85rem; font-weight: 600; color: #162B30; }
-        .store-file-input-wrapper { width: 100%; }
-        .store-file-input-display {
-          width: 100%; padding: 12px 16px; border: 1px solid #EAEFEF; border-radius: 8px;
-          background: #F8FAFB; color: #445459; font-size: 0.9rem; outline: none; cursor: pointer;
-        }
         
         .store-upload-actions-bar {
           display: flex; align-items: center; justify-content: space-between;

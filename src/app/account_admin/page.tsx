@@ -295,29 +295,42 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
   );
 };
 
-const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit }: { setActiveView: (v: string) => void, setSelectedStore: (s: any) => void, accountAdminId?: string, onEdit?: (s: any) => void }) => {
+const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, customerId, onEdit }: { setActiveView: (v: string) => void, setSelectedStore: (s: any) => void, accountAdminId?: string, customerId?: string, onEdit?: (s: any) => void }) => {
   const [stores, setStores] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const fetchStores = async () => {
+  const fetchData = async () => {
     if (!accountAdminId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/user?controllerId=${accountAdminId}`);
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setStores(data.data.filter((u: any) => u.role === "store"));
+      const [uRes, aRes] = await Promise.all([
+        fetch(`/api/user?controllerId=${accountAdminId}`),
+        customerId ? fetch(`/api/assign-device?customerId=${customerId}`).then(r => r.json()) : Promise.resolve({ success: true, data: [] })
+      ]);
+      
+      const uData = await uRes.json();
+      const aData = aRes;
+
+      if (uData.success && Array.isArray(uData.data)) {
+        setStores(uData.data.filter((u: any) => u.role === "store"));
+      }
+      if (aData.success && Array.isArray(aData.data)) {
+        setAssignments(aData.data);
       }
     } catch (err) {
-      console.error("Failed to fetch stores", err);
+      console.error("Failed to fetch data", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStores();
-  }, [accountAdminId]);
+    fetchData();
+  }, [accountAdminId, customerId]);
 
   const handleDelete = async (storeId: string) => {
     if (!confirm("Are you sure you want to delete this store? All associated data will be lost.")) return;
@@ -328,7 +341,7 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit
       const data = await res.json();
       if (data.success) {
         toast.success("Store deleted successfully");
-        fetchStores();
+        fetchData();
       } else {
         toast.error(data.message || "Failed to delete store");
       }
@@ -336,6 +349,24 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit
       toast.error("An error occurred");
     }
   };
+
+  const uniqueLocations = Array.from(new Set(stores.map(s => s.storeLocation || s.location).filter(Boolean)));
+
+  const filteredStores = stores.filter(store => {
+    const matchesSearch = 
+      (store.storeName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (store.username || "").toLowerCase().includes(search.toLowerCase()) ||
+      (store.storeLocation || store.location || "").toLowerCase().includes(search.toLowerCase());
+    
+    const matchesLocation = locationFilter === "all" || (store.storeLocation || store.location) === locationFilter;
+    
+    const isConnected = assignments.some(a => (a.userId?._id || a.userId) === store._id);
+    const matchesStatus = statusFilter === "all" || 
+      (statusFilter === "connected" && isConnected) || 
+      (statusFilter === "not_connected" && !isConnected);
+      
+    return matchesSearch && matchesLocation && matchesStatus;
+  });
 
   return (
   <div className="pb-12">
@@ -348,14 +379,29 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit
         <input 
           type="text" 
           placeholder="Search stores by name, location, or contact..." 
+          value={search}
+          onChange={e => setSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50"
         />
       </div>
-      <select className="w-32 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white text-gray-600">
-        <option>All Status</option>
+      <select 
+        value={locationFilter}
+        onChange={e => setLocationFilter(e.target.value)}
+        className="w-48 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white text-gray-600"
+      >
+        <option value="all">All Locations</option>
+        {uniqueLocations.map((loc: any) => (
+          <option key={loc} value={loc}>{loc}</option>
+        ))}
       </select>
-      <select className="w-40 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white text-gray-600">
-        <option>Sort by : Name</option>
+      <select 
+        value={statusFilter}
+        onChange={e => setStatusFilter(e.target.value)}
+        className="w-48 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white text-gray-600"
+      >
+        <option value="all">All Status</option>
+        <option value="connected">Device Connected</option>
+        <option value="not_connected">No Device</option>
       </select>
     </div>
 
@@ -373,7 +419,7 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit
       </div>
     ) : (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {stores.map((store) => (
+      {filteredStores.map((store) => (
         <div key={store._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col cursor-pointer transition-shadow hover:shadow-md" onClick={() => { setSelectedStore(store); setActiveView("store_detail"); }}>
           <div className="bg-[#1A454D] p-6 text-white relative">
             <div className="absolute top-4 right-4 bg-white/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">{store.status || 'Active'}</div>
@@ -409,16 +455,6 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, onEdit
                 <span>{new Date(store.createdAt).toLocaleDateString()}</span>
               </div>
                   <div className="flex items-center gap-4 text-[#00BCD4]">
-                    <button
-                      title="View"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedStore(store);
-                        setActiveView("store_detail");
-                      }}
-                    >
-                      <ListIcon size={18} className="text-[#00BCD4]" />
-                    </button>
                     <button
                       title="Edit"
                       onClick={(e) => {
@@ -1830,7 +1866,7 @@ export default function AccountAdminDashboard() {
     switch (activeView) {
       case "dashboard": return <DashboardView setActiveView={setActiveView} userData={userData} />;
       case "onboard_store": return <OnboardStoreView accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;
-      case "all_stores": return <AllStoresView setActiveView={setActiveView} setSelectedStore={setSelectedStore} accountAdminId={userData?._id} onEdit={(s) => { setSelectedStore(s); setActiveView("edit_store"); }} />;
+      case "all_stores": return <AllStoresView setActiveView={setActiveView} setSelectedStore={setSelectedStore} accountAdminId={userData?._id} customerId={userData?.customerId} onEdit={(s) => { setSelectedStore(s); setActiveView("edit_store"); }} />;
       case "edit_store": return <EditStoreView store={selectedStore} accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;
       case "store_detail": return <StoreDetailView store={selectedStore} setActiveView={setActiveView} />;
       case "connect_devices": return <AssignDeviceView customerId={userData?.customerId} accountAdminId={userData?._id} />;

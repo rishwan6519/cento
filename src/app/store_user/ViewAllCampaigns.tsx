@@ -27,9 +27,10 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
   }, [userId]);
 
   const filtered = playlists.filter(p => {
-    const t = (p.type || "").toLowerCase();
-    if (filter === "media" && t === "announcement") return false;
-    if (filter === "announcement" && t !== "announcement") return false;
+    const annTypes = ["announcement", "Instant Announcement", "offer", "alert", "info"];
+    const type = (p.type || "").toLowerCase();
+    if (filter === "media" && annTypes.some(t => type.includes(t.toLowerCase()))) return false;
+    if (filter === "announcement" && !annTypes.some(t => type.includes(t.toLowerCase()))) return false;
     
     // End Date Filter
     if (dateFilter && p.endDate) {
@@ -41,7 +42,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
         const formattedPDate = `${pYear}-${pMonth}-${pDay}`;
         if (formattedPDate !== dateFilter) return false;
       } else {
-        return false; // If date is invalid but filter is set, don't show
+        return false; 
       }
     }
 
@@ -51,7 +52,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
 
   const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-AU') : "—";
   const getStatus = (p: any) => {
-    if (!p.endDate) return "Active";
+    if (!p.endDate) return "Running";
     return new Date(p.endDate) > new Date() ? "Running" : "Completed";
   };
   const getStatusColor = (s: string) => s === "Running" ? "#16A34A" : s === "Completed" ? "#A4B6B9" : "#F59E0B";
@@ -63,6 +64,8 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
       setPlaylists(prev => prev.filter(p => (p._id || p.id) !== id));
     } catch {}
   };
+
+  const showTypeColumn = filter === "all" || filter === "announcement";
 
   return (
     <div className="su-vc-view">
@@ -99,16 +102,17 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
 
       {/* Table */}
       <div className="su-vc-table-wrap">
-        <div className="su-vc-table-header"><h2>Playlist</h2></div>
+        <div className="su-vc-table-header"><h2>{filter === "all" ? "All Campaigns" : filter === "media" ? "Media Playlists" : "Announcements"}</h2></div>
         {loading ? (
-          <div className="su-vc-empty">Loading playlists…</div>
+          <div className="su-vc-empty">Loading campaigns…</div>
         ) : filtered.length === 0 ? (
-          <div className="su-vc-empty">No playlists found. Create one to get started.</div>
+          <div className="su-vc-empty">No records found.</div>
         ) : (
           <>
             <table className="su-vc-table">
                <thead><tr>
-                 <th>CAMPAIGN TYPE</th><th>NAME</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
+                 {showTypeColumn && <th>CAMPAIGN TYPE</th>}
+                 <th>NAME</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
                </tr></thead>
               <tbody>
                 {filtered.map(p => {
@@ -118,13 +122,17 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                   const time = p.startTime && p.endTime ? `${p.startTime} to ${p.endTime}` : "";
                   const schedule = [days, time].filter(Boolean).join(" | ") || "—";
                   const preview = p.mediaIds?.length ? `Display file link - uploaded by ${p.userId?.username || "user"}` : "—";
+                  const isAnn = ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
+                  
                   return (
                      <tr key={id}>
-                       <td>
-                         <span className={`su-vc-type-badge ${p.type === 'announcement' ? 'su-vc-type--ann' : 'su-vc-type--media'}`}>
-                           {p.type === 'announcement' ? 'Announcement' : 'Media'}
-                         </span>
-                       </td>
+                       {showTypeColumn && (
+                        <td>
+                          <span className={`su-vc-type-badge ${isAnn ? 'su-vc-type--ann' : 'su-vc-type--media'}`}>
+                            {isAnn ? 'Announcement Playlist' : 'Media Playlist'}
+                          </span>
+                        </td>
+                       )}
                        <td style={{fontWeight:600,color:"#162B30"}}>{p.name || "Playlist name"}</td>
                       <td>{schedule}</td>
                       <td style={{fontSize:".8rem",color:"#64848D"}}>{preview}</td>

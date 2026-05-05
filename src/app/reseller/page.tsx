@@ -38,6 +38,8 @@ import {
   List,
   Trash,
   Eye,
+  EyeOff,
+  Lock,
   X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -1557,6 +1559,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [provFilter, setProvFilter] = useState("all");
 
 
   useEffect(() => {
@@ -1614,11 +1617,17 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
 
 
 
-  const filtered = rows.filter(r =>
-    r.customerName.toLowerCase().includes(search.toLowerCase()) ||
-    r.marketingUser.toLowerCase().includes(search.toLowerCase()) ||
-    r.location.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = rows.filter(r => {
+    const matchesSearch = r.customerName.toLowerCase().includes(search.toLowerCase()) ||
+      r.marketingUser.toLowerCase().includes(search.toLowerCase()) ||
+      r.location.toLowerCase().includes(search.toLowerCase());
+    
+    const matchesProv = provFilter === "all" || 
+      (provFilter === "provided" && r.provisioned) || 
+      (provFilter === "locked" && !r.provisioned);
+      
+    return matchesSearch && matchesProv;
+  });
 
   return (
     <div className="pb-12 max-w-[1200px]">
@@ -1636,10 +1645,14 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50"
           />
         </div>
-        <select className="w-56 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white text-gray-700">
-          <option>Media provisioning</option>
-          <option>Access provided</option>
-          <option>Access locked</option>
+        <select 
+          value={provFilter}
+          onChange={e => setProvFilter(e.target.value)}
+          className="w-56 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white text-gray-700"
+        >
+          <option value="all">Media provisioning</option>
+          <option value="provided">Access provided</option>
+          <option value="locked">Access locked</option>
         </select>
       </div>
 
@@ -1655,7 +1668,7 @@ const MediaProvisioningView = ({ onCreateCampaign }: { onCreateCampaign: (user: 
                 <th className="px-6 py-4">Central Marketing User</th>
                 <th className="px-6 py-4 whitespace-nowrap">Location</th>
                 <th className="px-6 py-4 whitespace-nowrap">Media Provisioning</th>
-                <th className="px-6 py-4">Document Upload By Account User</th>
+                <th className="px-6 py-4">Document Upload By Marketing User</th>
                 <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
@@ -2172,8 +2185,147 @@ const ResellerCreateCampaignFormView = ({ actingUser, onBack }: { actingUser: an
   );
 };
 
+const ChangePasswordModal = ({ userId, onClose }: { userId: string, onClose: () => void }) => {
+  const [formData, setFormData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (formData.newPassword !== formData.confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+    if (formData.newPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/user?userId=${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: formData.currentPassword,
+          password: formData.newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Password updated successfully!");
+        onClose();
+      } else {
+        setError(data.message || "Failed to update password.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleShow = (key: keyof typeof showPass) => setShowPass(prev => ({ ...prev, [key]: !prev[key] }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-lg">
+          <X size={20} />
+        </button>
+        
+        <div className="p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-[#FFF2F2] text-[#FF5722] rounded-xl shadow-sm">
+              <Lock size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Change Password</h2>
+              <p className="text-sm text-gray-500">Update your account security</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl font-medium animate-pulse">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700 ml-1">Current Password</label>
+              <div className="relative group">
+                <input 
+                  type={showPass.current ? "text" : "password"} 
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5722]/20 focus:border-[#FF5722] transition-all bg-gray-50/50 group-hover:bg-white" 
+                  required 
+                  value={formData.currentPassword}
+                  onChange={e => setFormData({ ...formData, currentPassword: e.target.value })}
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FF5722] p-1.5 transition-colors" onClick={() => toggleShow('current')}>
+                  {showPass.current ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700 ml-1">New Password</label>
+              <div className="relative group">
+                <input 
+                  type={showPass.new ? "text" : "password"} 
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5722]/20 focus:border-[#FF5722] transition-all bg-gray-50/50 group-hover:bg-white" 
+                  required 
+                  value={formData.newPassword}
+                  onChange={e => setFormData({ ...formData, newPassword: e.target.value })}
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FF5722] p-1.5 transition-colors" onClick={() => toggleShow('new')}>
+                  {showPass.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700 ml-1">Confirm New Password</label>
+              <div className="relative group">
+                <input 
+                  type={showPass.confirm ? "text" : "password"} 
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF5722]/20 focus:border-[#FF5722] transition-all bg-gray-50/50 group-hover:bg-white" 
+                  required 
+                  value={formData.confirmPassword}
+                  onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FF5722] p-1.5 transition-colors" onClick={() => toggleShow('confirm')}>
+                  {showPass.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button 
+                type="submit" 
+                className="w-full py-4 bg-[#FF5722] text-white rounded-xl font-bold hover:bg-[#E64A19] transition-all shadow-lg shadow-[#FF5722]/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" 
+                disabled={loading}
+              >
+                {loading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Updating...</span>
+                  </div>
+                ) : "Update Password"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ProfileView = () => {
   const [userData, setUserData] = useState<any>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -2319,7 +2471,19 @@ const ProfileView = () => {
         Upload Photo
         <input type="file" className="hidden" accept="image/*" />
       </label>
-      <button className="px-8 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors">Change Password</button>
+      <button 
+        onClick={() => setIsPasswordModalOpen(true)}
+        className="px-8 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-colors shadow-sm"
+      >
+        Change Password
+      </button>
+
+      {isPasswordModalOpen && (
+        <ChangePasswordModal 
+          userId={userData?._id || userData?.id} 
+          onClose={() => setIsPasswordModalOpen(false)} 
+        />
+      )}
     </div>
   </div>
   );

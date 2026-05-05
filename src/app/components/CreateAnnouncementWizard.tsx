@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, Mic, Volume2, FolderOpen, Store, AlertTriangle, Check, ChevronDown, Clock, Calendar, Hash, Music, Search, Zap, Megaphone, Type, Library, AlertCircle, Save } from "lucide-react";
+import { Upload, Mic, Volume2, FolderOpen, Store, Check, ChevronDown, Clock, Calendar, Music, Megaphone, Type, Save } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface CreateAnnouncementWizardProps {
@@ -426,16 +426,6 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
     ))
   );
 
-  const getMethodSummary = () => {
-    switch(method) {
-      case "upload": return selectedFiles.length > 0 ? "Ready to upload" : "Pending selection";
-      case "library": return selectedLibraryId ? "1 announcement selected" : "Pending selection";
-      case "tts": return ttsText ? `${ttsText.length} characters entered` : "Pending input";
-      case "record": return isRecordingSaved ? "Recording saved" : isRecording ? "Recording..." : "Ready to record";
-      default: return "";
-    }
-  };
-
   const renderMethodBox = () => {
     switch (method) {
       case "record":
@@ -736,9 +726,8 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
     <div className="font-sans text-slate-800">
       {/* Main Content Area */}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Left Column */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div className="space-y-6">
           
           {/* Upload/Record Announcement Card */}
           <div className="bg-[#E1F6F9] rounded-[24px] p-6 lg:p-8 shadow-sm">
@@ -893,153 +882,100 @@ export default function CreateAnnouncementWizard({ onNavigate, userRole, userId,
           )}
         </div>
 
-        {/* Right Column: Broadcast Summary */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100">
-            <h2 className="text-[16px] font-bold text-[#10353C] mb-6">Broadcast Summary</h2>
+        {/* If NOT instant, show Select Stores */}
+        {!isInstant && (
+          <div className="bg-white rounded-[24px] p-6 lg:p-8 shadow-sm border border-slate-100 flex flex-col">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+              <div>
+                <h2 className="text-[18px] font-bold text-[#10353C]">Select stores</h2>
+                <p className="text-[12px] text-slate-500 mt-1">Choose which store will play this announcement</p>
+              </div>
+              <div className="flex gap-3 items-center">
+                <div className="relative">
+                  <select className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-[12px] font-semibold appearance-none pr-8 cursor-pointer text-slate-500 outline-none">
+                    <option>Location</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+                <button 
+                  onClick={handleSelectAllStores}
+                  className="text-[#FF5722] text-[12px] font-bold px-4 py-2 rounded-lg border border-[#FF5722] hover:bg-[#FFF5F2] transition-colors"
+                >
+                  {selectedDeviceIds.length === devices.length && devices.length > 0 ? "Deselect All" : "Select All"}
+                </button>
+              </div>
+            </div>
             
-            <div className="space-y-4">
-              <div className="bg-white rounded-[16px] p-5 border border-slate-100 shadow-sm relative overflow-hidden group">
-                 <p className="text-[12px] font-bold text-[#10353C] mb-2">Target stores</p>
-                 <div className="flex justify-between items-center">
-                   <div className="text-4xl font-bold text-[#10353C]">{selectedStoreCount}</div>
-                   <div className="text-[#FF5722] opacity-40">
-                      <Store size={36} strokeWidth={1.5} />
-                   </div>
-                 </div>
-                 <p className="text-[11px] text-slate-400 mt-1">Store selected</p>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              {loadingDevices ? (
+                Array(6).fill(0).map((_, i) => (
+                  <div key={i} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 animate-pulse h-20"></div>
+                ))
+              ) : uniqueStores.map(store => {
+                const storeDeviceIds = store.deviceIds;
+                const isSelected = storeDeviceIds.every((id: string) => selectedDeviceIds.includes(id)) && storeDeviceIds.length > 0;
+                
+                return (
+                  <div 
+                    key={store._id}
+                    onClick={() => toggleStore(store._id)}
+                    className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer border-2 transition-all ${
+                      isSelected 
+                        ? "border-[#FF5722] shadow-sm ring-1 ring-[#FF5722]" 
+                        : "border-slate-100 bg-white hover:border-slate-200"
+                    }`}
+                  >
+                    <div className="w-12 h-12 bg-[#E1F6F9] rounded-[14px] flex items-center justify-center flex-shrink-0">
+                      <Store size={22} className="text-[#FF5722]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-bold text-[#10353C] truncate">{store.name}</p>
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      </div>
+                      <p className="text-[12px] text-slate-400 truncate mt-0.5">{store.address}</p>
+                      <p className="text-[11px] font-bold text-green-600 mt-1">{store.status}</p>
+                    </div>
+                    {isSelected && (
+                      <div className="ml-auto w-5 h-5 bg-[#FF5722] rounded-full flex items-center justify-center shrink-0">
+                        <Check size={12} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
-              <div className="bg-white rounded-[16px] p-5 border border-slate-100 shadow-sm">
-                 <p className="text-[12px] font-bold text-[#10353C] mb-3">Announcement Method</p>
-                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-[10px] bg-[#E1F6F9] flex items-center justify-center text-[#FF5722] shadow-sm">
-                      {method === 'upload' && <Upload size={18} />}
-                      {method === 'record' && <Mic size={18} />}
-                      {method === 'tts' && <Type size={18} />}
-                      {method === 'library' && <Library size={18} />}
-                   </div>
-                   <div>
-                      <h4 className="text-[13px] font-bold text-[#10353C]">{method === 'upload' ? 'Upload new file' : method === 'tts' ? 'Text to Speech' : method === 'record' ? 'Record Audio' : 'Library Selection'}</h4>
-                      <p className="text-[11px] text-[#64748B]">{getMethodSummary()}</p>
-                   </div>
-                 </div>
-              </div>
-
-              <div className={`rounded-[12px] p-5 flex gap-4 transition-all duration-500 border ${
-                isComplete 
-                  ? 'bg-[#F0FDF4] border-[#BBF7D0]' 
-                  : 'bg-white border-[#F59E0B]'
-              }`}>
-                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isComplete ? 'bg-[#DCFCE7] text-[#166534]' : 'border-2 border-[#F59E0B] text-[#F59E0B]'}`}>
-                   {isComplete ? <Check size={14} strokeWidth={3} /> : <span className="font-bold text-xs">!</span>}
-                 </div>
-                 <div>
-                    <h4 className={`text-sm font-bold mb-1 ${isComplete ? 'text-[#166534]' : 'text-[#10353C]'}`}>{isComplete ? 'Ready to Start' : 'Incomplete'}</h4>
-                    <p className={`text-xs font-medium leading-relaxed ${isComplete ? 'text-[#166534] opacity-80' : 'text-[#FF5722]'}`}>
-                      {isComplete 
-                        ? "All fields are complete. You can now deploy." 
-                        : "Please select stores. Start recording."}
-                    </p>
-                 </div>
-              </div>
+            {/* Action Buttons */}
+            <div className="flex justify-end items-center gap-4 pt-6 border-t border-slate-100">
+              <button 
+                onClick={() => {
+                  setPlaylistName("");
+                  setSelectedDeviceIds([]);
+                  setMethod("upload");
+                  setSelectedFiles([]);
+                }}
+                className="px-8 py-2.5 bg-white text-slate-600 text-[13px] font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                Reset
+              </button>
+              <button 
+                onClick={handleSubmit}
+                disabled={submitting || !isComplete}
+                className="px-10 py-2.5 bg-[#FF5722] text-white text-[13px] font-bold rounded-xl shadow-lg shadow-orange-100 hover:bg-[#F4511E] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
+              >
+                {submitting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <Megaphone size={16} />
+                    <span>Connect announcement</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
-
-          {/* If NOT instant, show Select Stores inside the right column */}
-          {!isInstant && (
-            <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 flex flex-col max-h-[500px]">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-[16px] font-bold text-[#10353C]">Select stores</h2>
-                <div className="flex gap-2">
-                  <div className="relative">
-                    <select className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold appearance-none pr-6 cursor-pointer text-slate-500">
-                      <option>Location</option>
-                    </select>
-                    <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
-                  <button 
-                    onClick={handleSelectAllStores}
-                    className="text-[#FF5722] text-[11px] font-bold px-2 py-1 rounded-lg border border-[#FF5722] hover:bg-orange-50 transition-colors"
-                  >
-                    {selectedDeviceIds.length === devices.length && devices.length > 0 ? "Deselect All" : "Select All"}
-                  </button>
-                </div>
-              </div>
-              
-              <p className="text-[11px] text-slate-500 mb-4">Choose which store will play this announcement</p>
-              
-              <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                {loadingDevices ? (
-                  Array(4).fill(0).map((_, i) => (
-                    <div key={i} className="bg-slate-50 border border-slate-100 rounded-2xl p-4 animate-pulse h-16"></div>
-                  ))
-                ) : uniqueStores.map(store => {
-                  const storeDeviceIds = store.deviceIds;
-                  const isSelected = storeDeviceIds.every((id: string) => selectedDeviceIds.includes(id)) && storeDeviceIds.length > 0;
-                  
-                  return (
-                    <div 
-                      key={store._id}
-                      onClick={() => toggleStore(store._id)}
-                      className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer border-2 transition-all ${
-                        isSelected 
-                          ? "border-[#FF5722] bg-white shadow-sm" 
-                          : "border-slate-50 bg-white hover:border-slate-200"
-                      }`}
-                    >
-                      <div className="w-10 h-10 bg-[#E1F6F9] rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Store size={18} className="text-[#FF5722]" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[13px] font-bold text-[#10353C] truncate">{store.name}</p>
-                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                        </div>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{store.address}</p>
-                        <p className="text-[10px] font-bold text-green-600 mt-1">{store.status}</p>
-                      </div>
-                      {isSelected && (
-                        <div className="ml-auto w-5 h-5 bg-[#FF5722] rounded-full flex items-center justify-center shrink-0">
-                          <Check size={12} className="text-white" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-6 pt-4 border-t border-slate-100 flex gap-3">
-                <button 
-                  onClick={() => {
-                    setPlaylistName("");
-                    setSelectedDeviceIds([]);
-                    setMethod("upload");
-                    setSelectedFiles([]);
-                  }}
-                  className="flex-1 bg-slate-50 text-slate-600 text-[13px] font-bold py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors"
-                >
-                  Reset
-                </button>
-                <button 
-                  onClick={handleSubmit}
-                  disabled={submitting || !isComplete}
-                  className="flex-[2] bg-[#FF5722] text-white text-[13px] font-bold py-2.5 rounded-xl shadow-lg shadow-orange-100 hover:bg-[#F4511E] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
-                >
-                  {submitting ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <>
-                      <Megaphone size={16} />
-                      <span>Connect announcement</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* If Instant, show Select Stores Full Width at Bottom */}

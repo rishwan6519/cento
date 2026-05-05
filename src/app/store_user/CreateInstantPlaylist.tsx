@@ -41,6 +41,8 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
   const [endTime, setEndTime] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
 
@@ -130,6 +132,39 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
   const toggleDevice = (id: string) =>
     setSelectedDevices(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !userId) return;
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("userId", userId);
+      fd.append("userRole", "store");
+      files.forEach((f, i) => {
+        fd.append(`files[${i}]`, f);
+        fd.append(`fileNames[${i}]`, f.name);
+      });
+      const r = await fetch("/api/media/upload", { method: "POST", body: fd });
+      const d = await r.json();
+      if (d.success) {
+        const newMedia = d.files.map((f: any) => ({
+          _id: f._id || f.id,
+          name: f.name,
+          type: f.type || "Media",
+          url: f.url
+        }));
+        setMediaItems(prev => [...newMedia, ...prev]);
+        // Auto add to playlist
+        newMedia.forEach((m: any) => addToPlaylist(m));
+      }
+    } catch {
+      alert("Failed to upload media");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async () => {
     if (!name.trim()) return;
     if (playlistItems.length === 0) return;
@@ -202,7 +237,7 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
         <div className="su-ip-card su-ip-media-available">
           <div className="su-ip-media-header">
             <h3 className="su-ip-card-title">Available Media</h3>
-            <div className="su-ip-filter-pills">
+            <div className="su-ip-filter-pills" style={{alignItems:'center'}}>
               {["All", "Audio", "Video", "Image"].map(f => (
                 <button
                   key={f}
@@ -212,6 +247,16 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
                   {f}
                 </button>
               ))}
+              <div style={{width:1,height:16,background:'#EAEFEF',margin:'0 4px'}}/>
+              <button 
+                className="su-ip-upload-btn-sm" 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                style={{display:'flex',alignItems:'center',gap:6,background:'#F8FAFB',border:'1px solid #D6E6E9',borderRadius:6,padding:'4px 10px',fontSize:'.75rem',fontWeight:700,color:'#F05A28',cursor:'pointer'}}
+              >
+                <FaPlus size={10}/> {isUploading ? 'Uploading...' : 'Upload New'}
+              </button>
+              <input ref={fileInputRef} type="file" multiple hidden onChange={handleUpload} />
             </div>
           </div>
 

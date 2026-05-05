@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { FaUpload, FaMicrophone, FaVolumeUp, FaFolderOpen, FaDesktop, FaCheck, FaStop, FaRedo, FaStore, FaArrowLeft } from "react-icons/fa";
+import { FaUpload, FaMicrophone, FaVolumeUp, FaFolderOpen, FaDesktop, FaCheck, FaStop, FaRedo, FaStore, FaArrowLeft, FaEye, FaTrash } from "react-icons/fa";
 import { ViewKey } from "./page";
 
 interface Props { 
@@ -74,6 +74,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const [libraryMedia, setLibraryMedia] = useState<any[]>([]);
   const [selectedLibraryId, setSelectedLibraryId] = useState<string|null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File|null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -284,12 +285,36 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
     );
     // default: upload
     return (
-      <div className="su-ca-upload-area" onClick={()=>fileInputRef.current?.click()}>
-        <div className="su-ca-upload-icon"><FaUpload size={24}/></div>
-        <h3>{selectedFiles.length>0?`${selectedFiles.length} file(s) selected`:'Upload file'}</h3>
-        <p>Add media from your device. Audio, video, image. Size upto 5kb</p>
-        <button className="su-ca-upload-btn">Start uploading</button>
-        <input ref={fileInputRef} type="file" multiple hidden onChange={e=>setSelectedFiles(Array.from(e.target.files||[]))}/>
+      <div className="su-ca-upload-container">
+        <div className="su-ca-upload-area" onClick={()=>fileInputRef.current?.click()}>
+          <div className="su-ca-upload-icon"><FaUpload size={24}/></div>
+          <h3>Upload file</h3>
+          <p>Add media from your device. Audio, video, image.</p>
+          <button className="su-ca-upload-btn">Browse files</button>
+          <input ref={fileInputRef} type="file" multiple hidden onChange={e=>{
+            const newFiles = Array.from(e.target.files||[]);
+            setSelectedFiles(prev => [...prev, ...newFiles]);
+          }}/>
+        </div>
+
+        {selectedFiles.length > 0 && (
+          <div className="su-ca-file-list">
+            {selectedFiles.map((file, idx) => (
+              <div key={`${file.name}-${idx}`} className="su-ca-file-item">
+                <div className="su-ca-file-info">
+                  <div className="su-ca-file-icon">
+                    {file.type.startsWith('image/') ? <FaDesktop size={12}/> : <FaVolumeUp size={12}/>}
+                  </div>
+                  <span className="su-ca-file-name">{file.name}</span>
+                </div>
+                <div className="su-ca-file-actions">
+                  <button className="su-ca-file-btn" onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}><FaEye size={12}/></button>
+                  <button className="su-ca-file-btn su-ca-file-btn--danger" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}><FaTrash size={11}/></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -306,7 +331,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
 
       <div className="su-ca-main-grid">
         {/* Left Column */}
-        <div className="su-ca-left">
+        <div className="su-ca-left su-ca-full-width">
           {/* Upload Section */}
           <div className="su-ca-upload-section">
             <h3 className="su-ca-section-title">Upload Announcement</h3>
@@ -365,35 +390,6 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
             </div>
           </div>
         </div>
-
-        {/* Right Column - Broadcast Summary */}
-        <div className="su-ca-right">
-          <div className="su-ca-card">
-            <h3 className="su-ca-section-title">Broadcast Summary</h3>
-            <div className="su-ca-summary-item">
-              <p className="su-ca-summary-label">Target stores</p>
-              <p className="su-ca-summary-big">{selectedStoreCount}</p>
-              <p className="su-ca-summary-sub">Store selected</p>
-            </div>
-            <div className="su-ca-summary-item">
-              <p className="su-ca-summary-label">Announcement Method</p>
-              <div style={{display:"flex",alignItems:"center",gap:12,marginTop:8}}>
-                <div className="su-ca-method-icon-sm">{getMethodIcon()}</div>
-                <div><p style={{fontWeight:700,fontSize:"0.85rem",color:"#162B30"}}>{getMethodLabel()}</p>
-                <p style={{fontSize:"0.75rem",color:"#64848D"}}>{getMethodSummary()}</p></div>
-              </div>
-            </div>
-            <div className={`su-ca-status-box ${selectedDeviceIds.length > 0 ? "su-ca-status-box--ok" : ""}`}>
-              <div className={`su-ca-status-icon ${selectedDeviceIds.length > 0 && getMethodSummary() !== 'Pending selection' && getMethodSummary() !== 'Pending input' ? "su-ca-status-icon--ok" : ""}`}>
-                {selectedDeviceIds.length > 0 && getMethodSummary().includes('saved') ? <FaCheck size={10} /> : <span>!</span>}
-              </div>
-              <div>
-                <p style={{fontWeight:700,fontSize:"0.85rem"}}>{selectedDeviceIds.length > 0 && (isRecordingSaved || isTtsSaved || selectedFiles.length > 0 || selectedLibraryId) ? "Ready to Start" : "Incomplete"}</p>
-                <p style={{fontSize:"0.75rem",color:"#F05A28"}}>{selectedDeviceIds.length > 0 && (isRecordingSaved || isTtsSaved || selectedFiles.length > 0 || selectedLibraryId) ? "All fields complete." : "Please select stores and complete media selection."}</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Select Stores */}
@@ -435,16 +431,59 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         </button>
       </div>
 
+      {/* Preview Modal */}
+      {previewFile && (
+        <div className="su-modal-overlay" onClick={() => setPreviewFile(null)}>
+          <div className="su-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="su-modal-header">
+              <h3>Preview: {previewFile.name}</h3>
+              <button className="su-modal-close" onClick={() => setPreviewFile(null)}>×</button>
+            </div>
+            <div className="su-modal-body">
+              {previewFile.type.startsWith('image/') ? (
+                <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{maxWidth:'100%', borderRadius:8}} />
+              ) : previewFile.type.startsWith('audio/') ? (
+                <audio src={URL.createObjectURL(previewFile)} controls style={{width:'100%'}} autoPlay />
+              ) : previewFile.type.startsWith('video/') ? (
+                <video src={URL.createObjectURL(previewFile)} controls style={{maxWidth:'100%', borderRadius:8}} autoPlay />
+              ) : (
+                <div style={{padding:40, textAlign:'center', color:'#64848D'}}>
+                  Preview not available for this file type ({previewFile.type})
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .su-ca-view{display:flex;flex-direction:column;gap:24px}
         .su-ca-title{font-size:1.5rem;font-weight:700;color:#162B30;margin:0}
         .su-ca-subtitle{font-size:.88rem;color:#64848D;margin:0}
         .su-ca-card{background:#fff;border-radius:14px;padding:28px;border:1px solid #EAEFEF}
         .su-ca-section-title{font-size:1.05rem;font-weight:700;color:#162B30;margin-bottom:20px}
-        .su-ca-main-grid{display:grid;grid-template-columns:1fr 340px;gap:24px}
+        .su-ca-main-grid{display:grid;grid-template-columns:1fr;gap:24px}
+        .su-ca-full-width{grid-column:1/-1}
+        
+        .su-ca-upload-container { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+        .su-ca-file-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 200px; overflow-y: auto; }
+        .su-ca-file-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #fff; border: 1px solid #D6E6E9; border-radius: 12px; }
+        .su-ca-file-info { display: flex; align-items: center; gap: 10px; }
+        .su-ca-file-icon { width: 28px; height: 28px; background: #FFF2F2; color: #F05A28; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+        .su-ca-file-name { font-size: 0.85rem; font-weight: 600; color: #162B30; }
+        .su-ca-file-actions { display: flex; gap: 6px; }
+        .su-ca-file-btn { width: 26px; height: 26px; border-radius: 6px; border: none; background: #F8FAFB; color: #11B5BB; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .su-ca-file-btn--danger { color: #DC2626; background: #FFF2F2; }
+
+        .su-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .su-preview-modal { background: #fff; width: 90%; max-width: 600px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .su-modal-header { padding: 16px 24px; border-bottom: 1px solid #EAEFEF; display: flex; justify-content: space-between; align-items: center; }
+        .su-modal-header h3 { font-size: 1rem; font-weight: 700; color: #162B30; margin: 0; }
+        .su-modal-close { background: none; border: none; font-size: 1.5rem; color: #A4B6B9; cursor: pointer; line-height: 1; }
+        .su-modal-body { padding: 24px; display: flex; align-items: center; justify-content: center; background: #F8FAFB; min-height: 200px; }
+
         @media(max-width:1000px){.su-ca-main-grid{grid-template-columns:1fr}}
         .su-ca-left{display:flex;flex-direction:column;gap:24px}
-        .su-ca-right{display:flex;flex-direction:column;gap:24px}
         .su-ca-upload-section{background:#EAF6F8;border-radius:16px;padding:28px}
         .su-ca-method-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
         @media(max-width:600px){.su-ca-method-grid{grid-template-columns:repeat(2,1fr)}}

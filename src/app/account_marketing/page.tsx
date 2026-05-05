@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
 import ViewAnnouncements from '../store/ViewAnnouncements';
+import MailboxView from './MailboxView';
 import {
   LayoutDashboard,
   Store,
@@ -208,49 +209,88 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
 const ViewStoreCampaignsView = ({ userData }: { userData?: any }) => {
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [campaignFilter, setCampaignFilter] = useState("");
+
+  const storeCampaignCounts = new Map();
+  stores.forEach(s => {
+    storeCampaignCounts.set(s._id, playlists.filter(p => p.selectedDeviceId === s._id).length);
+  });
+
+  const filteredStores = stores.filter(store => {
+    const sName = (store.storeName || store.username || "").toLowerCase();
+    const sLoc = (store.storeLocation || store.location || "").toLowerCase();
+    const query = search.toLowerCase();
+    const matchesSearch = sName.includes(query) || sLoc.includes(query);
+    const matchesLocation = locationFilter ? (store.storeLocation || store.location) === locationFilter : true;
+    
+    const count = storeCampaignCounts.get(store._id) || 0;
+    const matchesCampaigns = campaignFilter === "" ? true : count.toString() === campaignFilter;
+    
+    return matchesSearch && matchesLocation && matchesCampaigns;
+  });
+
+  const uniqueLocations = Array.from(new Set(stores.map(s => s.storeLocation || s.location).filter(Boolean)));
+  const uniqueCampaignCounts = Array.from(new Set(Array.from(storeCampaignCounts.values()))).sort((a, b) => a - b);
 
   useEffect(() => {
-    if (!userData) { setLoading(false); return; }
-    const fetchStores = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        if (userData.hasAllStoreAccess) {
+        let storesList = [];
+        if (userData?.hasAllStoreAccess) {
           const res = await fetch(`/api/user?controllerId=${userData.controllerId}`);
           const data = await res.json();
           if (data.success && Array.isArray(data.data)) {
-            setStores(data.data.filter((u: any) => u.role === 'store'));
+            storesList = data.data.filter((u: any) => u.role === "store");
           }
-        } else if (userData.assignedStoreId) {
+        } else if (userData?.assignedStoreId) {
           const res = await fetch(`/api/user?userId=${userData.assignedStoreId}`);
           const data = await res.json();
           if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-            setStores([data.data[0]]);
+            storesList = [data.data[0]];
           } else if (data.success && data.data && !Array.isArray(data.data)) {
-            setStores([data.data]);
+            storesList = [data.data];
+          }
+        }
+        setStores(storesList);
+
+        const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : "";
+        if (currentUserId) {
+          const pRes = await fetch(`/api/playlists?userId=${currentUserId}`);
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            setPlaylists(Array.isArray(pData) ? pData : []);
           }
         }
       } catch (err) {
-        console.error("Failed to fetch stores", err);
+        console.error("Failed to fetch data", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchStores();
+    fetchData();
   }, [userData]);
-
-  return (
+return (
     <div className="pb-12 max-w-[1200px]">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 flex gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             type="text" 
-            placeholder="Search by username, name, or location..." 
+            value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username, name, or location..." 
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50"
           />
         </div>
-        <select className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
-          <option>Location</option>
+        <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+          <option value="">All Locations</option>
+          {uniqueLocations.map(loc => <option key={loc as string} value={loc as string}>{loc as string}</option>)}
+        </select>
+        <select value={campaignFilter} onChange={(e) => setCampaignFilter(e.target.value)} className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+          <option value="">All Campaign Counts</option>
+          {uniqueCampaignCounts.map(count => <option key={count} value={count.toString()}>{count} Campaigns</option>)}
         </select>
       </div>
 
@@ -273,15 +313,15 @@ const ViewStoreCampaignsView = ({ userData }: { userData?: any }) => {
                 <tr>
                   <td colSpan={4} className="px-6 py-6 text-center text-gray-500">Loading stores...</td>
                 </tr>
-              ) : stores.length === 0 ? (
+              ) : filteredStores.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-6 text-center text-gray-500">No stores assigned or found.</td>
                 </tr>
-              ) : stores.map((store, i) => (
+              ) : filteredStores.map((store, i) => (
                 <tr key={store._id || i} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-6 py-6 text-gray-800">{store.storeName || store.username || "Store"}</td>
                   <td className="px-6 py-6 text-gray-800">{store.storeLocation || store.location || "N/A"}</td>
-                  <td className="px-6 py-6 text-gray-800">0</td>
+                  <td className="px-6 py-6 text-gray-800">{storeCampaignCounts.get(store._id) || 0}</td>
                   <td className="px-6 py-6 text-right">
                     {store.email ? (
                       <a
@@ -305,7 +345,7 @@ const ViewStoreCampaignsView = ({ userData }: { userData?: any }) => {
           </table>
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-          <span>Showing {stores.length} of {stores.length} store campaigns</span>
+          <span>Showing {filteredStores.length} of {stores.length} store campaigns</span>
           <div className="flex gap-2">
             <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Previous</button>
             <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Next</button>
@@ -631,7 +671,7 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full p-4 border border-gray-200 rounded-xl bg-gray-50 cursor-pointer text-gray-700 text-sm font-medium min-h-[52px] flex items-center"
                 >
-                  {uploadedFiles.length > 0 ? uploadedFiles.map(f => f.name).join(", ") : "Click to select files…"}
+                  {uploadedFiles.length > 0 ? uploadedFiles.map(f => f.name).join(", ") : "Click to select filesâ€¦"}
                 </div>
                 <input ref={fileInputRef} type="file" multiple hidden accept="audio/*,video/*,image/*" onChange={handleFileChange} />
                 
@@ -866,6 +906,8 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
 const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setActiveView?: any, setEditingCampaign?: any }) => {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
 
   const fetchPlaylists = async () => {
     const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : "";
@@ -883,6 +925,18 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
   };
 
   useEffect(() => { fetchPlaylists(); }, []);
+
+  const filteredPlaylists = playlists.filter(p => {
+    const matchesType = typeFilter === "" ? true : (
+      typeFilter === "announcement" 
+        ? ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(p.type)
+        : typeFilter === "media"
+          ? !["announcement", "Instant Announcement", "offer", "alert", "info"].includes(p.type)
+          : p.type === typeFilter
+    );
+    const matchesDate = endDateFilter === "" ? true : (p.endDate && new Date(p.endDate).toISOString().split('T')[0] === endDateFilter);
+    return matchesType && matchesDate;
+  });
 
   const handleDelete = async (id: string) => {
     if(!confirm("Are you sure you want to delete this campaign?")) return;
@@ -908,74 +962,102 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
     <div className="pb-12 max-w-[1200px]">
       <div className="flex items-center gap-4 mb-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex gap-4 flex-1">
-          <div className="flex items-center text-gray-500 font-medium px-4">Filter by</div>
-          <select className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
-            <option>Campaign type</option>
-          </select>
-          <select className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
-            <option>End date</option>
-          </select>
+          <div className="flex items-center text-gray-500 font-medium px-4 border-r border-gray-100 mr-2">Filter by</div>
+          
+          <div className="flex-1">
+            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Campaign Type</label>
+            <select 
+              value={typeFilter} 
+              onChange={(e) => setTypeFilter(e.target.value)} 
+              className="w-full px-4 py-2 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-gray-50/50 text-sm font-medium"
+            >
+              <option value="">All Types</option>
+              <option value="media">Media Playlist</option>
+              <option value="announcement">Announcement Playlist</option>
+            </select>
+          </div>
+
+          <div className="flex-1">
+            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">End Date</label>
+            <input 
+              type="date" 
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-gray-50/50 text-sm font-medium"
+            />
+          </div>
         </div>
         <button 
           onClick={() => setActiveView && setActiveView("create_central_campaign")}
-          className="flex items-center gap-2 px-6 py-4 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 shrink-0"
+          className="flex items-center gap-2 px-8 py-4 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-2xl font-bold transition-all shadow-lg shadow-[#FF5722]/20 shrink-0"
         >
           <Plus size={20} /> Create new campaign
         </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="bg-[#0E3B43] px-6 py-4">
+        <div className="bg-[#0E3B43] px-6 py-4 flex items-center justify-between">
           <h3 className="text-white font-bold">Central Campaigns</h3>
+          <span className="text-xs text-white/70 font-medium bg-white/10 px-3 py-1 rounded-full">{filteredPlaylists.length} Campaigns</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-gray-100 text-xs font-bold text-gray-900 uppercase">
-                <th className="px-6 py-4">PLAYLIST NAME</th>
-                <th className="px-6 py-4">START DATE</th>
-                <th className="px-6 py-4">END DATE</th>
-                <th className="px-6 py-4 text-right"></th>
+              <tr className="border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                <th className="px-6 py-5">CAMPAIGN TYPE</th>
+                <th className="px-6 py-5">PLAYLIST NAME</th>
+                <th className="px-6 py-5">START DATE</th>
+                <th className="px-6 py-5">END DATE</th>
+                <th className="px-6 py-5 text-right">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="text-sm font-medium">
               {loading ? (
-                <tr><td colSpan={4} className="p-6 text-center text-gray-500">Loading campaigns...</td></tr>
-              ) : playlists.length === 0 ? (
-                <tr><td colSpan={4} className="p-6 text-center text-gray-500">No campaigns found</td></tr>
-              ) : playlists.map((row, i) => (
-                <tr key={row._id || i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  <td className="px-6 py-6 text-gray-800">
-                    <p className="font-bold">{row.name}</p>
-                    <p className="text-xs text-[#FF5722] uppercase">{row.type}</p>
+                <tr><td colSpan={5} className="p-12 text-center text-gray-500">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-4 border-[#00BCD4] border-t-transparent rounded-full animate-spin"></div>
+                    <p className="font-bold text-[#0E3B43]">Loading campaigns...</p>
+                  </div>
+                </td></tr>
+              ) : filteredPlaylists.length === 0 ? (
+                <tr><td colSpan={5} className="p-12 text-center text-gray-500 italic font-medium">No campaigns found matching filters</td></tr>
+              ) : filteredPlaylists.map((row, i) => (
+                <tr key={row._id || i} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="px-6 py-6">
+                    <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase ${["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type) ? "bg-orange-50 text-[#FF5722] border border-orange-100" : "bg-cyan-50 text-[#00BCD4] border border-cyan-100"}`}>
+                      {["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type) ? "Announcement" : "Media"} Playlist
+                    </span>
                   </td>
-                  <td className="px-6 py-6 text-gray-800">{row.startDate ? new Date(row.startDate).toLocaleDateString() : '-'}</td>
-                  <td className="px-6 py-6 text-gray-800">{row.endDate ? new Date(row.endDate).toLocaleDateString() : '-'}</td>
-                  <td className="px-6 py-6 flex items-center justify-end gap-5">
-                    <button 
-                      onClick={() => {
-                        if (setActiveView && setEditingCampaign) {
-                          setEditingCampaign(row);
-                          setActiveView("create_central_campaign_form");
-                        }
-                      }}
-                      className="text-[#00BCD4] hover:text-[#00ACC1]"
-                    >
-                      <Edit size={18} />
-                    </button>
-                    <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-600"><Trash2 size={18} /></button>
+                  <td className="px-6 py-6 text-gray-900 font-bold">{row.name}</td>
+                  <td className="px-6 py-6 text-gray-600">{row.startDate ? new Date(row.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
+                  <td className="px-6 py-6 text-gray-600">{row.endDate ? new Date(row.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
+                  <td className="px-6 py-6">
+                    <div className="flex items-center justify-end gap-3">
+                      <button 
+                        onClick={() => {
+                          if (setActiveView && setEditingCampaign) {
+                            setEditingCampaign(row);
+                            setActiveView("create_central_campaign_form");
+                          }
+                        }}
+                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Campaign"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button 
+                        onClick={() => row._id && handleDelete(row._id)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Campaign"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-          <span>Showing {playlists.length} of {playlists.length} central campaigns</span>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50">Previous</button>
-            <button className="px-4 py-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50">Next</button>
-          </div>
         </div>
       </div>
     </div>
@@ -985,6 +1067,8 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
 const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView?: any, setEditingCampaign?: any }) => {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Status");
 
   const fetchPlaylists = async () => {
     const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : "";
@@ -1030,9 +1114,16 @@ const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView
     return `${days} | ${times}`;
   };
 
+  const filteredPlaylists = playlists.filter(p => {
+    const matchesSearch = (p.name || "").toLowerCase().includes(search.toLowerCase());
+    const currentStatus = p.status || "Running";
+    const matchesStatus = statusFilter === "Status" ? true : currentStatus === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="pb-12 max-w-[1200px]">
-      <h1 className="text-3xl font-bold text-gray-900 mb-1">View playlist</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">View playlist</h1>
       <p className="text-sm text-gray-500 mb-8">View your playlist here</p>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 flex gap-4">
@@ -1041,15 +1132,22 @@ const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView
           <input 
             type="text" 
             placeholder="Search by playlist name" 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50"
           />
         </div>
-        <select className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+        <select 
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white"
+        >
           <option>Status</option>
+          <option>Running</option>
+          <option>Expired</option>
         </select>
       </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+<div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="bg-[#0E3B43] px-6 py-4">
           <h3 className="text-white font-bold">Playlist</h3>
         </div>
@@ -1067,13 +1165,13 @@ const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView
             <tbody className="text-sm font-medium">
               {loading ? (
                 <tr><td colSpan={5} className="p-6 text-center text-gray-500">Loading playlists...</td></tr>
-              ) : playlists.length === 0 ? (
+              ) : filteredPlaylists.length === 0 ? (
                 <tr><td colSpan={5} className="p-6 text-center text-gray-500">No playlists found</td></tr>
-              ) : playlists.map((row, i) => (
+              ) : filteredPlaylists.map((row, i) => (
                 <tr key={row._id || i} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-6 py-6 text-gray-800">
                     <p className="font-bold">{row.name}</p>
-                    <p className="text-xs text-[#FF5722] uppercase">{row.type || 'media'}</p>
+                    <p className="text-xs text-[#FF5722] uppercase">{["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type) ? 'Announcement Playlist' : 'Media Playlist'}</p>
                   </td>
                   <td className="px-6 py-6 text-gray-800">{renderSchedule(row)}</td>
                   <td className="px-6 py-6 text-gray-500 text-sm">
@@ -1081,7 +1179,7 @@ const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView
                       ? `${row.files.length} file(s)` 
                       : "No files"}
                   </td>
-                  <td className={`px-6 py-6 text-green-500 font-medium`}>Active</td>
+                  <td className={`px-6 py-6 text-green-500 font-medium`}>Running</td>
                   <td className="px-6 py-6 flex items-center justify-end gap-5">
                     <button 
                       onClick={() => {
@@ -2000,7 +2098,7 @@ const ProfileView = ({ userData }: { userData?: any }) => {
                   required
                   value={passwords.current}
                   onChange={e => setPasswords({...passwords, current: e.target.value})}
-                  placeholder="••••••••" 
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
                   className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
                 />
               </div>
@@ -2011,7 +2109,7 @@ const ProfileView = ({ userData }: { userData?: any }) => {
                   required
                   value={passwords.new}
                   onChange={e => setPasswords({...passwords, new: e.target.value})}
-                  placeholder="••••••••" 
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
                   className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
                 />
               </div>
@@ -2022,7 +2120,7 @@ const ProfileView = ({ userData }: { userData?: any }) => {
                   required
                   value={passwords.confirm}
                   onChange={e => setPasswords({...passwords, confirm: e.target.value})}
-                  placeholder="••••••••" 
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
                   className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" 
                 />
               </div>
@@ -2138,6 +2236,8 @@ export default function AccountMarketingDashboard() {
       case "create_central_campaign_form": return <CreateCentralCampaignFormView userData={userData} editData={editingCampaign} setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "view_central_campaigns": return <ViewCentralCampaignsView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "create_instant_announcement": return <CreateInstantAnnouncementView userData={userData} setActiveView={setActiveView} />;
+      case "view_announcement": return <ViewAnnouncements onEdit={(item: any) => { setEditingCampaign(item); setActiveView("create_announcement"); }} />;
+      case "mailbox": return <MailboxView />;
       case "view_announcement": return <ViewAnnouncements />;
       case "view_playlist": return <ViewPlaylistView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "create_instant_playlist": return <CreateInstantPlaylistView userData={userData} />;
@@ -2293,3 +2393,5 @@ export default function AccountMarketingDashboard() {
     </div>
   );
 }
+
+
