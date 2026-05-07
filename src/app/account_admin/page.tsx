@@ -35,7 +35,8 @@ import {
   List as ListIcon,
   Mail,
   Wifi,
-  WifiOff
+  WifiOff,
+  MonitorPlay
 } from "lucide-react";
 import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
 import { useRouter } from "next/navigation";
@@ -455,6 +456,16 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, custom
                 <span>{new Date(store.createdAt).toLocaleDateString()}</span>
               </div>
                   <div className="flex items-center gap-4 text-[#00BCD4]">
+                    <button
+                      title="View Devices"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStore(store);
+                        setActiveView("store_detail");
+                      }}
+                    >
+                      <MonitorPlay size={18} className="text-cyan-500" />
+                    </button>
                     <button
                       title="Edit"
                       onClick={(e) => {

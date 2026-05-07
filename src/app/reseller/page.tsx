@@ -894,6 +894,7 @@ const AllAdminsView = ({ setActiveView }: { setActiveView: (view: string) => voi
   const [devices, setDevices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingAdmin, setEditingAdmin] = useState<any>(null);
+  const [checkingStatusAdmin, setCheckingStatusAdmin] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState("all");
   const [deviceFilter, setDeviceFilter] = useState("all");
@@ -1048,7 +1049,7 @@ const AllAdminsView = ({ setActiveView }: { setActiveView: (view: string) => voi
                         {stats.deviceCount === 0 ? (
                           <button onClick={() => setActiveView("assign_device")} className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold w-32 hover:bg-[#F4511E] transition-all">Assign now</button>
                         ) : (
-                          <button className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold w-32 hover:bg-[#F4511E] transition-all">Check status</button>
+                          <button onClick={() => setCheckingStatusAdmin(admin)} className="px-4 py-1.5 bg-[#FF5722] text-white rounded-lg text-xs font-bold w-32 hover:bg-[#F4511E] transition-all">Check status</button>
                         )}
                         <button onClick={() => setEditingAdmin(admin)} className="text-[#00BCD4] hover:text-[#00ACC1] transition-colors"><Edit size={16} /></button>
                         <button onClick={() => handleDeleteAdmin(admin._id)} className="text-red-500 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
@@ -1105,6 +1106,63 @@ const AllAdminsView = ({ setActiveView }: { setActiveView: (view: string) => voi
                  Save Changes
                </button>
              </div>
+           </div>
+        </div>
+      </div>
+    )}
+
+    {/* Device Status Modal */}
+    {checkingStatusAdmin && (
+      <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-sm">
+        <div className="bg-white rounded-3xl p-8 w-[600px] shadow-2xl relative animate-in fade-in zoom-in duration-200">
+           <button onClick={() => setCheckingStatusAdmin(null)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-all">✖</button>
+           <div className="flex items-center gap-3 mb-6">
+             <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center text-[#00BCD4]">
+               <MonitorSmartphone size={20} />
+             </div>
+             <div>
+               <h2 className="text-2xl font-bold text-gray-900">Device Status</h2>
+               <p className="text-sm text-gray-500">Showing devices for {checkingStatusAdmin.operatorName || checkingStatusAdmin.username}</p>
+             </div>
+           </div>
+           
+           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+             {devices.filter(d => d.customerId === checkingStatusAdmin.customerId).length === 0 ? (
+               <div className="text-center py-8 bg-gray-50 rounded-2xl">
+                 <Monitor size={32} className="text-gray-300 mx-auto mb-2" />
+                 <p className="text-gray-500">No devices assigned to this account.</p>
+               </div>
+             ) : (
+               devices.filter(d => d.customerId === checkingStatusAdmin.customerId).map((device: any) => (
+                 <div key={device._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                   <div className="flex items-center gap-4">
+                     <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-[#0E3B43] shadow-sm border border-gray-100 overflow-hidden">
+                       {device.imageUrl ? <img src={device.imageUrl} className="w-full h-full object-cover" /> : <Monitor size={18} />}
+                     </div>
+                     <div>
+                       <p className="font-bold text-gray-900">{device.name}</p>
+                       <p className="text-xs text-gray-500">SN: {device.serialNumber}</p>
+                     </div>
+                   </div>
+                   <div className="flex flex-col items-end gap-1">
+                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                       device.status === 'active' || device.status === 'online' 
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                        : 'bg-red-50 text-red-600 border border-red-100'
+                     }`}>
+                       {device.status === 'active' || device.status === 'online' ? 'Online' : 'Offline'}
+                     </span>
+                     <p className="text-[10px] text-gray-400">Last seen: {device.lastConnection ? new Date(device.lastConnection).toLocaleString() : 'Never'}</p>
+                   </div>
+                 </div>
+               ))
+             )}
+           </div>
+           
+           <div className="mt-8">
+             <button onClick={() => setCheckingStatusAdmin(null)} className="w-full py-3 bg-[#0E3B43] text-white rounded-xl font-bold hover:bg-[#155662] transition-all">
+               Close
+             </button>
            </div>
         </div>
       </div>
@@ -2564,7 +2622,7 @@ export default function ResellerDashboard() {
 
   const handleMenuClick = (linkId: string, hasSubItems: boolean) => {
     if (linkId === "support") {
-      window.location.href = "mailto:support@centelon.com?subject=Reseller%20Portal%20Support";
+      window.location.href = "mailto:contact@centelonrobotics.tech?subject=Reseller%20Portal%20Support";
       return;
     }
     if (hasSubItems) {

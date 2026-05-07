@@ -206,7 +206,7 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
 
 // --- NEW VIEWS ---
 
-const ViewStoreCampaignsView = ({ userData }: { userData?: any }) => {
+const ViewStoreCampaignsView = ({ userData, setActiveView, setMailboxData }: { userData?: any, setActiveView: (v: string) => void, setMailboxData: (d: any) => void }) => {
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [playlists, setPlaylists] = useState<any[]>([]);
@@ -227,13 +227,21 @@ const ViewStoreCampaignsView = ({ userData }: { userData?: any }) => {
     const matchesLocation = locationFilter ? (store.storeLocation || store.location) === locationFilter : true;
     
     const count = storeCampaignCounts.get(store._id) || 0;
-    const matchesCampaigns = campaignFilter === "" ? true : count.toString() === campaignFilter;
+    let matchesCampaigns = true;
+    if (campaignFilter === "0") {
+      matchesCampaigns = count === 0;
+    } else if (campaignFilter === "0-5") {
+      matchesCampaigns = count > 0 && count <= 5;
+    } else if (campaignFilter === "5-10") {
+      matchesCampaigns = count > 5 && count <= 10;
+    } else if (campaignFilter === "10+") {
+      matchesCampaigns = count > 10;
+    }
     
     return matchesSearch && matchesLocation && matchesCampaigns;
   });
 
   const uniqueLocations = Array.from(new Set(stores.map(s => s.storeLocation || s.location).filter(Boolean)));
-  const uniqueCampaignCounts = Array.from(new Set(Array.from(storeCampaignCounts.values()))).sort((a, b) => a - b);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -288,9 +296,12 @@ return (
           <option value="">All Locations</option>
           {uniqueLocations.map(loc => <option key={loc as string} value={loc as string}>{loc as string}</option>)}
         </select>
-        <select value={campaignFilter} onChange={(e) => setCampaignFilter(e.target.value)} className="w-48 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
+        <select value={campaignFilter} onChange={(e) => setCampaignFilter(e.target.value)} className="w-56 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 bg-white">
           <option value="">All Campaign Counts</option>
-          {uniqueCampaignCounts.map(count => <option key={count} value={count.toString()}>{count} Campaigns</option>)}
+          <option value="0">&lt;0 Campaigns</option>
+          <option value="0-5">0-5 Campaigns</option>
+          <option value="5-10">5-10 Campaigns</option>
+          <option value="10+">10+ Campaigns</option>
         </select>
       </div>
 
@@ -323,21 +334,18 @@ return (
                   <td className="px-6 py-6 text-gray-800">{store.storeLocation || store.location || "N/A"}</td>
                   <td className="px-6 py-6 text-gray-800">{storeCampaignCounts.get(store._id) || 0}</td>
                   <td className="px-6 py-6 text-right">
-                    {store.email ? (
-                      <a
-                        href={`mailto:${store.email}`}
-                        className="inline-block px-6 py-2.5 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20"
-                      >
-                        Request status
-                      </a>
-                    ) : (
-                      <button
-                        onClick={() => toast.error("No email address found for this store")}
-                        className="px-6 py-2.5 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20"
-                      >
-                        Request status
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        setMailboxData({ 
+                          recipient: store.email || "", 
+                          subject: `Campaign Status Request: ${store.storeName || store.username || 'Store'}`
+                        });
+                        setActiveView("mailbox");
+                      }}
+                      className="px-6 py-2.5 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20"
+                    >
+                      Request status
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1280,8 +1288,13 @@ const CreateInstantPlaylistView = ({ userData }: { userData?: any }) => {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Category</label>
-              <select className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 text-gray-500">
-                <option></option>
+              <select className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 text-gray-700">
+                <option value="">Select category</option>
+                <option value="Promotional">Promotional</option>
+                <option value="Product Showcase">Product Showcase</option>
+                <option value="Seasonal">Seasonal</option>
+                <option value="Brand Content">Brand Content</option>
+                <option value="General">General</option>
               </select>
             </div>
             <div>
@@ -1490,6 +1503,9 @@ const MediaProvisioningView = () => {
   const [campaignStartDate, setCampaignStartDate] = useState("");
   const [campaignEndDate, setCampaignEndDate] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isSelectionConfirmed, setIsSelectionConfirmed] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [showPreview, setShowPreview] = useState(false);
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1679,6 +1695,7 @@ const MediaProvisioningView = () => {
                     onChange={(e) => {
                       const newFiles = Array.from(e.target.files || []);
                       setSelectedFiles(prev => [...prev, ...newFiles]);
+                      setIsSelectionConfirmed(false);
                     }}
                     className="hidden"
                     multiple
@@ -1699,7 +1716,11 @@ const MediaProvisioningView = () => {
                               <span className="text-sm font-bold text-gray-700 truncate max-w-[200px]">{file.name}</span>
                             </div>
                             <button 
-                              onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); 
+                                setIsSelectionConfirmed(false);
+                              }}
                               className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                             >
                               <Trash2 size={16} />
@@ -1726,16 +1747,35 @@ const MediaProvisioningView = () => {
                   </span>
                   <div className="flex gap-3">
                     <button 
+                      onClick={() => {
+                        setPreviewIndex(0);
+                        setShowPreview(true);
+                      }}
                       disabled={selectedFiles.length === 0}
                       className="px-6 py-2 bg-white text-[#FF5722] border border-[#FF5722] rounded-lg font-bold text-sm hover:bg-orange-50 transition-colors disabled:opacity-50"
                     >
                       Preview media
                     </button>
                     <button 
-                      disabled={selectedFiles.length === 0}
-                      className="px-6 py-2 bg-[#FF5722] text-white rounded-lg font-bold text-sm hover:bg-[#F4511E] transition-colors disabled:opacity-50"
+                      onClick={() => {
+                        setIsSelectionConfirmed(true);
+                        toast.success(`${selectedFiles.length} file(s) selection confirmed!`);
+                      }}
+                      disabled={selectedFiles.length === 0 || isSelectionConfirmed}
+                      className={`px-6 py-2 rounded-lg font-bold text-sm transition-all shadow-md ${
+                        isSelectionConfirmed 
+                          ? "bg-green-500 text-white shadow-green-500/20" 
+                          : "bg-[#FF5722] hover:bg-[#F4511E] text-white shadow-[#FF5722]/20"
+                      } disabled:opacity-50 flex items-center gap-2`}
                     >
-                      Confirm selection
+                      {isSelectionConfirmed ? (
+                        <>
+                          <CheckCircle2 size={16} />
+                          Selection Confirmed
+                        </>
+                      ) : (
+                        "Confirm selection"
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1875,6 +1915,110 @@ const MediaProvisioningView = () => {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
             {saving ? "Confirming..." : "Confirm Provisioning"}
           </button>
+        </div>
+      )}
+      
+      {showPreview && selectedFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] w-full max-w-4xl overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/50 to-transparent p-8 flex items-center justify-between z-10 pointer-events-none">
+              <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 pointer-events-auto">
+                <p className="text-white text-sm font-bold truncate max-w-[300px]">{selectedFiles[previewIndex]?.name}</p>
+              </div>
+              <button 
+                onClick={() => setShowPreview(false)}
+                className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-all pointer-events-auto"
+              >
+                <ChevronDown size={24} className="rotate-90" />
+              </button>
+            </div>
+
+            {/* Preview Content */}
+            <div className="h-[600px] flex items-center justify-center bg-[#0E3B43] relative group">
+              {selectedFiles[previewIndex]?.type.startsWith('image/') ? (
+                <img 
+                  src={URL.createObjectURL(selectedFiles[previewIndex])} 
+                  alt="Preview" 
+                  className="max-h-full max-w-full object-contain"
+                  onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+                />
+              ) : selectedFiles[previewIndex]?.type.startsWith('video/') ? (
+                <video 
+                  src={URL.createObjectURL(selectedFiles[previewIndex])} 
+                  controls 
+                  autoPlay
+                  className="max-h-full max-w-full"
+                  onLoadedData={(e) => URL.revokeObjectURL((e.target as HTMLVideoElement).src)}
+                />
+              ) : selectedFiles[previewIndex]?.type.startsWith('audio/') ? (
+                <div className="flex flex-col items-center gap-6">
+                  <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center text-[#A1F4FD] border border-white/10">
+                    <Volume2 size={48} />
+                  </div>
+                  <audio 
+                    src={URL.createObjectURL(selectedFiles[previewIndex])} 
+                    controls 
+                    autoPlay
+                    className="w-80"
+                    onLoadedData={(e) => URL.revokeObjectURL((e.target as HTMLAudioElement).src)}
+                  />
+                </div>
+              ) : (
+                <div className="text-white text-center">
+                  <AlertTriangle size={48} className="mx-auto mb-4 text-[#A1F4FD]" />
+                  <p className="font-bold">Preview not available for this file type</p>
+                </div>
+              )}
+
+              {/* Navigation Arrows */}
+              {selectedFiles.length > 1 && (
+                <>
+                  <button 
+                    onClick={() => setPreviewIndex(prev => (prev > 0 ? prev - 1 : selectedFiles.length - 1))}
+                    className="absolute left-6 w-14 h-14 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <ChevronDown size={24} className="rotate-180" />
+                  </button>
+                  <button 
+                    onClick={() => setPreviewIndex(prev => (prev < selectedFiles.length - 1 ? prev + 1 : 0))}
+                    className="absolute right-6 w-14 h-14 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <ChevronDown size={24} className="-rotate-180" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Footer / Info */}
+            <div className="bg-white p-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-[#FF5722]">
+                  <ImageIcon size={20} />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">File Type</p>
+                  <p className="text-sm font-bold text-gray-900">{selectedFiles[previewIndex]?.type || 'Unknown'}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">File Size</p>
+                <p className="text-sm font-bold text-gray-900">{(selectedFiles[previewIndex]?.size / (1024 * 1024)).toFixed(2)} MB</p>
+              </div>
+            </div>
+            
+            {/* Pagination Dots */}
+            {selectedFiles.length > 1 && (
+              <div className="bg-gray-50 border-t border-gray-100 px-8 py-4 flex justify-center gap-2">
+                {selectedFiles.map((_, i) => (
+                  <div 
+                    key={i} 
+                    className={`h-1.5 rounded-full transition-all ${i === previewIndex ? 'w-8 bg-[#FF5722]' : 'w-2 bg-gray-300'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -2154,6 +2298,7 @@ export default function AccountMarketingDashboard() {
   const [expandedMenu, setExpandedMenu] = useState<string>("");
   const [activeView, setActiveView] = useState("dashboard"); // Default
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [mailboxData, setMailboxData] = useState<{ recipient: string, subject: string }>({ recipient: "", subject: "" });
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
@@ -2231,14 +2376,13 @@ export default function AccountMarketingDashboard() {
   const renderContent = () => {
     switch (activeView) {
       case "dashboard": return <DashboardView setActiveView={setActiveView} userData={userData} />;
-      case "view_store_campaigns": return <ViewStoreCampaignsView userData={userData} />;
+      case "view_store_campaigns": return <ViewStoreCampaignsView userData={userData} setActiveView={setActiveView} setMailboxData={setMailboxData} />;
       case "create_central_campaign": return <CreateCentralCampaignMenuView setActiveView={setActiveView} />;
       case "create_central_campaign_form": return <CreateCentralCampaignFormView userData={userData} editData={editingCampaign} setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "view_central_campaigns": return <ViewCentralCampaignsView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "create_instant_announcement": return <CreateInstantAnnouncementView userData={userData} setActiveView={setActiveView} />;
       case "view_announcement": return <ViewAnnouncements onEdit={(item: any) => { setEditingCampaign(item); setActiveView("create_announcement"); }} />;
-      case "mailbox": return <MailboxView />;
-      case "view_announcement": return <ViewAnnouncements />;
+      case "mailbox": return <MailboxView recipient={mailboxData.recipient} subject={mailboxData.subject} />;
       case "view_playlist": return <ViewPlaylistView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "create_instant_playlist": return <CreateInstantPlaylistView userData={userData} />;
       case "create_announcement": return <CreateAnnouncementWizard userRole="account_marketing" userId={userData?._id || (typeof window !== "undefined" ? localStorage.getItem("userId") : "")} customerId={userData?.customerId} onNavigate={setActiveView} />;

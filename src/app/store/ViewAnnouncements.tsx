@@ -35,7 +35,7 @@ const ViewAnnouncements: React.FC<{ onEdit?: (item: any) => void }> = ({ onEdit 
 
   const getStatusColor = (s: string) => {
     if (s === "Paused") return "#EF4444";
-    if (s === "Running") return "#22C55E";
+    if (s === "Running" || s === "active") return "#22C55E";
     if (s === "Upcoming") return "#EAB308";
     return "#64748b";
   };
@@ -170,7 +170,9 @@ const ViewAnnouncements: React.FC<{ onEdit?: (item: any) => void }> = ({ onEdit 
                         <span style={{color: '#06b6d4', textDecoration: 'underline', cursor: 'pointer'}}>Preview Audio</span>
                       ) : "[No media]"}
                     </td>
-                    <td style={{ padding: "18px 20px", color: getStatusColor(item.status || "Running"), fontWeight: 600 }}>{item.status || "Running"}</td>
+                    <td style={{ padding: "18px 20px", color: getStatusColor(item.status), fontWeight: 600 }}>
+                      {(item.status === "active" || !item.status) ? "Running" : item.status}
+                    </td>
                     <td style={{ padding: "18px 20px" }}>
                       <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
                         <button onClick={() => onEdit?.(item)} style={{ background: "none", border: "none", cursor: "pointer", color: "#06b6d4" }}><FiEdit2 size={16} /></button>
