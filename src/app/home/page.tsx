@@ -121,7 +121,8 @@ const CustomerEngagementPlatform = () => {
       const res = await fetch(`/api/user/users?userId=${userId}`);
       const data = await res.json();
 
-      if (data[card.apiKey]) {
+      // Allow access if the API says so OR if the user has the 'user' role and is clicking 'Multimedia Platform'
+      if (data[card.apiKey] || (userRole === "user" && card.apiKey === "platform")) {
         // Always navigate to the card's route when user has access
         router.push(card.route);
       } else {
