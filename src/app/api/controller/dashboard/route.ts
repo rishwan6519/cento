@@ -70,17 +70,60 @@ export async function GET(request: Request) {
       // Find all customers created by this reseller
       const customers = await Customer.find({ resellerId: userObjectId }, '_id');
       const customerIds = customers.map((c: any) => c._id);
-      
-      const accountAdmins = await User.find({ role: UserRole.AccountAdmin, customerId: { $in: customerIds } }, 'username email phone companyName location');
-      const accountMarketingUsers = await User.find({ role: UserRole.AccountMarketing, customerId: { $in: customerIds } }, 'username email phone companyName');
-      const stores = await User.find({ role: UserRole.Store, customerId: { $in: customerIds } }, 'username storeName storeLocation operatorName');
+
+      // --- Account Admins enriched with their stores ---
+      const rawAccountAdmins = await User.find(
+        { role: UserRole.AccountAdmin, customerId: { $in: customerIds } },
+        'username email phone companyName location customerId'
+      ).lean();
+
+      const accountAdmins = await Promise.all(
+        rawAccountAdmins.map(async (admin: any) => {
+          const adminStores = await User.find(
+            { role: UserRole.Store, customerId: admin.customerId },
+            'username storeName storeLocation operatorName'
+          ).lean();
+          return { ...admin, stores: adminStores };
+        })
+      );
+
+      // --- Account Marketing Users enriched with their assigned store ---
+      const rawMarketingUsers = await User.find(
+        { role: UserRole.AccountMarketing, customerId: { $in: customerIds } },
+        'username email phone companyName hasAllStoreAccess assignedStoreId customerId'
+      ).lean();
+
+      const accountMarketingUsers = await Promise.all(
+        rawMarketingUsers.map(async (mu: any) => {
+          let assignedStore = null;
+          if (mu.hasAllStoreAccess) {
+            // Has access to all stores under the same customer
+            assignedStore = await User.find(
+              { role: UserRole.Store, customerId: mu.customerId },
+              'username storeName storeLocation operatorName'
+            ).lean();
+          } else if (mu.assignedStoreId) {
+            assignedStore = await User.findById(
+              mu.assignedStoreId,
+              'username storeName storeLocation operatorName'
+            ).lean();
+          }
+          return { ...mu, assignedStore };
+        })
+      );
+
+      // All stores under the reseller's customers (flat list)
+      const stores = await User.find(
+        { role: UserRole.Store, customerId: { $in: customerIds } },
+        'username storeName storeLocation operatorName'
+      ).lean();
 
       const orConditions: any[] = [{ resellerId: userObjectId }];
       if (customerIds.length > 0) {
         orConditions.push({ customerId: { $in: customerIds } });
       }
       const devices = await Device.find({ $or: orConditions }).populate('typeId', 'name imageUrl').lean();
-      
+
       const deviceIds = devices.map(d => d._id);
       const assignments = await AssignedDevice.find({ deviceId: { $in: deviceIds } }).populate('userId', 'username storeName storeLocation').lean();
 
@@ -106,9 +149,33 @@ export async function GET(request: Request) {
       };
 
     } else if (user.role === UserRole.AccountAdmin) {
-      const marketingUsers = await User.find({ role: UserRole.AccountMarketing, customerId: user.customerId }, 'username email phone');
-      const stores = await User.find({ role: UserRole.Store, customerId: user.customerId }, 'username storeName storeLocation operatorName');
-      
+      // Stores created under this admin's customer
+      const stores = await User.find(
+        { role: UserRole.Store, customerId: user.customerId },
+        'username storeName storeLocation operatorName'
+      ).lean();
+
+      // Marketing users enriched with their assigned store
+      const rawMarketingUsers = await User.find(
+        { role: UserRole.AccountMarketing, customerId: user.customerId },
+        'username email phone hasAllStoreAccess assignedStoreId'
+      ).lean();
+
+      const marketingUsers = await Promise.all(
+        rawMarketingUsers.map(async (mu: any) => {
+          let assignedStore = null;
+          if (mu.hasAllStoreAccess) {
+            assignedStore = stores; // all stores under this admin
+          } else if (mu.assignedStoreId) {
+            assignedStore = await User.findById(
+              mu.assignedStoreId,
+              'username storeName storeLocation operatorName'
+            ).lean();
+          }
+          return { ...mu, assignedStore };
+        })
+      );
+
       const devices = await Device.find({ customerId: user.customerId }).populate('typeId', 'name imageUrl').lean();
 
       const deviceIds = devices.map(d => d._id);
@@ -129,8 +196,8 @@ export async function GET(request: Request) {
 
       dashboard = {
         section: "Account Admin Dashboard",
-        marketingUsers,
         stores,
+        marketingUsers,
         devices: mappedDevices
       };
 
