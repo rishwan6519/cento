@@ -156,9 +156,11 @@ export async function GET(request: Request) {
       ).lean();
 
       // Marketing users enriched with their assigned store
+      // Filter by controllerId (this admin's _id) so each admin only sees
+      // the marketing users they created, not those of sibling admins.
       const rawMarketingUsers = await User.find(
-        { role: UserRole.AccountMarketing, customerId: user.customerId },
-        'username email phone hasAllStoreAccess assignedStoreId'
+        { role: UserRole.AccountMarketing, controllerId: userObjectId },
+        'username email phone hasAllStoreAccess assignedStoreId controllerId'
       ).lean();
 
       const marketingUsers = await Promise.all(

@@ -78,6 +78,7 @@ export async function GET(request: Request) {
     );
   }
 }
+ 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/mobile/device-controller
@@ -102,13 +103,8 @@ export async function GET(request: Request) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
-    const decoded = verifyToken(request);
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: "Missing or invalid token" },
-        { status: 401 }
-      );
-    }
+  
+    
 
     const body = await request.json();
     const { deviceId, deviceReset } = body;
@@ -131,6 +127,7 @@ export async function POST(request: Request) {
 
     await connectToDatabase();
 
+    
     // Upsert: create the record if it doesn't exist, otherwise update it
     const updated = await DeviceController.findOneAndUpdate(
       { deviceId },
