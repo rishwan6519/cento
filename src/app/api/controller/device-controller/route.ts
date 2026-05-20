@@ -5,8 +5,7 @@ import DeviceController from "@/models/DeviceController";
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/controller/device-controller?deviceId=<deviceId>
 //
-// No auth required – devices poll this endpoint directly.
-//
+// No auth required.
 // Returns the current reset status for the given device.
 //
 // Response:
@@ -56,8 +55,7 @@ export async function GET(request: Request) {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/controller/device-controller
 //
-// No auth required – devices or internal services call this directly.
-//
+// No auth required.
 // Sets the deviceReset flag for a specific device.
 //
 // Body:
