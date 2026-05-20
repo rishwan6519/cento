@@ -87,17 +87,17 @@ export async function GET(request: Request) {
         })
       );
 
-      // --- Account Marketing Users enriched with their assigned store ---
+      // --- Account Marketing Users enriched with assigned store + parent admin ---
       const rawMarketingUsers = await User.find(
         { role: UserRole.AccountMarketing, customerId: { $in: customerIds } },
-        'username email phone companyName hasAllStoreAccess assignedStoreId customerId'
+        'username email phone hasAllStoreAccess assignedStoreId customerId controllerId'
       ).lean();
 
       const accountMarketingUsers = await Promise.all(
         rawMarketingUsers.map(async (mu: any) => {
+          // Resolve assigned store(s)
           let assignedStore = null;
           if (mu.hasAllStoreAccess) {
-            // Has access to all stores under the same customer
             assignedStore = await User.find(
               { role: UserRole.Store, customerId: mu.customerId },
               'username storeName storeLocation operatorName'
@@ -108,7 +108,18 @@ export async function GET(request: Request) {
               'username storeName storeLocation operatorName'
             ).lean();
           }
-          return { ...mu, assignedStore };
+
+          // Resolve which AccountAdmin created this marketing user
+          let createdByAdmin = null;
+          if (mu.controllerId) {
+            createdByAdmin = await User.findById(
+              mu.controllerId,
+              'username email location'
+            ).lean();
+          }
+
+          const { controllerId, customerId, ...rest } = mu;
+          return { ...rest, assignedStore, createdByAdmin };
         })
       );
 
