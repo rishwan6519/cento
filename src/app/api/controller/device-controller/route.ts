@@ -1,50 +1,25 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/lib/db";
 import DeviceController from "@/models/DeviceController";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Auth helper – verifies Bearer JWT and returns the decoded payload or null
-// ─────────────────────────────────────────────────────────────────────────────
-function verifyToken(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-
-  const token = authHeader.split(" ")[1];
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET || "fallback_secret") as {
-      userId: string;
-      role: string;
-    };
-  } catch {
-    return null;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/mobile/device-controller?deviceId=<deviceId>
+// GET /api/controller/device-controller?deviceId=<deviceId>
 //
-// Returns the current controller status for the given device.
+// No auth required – devices poll this endpoint directly.
+//
+// Returns the current reset status for the given device.
 //
 // Response:
 // {
 //   "success": true,
 //   "data": {
 //     "deviceId": "SN-001",
-//     "deviceReset": 0          // 0 = no action pending, 1 = reset requested
+//     "deviceReset": 0    // 0 = no reset pending, 1 = reset requested
 //   }
 // }
 // ─────────────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
-    const decoded = verifyToken(request);
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: "Missing or invalid token" },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get("deviceId");
 
@@ -57,7 +32,6 @@ export async function GET(request: Request) {
 
     await connectToDatabase();
 
-    // Find or return a default record (deviceReset = 0) without creating one
     const controller = await DeviceController.findOne({ deviceId }).lean();
 
     return NextResponse.json(
@@ -71,24 +45,25 @@ export async function GET(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Mobile API device-controller GET error:", error);
+    console.error("device-controller GET error:", error);
     return NextResponse.json(
       { success: false, message: "Internal server error" },
       { status: 500 }
     );
   }
 }
- 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/mobile/device-controller
+// POST /api/controller/device-controller
+//
+// No auth required – devices or internal services call this directly.
 //
 // Sets the deviceReset flag for a specific device.
 //
 // Body:
 // {
-//   "deviceId": "SN-001",       // required
-//   "deviceReset": 1            // required – 0 or 1
+//   "deviceId": "SN-001",   // required
+//   "deviceReset": 1        // required – 0 (clear) or 1 (trigger reset)
 // }
 //
 // Response:
@@ -103,13 +78,9 @@ export async function GET(request: Request) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
-  
-    
-
     const body = await request.json();
     const { deviceId, deviceReset } = body;
 
-    // Validate deviceId
     if (!deviceId || typeof deviceId !== "string") {
       return NextResponse.json(
         { success: false, message: "'deviceId' is required and must be a string" },
@@ -117,7 +88,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate deviceReset value
     if (deviceReset !== 0 && deviceReset !== 1) {
       return NextResponse.json(
         { success: false, message: "'deviceReset' must be 0 or 1" },
@@ -127,8 +97,6 @@ export async function POST(request: Request) {
 
     await connectToDatabase();
 
-    
-    // Upsert: create the record if it doesn't exist, otherwise update it
     const updated = await DeviceController.findOneAndUpdate(
       { deviceId },
       { deviceReset },
@@ -147,7 +115,7 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Mobile API device-controller POST error:", error);
+    console.error("device-controller POST error:", error);
     return NextResponse.json(
       { success: false, message: "Internal server error" },
       { status: 500 }
