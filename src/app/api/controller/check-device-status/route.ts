@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db";
 import Device from "@/models/Device";
 import AssignedDevice from "@/models/AssignDevice";
 import User from "@/models/User";
+import Customer from "@/models/Customer";
 import { sendDeviceOfflineAlert } from "@/lib/firebase-admin";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +31,18 @@ export async function GET(request: Request) {
     const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
     const cutoffTime = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
 
+    // Self-healing: Reset lastNotifiedOffline for devices that are back online
+    // (i.e. lastConnection is >= cutoffTime AND lastNotifiedOffline is set)
+    await Device.updateMany(
+      {
+        lastConnection: { $gte: cutoffTime },
+        lastNotifiedOffline: { $exists: true },
+      },
+      {
+        $unset: { lastNotifiedOffline: "" },
+      }
+    );
+
     // Find all devices that have gone offline (lastConnection older than 5 min)
     const offlineDevices = await Device.find({
       lastConnection: { $lt: cutoffTime },
@@ -47,20 +60,20 @@ export async function GET(request: Request) {
     let totalNotified = 0;
 
     for (const device of offlineDevices) {
-      // Find which store this device is assigned to
+      // Find which store this device is assigned to (if any)
       const assignment = await AssignedDevice.findOne({
         deviceId: device._id,
       }).lean();
 
-      if (!assignment) continue;
-
       // Build the $or conditions dynamically to avoid matching null/undefined fields
       const orConditions = [];
 
-      if ((assignment as any).userId) {
-        orConditions.push({ _id: (assignment as any).userId }); // assigned store
+      // 1. Assigned Store
+      if (assignment && (assignment as any).userId) {
+        orConditions.push({ _id: (assignment as any).userId });
       }
 
+      // 2. Account Admins & Marketing Users under this customer
       if ((device as any).customerId) {
         orConditions.push({
           customerId: (device as any).customerId,
@@ -68,9 +81,19 @@ export async function GET(request: Request) {
         });
       }
 
-      if ((device as any).resellerId) {
+      // 3. Reseller of this device
+      let resellerId = (device as any).resellerId;
+      if (!resellerId && (device as any).customerId) {
+        // Resolve reseller via Customer document if not directly on the device
+        const customer: any = await Customer.findById((device as any).customerId).lean();
+        if (customer && customer.resellerId) {
+          resellerId = customer.resellerId;
+        }
+      }
+
+      if (resellerId) {
         orConditions.push({
-          resellerId: (device as any).resellerId,
+          _id: resellerId,
           role: "reseller",
         });
       }
@@ -91,14 +114,18 @@ export async function GET(request: Request) {
       if (allTokens.length === 0) continue;
 
       // Send the offline push notification
-      await sendDeviceOfflineAlert(allTokens, (device as any).name || (device as any)._id.toString());
-
-      // Mark device as notified to avoid repeated alerts
-      await Device.findByIdAndUpdate((device as any)._id, {
-        lastNotifiedOffline: new Date(),
-      });
-
-      totalNotified++;
+      try {
+        await sendDeviceOfflineAlert(allTokens, (device as any).name || (device as any)._id.toString());
+        
+        // Mark device as notified to avoid repeated alerts
+        await Device.findByIdAndUpdate((device as any)._id, {
+          lastNotifiedOffline: new Date(),
+        });
+        
+        totalNotified++;
+      } catch (fcmError) {
+        console.error(`Failed to send offline notification for device ${device._id}:`, fcmError);
+      }
     }
 
     return NextResponse.json({

@@ -68,65 +68,13 @@ export async function GET(request: Request) {
 
     if (user.role === UserRole.Reseller) {
       // Find all customers created by this reseller
-      const customers = await Customer.find({ resellerId: userObjectId }, '_id');
+      const customers = await Customer.find({ resellerId: userObjectId }).lean();
       const customerIds = customers.map((c: any) => c._id);
-
-      // --- Account Admins enriched with their stores ---
-      const rawAccountAdmins = await User.find(
-        { role: UserRole.AccountAdmin, customerId: { $in: customerIds } },
-        'username email phone companyName location customerId'
-      ).lean();
-
-      const accountAdmins = await Promise.all(
-        rawAccountAdmins.map(async (admin: any) => {
-          const adminStores = await User.find(
-            { role: UserRole.Store, customerId: admin.customerId },
-            'username storeName storeLocation operatorName'
-          ).lean();
-          return { ...admin, stores: adminStores };
-        })
-      );
-
-      // --- Account Marketing Users enriched with assigned store + parent admin ---
-      const rawMarketingUsers = await User.find(
-        { role: UserRole.AccountMarketing, customerId: { $in: customerIds } },
-        'username email phone hasAllStoreAccess assignedStoreId customerId controllerId'
-      ).lean();
-
-      const accountMarketingUsers = await Promise.all(
-        rawMarketingUsers.map(async (mu: any) => {
-          // Resolve assigned store(s)
-          let assignedStore = null;
-          if (mu.hasAllStoreAccess) {
-            assignedStore = await User.find(
-              { role: UserRole.Store, customerId: mu.customerId },
-              'username storeName storeLocation operatorName'
-            ).lean();
-          } else if (mu.assignedStoreId) {
-            assignedStore = await User.findById(
-              mu.assignedStoreId,
-              'username storeName storeLocation operatorName'
-            ).lean();
-          }
-
-          // Resolve which AccountAdmin created this marketing user
-          let createdByAdmin = null;
-          if (mu.controllerId) {
-            createdByAdmin = await User.findById(
-              mu.controllerId,
-              'username email location'
-            ).lean();
-          }
-
-          const { controllerId, customerId, ...rest } = mu;
-          return { ...rest, assignedStore, createdByAdmin };
-        })
-      );
 
       // All stores under the reseller's customers (flat list)
       const stores = await User.find(
         { role: UserRole.Store, customerId: { $in: customerIds } },
-        'username storeName storeLocation operatorName'
+        'username storeName storeLocation operatorName customerId'
       ).lean();
 
       const orConditions: any[] = [{ resellerId: userObjectId }];
@@ -147,16 +95,57 @@ export async function GET(request: Request) {
           type: formatDeviceType(d.typeId),
           lastConnection: d.lastConnection,
           status: getDeviceStatus(d.lastConnection),
-          connectedStore: assignment && assignment.userId ? assignment.userId : null
+          connectedStore: assignment && assignment.userId ? assignment.userId : null,
+          customerId: d.customerId
         };
       });
 
+      // Group entities by Organization (Customer)
+      const organizations = customers.map((customer: any) => {
+        const customerIdStr = customer._id.toString();
+
+        const customerDevices = mappedDevices.filter(
+          (d: any) => d.customerId && d.customerId.toString() === customerIdStr
+        );
+
+        const customerStores = stores
+          .filter((store: any) => store.customerId && store.customerId.toString() === customerIdStr)
+          .map((store: any) => {
+            const storeIdStr = store._id.toString();
+            const storeDevices = customerDevices.filter(
+              (d: any) => d.connectedStore && d.connectedStore._id.toString() === storeIdStr
+            );
+            return {
+              ...store,
+              devices: storeDevices
+            };
+          });
+
+        const customerUnassignedDevices = customerDevices.filter(
+          (d: any) => !d.connectedStore || !d.connectedStore._id
+        );
+
+        return {
+          _id: customer._id,
+          organizationName: customer.organizationName,
+          contactName: customer.contactName,
+          phone: customer.phone,
+          email: customer.email,
+          addressLine1: customer.addressLine1,
+          addressLine2: customer.addressLine2,
+          pinCode: customer.pinCode,
+          city: customer.city,
+          stores: customerStores,
+          unassignedDevices: customerUnassignedDevices
+        };
+      });
+
+      const unassignedDevices = mappedDevices.filter((d: any) => !d.customerId);
+
       dashboard = {
         section: "Reseller Dashboard",
-        accountAdmins,
-        accountMarketingUsers,
-        stores,
-        devices: mappedDevices
+        organizations,
+        unassignedDevices
       };
 
     } else if (user.role === UserRole.AccountAdmin) {
