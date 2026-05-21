@@ -22,6 +22,7 @@
     "date-fns": "^4.1.0",
     "dynamsoft-camera-enhancer": "^3.3.1",
     "dynamsoft-javascript-barcode": "^9.6.11",
+    "firebase-admin": "^13.10.0",
     "formidable": "^3.5.4",
     "framer-motion": "^12.8.2",
     "fs": "^0.0.1-security",

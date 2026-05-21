@@ -94,6 +94,7 @@ export interface UserDocument extends Document {
   assignedStoreId?: mongoose.Types.ObjectId;
   mediaProvisioning?: boolean;
   provisionedFiles?: { name: string; url: string }[];
+  fcmTokens?: string[];
 }
 
 const UserSchema: Schema = new Schema({
@@ -161,6 +162,10 @@ const UserSchema: Schema = new Schema({
   },
   provisionedFiles: {
     type: [{ name: String, url: String }],
+    default: []
+  },
+  fcmTokens: {
+    type: [String],
     default: []
   }
 }, { 
