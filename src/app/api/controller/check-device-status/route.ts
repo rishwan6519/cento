@@ -54,16 +54,32 @@ export async function GET(request: Request) {
 
       if (!assignment) continue;
 
-      // Collect all users who should be notified:
-      // - The store user assigned to the device
-      // - The account admin (via controllerId or customerId)
-      // - Any marketing users under the same customer
+      // Build the $or conditions dynamically to avoid matching null/undefined fields
+      const orConditions = [];
+
+      if ((assignment as any).userId) {
+        orConditions.push({ _id: (assignment as any).userId }); // assigned store
+      }
+
+      if ((device as any).customerId) {
+        orConditions.push({
+          customerId: (device as any).customerId,
+          role: { $in: ["account_admin", "account_marketing"] },
+        });
+      }
+
+      if ((device as any).resellerId) {
+        orConditions.push({
+          resellerId: (device as any).resellerId,
+          role: "reseller",
+        });
+      }
+
+      if (orConditions.length === 0) continue;
+
+      // Collect all users who should be notified
       const usersToNotify = await User.find({
-        $or: [
-          { _id: (assignment as any).userId },                        // assigned store
-          { customerId: (device as any).customerId, role: { $in: ["account_admin", "account_marketing"] } },
-          { resellerId: (device as any).resellerId, role: "reseller" },
-        ],
+        $or: orConditions,
         fcmTokens: { $exists: true, $not: { $size: 0 } }, // only users with FCM tokens
       }).select("fcmTokens").lean();
 
