@@ -89,13 +89,23 @@ export async function sendPushNotification(
 // ─────────────────────────────────────────────────────────────────────────────
 export async function sendDeviceOfflineAlert(
   fcmTokens: string[],
-  deviceName: string
+  deviceName: string,
+  isReminder: boolean = false
 ) {
+  const title = isReminder ? "Device Still Offline ⚠️" : "Device Offline Alert ⚠️";
+  const body = isReminder
+    ? `${deviceName} is still offline.`
+    : `${deviceName} has lost connection to the server.`;
+
   return sendPushNotification(
     fcmTokens,
-    "Device Offline Alert ⚠️",
-    `${deviceName} has lost connection to the server.`,
-    { type: "device_offline", deviceName }
+    title,
+    body,
+    {
+      type: "device_offline",
+      deviceName,
+      isReminder: String(isReminder)
+    }
   );
 }
 

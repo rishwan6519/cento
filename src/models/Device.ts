@@ -44,6 +44,11 @@ const deviceSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: false
+  },
+  lastNotifiedOffline: {
+    type: Date,
+    required: false,
+    default: null
   }
 }, {
   timestamps: true

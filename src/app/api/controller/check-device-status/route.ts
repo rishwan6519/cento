@@ -17,9 +17,12 @@ import { sendDeviceOfflineAlert } from "@/lib/firebase-admin";
 // ─────────────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
-    // Secure the cron endpoint with a secret
+    // Secure the cron endpoint with a secret (supporting both x-cron-secret and standard Vercel Authorization Bearer header)
     const cronSecret = request.headers.get("x-cron-secret");
-    if (cronSecret !== process.env.CRON_SECRET) {
+    const authHeader = request.headers.get("authorization");
+    const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+    if (cronSecret !== process.env.CRON_SECRET && !isVercelCron) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 }
@@ -32,21 +35,26 @@ export async function GET(request: Request) {
     const cutoffTime = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
 
     // Self-healing: Reset lastNotifiedOffline for devices that are back online
-    // (i.e. lastConnection is >= cutoffTime AND lastNotifiedOffline is set)
+    // (i.e. lastConnection is >= cutoffTime and lastNotifiedOffline is set to non-null value)
     await Device.updateMany(
       {
         lastConnection: { $gte: cutoffTime },
-        lastNotifiedOffline: { $exists: true },
+        lastNotifiedOffline: { $ne: null },
       },
       {
-        $unset: { lastNotifiedOffline: "" },
+        $set: { lastNotifiedOffline: null },
       }
     );
 
     // Find all devices that have gone offline (lastConnection older than 5 min)
+    // AND either have not been notified yet, OR were notified more than 5 minutes ago
     const offlineDevices = await Device.find({
       lastConnection: { $lt: cutoffTime },
-      lastNotifiedOffline: { $exists: false }, // Not yet notified
+      $or: [
+        { lastNotifiedOffline: { $exists: false } },
+        { lastNotifiedOffline: null },
+        { lastNotifiedOffline: { $lt: cutoffTime } },
+      ],
     }).lean();
 
     if (offlineDevices.length === 0) {
@@ -113,11 +121,18 @@ export async function GET(request: Request) {
 
       if (allTokens.length === 0) continue;
 
+      // Determine if this is a reminder
+      const isReminder = !!(device as any).lastNotifiedOffline;
+
       // Send the offline push notification
       try {
-        await sendDeviceOfflineAlert(allTokens, (device as any).name || (device as any)._id.toString());
+        await sendDeviceOfflineAlert(
+          allTokens,
+          (device as any).name || (device as any)._id.toString(),
+          isReminder
+        );
         
-        // Mark device as notified to avoid repeated alerts
+        // Mark device as notified with the current time to track next reminder window
         await Device.findByIdAndUpdate((device as any)._id, {
           lastNotifiedOffline: new Date(),
         });
