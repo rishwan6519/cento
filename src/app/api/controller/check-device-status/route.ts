@@ -5,6 +5,7 @@ import AssignedDevice from "@/models/AssignDevice";
 import User from "@/models/User";
 import Customer from "@/models/Customer";
 import { sendDeviceOfflineAlert } from "@/lib/firebase-admin";
+import { Settings } from "@/models/Settings";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/controller/check-device-status
@@ -31,7 +32,17 @@ export async function GET(request: Request) {
 
     await connectToDatabase();
 
-    const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+    // Fetch offline threshold from settings (default to 60 minutes)
+    const thresholdSetting = await Settings.findOne({ key: "device_offline_threshold_minutes" }).lean();
+    let thresholdMinutes = 60; // default 1 hour
+    if (thresholdSetting && thresholdSetting.value) {
+      const parsed = parseInt(thresholdSetting.value, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        thresholdMinutes = parsed;
+      }
+    }
+
+    const OFFLINE_THRESHOLD_MS = thresholdMinutes * 60 * 1000;
     const cutoffTime = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
 
     // Self-healing: Reset lastNotifiedOffline for devices that are back online
@@ -46,8 +57,8 @@ export async function GET(request: Request) {
       }
     );
 
-    // Find all devices that have gone offline (lastConnection older than 5 min)
-    // AND either have not been notified yet, OR were notified more than 5 minutes ago
+    // Find all devices that have gone offline (lastConnection older than the threshold time)
+    // AND either have not been notified yet, OR were notified more than the threshold time ago
     const offlineDevices = await Device.find({
       lastConnection: { $lt: cutoffTime },
       $or: [
