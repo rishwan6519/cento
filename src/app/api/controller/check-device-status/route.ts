@@ -5,7 +5,6 @@ import AssignedDevice from "@/models/AssignDevice";
 import User from "@/models/User";
 import Customer from "@/models/Customer";
 import { sendDeviceOfflineAlert } from "@/lib/firebase-admin";
-import { Settings } from "@/models/Settings";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/controller/check-device-status
@@ -32,48 +31,26 @@ export async function GET(request: Request) {
 
     await connectToDatabase();
 
-    // Initial offline alert delay: Wait 2 minutes after a device goes offline
-    const OFFLINE_DETECTION_MS = 2 * 60 * 1000; // 2 minutes
-    const cutoffOffline = new Date(Date.now() - OFFLINE_DETECTION_MS);
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-    // Fetch reminder interval from settings (default to 60 minutes)
-    const thresholdSetting = await Settings.findOne({ key: "device_offline_threshold_minutes" }).lean();
-    let thresholdMinutes = 60; // default 1 hour
-    if (thresholdSetting && thresholdSetting.value) {
-      const parsed = parseInt(thresholdSetting.value, 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        thresholdMinutes = parsed;
-      }
-    }
-
-    const REMINDER_INTERVAL_MS = thresholdMinutes * 60 * 1000;
-    const cutoffReminder = new Date(Date.now() - REMINDER_INTERVAL_MS);
-
-    // Self-healing: Reset lastNotifiedOffline for devices that are back online
-    // (i.e. lastConnection is >= cutoffOffline and lastNotifiedOffline is set to non-null value)
+    // Self-healing: Reset notifiedUsers and lastNotifiedOffline for devices that are back online (seen within last 5 minutes)
     await Device.updateMany(
       {
-        lastConnection: { $gte: cutoffOffline },
-        lastNotifiedOffline: { $ne: null },
+        lastConnection: { $gte: fiveMinutesAgo },
+        $or: [
+          { lastNotifiedOffline: { $ne: null } },
+          { notifiedUsers: { $exists: true, $ne: {} } }
+        ]
       },
       {
-        $set: { lastNotifiedOffline: null },
+        $set: { lastNotifiedOffline: null, notifiedUsers: {} },
       }
     );
 
-    // Find all devices that:
-    // 1. Are offline (lastConnection is older than 2 minutes ago)
-    // 2. AND either:
-    //    a. Have not been notified yet (lastNotifiedOffline is null or undefined)
-    //    b. OR have been notified, but the last notification was sent more than the reminder interval ago (lastNotifiedOffline is older than cutoffReminder)
+    // Find all devices that have gone offline (lastConnection older than 5 minutes)
     const offlineDevices = await Device.find({
-      lastConnection: { $lt: cutoffOffline },
-      $or: [
-        { lastNotifiedOffline: { $exists: false } },
-        { lastNotifiedOffline: null },
-        { lastNotifiedOffline: { $lt: cutoffReminder } },
-      ],
-    }).lean();
+      lastConnection: { $lt: fiveMinutesAgo }
+    });
 
     if (offlineDevices.length === 0) {
       return NextResponse.json({
@@ -126,34 +103,54 @@ export async function GET(request: Request) {
 
       if (orConditions.length === 0) continue;
 
-      // Collect all users who should be notified
+      // Collect all users who should be notified (including their customized notificationFrequency)
       const usersToNotify = await User.find({
         $or: orConditions,
         fcmTokens: { $exists: true, $not: { $size: 0 } }, // only users with FCM tokens
-      }).select("fcmTokens").lean();
+      }).select("fcmTokens notificationFrequency").lean();
 
-      // Flatten all FCM tokens from all relevant users
-      const allTokens: string[] = usersToNotify.flatMap(
-        (u: any) => u.fcmTokens || []
-      );
+      if (usersToNotify.length === 0) continue;
 
-      if (allTokens.length === 0) continue;
+      const tokensToNotify: string[] = [];
 
-      // Determine if this is a reminder
-      const isReminder = !!(device as any).lastNotifiedOffline;
+      // Ensure notifiedUsers map exists
+      if (!device.notifiedUsers) {
+        device.notifiedUsers = new Map();
+      }
+
+      for (const user of usersToNotify) {
+        const thresholdMinutes = user.notificationFrequency !== undefined ? user.notificationFrequency : 60;
+        const userCutoffTime = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+
+        // Check if device is offline for this user (i.e. lastConnection is older than their threshold)
+        if (device.lastConnection && new Date(device.lastConnection) < userCutoffTime) {
+          const lastNotified = device.notifiedUsers.get(user._id.toString());
+
+          // Send notification if not notified yet, OR if the last notification was longer than their threshold ago
+          if (!lastNotified || new Date(lastNotified) < userCutoffTime) {
+            if (user.fcmTokens && user.fcmTokens.length > 0) {
+              tokensToNotify.push(...user.fcmTokens);
+            }
+            device.notifiedUsers.set(user._id.toString(), new Date());
+          }
+        }
+      }
+
+      if (tokensToNotify.length === 0) continue;
 
       // Send the offline push notification
       try {
         await sendDeviceOfflineAlert(
-          allTokens,
-          (device as any).name || (device as any)._id.toString(),
-          isReminder
+          tokensToNotify,
+          device.name || device._id.toString(),
+          false
         );
         
-        // Mark device as notified with the current time to track next reminder window
-        await Device.findByIdAndUpdate((device as any)._id, {
-          lastNotifiedOffline: new Date(),
-        });
+        // Also update standard lastNotifiedOffline for backward compatibility
+        device.lastNotifiedOffline = new Date();
+        
+        // Save the updated map & notification timestamps
+        await device.save();
         
         totalNotified++;
       } catch (fcmError) {
@@ -163,7 +160,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Offline alert sent for ${totalNotified} device(s)`,
+      message: `Offline alert evaluated. Sent notifications to users for ${totalNotified} device(s)`,
       notified: totalNotified,
     });
   } catch (error) {

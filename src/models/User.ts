@@ -95,6 +95,7 @@ export interface UserDocument extends Document {
   mediaProvisioning?: boolean;
   provisionedFiles?: { name: string; url: string }[];
   fcmTokens?: string[];
+  notificationFrequency?: number;
 }
 
 const UserSchema: Schema = new Schema({
@@ -167,6 +168,11 @@ const UserSchema: Schema = new Schema({
   fcmTokens: {
     type: [String],
     default: []
+  },
+  notificationFrequency: {
+    type: Number,
+    required: false,
+    default: 60
   }
 }, { 
   timestamps: true 

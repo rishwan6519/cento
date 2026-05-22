@@ -6,9 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
     const settings = await Settings.find({});
-    const config: Record<string, string> = {
-      device_offline_threshold_minutes: "60", // default 1 hour
-    };
+    const config: Record<string, string> = {};
     settings.forEach(s => {
       config[s.key] = s.value;
     });

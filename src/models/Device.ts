@@ -49,6 +49,11 @@ const deviceSchema = new mongoose.Schema({
     type: Date,
     required: false,
     default: null
+  },
+  notifiedUsers: {
+    type: Map,
+    of: Date,
+    default: {}
   }
 }, {
   timestamps: true

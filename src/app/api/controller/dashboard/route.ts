@@ -9,7 +9,6 @@ import PlaylistConfig from "@/models/PlaylistConfig";
 import AnnouncementPlaylist from "@/models/AnnouncementPlaylist";
 import AssignedDevice from "@/models/AssignDevice";
 import "@/models/DeviceTypes"; // Register DeviceType schema for populate
-import { Settings } from "@/models/Settings";
 
 export async function GET(request: Request) {
   try {
@@ -37,17 +36,6 @@ export async function GET(request: Request) {
     // Connect to database
     await connectToDatabase();
 
-    // Fetch offline threshold from settings (default to 60 minutes)
-    const thresholdSetting = await Settings.findOne({ key: "device_offline_threshold_minutes" }).lean();
-    let thresholdMinutes = 60; // default 1 hour
-    if (thresholdSetting && thresholdSetting.value) {
-      const parsed = parseInt(thresholdSetting.value, 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        thresholdMinutes = parsed;
-      }
-    }
-    const OFFLINE_THRESHOLD_MS = thresholdMinutes * 60 * 1000;
-
     // Find user to ensure they exist and get current role/info
     const user = await User.findById(userId);
     if (!user) {
@@ -56,6 +44,10 @@ export async function GET(request: Request) {
         { status: 404 }
       );
     }
+
+    // Get the user's personalized offline threshold (default to 60 minutes)
+    const thresholdMinutes = user.notificationFrequency !== undefined ? user.notificationFrequency : 60;
+    const OFFLINE_THRESHOLD_MS = thresholdMinutes * 60 * 1000;
 
     // --- Fetch Dashboard Data based on role ---
     let dashboard: any = {};
@@ -281,6 +273,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: true,
+        notificationFrequency: thresholdMinutes,
         ...dashboard
       },
       { status: 200 }
