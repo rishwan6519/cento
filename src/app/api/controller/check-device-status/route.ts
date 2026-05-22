@@ -32,7 +32,11 @@ export async function GET(request: Request) {
 
     await connectToDatabase();
 
-    // Fetch offline threshold from settings (default to 60 minutes)
+    // Initial offline alert delay: Wait 2 minutes after a device goes offline
+    const OFFLINE_DETECTION_MS = 2 * 60 * 1000; // 2 minutes
+    const cutoffOffline = new Date(Date.now() - OFFLINE_DETECTION_MS);
+
+    // Fetch reminder interval from settings (default to 60 minutes)
     const thresholdSetting = await Settings.findOne({ key: "device_offline_threshold_minutes" }).lean();
     let thresholdMinutes = 60; // default 1 hour
     if (thresholdSetting && thresholdSetting.value) {
@@ -42,14 +46,14 @@ export async function GET(request: Request) {
       }
     }
 
-    const OFFLINE_THRESHOLD_MS = thresholdMinutes * 60 * 1000;
-    const cutoffTime = new Date(Date.now() - OFFLINE_THRESHOLD_MS);
+    const REMINDER_INTERVAL_MS = thresholdMinutes * 60 * 1000;
+    const cutoffReminder = new Date(Date.now() - REMINDER_INTERVAL_MS);
 
     // Self-healing: Reset lastNotifiedOffline for devices that are back online
-    // (i.e. lastConnection is >= cutoffTime and lastNotifiedOffline is set to non-null value)
+    // (i.e. lastConnection is >= cutoffOffline and lastNotifiedOffline is set to non-null value)
     await Device.updateMany(
       {
-        lastConnection: { $gte: cutoffTime },
+        lastConnection: { $gte: cutoffOffline },
         lastNotifiedOffline: { $ne: null },
       },
       {
@@ -57,14 +61,17 @@ export async function GET(request: Request) {
       }
     );
 
-    // Find all devices that have gone offline (lastConnection older than the threshold time)
-    // AND either have not been notified yet, OR were notified more than the threshold time ago
+    // Find all devices that:
+    // 1. Are offline (lastConnection is older than 2 minutes ago)
+    // 2. AND either:
+    //    a. Have not been notified yet (lastNotifiedOffline is null or undefined)
+    //    b. OR have been notified, but the last notification was sent more than the reminder interval ago (lastNotifiedOffline is older than cutoffReminder)
     const offlineDevices = await Device.find({
-      lastConnection: { $lt: cutoffTime },
+      lastConnection: { $lt: cutoffOffline },
       $or: [
         { lastNotifiedOffline: { $exists: false } },
         { lastNotifiedOffline: null },
-        { lastNotifiedOffline: { $lt: cutoffTime } },
+        { lastNotifiedOffline: { $lt: cutoffReminder } },
       ],
     }).lean();
 
