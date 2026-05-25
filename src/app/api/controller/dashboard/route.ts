@@ -99,7 +99,11 @@ export async function GET(request: Request) {
           type: formatDeviceType(d.typeId),
           lastConnection: d.lastConnection,
           status: getDeviceStatus(d.lastConnection),
-          connectedStore: assignment && assignment.userId ? assignment.userId : null,
+          connectedStore: assignment && assignment.userId ? {
+            ...assignment.userId,
+            openingTime: "09:00",
+            closingTime: "18:00"
+          } : null,
           customerId: d.customerId
         };
       });
@@ -121,6 +125,8 @@ export async function GET(request: Request) {
             );
             return {
               ...store,
+              openingTime: "09:00",
+              closingTime: "18:00",
               devices: storeDevices
             };
           });
@@ -154,10 +160,16 @@ export async function GET(request: Request) {
 
     } else if (user.role === UserRole.AccountAdmin) {
       // Stores created under this admin's customer
-      const stores = await User.find(
+      const rawStores = await User.find(
         { role: UserRole.Store, customerId: user.customerId },
         'username storeName storeLocation operatorName'
       ).lean();
+
+      const stores = rawStores.map((store: any) => ({
+        ...store,
+        openingTime: "09:00",
+        closingTime: "18:00"
+      }));
 
       // Marketing users enriched with their assigned store
       // Filter by controllerId (this admin's _id) so each admin only sees
@@ -173,10 +185,17 @@ export async function GET(request: Request) {
           if (mu.hasAllStoreAccess) {
             assignedStore = stores; // all stores under this admin
           } else if (mu.assignedStoreId) {
-            assignedStore = await User.findById(
+            const rawStore = await User.findById(
               mu.assignedStoreId,
               'username storeName storeLocation operatorName'
             ).lean();
+            if (rawStore) {
+              assignedStore = {
+                ...rawStore,
+                openingTime: "09:00",
+                closingTime: "18:00"
+              };
+            }
           }
           return { ...mu, assignedStore };
         })
@@ -196,7 +215,11 @@ export async function GET(request: Request) {
           type: formatDeviceType(d.typeId),
           lastConnection: d.lastConnection,
           status: getDeviceStatus(d.lastConnection),
-          connectedStore: assignment && assignment.userId ? assignment.userId : null
+          connectedStore: assignment && assignment.userId ? {
+            ...assignment.userId,
+            openingTime: "09:00",
+            closingTime: "18:00"
+          } : null
         };
       });
 
@@ -208,14 +231,19 @@ export async function GET(request: Request) {
       };
 
     } else if (user.role === UserRole.AccountMarketing) {
-      let availableStores = [];
+      let rawAvailableStores = [];
       if (user.hasAllStoreAccess) {
-        availableStores = await User.find({ role: UserRole.Store, customerId: user.customerId }, 'username storeName storeLocation');
+        rawAvailableStores = await User.find({ role: UserRole.Store, customerId: user.customerId }, 'username storeName storeLocation').lean();
       } else {
         // Find stores associated with the same customer if no specific assigned stores property exists
         // This handles cases where Marketing user has limited stores but simplified here to find by controllerId or similar logic.
-        availableStores = await User.find({ role: UserRole.Store, customerId: user.customerId }, 'username storeName storeLocation');
+        rawAvailableStores = await User.find({ role: UserRole.Store, customerId: user.customerId }, 'username storeName storeLocation').lean();
       }
+      const availableStores = rawAvailableStores.map((store: any) => ({
+        ...store,
+        openingTime: "09:00",
+        closingTime: "18:00"
+      }));
 
       // Check for available campaigns (playlists & announcements)
       const playlists = await PlaylistConfig.find({ 
@@ -262,6 +290,8 @@ export async function GET(request: Request) {
 
       dashboard = {
         section: "Store Dashboard",
+        openingTime: "09:00",
+        closingTime: "18:00",
         assignedDevices,
         playlists,
         announcements
