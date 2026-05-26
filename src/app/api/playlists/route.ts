@@ -4,6 +4,7 @@ import PlaylistConfig from '@/models/PlaylistConfig';
 import DevicePlaylist from '@/models/ConectPlaylist';
 import OnboardedDevice from '@/models/OnboardedDevice';
 import AssignedDevice from '@/models/AssignDevice';
+import Device from '@/models/Device';
 import mongoose from 'mongoose';
 
 export async function POST(req: NextRequest) {
@@ -80,6 +81,98 @@ export async function POST(req: NextRequest) {
         volume: backgroundAudio?.volume || 50
       }
     });
+    console.log('Playlist created successfully:', playlist);
+
+    // Connect playlist to selected device(s) in DevicePlaylist collection
+    const rawDevices: string[] = [];
+    if (selectedDeviceId && mongoose.Types.ObjectId.isValid(selectedDeviceId)) {
+      rawDevices.push(selectedDeviceId);
+    }
+    if (Array.isArray(deviceIds)) {
+      deviceIds.forEach((id: any) => {
+        if (id && mongoose.Types.ObjectId.isValid(id) && !rawDevices.includes(id.toString())) {
+          rawDevices.push(id.toString());
+        }
+      });
+    }
+
+    const devicesToConnect: string[] = [];
+    for (const devId of rawDevices) {
+      const directDevice = await Device.findById(devId);
+      if (directDevice) {
+        if (!devicesToConnect.includes(devId)) {
+          devicesToConnect.push(devId);
+        }
+        continue;
+      }
+      const assignment = await AssignedDevice.findById(devId);
+      if (assignment && assignment.deviceId) {
+        const actualId = assignment.deviceId.toString();
+        if (!devicesToConnect.includes(actualId)) {
+          devicesToConnect.push(actualId);
+        }
+        continue;
+      }
+      const onboarding = await OnboardedDevice.findById(devId);
+      if (onboarding && onboarding.deviceId) {
+        const actualId = onboarding.deviceId.toString();
+        if (!devicesToConnect.includes(actualId)) {
+          devicesToConnect.push(actualId);
+        }
+        continue;
+      }
+      if (!devicesToConnect.includes(devId)) {
+        devicesToConnect.push(devId);
+      }
+    }
+
+    if (devicesToConnect.length > 0) {
+      let resolvedUserId = userId;
+      if (!resolvedUserId || !mongoose.Types.ObjectId.isValid(resolvedUserId)) {
+        const onboarded = await OnboardedDevice.findOne({ deviceId: devicesToConnect[0] });
+        if (onboarded && onboarded.userId) {
+          resolvedUserId = onboarded.userId;
+        } else {
+          const assigned = await AssignedDevice.findOne({ deviceId: devicesToConnect[0] });
+          if (assigned && assigned.userId) {
+            resolvedUserId = assigned.userId;
+          } else {
+            const User = mongoose.models.User;
+            if (User) {
+              const anyUser = await User.findOne();
+              if (anyUser) {
+                resolvedUserId = anyUser._id;
+              }
+            }
+          }
+        }
+      }
+
+      if (resolvedUserId) {
+        for (const devId of devicesToConnect) {
+          const existingConnection = await DevicePlaylist.findOne({ deviceId: devId });
+          if (existingConnection) {
+            const currentPlaylistIds = existingConnection.playlistIds || [];
+            const alreadyConnected = currentPlaylistIds.some(
+              (pid: any) => pid.toString() === playlist._id.toString()
+            );
+            if (!alreadyConnected) {
+              existingConnection.playlistIds.push(playlist._id);
+              existingConnection.updatedAt = new Date();
+              existingConnection.userId = resolvedUserId;
+              await existingConnection.save();
+            }
+          } else {
+            await DevicePlaylist.create({
+              deviceId: devId,
+              playlistIds: [playlist._id],
+              userId: resolvedUserId,
+              updatedAt: new Date()
+            });
+          }
+        }
+      }
+    }
 
     return NextResponse.json({ success: true, data: playlist }, { status: 201 });
 
@@ -108,7 +201,11 @@ export async function PUT(req: NextRequest) {
       daysOfWeek,
       globalMinVolume,
       globalMaxVolume,
-      selectedDeviceId
+      selectedDeviceId,
+      deviceIds,
+      description,
+      backgroundAudio,
+      userId
     } = body;
 
     if (!id) {
@@ -129,6 +226,20 @@ export async function PUT(req: NextRequest) {
       selectedDeviceId: selectedDeviceId || null,
     };
 
+    if (deviceIds !== undefined) {
+      updateFields.deviceIds = deviceIds;
+    }
+    if (description !== undefined) {
+      updateFields.description = description;
+    }
+    if (backgroundAudio !== undefined) {
+      updateFields.backgroundAudio = {
+        enabled: backgroundAudio?.enabled || false,
+        file: backgroundAudio?.file || null,
+        volume: backgroundAudio?.volume || 50
+      };
+    }
+
     if (Array.isArray(mediaIds) && mediaIds.length > 0) {
       updateFields.files = mediaIds.map((mediaId: any, index: number) => ({
         fileId: mediaId,
@@ -147,6 +258,108 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
     }
 
+    // Sync DevicePlaylist connections
+    const rawDevices: string[] = [];
+    if (selectedDeviceId && mongoose.Types.ObjectId.isValid(selectedDeviceId)) {
+      rawDevices.push(selectedDeviceId);
+    }
+    if (Array.isArray(deviceIds)) {
+      deviceIds.forEach((id: any) => {
+        if (id && mongoose.Types.ObjectId.isValid(id) && !rawDevices.includes(id.toString())) {
+          rawDevices.push(id.toString());
+        }
+      });
+    }
+
+    const devicesToConnect: string[] = [];
+    for (const devId of rawDevices) {
+      const directDevice = await Device.findById(devId);
+      if (directDevice) {
+        if (!devicesToConnect.includes(devId)) {
+          devicesToConnect.push(devId);
+        }
+        continue;
+      }
+      const assignment = await AssignedDevice.findById(devId);
+      if (assignment && assignment.deviceId) {
+        const actualId = assignment.deviceId.toString();
+        if (!devicesToConnect.includes(actualId)) {
+          devicesToConnect.push(actualId);
+        }
+        continue;
+      }
+      const onboarding = await OnboardedDevice.findById(devId);
+      if (onboarding && onboarding.deviceId) {
+        const actualId = onboarding.deviceId.toString();
+        if (!devicesToConnect.includes(actualId)) {
+          devicesToConnect.push(actualId);
+        }
+        continue;
+      }
+      if (!devicesToConnect.includes(devId)) {
+        devicesToConnect.push(devId);
+      }
+    }
+
+    // Disconnect from devices that are no longer in devicesToConnect
+    const connectedConnections = await DevicePlaylist.find({ playlistIds: playlist._id });
+    for (const conn of connectedConnections) {
+      if (!devicesToConnect.includes(conn.deviceId.toString())) {
+        conn.playlistIds = conn.playlistIds.filter((pid: any) => pid.toString() !== playlist._id.toString());
+        conn.updatedAt = new Date();
+        await conn.save();
+      }
+    }
+
+    // Connect to new/existing devices in devicesToConnect
+    if (devicesToConnect.length > 0) {
+      let resolvedUserId = userId || playlist.userId;
+      if (!resolvedUserId || !mongoose.Types.ObjectId.isValid(resolvedUserId)) {
+        const onboarded = await OnboardedDevice.findOne({ deviceId: devicesToConnect[0] });
+        if (onboarded && onboarded.userId) {
+          resolvedUserId = onboarded.userId;
+        } else {
+          const assigned = await AssignedDevice.findOne({ deviceId: devicesToConnect[0] });
+          if (assigned && assigned.userId) {
+            resolvedUserId = assigned.userId;
+          } else {
+            const User = mongoose.models.User;
+            if (User) {
+              const anyUser = await User.findOne();
+              if (anyUser) {
+                resolvedUserId = anyUser._id;
+              }
+            }
+          }
+        }
+      }
+
+      if (resolvedUserId) {
+        for (const devId of devicesToConnect) {
+          const existingConnection = await DevicePlaylist.findOne({ deviceId: devId });
+          if (existingConnection) {
+            const currentPlaylistIds = existingConnection.playlistIds || [];
+            const alreadyConnected = currentPlaylistIds.some(
+              (pid: any) => pid.toString() === playlist._id.toString()
+            );
+            if (!alreadyConnected) {
+              existingConnection.playlistIds.push(playlist._id);
+              existingConnection.updatedAt = new Date();
+              existingConnection.userId = resolvedUserId;
+              await existingConnection.save();
+            }
+          } else {
+            await DevicePlaylist.create({
+              deviceId: devId,
+              playlistIds: [playlist._id],
+              userId: resolvedUserId,
+              updatedAt: new Date()
+            });
+          }
+        }
+      }
+    }
+
     return NextResponse.json({ success: true, data: playlist });
   } catch (error) {
     console.error('Error updating playlist:', error);
@@ -161,40 +374,40 @@ export async function PUT(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
 
-     const userId = req.nextUrl.searchParams.get('userId');
-    
-        if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-          return NextResponse.json(
-            { error: 'Invalid or missing userId' },
-            { status: 400 }
-          );
-        }
-    
+    const userId = req.nextUrl.searchParams.get('userId');
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json(
+        { error: 'Invalid or missing userId' },
+        { status: 400 }
+      );
+    }
+
     await connectToDatabase();
-    
+
     // Look up the user to find their controllerId (super user)
     const User = mongoose.models.User;
     const userObjectId = new mongoose.Types.ObjectId(userId);
     let myPlaylistsQuery: any = { userId: userObjectId };
     let controllerId: mongoose.Types.ObjectId | null = null;
-    
+
     if (User) {
       const user = await User.findById(userId).select('controllerId');
       if (user?.controllerId) {
         controllerId = new mongoose.Types.ObjectId(user.controllerId);
       }
     }
-    
+
     // Fetch user's own playlists
     const ownPlaylists = await PlaylistConfig.find(myPlaylistsQuery);
-    
+
     // For controller (super user) playlists, only include if they are CONNECTED to one of the user's devices
     let connectedSuperUserPlaylists: any[] = [];
     if (controllerId) {
       // 1. Get all device IDs that this user owns or is assigned to
       const onboarded = await OnboardedDevice.find({ userId: userObjectId }).select('deviceId');
       const assigned = await AssignedDevice.find({ userId: userObjectId, status: 'active' }).select('deviceId');
-      
+
       const deviceIds = [
         ...onboarded.map(d => d.deviceId),
         ...assigned.map(d => d.deviceId)
@@ -217,11 +430,11 @@ export async function GET(req: NextRequest) {
         }
       }
     }
-    
+
     // Combine both sets
     const allPlaylists = [...ownPlaylists, ...connectedSuperUserPlaylists]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
+
     return NextResponse.json(allPlaylists);
   } catch (error) {
     console.error('Error fetching playlists:', error);
@@ -235,7 +448,7 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     let id = req.nextUrl.searchParams.get('id');
-    
+
     if (!id) {
       try {
         const body = await req.json();
