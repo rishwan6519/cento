@@ -114,6 +114,36 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
     setSelectedDeviceIds(p => p.includes(devId) ? p.filter(x => x !== devId) : [...p, devId]);
   };
 
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+
+  const handleDisconnectDevice = async (e: React.MouseEvent, deviceId: string) => {
+    e.stopPropagation();
+    if (!editingPlaylist || (!editingPlaylist._id && !editingPlaylist.id)) return;
+    
+    setDisconnectingId(deviceId);
+    try {
+      const res = await fetch('/api/playlists/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          playlistId: editingPlaylist._id || editingPlaylist.id, 
+          deviceId 
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSelectedDeviceIds(p => p.filter(x => x !== deviceId));
+      } else {
+        alert("Failed to disconnect: " + (data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error disconnecting device");
+    } finally {
+      setDisconnectingId(null);
+    }
+  };
+
   const formatDur = (s: number) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
 
   const startRecording = async () => {
@@ -414,6 +444,25 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
                     <p className="su-ip-sdev" style={{fontSize:'0.75rem',color:'#64848D',marginBottom:2}}>{s.name} ({s.serialNumber})</p>
                     <p className="su-ip-saddr">{s.address}</p>
                     <p style={{fontSize:"0.7rem",fontWeight:700,color:isOnline ? "#16A34A" : "#DC2626",marginTop:4}}>{isOnline ? "Active" : "Offline"}</p>
+                    {isSelected && editingPlaylist && (
+                      <button 
+                        onClick={(e) => handleDisconnectDevice(e, s._id)}
+                        disabled={disconnectingId === s._id}
+                        style={{
+                          marginTop: 6,
+                          padding: '4px 8px',
+                          background: '#FFF2F2',
+                          color: '#DC2626',
+                          border: '1px solid #FECACA',
+                          borderRadius: 4,
+                          fontSize: '0.7rem',
+                          cursor: disconnectingId === s._id ? 'not-allowed' : 'pointer',
+                          opacity: disconnectingId === s._id ? 0.6 : 1
+                        }}
+                      >
+                        {disconnectingId === s._id ? 'Disconnecting...' : 'Disconnect'}
+                      </button>
+                    )}
                   </div>
                   {isSelected && <div className="su-ip-scheck"><FaCheck size={8} /></div>}
                 </div>

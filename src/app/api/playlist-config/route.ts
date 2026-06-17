@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         delay: file.delay || 0,
         maxVolume: file.maxVolume || 100,
         minVolume: file.minVolume || 0,
-        backgroundImageEnabled: file.backgroundImageEnabled || false,
+        backgroundImageEnabled: file.backgroundImageEnabled || !!file.backgroundImage || false,
         backgroundImage: file.backgroundImage || null,
       })),
       status: "active",
@@ -121,30 +121,30 @@ export async function PUT(req: NextRequest) {
     // Handle background images
     for (let i = 0; i < configData.files.length; i++) {
       const file = configData.files[i];
-      if (file.backgroundImageEnabled) {
-        const bgImageFile = formData.get(`bgImage-${i}`);
-        if (bgImageFile && bgImageFile instanceof File) {
-          const fileName = `bg-${Date.now()}-${bgImageFile.name}`;
-          const uploadsDir = path.join(
-            process.cwd(),
-            "uploads",
-            "backgrounds"
-          );
+      const bgImageFile = formData.get(`bgImage-${i}`);
+      
+      if (bgImageFile && bgImageFile instanceof File) {
+        file.backgroundImageEnabled = true;
+        const fileName = `bg-${Date.now()}-${bgImageFile.name}`;
+        const uploadsDir = path.join(
+          process.cwd(),
+          "uploads",
+          "backgrounds"
+        );
 
-          if (!existsSync(uploadsDir)) {
-            await mkdir(uploadsDir, { recursive: true });
-          }
-
-          const filePath = path.join(uploadsDir, fileName);
-
-          const bytes = await bgImageFile.arrayBuffer();
-          const buffer = Buffer.from(bytes);
-
-          await writeFile(filePath, buffer);
-          configData.files[
-            i
-          ].backgroundImage = `/uploads/backgrounds/${fileName}`;
+        if (!existsSync(uploadsDir)) {
+          await mkdir(uploadsDir, { recursive: true });
         }
+
+        const filePath = path.join(uploadsDir, fileName);
+
+        const bytes = await bgImageFile.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+
+        await writeFile(filePath, buffer);
+        configData.files[i].backgroundImage = `/uploads/backgrounds/${fileName}`;
+      } else if (file.backgroundImage) {
+        file.backgroundImageEnabled = true;
       }
     }
 

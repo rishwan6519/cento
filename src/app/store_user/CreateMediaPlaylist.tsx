@@ -24,6 +24,8 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   const [existingMediaData, setExistingMediaData] = useState<any[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
+  const [availableBgImages, setAvailableBgImages] = useState<any[]>([]);
+  const [bgSettings, setBgSettings] = useState<Record<string, { enabled: boolean; imageId: string | null }>>({});
 
   // Real devices from API
   const [devices, setDevices] = useState<any[]>([]);
@@ -59,6 +61,15 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       if (editingPlaylist.files && editingPlaylist.files.length > 0) {
         setSelectionMode("existing");
         setSelectedMediaIds(editingPlaylist.files.map((f: any) => f.fileId || f._id));
+        
+        const newBgSettings: Record<string, any> = {};
+        editingPlaylist.files.forEach((f: any) => {
+          const id = f.fileId || f._id;
+          if (f.backgroundImageEnabled) {
+            newBgSettings[id] = { enabled: true, imageId: f.backgroundImage || null };
+          }
+        });
+        setBgSettings(newBgSettings);
       }
     }
   }, [editingPlaylist]);
@@ -80,6 +91,17 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
     }).catch(()=>setDevices([])).finally(()=>setLoadingDevices(false));
   }, [userId]);
 
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/media?userId=${userId}`).then(r=>r.json())
+      .then(d => {
+        const allMedia = d.media||d.mediaFiles||d.data||[];
+        const images = allMedia.filter((m:any) => m.type && m.type.toLowerCase().includes('image'));
+        setAvailableBgImages(images);
+      })
+      .catch(()=>{});
+  }, [userId]);
+
   // Fetch existing media when mode = existing
   useEffect(() => {
     if (selectionMode !== "existing" || !userId) return;
@@ -96,17 +118,110 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   };
   const toggleMedia = (id: string) => setSelectedMediaIds(p => p.includes(id) ? p.filter(x=>x!==id) : [...p,id]);
 
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleDisconnectDevice = async (e: React.MouseEvent, deviceId: string) => {
+    e.stopPropagation();
+    if (!editingPlaylist || (!editingPlaylist._id && !editingPlaylist.id)) return;
+    
+    setDisconnectingId(deviceId);
+    try {
+      const res = await fetch('/api/playlists/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          playlistId: editingPlaylist._id || editingPlaylist.id, 
+          deviceId 
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSelectedDeviceIds(p => p.filter(x => x !== deviceId));
+      } else {
+        alert("Failed to disconnect: " + (data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error disconnecting device");
+    } finally {
+      setDisconnectingId(null);
+    }
+  };
+
+  const handleUploadFiles = async () => {
+    if (selectedFiles.length === 0) {
+      alert("Please select files first");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData(); 
+      fd.append("userId", userId); 
+      fd.append("userRole", "store");
+      selectedFiles.forEach((f, i) => { 
+        fd.append(`files[${i}]`, f); 
+        fd.append(`fileNames[${i}]`, f.name); 
+      });
+      const r = await fetch("/api/media/upload", { method: "POST", body: fd }); 
+      const d = await r.json();
+      if (d.success) {
+        const newBgSettings = { ...bgSettings };
+        const newIds = d.files.map((f:any, idx:number) => {
+          const id = f._id || f.id;
+          const originalName = selectedFiles[idx]?.name || f.name;
+          if (newBgSettings[originalName]) {
+            newBgSettings[id] = newBgSettings[originalName];
+          }
+          return id;
+        });
+        setBgSettings(newBgSettings);
+        setSelectedMediaIds(prev => [...prev, ...newIds]);
+        setSelectedFiles([]);
+        setSelectionConfirmed(false);
+        setSelectionMode("existing");
+      } else {
+        alert("Upload failed: " + (d.error || "Unknown error"));
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error uploading files");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!playlistName.trim() || selectedDeviceIds.length === 0) return;
     setSubmitting(true);
     try {
-      let mediaIds = [...selectedMediaIds];
+      let filesPayload: any[] = [];
       if (selectionMode === "upload" && selectedFiles.length > 0) {
         const fd = new FormData(); fd.append("userId",userId); fd.append("userRole", "store");
         selectedFiles.forEach((f,i) => { fd.append(`files[${i}]`,f); fd.append(`fileNames[${i}]`,f.name); });
         const r = await fetch("/api/media/upload",{method:"POST",body:fd}); const d = await r.json();
-        if (d.success) mediaIds = d.files.map((f:any)=>f._id||f.id);
+        if (d.success) {
+          filesPayload = d.files.map((f:any, idx: number) => {
+            const originalName = selectedFiles[idx]?.name;
+            const bg = bgSettings[originalName] || { enabled: false, imageId: null };
+            return {
+              fileId: f._id || f.id,
+              backgroundImageEnabled: bg.enabled,
+              backgroundImage: bg.imageId
+            };
+          });
+        }
+      } else {
+        filesPayload = selectedMediaIds.map(id => {
+          const bg = bgSettings[id] || { enabled: false, imageId: null };
+          return {
+            fileId: id,
+            backgroundImageEnabled: bg.enabled,
+            backgroundImage: bg.imageId
+          };
+        });
       }
+      
       const body = { 
         userId, 
         name:playlistName, 
@@ -119,7 +234,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         globalMinVolume:30, 
         globalMaxVolume:volume, 
         deviceIds:selectedDeviceIds, 
-        mediaIds,
+        files: filesPayload,
         id: editingPlaylist?._id || editingPlaylist?.id
       };
       const method = editingPlaylist ? "PUT" : "POST";
@@ -192,21 +307,63 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               {selectedFiles.length > 0 && (
                 <div className="store-selected-files-list">
                   {selectedFiles.map((file, idx) => (
-                    <div key={`${file.name}-${idx}`} className="store-selected-file-item">
-                      <div className="store-file-info">
-                        <div className="store-file-icon-sm">
-                          {file.type.startsWith('image/') ? <FaDesktop /> : <FaPlay size={10} />}
+                    <div key={`${file.name}-${idx}`} className="store-selected-file-item" style={{display: 'block', padding: 0}}>
+                      <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px'}}>
+                        <div className="store-file-info">
+                          <div className="store-file-icon-sm">
+                            {file.type.startsWith('image/') ? <FaDesktop /> : <FaPlay size={10} />}
+                          </div>
+                          <span className="store-file-name">{file.name}</span>
                         </div>
-                        <span className="store-file-name">{file.name}</span>
+                        <div className="store-file-actions">
+                          <button className="store-file-action-btn" title="Preview" onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}>
+                            <FaEye size={12} />
+                          </button>
+                          <button className="store-file-action-btn store-file-action-btn--remove" title="Remove" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}>
+                            <FaTrash size={11} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="store-file-actions">
-                        <button className="store-file-action-btn" title="Preview" onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}>
-                          <FaEye size={12} />
-                        </button>
-                        <button className="store-file-action-btn store-file-action-btn--remove" title="Remove" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}>
-                          <FaTrash size={11} />
-                        </button>
-                      </div>
+                      {file.type.startsWith('audio/') && (
+                        <div style={{padding: '12px 16px', background: '#F8FAFB', borderTop: '1px solid #EAEFEF', borderBottomLeftRadius: 10, borderBottomRightRadius: 10}}>
+                          <label style={{fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: '#162B30'}}>
+                            <input type="checkbox" 
+                              checked={bgSettings[file.name]?.enabled || false}
+                              onChange={(e) => setBgSettings(p => ({...p, [file.name]: { ...p[file.name], enabled: e.target.checked }}))}
+                            />
+                            Enable BG image
+                          </label>
+                          {bgSettings[file.name]?.enabled && (
+                            <div style={{marginTop: 8}}>
+                              {availableBgImages.length === 0 ? (
+                                <p style={{fontSize: '0.75rem', color: '#64848D', marginTop: 4}}>No background images available. Please upload an image first.</p>
+                              ) : (
+                                <div style={{display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8}}>
+                                  {availableBgImages.map(img => {
+                                    const isSelected = bgSettings[file.name]?.imageId === img._id;
+                                    const imgUrl = img.url || img.fileUrl;
+                                    return (
+                                      <div 
+                                        key={img._id}
+                                        onClick={(e) => { e.stopPropagation(); setBgSettings(p => ({...p, [file.name]: { ...p[file.name], imageId: isSelected ? "" : img._id }})); }}
+                                        style={{
+                                          width: 60, height: 45, borderRadius: 6, overflow: 'hidden', 
+                                          border: isSelected ? '2px solid #F05A28' : '1px solid #EAEFEF',
+                                          cursor: 'pointer', position: 'relative'
+                                        }}
+                                        title={img.name}
+                                      >
+                                        {imgUrl && <img src={imgUrl} alt={img.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />}
+                                        {isSelected && <div style={{position: 'absolute', top: 2, right: 2, background: '#F05A28', color: '#fff', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'}}><FaCheck size={8}/></div>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -215,6 +372,9 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               <div className="store-upload-actions-bar">
                 <span className="store-file-selected-text">{selectedFiles.length} file{selectedFiles.length!==1?'s':''} selected</span>
                 <div className="store-upload-actions-right">
+                  <button className="store-btn-outline-orange" onClick={handleUploadFiles} disabled={uploading}>
+                    {uploading ? "Uploading..." : "Upload"}
+                  </button>
                   <button className="store-btn-solid-orange" onClick={() => { if(selectedFiles.length>0) setSelectionConfirmed(true); else alert("Please select files first"); }}>
                     {selectionConfirmed ? "✓ Selection Confirmed" : "Confirm selection"}
                   </button>
@@ -266,7 +426,49 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                   return (
                     <tr key={id}>
                       <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(id)} onChange={()=>toggleMedia(id)} /></td>
-                      <td style={{fontWeight:500,color:'#445459'}}>{media.name}</td>
+                      <td style={{fontWeight:500,color:'#445459'}}>
+                        {media.name}
+                        {badge === 'audio' && selectedMediaIds.includes(id) && (
+                          <div style={{marginTop: 8, padding: '8px 10px', background: '#F8FAFB', borderRadius: 6, border: '1px dashed #D6E6E9', maxWidth: 220}}>
+                            <label style={{fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#162B30'}}>
+                              <input type="checkbox" 
+                                checked={bgSettings[id]?.enabled || false}
+                                onChange={(e) => setBgSettings(p => ({...p, [id]: { ...p[id], enabled: e.target.checked }}))}
+                              />
+                              Enable BG image
+                            </label>
+                            {bgSettings[id]?.enabled && (
+                              <div style={{marginTop: 6}}>
+                                {availableBgImages.length === 0 ? (
+                                  <p style={{fontSize: '0.75rem', color: '#64848D', marginTop: 4}}>No background images available. Please upload an image first.</p>
+                                ) : (
+                                  <div style={{display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6}}>
+                                    {availableBgImages.map(img => {
+                                      const isSelected = bgSettings[id]?.imageId === img._id;
+                                      const imgUrl = img.url || img.fileUrl;
+                                      return (
+                                        <div 
+                                          key={img._id}
+                                          onClick={(e) => { e.stopPropagation(); setBgSettings(p => ({...p, [id]: { ...p[id], imageId: isSelected ? "" : img._id }})); }}
+                                          style={{
+                                            width: 50, height: 38, borderRadius: 4, overflow: 'hidden', 
+                                            border: isSelected ? '2px solid #F05A28' : '1px solid #EAEFEF',
+                                            cursor: 'pointer', position: 'relative'
+                                          }}
+                                          title={img.name}
+                                        >
+                                          {imgUrl && <img src={imgUrl} alt={img.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />}
+                                          {isSelected && <div style={{position: 'absolute', top: 2, right: 2, background: '#F05A28', color: '#fff', borderRadius: '50%', width: 12, height: 12, display: 'flex', alignItems: 'center', justifyContent: 'center'}}><FaCheck size={6}/></div>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td><span className={`store-type-badge store-type-badge--${badge}`}>{media.type||'Media'}</span></td>
                       <td style={{color:'#445459'}}>{media.createdAt?new Date(media.createdAt).toLocaleDateString('en-US',{month:'long',year:'numeric'}):'—'}</td>
                       <td><button className="store-preview-btn" onClick={() => { setPreviewMediaUrl(media.url || media.fileUrl); setPreviewMediaName(media.name); }}><FaPlay size={10}/> Preview</button></td>
@@ -342,6 +544,25 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                     <p style={{fontWeight:700,fontSize:'.82rem',color:'#162B30'}}>{s.name} <span style={{color:isOnline?'#16A34A':'#DC2626',fontSize:10}}>●</span></p>
                     <p style={{fontSize:'.7rem',color:'#A4B6B9',marginTop:2}}>{s.address}</p>
                     <p style={{fontSize:'.7rem',fontWeight:700,color:isOnline?'#16A34A':'#DC2626',marginTop:4}}>{s.status || "Inactive"}</p>
+                    {isSel && editingPlaylist && (
+                      <button 
+                        onClick={(e) => handleDisconnectDevice(e, s._id)}
+                        disabled={disconnectingId === s._id}
+                        style={{
+                          marginTop: 6,
+                          padding: '4px 8px',
+                          background: '#FFF2F2',
+                          color: '#DC2626',
+                          border: '1px solid #FECACA',
+                          borderRadius: 4,
+                          fontSize: '0.7rem',
+                          cursor: disconnectingId === s._id ? 'not-allowed' : 'pointer',
+                          opacity: disconnectingId === s._id ? 0.6 : 1
+                        }}
+                      >
+                        {disconnectingId === s._id ? 'Disconnecting...' : 'Disconnect'}
+                      </button>
+                    )}
                   </div>
                   {isSel && <div style={{position:'absolute',top:8,right:8,width:20,height:20,borderRadius:'50%',background:'#F05A28',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}><FaCheck size={8}/></div>}
                 </div>);

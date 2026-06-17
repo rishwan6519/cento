@@ -6,6 +6,7 @@ import OnboardedDevice from '@/models/OnboardedDevice';
 import AssignedDevice from '@/models/AssignDevice';
 import Device from '@/models/Device';
 import mongoose from 'mongoose';
+import MediaItem from '@/models/MediaItems';
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,16 +47,48 @@ export async function POST(req: NextRequest) {
     // Resolve files — accept either 'files' array or 'mediaIds' array
     let resolvedFiles: any[] = [];
     if (Array.isArray(files) && files.length > 0) {
-      resolvedFiles = files.map((file: any, index: number) => ({
-        ...file,
-        displayOrder: index + 1,
-        delay: file.delay || 0
+      resolvedFiles = await Promise.all(files.map(async (file: any, index: number) => {
+        let mediaDetails = { name: file.name, path: file.path, type: file.type };
+        if (!file.path && (file.fileId || file._id || file.id)) {
+           const media = await MediaItem.findById(file.fileId || file._id || file.id);
+           if (media) {
+             mediaDetails.name = media.name;
+             mediaDetails.path = media.url || media.fileUrl;
+             mediaDetails.type = media.type;
+           }
+        }
+        let bgImage = file.backgroundImage || null;
+        if (bgImage && mongoose.Types.ObjectId.isValid(bgImage)) {
+           const bgMedia = await MediaItem.findById(bgImage);
+           if (bgMedia) {
+             bgImage = bgMedia.url || bgMedia.fileUrl;
+           }
+        }
+        return {
+          ...file,
+          ...mediaDetails,
+          backgroundImage: bgImage,
+          displayOrder: index + 1,
+          delay: file.delay || 0
+        };
       }));
     } else if (Array.isArray(mediaIds) && mediaIds.length > 0) {
-      resolvedFiles = mediaIds.map((id: any, index: number) => ({
-        fileId: id,
-        displayOrder: index + 1,
-        delay: 0
+      resolvedFiles = await Promise.all(mediaIds.map(async (id: any, index: number) => {
+        let mediaDetails = { name: undefined, path: undefined, type: undefined };
+        if (id) {
+           const media = await MediaItem.findById(id);
+           if (media) {
+             mediaDetails.name = media.name;
+             mediaDetails.path = media.url || media.fileUrl;
+             mediaDetails.type = media.type;
+           }
+        }
+        return {
+          fileId: id,
+          ...mediaDetails,
+          displayOrder: index + 1,
+          delay: 0
+        };
       }));
     }
 
@@ -205,7 +238,8 @@ export async function PUT(req: NextRequest) {
       deviceIds,
       description,
       backgroundAudio,
-      userId
+      userId,
+      files
     } = body;
 
     if (!id) {
@@ -240,11 +274,49 @@ export async function PUT(req: NextRequest) {
       };
     }
 
-    if (Array.isArray(mediaIds) && mediaIds.length > 0) {
-      updateFields.files = mediaIds.map((mediaId: any, index: number) => ({
-        fileId: mediaId,
-        displayOrder: index + 1,
-        delay: 0
+    if (Array.isArray(files) && files.length > 0) {
+      updateFields.files = await Promise.all(files.map(async (file: any, index: number) => {
+        let mediaDetails = { name: file.name, path: file.path, type: file.type };
+        if (!file.path && (file.fileId || file._id || file.id)) {
+           const media = await MediaItem.findById(file.fileId || file._id || file.id);
+           if (media) {
+             mediaDetails.name = media.name;
+             mediaDetails.path = media.url || media.fileUrl;
+             mediaDetails.type = media.type;
+           }
+        }
+        let bgImage = file.backgroundImage || null;
+        if (bgImage && mongoose.Types.ObjectId.isValid(bgImage)) {
+           const bgMedia = await MediaItem.findById(bgImage);
+           if (bgMedia) {
+             bgImage = bgMedia.url || bgMedia.fileUrl;
+           }
+        }
+        return {
+          ...file,
+          ...mediaDetails,
+          backgroundImage: bgImage,
+          displayOrder: index + 1,
+          delay: file.delay || 0
+        };
+      }));
+    } else if (Array.isArray(mediaIds) && mediaIds.length > 0) {
+      updateFields.files = await Promise.all(mediaIds.map(async (mediaId: any, index: number) => {
+        let mediaDetails = { name: undefined, path: undefined, type: undefined };
+        if (mediaId) {
+           const media = await MediaItem.findById(mediaId);
+           if (media) {
+             mediaDetails.name = media.name;
+             mediaDetails.path = media.url || media.fileUrl;
+             mediaDetails.type = media.type;
+           }
+        }
+        return {
+          fileId: mediaId,
+          ...mediaDetails,
+          displayOrder: index + 1,
+          delay: 0
+        };
       }));
     }
 
