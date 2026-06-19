@@ -61,7 +61,7 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
       setEndTime(editingPlaylist.endTime || "");
       setDescription(editingPlaylist.description || "");
       setSelectedDevices(editingPlaylist.deviceIds || []);
-      
+
       if (editingPlaylist.files && editingPlaylist.files.length > 0) {
         // Need to find the actual media objects from mediaItems once they load
         // But for now, we'll map the IDs
@@ -171,17 +171,17 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
     if (selectedDevices.length === 0) return;
     setSubmitting(true);
     try {
-      const body = { 
-        userId, name, category, endDate, endTime, description, 
-        mediaIds: playlistItems.map(p => p._id), 
+      const body = {
+        userId, name, category, endDate, endTime, description,
+        mediaIds: playlistItems.map(p => p._id),
         deviceIds: selectedDevices,
         id: editingPlaylist?._id || editingPlaylist?.id
       };
       const fetchMethod = editingPlaylist ? "PUT" : "POST";
-      const res = await fetch("/api/playlists", { 
-        method: fetchMethod, 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify(body) 
+      const res = await fetch("/api/playlists", {
+        method: fetchMethod,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (data.success) onNavigate("dashboard");
@@ -218,11 +218,11 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
           </div>
           <div className="su-ip-form-group">
             <label>Auto-stop date <span className="su-required">*</span></label>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{width:'100%',padding:'12px 16px',border:'1px solid #EAEFEF',borderRadius:10}} />
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ width: '100%', padding: '12px 16px', border: '1px solid #EAEFEF', borderRadius: 10 }} />
           </div>
           <div className="su-ip-form-group">
             <label>Auto-stop time <span className="su-required">*</span></label>
-            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{width:'100%',padding:'12px 16px',border:'1px solid #EAEFEF',borderRadius:10}} />
+            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ width: '100%', padding: '12px 16px', border: '1px solid #EAEFEF', borderRadius: 10 }} />
           </div>
         </div>
         <div className="su-ip-form-group su-ip-form-group--full">
@@ -237,7 +237,7 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
         <div className="su-ip-card su-ip-media-available">
           <div className="su-ip-media-header">
             <h3 className="su-ip-card-title">Available Media</h3>
-            <div className="su-ip-filter-pills" style={{alignItems:'center'}}>
+            <div className="su-ip-filter-pills" style={{ alignItems: 'center' }}>
               {["All", "Audio", "Video", "Image"].map(f => (
                 <button
                   key={f}
@@ -247,14 +247,14 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
                   {f}
                 </button>
               ))}
-              <div style={{width:1,height:16,background:'#EAEFEF',margin:'0 4px'}}/>
-              <button 
-                className="su-ip-upload-btn-sm" 
+              <div style={{ width: 1, height: 16, background: '#EAEFEF', margin: '0 4px' }} />
+              <button
+                className="su-ip-upload-btn-sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                style={{display:'flex',alignItems:'center',gap:6,background:'#F8FAFB',border:'1px solid #D6E6E9',borderRadius:6,padding:'4px 10px',fontSize:'.75rem',fontWeight:700,color:'#F05A28',cursor:'pointer'}}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F8FAFB', border: '1px solid #D6E6E9', borderRadius: 6, padding: '4px 10px', fontSize: '.75rem', fontWeight: 700, color: '#F05A28', cursor: 'pointer' }}
               >
-                <FaPlus size={10}/> {isUploading ? 'Uploading...' : 'Upload New'}
+                <FaPlus size={10} /> {isUploading ? 'Uploading...' : 'Upload New'}
               </button>
               <input ref={fileInputRef} type="file" multiple hidden onChange={handleUpload} />
             </div>

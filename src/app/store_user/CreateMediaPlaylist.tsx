@@ -2,15 +2,15 @@ import React, { useState, useEffect, useRef } from "react";
 import { ViewKey } from "./page";
 import { FaUpload, FaPlay, FaTrash, FaDesktop, FaCheck, FaArrowLeft, FaEye } from "react-icons/fa";
 
-interface Props { 
-  onNavigate: (view: ViewKey) => void; 
+interface Props {
+  onNavigate: (view: ViewKey) => void;
   editingPlaylist?: any;
 }
 
 export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Props) {
-  const [selectionMode, setSelectionMode] = useState<"upload"|"existing"|null>(null);
+  const [selectionMode, setSelectionMode] = useState<"upload" | "existing" | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [selectedDays, setSelectedDays] = useState<string[]>(["Tue","Fri"]);
+  const [selectedDays, setSelectedDays] = useState<string[]>(["Tue", "Fri"]);
   const [volume, setVolume] = useState(30);
   const [playlistName, setPlaylistName] = useState("");
   const [playlistType, setPlaylistType] = useState("");
@@ -57,11 +57,11 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       setSelectedDays(editingPlaylist.daysOfWeek || []);
       setVolume(editingPlaylist.globalMaxVolume || 30);
       setSelectedDeviceIds(editingPlaylist.deviceIds || []);
-      
+
       if (editingPlaylist.files && editingPlaylist.files.length > 0) {
         setSelectionMode("existing");
         setSelectedMediaIds(editingPlaylist.files.map((f: any) => f.fileId || f._id));
-        
+
         const newBgSettings: Record<string, any> = {};
         editingPlaylist.files.forEach((f: any) => {
           const id = f.fileId || f._id;
@@ -77,7 +77,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   // Fetch devices
   useEffect(() => {
     if (!userId) { setLoadingDevices(false); return; }
-    fetch(`/api/assign-device?userId=${userId}`).then(r=>r.json()).then(d => {
+    fetch(`/api/assign-device?userId=${userId}`).then(r => r.json()).then(d => {
       const a = d.data || [];
       const individualDevices = a.map((x: any) => ({
         _id: x.deviceId?._id || x._id,
@@ -88,35 +88,35 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         address: x.userId?.storeLocation || "N/A"
       }));
       setDevices(individualDevices);
-    }).catch(()=>setDevices([])).finally(()=>setLoadingDevices(false));
+    }).catch(() => setDevices([])).finally(() => setLoadingDevices(false));
   }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
-    fetch(`/api/media?userId=${userId}`).then(r=>r.json())
+    fetch(`/api/media?userId=${userId}`).then(r => r.json())
       .then(d => {
-        const allMedia = d.media||d.mediaFiles||d.data||[];
-        const images = allMedia.filter((m:any) => m.type && m.type.toLowerCase().includes('image'));
+        const allMedia = d.media || d.mediaFiles || d.data || [];
+        const images = allMedia.filter((m: any) => m.type && m.type.toLowerCase().includes('image'));
         setAvailableBgImages(images);
       })
-      .catch(()=>{});
+      .catch(() => { });
   }, [userId]);
 
   // Fetch existing media when mode = existing
   useEffect(() => {
     if (selectionMode !== "existing" || !userId) return;
     setLoadingMedia(true);
-    fetch(`/api/media?userId=${userId}`).then(r=>r.json())
-      .then(d => setExistingMediaData(d.media||d.mediaFiles||d.data||[]))
-      .catch(()=>setExistingMediaData([]))
-      .finally(()=>setLoadingMedia(false));
+    fetch(`/api/media?userId=${userId}`).then(r => r.json())
+      .then(d => setExistingMediaData(d.media || d.mediaFiles || d.data || []))
+      .catch(() => setExistingMediaData([]))
+      .finally(() => setLoadingMedia(false));
   }, [selectionMode, userId]);
 
-  const toggleDay = (day: string) => setSelectedDays(p => p.includes(day) ? p.filter(d=>d!==day) : [...p,day]);
+  const toggleDay = (day: string) => setSelectedDays(p => p.includes(day) ? p.filter(d => d !== day) : [...p, day]);
   const toggleDevice = (id: string) => {
-    setSelectedDeviceIds(p => p.includes(id) ? p.filter(x=>x!==id) : [...p,id]);
+    setSelectedDeviceIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   };
-  const toggleMedia = (id: string) => setSelectedMediaIds(p => p.includes(id) ? p.filter(x=>x!==id) : [...p,id]);
+  const toggleMedia = (id: string) => setSelectedMediaIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -124,15 +124,15 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   const handleDisconnectDevice = async (e: React.MouseEvent, deviceId: string) => {
     e.stopPropagation();
     if (!editingPlaylist || (!editingPlaylist._id && !editingPlaylist.id)) return;
-    
+
     setDisconnectingId(deviceId);
     try {
       const res = await fetch('/api/playlists/disconnect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          playlistId: editingPlaylist._id || editingPlaylist.id, 
-          deviceId 
+        body: JSON.stringify({
+          playlistId: editingPlaylist._id || editingPlaylist.id,
+          deviceId
         })
       });
       const data = await res.json();
@@ -156,18 +156,18 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
     }
     setUploading(true);
     try {
-      const fd = new FormData(); 
-      fd.append("userId", userId); 
+      const fd = new FormData();
+      fd.append("userId", userId);
       fd.append("userRole", "store");
-      selectedFiles.forEach((f, i) => { 
-        fd.append(`files[${i}]`, f); 
-        fd.append(`fileNames[${i}]`, f.name); 
+      selectedFiles.forEach((f, i) => {
+        fd.append(`files[${i}]`, f);
+        fd.append(`fileNames[${i}]`, f.name);
       });
-      const r = await fetch("/api/media/upload", { method: "POST", body: fd }); 
+      const r = await fetch("/api/media/upload", { method: "POST", body: fd });
       const d = await r.json();
       if (d.success) {
         const newBgSettings = { ...bgSettings };
-        const newIds = d.files.map((f:any, idx:number) => {
+        const newIds = d.files.map((f: any, idx: number) => {
           const id = f._id || f.id;
           const originalName = selectedFiles[idx]?.name || f.name;
           if (newBgSettings[originalName]) {
@@ -197,11 +197,11 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
     try {
       let filesPayload: any[] = [];
       if (selectionMode === "upload" && selectedFiles.length > 0) {
-        const fd = new FormData(); fd.append("userId",userId); fd.append("userRole", "store");
-        selectedFiles.forEach((f,i) => { fd.append(`files[${i}]`,f); fd.append(`fileNames[${i}]`,f.name); });
-        const r = await fetch("/api/media/upload",{method:"POST",body:fd}); const d = await r.json();
+        const fd = new FormData(); fd.append("userId", userId); fd.append("userRole", "store");
+        selectedFiles.forEach((f, i) => { fd.append(`files[${i}]`, f); fd.append(`fileNames[${i}]`, f.name); });
+        const r = await fetch("/api/media/upload", { method: "POST", body: fd }); const d = await r.json();
         if (d.success) {
-          filesPayload = d.files.map((f:any, idx: number) => {
+          filesPayload = d.files.map((f: any, idx: number) => {
             const originalName = selectedFiles[idx]?.name;
             const bg = bgSettings[originalName] || { enabled: false, imageId: null };
             return {
@@ -221,31 +221,31 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
           };
         });
       }
-      
-      const body = { 
-        userId, 
-        name:playlistName, 
-        type:playlistType||"media", 
-        startDate, 
-        endDate, 
-        startTime, 
-        endTime, 
-        daysOfWeek:selectedDays, 
-        globalMinVolume:30, 
-        globalMaxVolume:volume, 
-        deviceIds:selectedDeviceIds, 
+
+      const body = {
+        userId,
+        name: playlistName,
+        type: playlistType || "media",
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        daysOfWeek: selectedDays,
+        globalMinVolume: 30,
+        globalMaxVolume: volume,
+        deviceIds: selectedDeviceIds,
         files: filesPayload,
         id: editingPlaylist?._id || editingPlaylist?.id
       };
       const method = editingPlaylist ? "PUT" : "POST";
-      const res = await fetch("/api/playlists",{
+      const res = await fetch("/api/playlists", {
         method,
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(body)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (data.success) onNavigate("dashboard");
-    } catch {} finally { setSubmitting(false); }
+    } catch { } finally { setSubmitting(false); }
   };
   return (
     <div className="store-create-playlist-view">
@@ -264,10 +264,10 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
             <p className="store-step-subtitle">Audio, video, image. Size upto 5kb</p>
           </div>
         </div>
-        
+
         <div className="store-step-content">
           <div className="store-media-selection-options">
-            <div 
+            <div
               className={`store-media-option-box ${selectionMode === "upload" ? "store-media-option-box--active" : ""}`}
               onClick={() => setSelectionMode("upload")}
             >
@@ -277,8 +277,8 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               <h3>Upload new</h3>
               <p>Add media from your device</p>
             </div>
-            
-            <div 
+
+            <div
               className={`store-media-option-box ${selectionMode === "existing" ? "store-media-option-box--active" : ""}`}
               onClick={() => setSelectionMode("existing")}
             >
@@ -293,12 +293,12 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
           {selectionMode === "upload" && (
             <div className="store-upload-file-section">
               <label className="store-input-label">Upload files</label>
-              <div className="store-file-dropzone" onClick={()=>fileInputRef.current?.click()}>
-                <FaUpload size={24} style={{marginBottom:12, opacity:0.5}} />
+              <div className="store-file-dropzone" onClick={() => fileInputRef.current?.click()}>
+                <FaUpload size={24} style={{ marginBottom: 12, opacity: 0.5 }} />
                 <p>Click to browse or drag and drop files</p>
-                <span style={{fontSize:'.75rem', color:'#A4B6B9'}}>Audio, Video or Images</span>
-                <input ref={fileInputRef} type="file" multiple hidden onChange={e=>{
-                  const newFiles = Array.from(e.target.files||[]);
+                <span style={{ fontSize: '.75rem', color: '#A4B6B9' }}>Audio, Video or Images</span>
+                <input ref={fileInputRef} type="file" multiple hidden onChange={e => {
+                  const newFiles = Array.from(e.target.files || []);
                   setSelectedFiles(prev => [...prev, ...newFiles]);
                   setSelectionConfirmed(false);
                 }} />
@@ -307,8 +307,8 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               {selectedFiles.length > 0 && (
                 <div className="store-selected-files-list">
                   {selectedFiles.map((file, idx) => (
-                    <div key={`${file.name}-${idx}`} className="store-selected-file-item" style={{display: 'block', padding: 0}}>
-                      <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px'}}>
+                    <div key={`${file.name}-${idx}`} className="store-selected-file-item" style={{ display: 'block', padding: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
                         <div className="store-file-info">
                           <div className="store-file-icon-sm">
                             {file.type.startsWith('image/') ? <FaDesktop /> : <FaPlay size={10} />}
@@ -325,36 +325,36 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                         </div>
                       </div>
                       {file.type.startsWith('audio/') && (
-                        <div style={{padding: '12px 16px', background: '#F8FAFB', borderTop: '1px solid #EAEFEF', borderBottomLeftRadius: 10, borderBottomRightRadius: 10}}>
-                          <label style={{fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: '#162B30'}}>
-                            <input type="checkbox" 
+                        <div style={{ padding: '12px 16px', background: '#F8FAFB', borderTop: '1px solid #EAEFEF', borderBottomLeftRadius: 10, borderBottomRightRadius: 10 }}>
+                          <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: '#162B30' }}>
+                            <input type="checkbox"
                               checked={bgSettings[file.name]?.enabled || false}
-                              onChange={(e) => setBgSettings(p => ({...p, [file.name]: { ...p[file.name], enabled: e.target.checked }}))}
+                              onChange={(e) => setBgSettings(p => ({ ...p, [file.name]: { ...p[file.name], enabled: e.target.checked } }))}
                             />
                             Enable BG image
                           </label>
                           {bgSettings[file.name]?.enabled && (
-                            <div style={{marginTop: 8}}>
+                            <div style={{ marginTop: 8 }}>
                               {availableBgImages.length === 0 ? (
-                                <p style={{fontSize: '0.75rem', color: '#64848D', marginTop: 4}}>No background images available. Please upload an image first.</p>
+                                <p style={{ fontSize: '0.75rem', color: '#64848D', marginTop: 4 }}>No background images available. Please upload an image first.</p>
                               ) : (
-                                <div style={{display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8}}>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                                   {availableBgImages.map(img => {
                                     const isSelected = bgSettings[file.name]?.imageId === img._id;
                                     const imgUrl = img.url || img.fileUrl;
                                     return (
-                                      <div 
+                                      <div
                                         key={img._id}
-                                        onClick={(e) => { e.stopPropagation(); setBgSettings(p => ({...p, [file.name]: { ...p[file.name], imageId: isSelected ? "" : img._id }})); }}
+                                        onClick={(e) => { e.stopPropagation(); setBgSettings(p => ({ ...p, [file.name]: { ...p[file.name], imageId: isSelected ? "" : img._id } })); }}
                                         style={{
-                                          width: 60, height: 45, borderRadius: 6, overflow: 'hidden', 
+                                          width: 60, height: 45, borderRadius: 6, overflow: 'hidden',
                                           border: isSelected ? '2px solid #F05A28' : '1px solid #EAEFEF',
                                           cursor: 'pointer', position: 'relative'
                                         }}
                                         title={img.name}
                                       >
-                                        {imgUrl && <img src={imgUrl} alt={img.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />}
-                                        {isSelected && <div style={{position: 'absolute', top: 2, right: 2, background: '#F05A28', color: '#fff', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'}}><FaCheck size={8}/></div>}
+                                        {imgUrl && <img src={imgUrl} alt={img.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                                        {isSelected && <div style={{ position: 'absolute', top: 2, right: 2, background: '#F05A28', color: '#fff', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaCheck size={8} /></div>}
                                       </div>
                                     );
                                   })}
@@ -370,12 +370,12 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               )}
 
               <div className="store-upload-actions-bar">
-                <span className="store-file-selected-text">{selectedFiles.length} file{selectedFiles.length!==1?'s':''} selected</span>
+                <span className="store-file-selected-text">{selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected</span>
                 <div className="store-upload-actions-right">
                   <button className="store-btn-outline-orange" onClick={handleUploadFiles} disabled={uploading}>
                     {uploading ? "Uploading..." : "Upload"}
                   </button>
-                  <button className="store-btn-solid-orange" onClick={() => { if(selectedFiles.length>0) setSelectionConfirmed(true); else alert("Please select files first"); }}>
+                  <button className="store-btn-solid-orange" onClick={() => { if (selectedFiles.length > 0) setSelectionConfirmed(true); else alert("Please select files first"); }}>
                     {selectionConfirmed ? "✓ Selection Confirmed" : "Confirm selection"}
                   </button>
                 </div>
@@ -415,69 +415,69 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               <button className="store-btn-solid-orange store-btn-go">Go</button>
             </div>
 
-            {loadingMedia ? <div style={{padding:32,textAlign:'center',color:'#A4B6B9'}}>Loading media…</div> : existingMediaData.length === 0 ? <div style={{padding:32,textAlign:'center',color:'#A4B6B9'}}>No media files found. Upload media first.</div> : (
-            <table className="store-existing-table">
-              <thead><tr><th style={{width:'40px'}}></th><th>MEDIA NAME</th><th>TYPE</th><th>UPLOAD DATE</th><th>PREVIEW</th><th style={{width:'60px'}}></th></tr></thead>
-              <tbody>
-                {existingMediaData.map((media:any) => {
-                  const id = media._id||media.id;
-                  const t = (media.type||"").toLowerCase();
-                  const badge = t.includes('video')?'video':t.includes('audio')?'audio':'image';
-                  return (
-                    <tr key={id}>
-                      <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(id)} onChange={()=>toggleMedia(id)} /></td>
-                      <td style={{fontWeight:500,color:'#445459'}}>
-                        {media.name}
-                        {badge === 'audio' && selectedMediaIds.includes(id) && (
-                          <div style={{marginTop: 8, padding: '8px 10px', background: '#F8FAFB', borderRadius: 6, border: '1px dashed #D6E6E9', maxWidth: 220}}>
-                            <label style={{fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#162B30'}}>
-                              <input type="checkbox" 
-                                checked={bgSettings[id]?.enabled || false}
-                                onChange={(e) => setBgSettings(p => ({...p, [id]: { ...p[id], enabled: e.target.checked }}))}
-                              />
-                              Enable BG image
-                            </label>
-                            {bgSettings[id]?.enabled && (
-                              <div style={{marginTop: 6}}>
-                                {availableBgImages.length === 0 ? (
-                                  <p style={{fontSize: '0.75rem', color: '#64848D', marginTop: 4}}>No background images available. Please upload an image first.</p>
-                                ) : (
-                                  <div style={{display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6}}>
-                                    {availableBgImages.map(img => {
-                                      const isSelected = bgSettings[id]?.imageId === img._id;
-                                      const imgUrl = img.url || img.fileUrl;
-                                      return (
-                                        <div 
-                                          key={img._id}
-                                          onClick={(e) => { e.stopPropagation(); setBgSettings(p => ({...p, [id]: { ...p[id], imageId: isSelected ? "" : img._id }})); }}
-                                          style={{
-                                            width: 50, height: 38, borderRadius: 4, overflow: 'hidden', 
-                                            border: isSelected ? '2px solid #F05A28' : '1px solid #EAEFEF',
-                                            cursor: 'pointer', position: 'relative'
-                                          }}
-                                          title={img.name}
-                                        >
-                                          {imgUrl && <img src={imgUrl} alt={img.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />}
-                                          {isSelected && <div style={{position: 'absolute', top: 2, right: 2, background: '#F05A28', color: '#fff', borderRadius: '50%', width: 12, height: 12, display: 'flex', alignItems: 'center', justifyContent: 'center'}}><FaCheck size={6}/></div>}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td><span className={`store-type-badge store-type-badge--${badge}`}>{media.type||'Media'}</span></td>
-                      <td style={{color:'#445459'}}>{media.createdAt?new Date(media.createdAt).toLocaleDateString('en-US',{month:'long',year:'numeric'}):'—'}</td>
-                      <td><button className="store-preview-btn" onClick={() => { setPreviewMediaUrl(media.url || media.fileUrl); setPreviewMediaName(media.name); }}><FaPlay size={10}/> Preview</button></td>
-                      <td><button className="store-table-action-btn store-table-action-btn--delete"><FaTrash /></button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {loadingMedia ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9' }}>Loading media…</div> : existingMediaData.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9' }}>No media files found. Upload media first.</div> : (
+              <table className="store-existing-table">
+                <thead><tr><th style={{ width: '40px' }}></th><th>MEDIA NAME</th><th>TYPE</th><th>UPLOAD DATE</th><th>PREVIEW</th><th style={{ width: '60px' }}></th></tr></thead>
+                <tbody>
+                  {existingMediaData.map((media: any) => {
+                    const id = media._id || media.id;
+                    const t = (media.type || "").toLowerCase();
+                    const badge = t.includes('video') ? 'video' : t.includes('audio') ? 'audio' : 'image';
+                    return (
+                      <tr key={id}>
+                        <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(id)} onChange={() => toggleMedia(id)} /></td>
+                        <td style={{ fontWeight: 500, color: '#445459' }}>
+                          {media.name}
+                          {badge === 'audio' && selectedMediaIds.includes(id) && (
+                            <div style={{ marginTop: 8, padding: '8px 10px', background: '#F8FAFB', borderRadius: 6, border: '1px dashed #D6E6E9', maxWidth: 220 }}>
+                              <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#162B30' }}>
+                                <input type="checkbox"
+                                  checked={bgSettings[id]?.enabled || false}
+                                  onChange={(e) => setBgSettings(p => ({ ...p, [id]: { ...p[id], enabled: e.target.checked } }))}
+                                />
+                                Enable BG image
+                              </label>
+                              {bgSettings[id]?.enabled && (
+                                <div style={{ marginTop: 6 }}>
+                                  {availableBgImages.length === 0 ? (
+                                    <p style={{ fontSize: '0.75rem', color: '#64848D', marginTop: 4 }}>No background images available. Please upload an image first.</p>
+                                  ) : (
+                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                                      {availableBgImages.map(img => {
+                                        const isSelected = bgSettings[id]?.imageId === img._id;
+                                        const imgUrl = img.url || img.fileUrl;
+                                        return (
+                                          <div
+                                            key={img._id}
+                                            onClick={(e) => { e.stopPropagation(); setBgSettings(p => ({ ...p, [id]: { ...p[id], imageId: isSelected ? "" : img._id } })); }}
+                                            style={{
+                                              width: 50, height: 38, borderRadius: 4, overflow: 'hidden',
+                                              border: isSelected ? '2px solid #F05A28' : '1px solid #EAEFEF',
+                                              cursor: 'pointer', position: 'relative'
+                                            }}
+                                            title={img.name}
+                                          >
+                                            {imgUrl && <img src={imgUrl} alt={img.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                                            {isSelected && <div style={{ position: 'absolute', top: 2, right: 2, background: '#F05A28', color: '#fff', borderRadius: '50%', width: 12, height: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaCheck size={6} /></div>}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td><span className={`store-type-badge store-type-badge--${badge}`}>{media.type || 'Media'}</span></td>
+                        <td style={{ color: '#445459' }}>{media.createdAt ? new Date(media.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—'}</td>
+                        <td><button className="store-preview-btn" onClick={() => { setPreviewMediaUrl(media.url || media.fileUrl); setPreviewMediaName(media.name); }}><FaPlay size={10} /> Preview</button></td>
+                        <td><button className="store-table-action-btn store-table-action-btn--delete"><FaTrash /></button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
         </div>
@@ -492,27 +492,27 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
             <p className="store-step-subtitle">Setup your playlist here</p>
           </div>
         </div>
-        
+
         <div className="store-step-content">
           <div className="store-form-grid">
             <div className="store-form-group">
               <label>Playlist name</label>
-              <input type="text" placeholder="Enter playlist name" value={playlistName} onChange={e=>setPlaylistName(e.target.value)} />
+              <input type="text" placeholder="Enter playlist name" value={playlistName} onChange={e => setPlaylistName(e.target.value)} />
             </div>
             <div className="store-form-group">
               <label>Type</label>
-              <select value={playlistType} onChange={e=>setPlaylistType(e.target.value)}><option value="">Select type</option><option value="media">Media</option><option value="promotional">Promotional</option></select>
+              <select value={playlistType} onChange={e => setPlaylistType(e.target.value)}><option value="">Select type</option><option value="media">Media</option><option value="promotional">Promotional</option></select>
             </div>
-            <div className="store-form-group"><label>Start date</label><input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} /></div>
-            <div className="store-form-group"><label>End date</label><input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} /></div>
-            <div className="store-form-group"><label>Start time</label><input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} /></div>
-            <div className="store-form-group"><label>End time</label><input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} /></div>
+            <div className="store-form-group"><label>Start date</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></div>
+            <div className="store-form-group"><label>End date</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
+            <div className="store-form-group"><label>Start time</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
+            <div className="store-form-group"><label>End time</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></div>
           </div>
 
           <div className="store-form-group store-form-group--full mt-4">
             <label>Days of the week</label>
-            <div className="store-days-selector">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(day=>(
-              <button key={day} className={`store-day-pill ${selectedDays.includes(day)?"store-day-pill--active":""}`} onClick={()=>toggleDay(day)}>{day}</button>
+            <div className="store-days-selector">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
+              <button key={day} className={`store-day-pill ${selectedDays.includes(day) ? "store-day-pill--active" : ""}`} onClick={() => toggleDay(day)}>{day}</button>
             ))}</div>
           </div>
 
@@ -520,7 +520,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
             <h4>Global volume settings</h4>
             <div className="store-volume-controls">
               <span className="store-volume-label store-volume-label--min">Min : 30%</span>
-              <div className="store-volume-slider-wrap"><input type="range" min="0" max="100" value={volume} onChange={e=>setVolume(Number(e.target.value))} className="store-volume-slider" /></div>
+              <div className="store-volume-slider-wrap"><input type="range" min="0" max="100" value={volume} onChange={e => setVolume(Number(e.target.value))} className="store-volume-slider" /></div>
               <span className="store-volume-label store-volume-label--max">Max : {volume}%</span>
             </div>
             <button className="store-btn-outline-orange mt-3">Apply volume for all files</button>
@@ -528,53 +528,53 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
 
           {/* Select Stores - Real devices */}
           <div className="store-form-group store-form-group--full mt-4">
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <div><label style={{fontSize:'.95rem',fontWeight:700}}>Select stores</label><p style={{fontSize:'.78rem',color:'#64848D',marginTop:4}}>Choose which store will play this playlist</p></div>
-              {devices.length>0 && <button style={{padding:'6px 16px',borderRadius:6,border:'1px solid #F05A28',color:'#F05A28',background:'#fff',fontWeight:600,fontSize:'.8rem',cursor:'pointer'}} onClick={()=>{const all=devices.flatMap(d=>d.deviceIds);setSelectedDeviceIds(selectedDeviceIds.length===all.length?[]:all);}}>Select All</button>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div><label style={{ fontSize: '.95rem', fontWeight: 700 }}>Select stores</label><p style={{ fontSize: '.78rem', color: '#64848D', marginTop: 4 }}>Choose which store will play this playlist</p></div>
+              {devices.length > 0 && <button style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid #F05A28', color: '#F05A28', background: '#fff', fontWeight: 600, fontSize: '.8rem', cursor: 'pointer' }} onClick={() => { const all = devices.flatMap(d => d.deviceIds); setSelectedDeviceIds(selectedDeviceIds.length === all.length ? [] : all); }}>Select All</button>}
             </div>
-            {loadingDevices ? <div style={{padding:24,textAlign:'center',color:'#A4B6B9'}}>Loading stores…</div>
-            : devices.length === 0 ? <div style={{padding:32,textAlign:'center',color:'#A4B6B9',border:'1px dashed #D6E6E9',borderRadius:12,background:'#F8FAFB'}}>No devices connected to this store yet.</div>
-            : <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
-              {devices.map(s => {
-                const isSel = selectedDeviceIds.includes(s._id);
-                const isOnline = (s.status || "").toLowerCase() === "online";
-                return (<div key={s._id} onClick={()=>toggleDevice(s._id)} style={{display:'flex',alignItems:'center',gap:12,padding:16,border:`2px solid ${isSel?'#F05A28':'#EAEFEF'}`,borderRadius:14,cursor:'pointer',background:isSel?'#FFF8F5':'#fff',position:'relative'}}>
-                  <div style={{width:36,height:36,borderRadius:8,background:'#EAF6F8',display:'flex',alignItems:'center',justifyContent:'center',color:'#F05A28'}}><FaDesktop size={14}/></div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <p style={{fontWeight:700,fontSize:'.82rem',color:'#162B30'}}>{s.name} <span style={{color:isOnline?'#16A34A':'#DC2626',fontSize:10}}>●</span></p>
-                    <p style={{fontSize:'.7rem',color:'#A4B6B9',marginTop:2}}>{s.address}</p>
-                    <p style={{fontSize:'.7rem',fontWeight:700,color:isOnline?'#16A34A':'#DC2626',marginTop:4}}>{s.status || "Inactive"}</p>
-                    {isSel && editingPlaylist && (
-                      <button 
-                        onClick={(e) => handleDisconnectDevice(e, s._id)}
-                        disabled={disconnectingId === s._id}
-                        style={{
-                          marginTop: 6,
-                          padding: '4px 8px',
-                          background: '#FFF2F2',
-                          color: '#DC2626',
-                          border: '1px solid #FECACA',
-                          borderRadius: 4,
-                          fontSize: '0.7rem',
-                          cursor: disconnectingId === s._id ? 'not-allowed' : 'pointer',
-                          opacity: disconnectingId === s._id ? 0.6 : 1
-                        }}
-                      >
-                        {disconnectingId === s._id ? 'Disconnecting...' : 'Disconnect'}
-                      </button>
-                    )}
-                  </div>
-                  {isSel && <div style={{position:'absolute',top:8,right:8,width:20,height:20,borderRadius:'50%',background:'#F05A28',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}><FaCheck size={8}/></div>}
-                </div>);
-              })}
-            </div>}
-            {selectedDeviceIds.length>0 && <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 16px',background:'#F0FDF4',borderRadius:8,border:'1px dashed #BBF7D0',marginTop:14}}><div><p style={{fontWeight:700,fontSize:'.85rem',color:'#166534'}}>{selectedDeviceIds.length} device(s) selected</p><p style={{fontSize:'.75rem',color:'#64848D'}}>Ready to push playlist</p></div><button style={{border:'none',background:'none',color:'#F05A28',fontWeight:700,fontSize:'.85rem',cursor:'pointer'}} onClick={()=>setSelectedDeviceIds([])}>Clear</button></div>}
+            {loadingDevices ? <div style={{ padding: 24, textAlign: 'center', color: '#A4B6B9' }}>Loading stores…</div>
+              : devices.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9', border: '1px dashed #D6E6E9', borderRadius: 12, background: '#F8FAFB' }}>No devices connected to this store yet.</div>
+                : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
+                  {devices.map(s => {
+                    const isSel = selectedDeviceIds.includes(s._id);
+                    const isOnline = (s.status || "").toLowerCase() === "online";
+                    return (<div key={s._id} onClick={() => toggleDevice(s._id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, border: `2px solid ${isSel ? '#F05A28' : '#EAEFEF'}`, borderRadius: 14, cursor: 'pointer', background: isSel ? '#FFF8F5' : '#fff', position: 'relative' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 8, background: '#EAF6F8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F05A28' }}><FaDesktop size={14} /></div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontWeight: 700, fontSize: '.82rem', color: '#162B30' }}>{s.name} <span style={{ color: isOnline ? '#16A34A' : '#DC2626', fontSize: 10 }}>●</span></p>
+                        <p style={{ fontSize: '.7rem', color: '#A4B6B9', marginTop: 2 }}>{s.address}</p>
+                        <p style={{ fontSize: '.7rem', fontWeight: 700, color: isOnline ? '#16A34A' : '#DC2626', marginTop: 4 }}>{s.status || "Inactive"}</p>
+                        {isSel && editingPlaylist && (
+                          <button
+                            onClick={(e) => handleDisconnectDevice(e, s._id)}
+                            disabled={disconnectingId === s._id}
+                            style={{
+                              marginTop: 6,
+                              padding: '4px 8px',
+                              background: '#FFF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                              borderRadius: 4,
+                              fontSize: '0.7rem',
+                              cursor: disconnectingId === s._id ? 'not-allowed' : 'pointer',
+                              opacity: disconnectingId === s._id ? 0.6 : 1
+                            }}
+                          >
+                            {disconnectingId === s._id ? 'Disconnecting...' : 'Disconnect'}
+                          </button>
+                        )}
+                      </div>
+                      {isSel && <div style={{ position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: '50%', background: '#F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><FaCheck size={8} /></div>}
+                    </div>);
+                  })}
+                </div>}
+            {selectedDeviceIds.length > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#F0FDF4', borderRadius: 8, border: '1px dashed #BBF7D0', marginTop: 14 }}><div><p style={{ fontWeight: 700, fontSize: '.85rem', color: '#166534' }}>{selectedDeviceIds.length} device(s) selected</p><p style={{ fontSize: '.75rem', color: '#64848D' }}>Ready to push playlist</p></div><button style={{ border: 'none', background: 'none', color: '#F05A28', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }} onClick={() => setSelectedDeviceIds([])}>Clear</button></div>}
           </div>
 
           <div className="store-form-actions">
-            <button className="store-btn-outline-grey" onClick={()=>{setPlaylistName('');setSelectedDeviceIds([]);setSelectedMediaIds([]);setSelectedFiles([])}}>Reset</button>
+            <button className="store-btn-outline-grey" onClick={() => { setPlaylistName(''); setSelectedDeviceIds([]); setSelectedMediaIds([]); setSelectedFiles([]) }}>Reset</button>
             <button className="store-btn-solid-orange store-btn-solid-orange--icon" onClick={handleSubmit} disabled={submitting}>
-              {submitting?'Creating…':'Connect playlist to stores'}
+              {submitting ? 'Creating…' : 'Connect playlist to stores'}
             </button>
           </div>
         </div>
@@ -590,13 +590,13 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
             </div>
             <div className="store-modal-body">
               {previewFile.type.startsWith('image/') ? (
-                <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{maxWidth:'100%', borderRadius:8}} />
+                <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{ maxWidth: '100%', borderRadius: 8 }} />
               ) : previewFile.type.startsWith('audio/') ? (
-                <audio src={URL.createObjectURL(previewFile)} controls style={{width:'100%'}} autoPlay />
+                <audio src={URL.createObjectURL(previewFile)} controls style={{ width: '100%' }} autoPlay />
               ) : previewFile.type.startsWith('video/') ? (
-                <video src={URL.createObjectURL(previewFile)} controls style={{maxWidth:'100%', borderRadius:8}} autoPlay />
+                <video src={URL.createObjectURL(previewFile)} controls style={{ maxWidth: '100%', borderRadius: 8 }} autoPlay />
               ) : (
-                <div style={{padding:40, textAlign:'center', color:'#64848D'}}>
+                <div style={{ padding: 40, textAlign: 'center', color: '#64848D' }}>
                   Preview not available for this file type ({previewFile.type})
                 </div>
               )}
@@ -615,11 +615,11 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
             </div>
             <div className="store-modal-body">
               {previewMediaUrl.match(/\.(mp3|wav|ogg)$/i) || previewMediaUrl.includes('audio') ? (
-                <audio src={previewMediaUrl} controls style={{width:'100%'}} autoPlay />
+                <audio src={previewMediaUrl} controls style={{ width: '100%' }} autoPlay />
               ) : previewMediaUrl.match(/\.(mp4|webm|ogg)$/i) || previewMediaUrl.includes('video') ? (
-                <video src={previewMediaUrl} controls style={{maxWidth:'100%', borderRadius:8}} autoPlay />
+                <video src={previewMediaUrl} controls style={{ maxWidth: '100%', borderRadius: 8 }} autoPlay />
               ) : (
-                <img src={previewMediaUrl} alt="Preview" style={{maxWidth:'100%', borderRadius:8}} />
+                <img src={previewMediaUrl} alt="Preview" style={{ maxWidth: '100%', borderRadius: 8 }} />
               )}
             </div>
           </div>

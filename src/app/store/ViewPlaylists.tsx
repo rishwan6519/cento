@@ -96,9 +96,13 @@ const EditModal: React.FC<EditModalProps> = ({ playlist, onClose, onSaved }) => 
     if (!form.name.trim()) { toast.error("Playlist name is required"); return; }
     setSaving(true);
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
       const res = await fetch("/api/playlists", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ id: playlist._id, ...form }),
       });
       const data = await res.json();
@@ -399,9 +403,13 @@ const ViewPlaylists: React.FC<ViewPlaylistsProps> = ({
     if (!window.confirm("Delete this playlist?")) return;
     setDeletingId(id);
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
       const res = await fetch("/api/playlists", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ id }),
       });
       const data = await res.json();

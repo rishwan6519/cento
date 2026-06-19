@@ -43,9 +43,13 @@ const ViewAnnouncements: React.FC<{ onEdit?: (item: any) => void }> = ({ onEdit 
     const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this announcement?")) return;
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
       const res = await fetch("/api/playlists", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ id })
       });
       const data = await res.json();

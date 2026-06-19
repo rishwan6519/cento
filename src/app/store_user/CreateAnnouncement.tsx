@@ -3,14 +3,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaUpload, FaMicrophone, FaVolumeUp, FaFolderOpen, FaDesktop, FaCheck, FaStop, FaRedo, FaStore, FaArrowLeft, FaEye, FaTrash } from "react-icons/fa";
 import { ViewKey } from "./page";
 
-interface Props { 
-  onNavigate: (view: ViewKey) => void; 
+interface Props {
+  onNavigate: (view: ViewKey) => void;
   isInstant?: boolean;
   editingPlaylist?: any;
 }
 
 export default function CreateAnnouncement({ onNavigate, isInstant = false, editingPlaylist }: Props) {
-  const [method, setMethod] = useState<"upload"|"record"|"tts"|"library">("upload");
+  const [method, setMethod] = useState<"upload" | "record" | "tts" | "library">("upload");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [playlistName, setPlaylistName] = useState("");
   const [announcementType, setAnnouncementType] = useState("");
@@ -18,7 +18,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [selectedDays, setSelectedDays] = useState<string[]>(["Tue","Fri"]);
+  const [selectedDays, setSelectedDays] = useState<string[]>(["Tue", "Fri"]);
   const [volumeMin] = useState(30);
   const [volumeMax] = useState(80);
   const [devices, setDevices] = useState<any[]>([]);
@@ -45,7 +45,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
       setEndTime(editingPlaylist.endTime || "");
       setSelectedDays(editingPlaylist.daysOfWeek || []);
       setSelectedDeviceIds(editingPlaylist.deviceIds || []);
-      
+
       if (editingPlaylist.files && editingPlaylist.files.length > 0) {
         setMethod("library");
         setSelectedLibraryId(editingPlaylist.files[0].fileId || editingPlaylist.files[0]._id);
@@ -55,26 +55,26 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder|null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordedBlob, setRecordedBlob] = useState<Blob|null>(null);
-  const [audioUrl, setAudioUrl] = useState<string|null>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isRecordingSaved, setIsRecordingSaved] = useState(false);
   const timerRef = useRef<any>(null);
 
   // TTS state
   const [ttsText, setTtsText] = useState("");
-  const [ttsAudioUrl, setTtsAudioUrl] = useState<string|null>(null);
-  const [ttsBlob, setTtsBlob] = useState<Blob|null>(null);
+  const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
+  const [ttsBlob, setTtsBlob] = useState<Blob | null>(null);
   const [isTtsGenerating, setIsTtsGenerating] = useState(false);
   const [isTtsSaved, setIsTtsSaved] = useState(false);
   const [ttsVoice, setTtsVoice] = useState("Puck"); // Professional Male
 
   // Library state
   const [libraryMedia, setLibraryMedia] = useState<any[]>([]);
-  const [selectedLibraryId, setSelectedLibraryId] = useState<string|null>(null);
+  const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
-  const [previewFile, setPreviewFile] = useState<File|null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -102,8 +102,8 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   useEffect(() => {
     if (method !== "library" || !userId) return;
     setLoadingLibrary(true);
-    fetch(`/api/media?userId=${userId}`).then(r=>r.json())
-      .then(d => setLibraryMedia(d.media||d.mediaFiles||d.data||[]))
+    fetch(`/api/media?userId=${userId}`).then(r => r.json())
+      .then(d => setLibraryMedia(d.media || d.mediaFiles || d.data || []))
       .catch(() => setLibraryMedia([]))
       .finally(() => setLoadingLibrary(false));
   }, [method, userId]);
@@ -119,15 +119,15 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const handleDisconnectDevice = async (e: React.MouseEvent, deviceId: string) => {
     e.stopPropagation();
     if (!editingPlaylist || (!editingPlaylist._id && !editingPlaylist.id)) return;
-    
+
     setDisconnectingId(deviceId);
     try {
       const res = await fetch('/api/playlists/disconnect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          playlistId: editingPlaylist._id || editingPlaylist.id, 
-          deviceId 
+        body: JSON.stringify({
+          playlistId: editingPlaylist._id || editingPlaylist.id,
+          deviceId
         })
       });
       const data = await res.json();
@@ -144,22 +144,22 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
     }
   };
 
-  const formatDur = (s: number) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+  const formatDur = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
   const startRecording = async () => {
     try {
       setRecordedBlob(null); setIsRecordingSaved(false);
       if (audioUrl) URL.revokeObjectURL(audioUrl); setAudioUrl(null);
-      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-      const rec = new MediaRecorder(stream, {mimeType:'audio/webm'});
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       const chunks: Blob[] = [];
-      rec.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
-      rec.onstop = () => { const b=new Blob(chunks,{type:'audio/webm'}); if(b.size>0){setRecordedBlob(b);setAudioUrl(URL.createObjectURL(b));} stream.getTracks().forEach(t=>t.stop()); };
+      rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = () => { const b = new Blob(chunks, { type: 'audio/webm' }); if (b.size > 0) { setRecordedBlob(b); setAudioUrl(URL.createObjectURL(b)); } stream.getTracks().forEach(t => t.stop()); };
       rec.start(); setMediaRecorder(rec); setIsRecording(true); setRecordingDuration(0);
-      timerRef.current = setInterval(()=>setRecordingDuration(p=>p+1),1000);
+      timerRef.current = setInterval(() => setRecordingDuration(p => p + 1), 1000);
     } catch { alert('Could not access microphone'); }
   };
-  const stopRecording = () => { if(mediaRecorder&&isRecording){mediaRecorder.stop();setIsRecording(false);if(timerRef.current)clearInterval(timerRef.current);} };
+  const stopRecording = () => { if (mediaRecorder && isRecording) { mediaRecorder.stop(); setIsRecording(false); if (timerRef.current) clearInterval(timerRef.current); } };
   const saveRecording = () => setIsRecordingSaved(true);
 
   const handleTtsGenerate = async () => {
@@ -191,14 +191,14 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const saveTts = () => setIsTtsSaved(true);
 
   const getMethodSummary = () => {
-    if(method==='upload') return selectedFiles.length>0?'Ready to upload':'Pending selection';
-    if(method==='record') return isRecordingSaved?'Recording saved':isRecording?'Recording...':'Ready to record';
-    if(method==='tts') return isTtsSaved?'TTS saved':isTtsGenerating?'Generating...':ttsText?'Ready to generate':'Pending input';
-    if(method==='library') return selectedLibraryId?'1 item selected':'Pending selection';
+    if (method === 'upload') return selectedFiles.length > 0 ? 'Ready to upload' : 'Pending selection';
+    if (method === 'record') return isRecordingSaved ? 'Recording saved' : isRecording ? 'Recording...' : 'Ready to record';
+    if (method === 'tts') return isTtsSaved ? 'TTS saved' : isTtsGenerating ? 'Generating...' : ttsText ? 'Ready to generate' : 'Pending input';
+    if (method === 'library') return selectedLibraryId ? '1 item selected' : 'Pending selection';
     return '';
   };
-  const getMethodLabel = () => ({upload:'Upload new file',record:'Record Audio',tts:'Text to Speech',library:'Library Selection'}[method]);
-  const getMethodIcon = () => ({upload:<FaUpload size={14}/>,record:<FaMicrophone size={14}/>,tts:<FaVolumeUp size={14}/>,library:<FaFolderOpen size={14}/>}[method]);
+  const getMethodLabel = () => ({ upload: 'Upload new file', record: 'Record Audio', tts: 'Text to Speech', library: 'Library Selection' }[method]);
+  const getMethodIcon = () => ({ upload: <FaUpload size={14} />, record: <FaMicrophone size={14} />, tts: <FaVolumeUp size={14} />, library: <FaFolderOpen size={14} /> }[method]);
 
   const handleSubmit = async () => {
     if (selectedDeviceIds.length === 0) return;
@@ -216,7 +216,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         const fd = new FormData();
         fd.append("userId", userId); fd.append("userRole", "store");
         const fn = `recording_${Date.now()}.wav`;
-        fd.append('files[0]', new File([recordedBlob], fn, {type:'audio/wav'}));
+        fd.append('files[0]', new File([recordedBlob], fn, { type: 'audio/wav' }));
         fd.append('fileNames[0]', fn);
         const r = await fetch("/api/media/upload", { method: "POST", body: fd });
         const d = await r.json();
@@ -225,7 +225,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         const fd = new FormData();
         fd.append("userId", userId); fd.append("userRole", "store");
         const fn = `tts_${Date.now()}.wav`;
-        fd.append('files[0]', new File([ttsBlob], fn, {type:'audio/wav'}));
+        fd.append('files[0]', new File([ttsBlob], fn, { type: 'audio/wav' }));
         fd.append('fileNames[0]', fn);
         const r = await fetch("/api/media/upload", { method: "POST", body: fd });
         const d = await r.json();
@@ -233,30 +233,30 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
       } else if (method === "library" && selectedLibraryId) {
         mediaIds = [selectedLibraryId];
       }
-      const body = { 
-        userId, 
-        name: playlistName, 
-        type: announcementType || "announcement", 
-        startDate, 
-        endDate, 
-        startTime, 
-        endTime, 
-        daysOfWeek: selectedDays, 
-        globalMinVolume: volumeMin, 
-        globalMaxVolume: volumeMax, 
-        deviceIds: selectedDeviceIds, 
+      const body = {
+        userId,
+        name: playlistName,
+        type: announcementType || "announcement",
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        daysOfWeek: selectedDays,
+        globalMinVolume: volumeMin,
+        globalMaxVolume: volumeMax,
+        deviceIds: selectedDeviceIds,
         mediaIds,
         id: editingPlaylist?._id || editingPlaylist?.id
       };
       const fetchMethod = editingPlaylist ? "PUT" : "POST";
-      const res = await fetch("/api/playlists", { 
-        method: fetchMethod, 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify(body) 
+      const res = await fetch("/api/playlists", {
+        method: fetchMethod,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (data.success) onNavigate("dashboard");
-    } catch {} finally { setSubmitting(false); }
+    } catch { } finally { setSubmitting(false); }
   };
 
   const selectedStoreCount = devices.filter(s => s.deviceIds.every((id: string) => selectedDeviceIds.includes(id)) && s.deviceIds.length > 0).length;
@@ -264,67 +264,67 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const renderMethodContent = () => {
     if (method === 'record') return (
       <div className="su-ca-upload-area">
-        <div className="su-ca-upload-icon" style={{background:isRecording?'#FEE2E2':undefined,color:isRecording?'#DC2626':undefined}}><FaMicrophone size={24}/></div>
-        <h3>{isRecording?'Recording in progress...':audioUrl?'Recording ready':'Ready to record'}</h3>
-        {!audioUrl && <p>{isRecording?`Recording: ${formatDur(recordingDuration)}`:'Click the button below to start recording your announcement.'}</p>}
-        {audioUrl && <div style={{width:'100%',maxWidth:340,margin:'12px auto'}}><audio src={audioUrl} controls style={{width:'100%'}}/></div>}
-        <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+        <div className="su-ca-upload-icon" style={{ background: isRecording ? '#FEE2E2' : undefined, color: isRecording ? '#DC2626' : undefined }}><FaMicrophone size={24} /></div>
+        <h3>{isRecording ? 'Recording in progress...' : audioUrl ? 'Recording ready' : 'Ready to record'}</h3>
+        {!audioUrl && <p>{isRecording ? `Recording: ${formatDur(recordingDuration)}` : 'Click the button below to start recording your announcement.'}</p>}
+        {audioUrl && <div style={{ width: '100%', maxWidth: 340, margin: '12px auto' }}><audio src={audioUrl} controls style={{ width: '100%' }} /></div>}
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
           {audioUrl ? (isRecordingSaved ? (
-            <button className="su-ca-upload-btn" style={{background:'#fff',color:'#445459',border:'1px solid #D6E6E9'}} onClick={()=>{setRecordedBlob(null);setAudioUrl(null);setIsRecordingSaved(false);startRecording();}}>Re-record</button>
+            <button className="su-ca-upload-btn" style={{ background: '#fff', color: '#445459', border: '1px solid #D6E6E9' }} onClick={() => { setRecordedBlob(null); setAudioUrl(null); setIsRecordingSaved(false); startRecording(); }}>Re-record</button>
           ) : (<>
-            <button className="su-ca-upload-btn" style={{background:'#fff',color:'#445459',border:'1px solid #D6E6E9'}} onClick={()=>{setRecordedBlob(null);setAudioUrl(null);startRecording();}}>Re-record</button>
-            <button className="su-ca-upload-btn" onClick={saveRecording}><FaCheck size={12}/> Save</button>
+            <button className="su-ca-upload-btn" style={{ background: '#fff', color: '#445459', border: '1px solid #D6E6E9' }} onClick={() => { setRecordedBlob(null); setAudioUrl(null); startRecording(); }}>Re-record</button>
+            <button className="su-ca-upload-btn" onClick={saveRecording}><FaCheck size={12} /> Save</button>
           </>)) : (
-            <button className="su-ca-upload-btn" onClick={isRecording?stopRecording:startRecording}>
-              {isRecording?<><FaStop size={12}/> Stop Recording</>:'Start Recording'}
+            <button className="su-ca-upload-btn" onClick={isRecording ? stopRecording : startRecording}>
+              {isRecording ? <><FaStop size={12} /> Stop Recording</> : 'Start Recording'}
             </button>
           )}
         </div>
       </div>
     );
     if (method === 'tts') return (
-      <div className="su-ca-upload-area" style={{cursor:'default'}}>
-        <div style={{width:'100%',textAlign:'left',marginBottom:12}}>
-          <label style={{fontSize:'.82rem',fontWeight:700,color:'#162B30'}}>Announcement text</label>
-          <textarea value={ttsText} onChange={e=>setTtsText(e.target.value)} placeholder="Welcome to our store! Today we have..." style={{width:'100%',minHeight:100,padding:12,border:'1px solid #EAEFEF',borderRadius:10,resize:'none',marginTop:8,fontFamily:'inherit',fontSize:'.88rem'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',marginTop:6}}><span style={{fontSize:'.72rem',color:'#A4B6B9'}}>{ttsText.length} characters</span><span style={{fontSize:'.72rem',color:'#A4B6B9',fontStyle:'italic'}}>Recommended: 30-200 words</span></div>
+      <div className="su-ca-upload-area" style={{ cursor: 'default' }}>
+        <div style={{ width: '100%', textAlign: 'left', marginBottom: 12 }}>
+          <label style={{ fontSize: '.82rem', fontWeight: 700, color: '#162B30' }}>Announcement text</label>
+          <textarea value={ttsText} onChange={e => setTtsText(e.target.value)} placeholder="Welcome to our store! Today we have..." style={{ width: '100%', minHeight: 100, padding: 12, border: '1px solid #EAEFEF', borderRadius: 10, resize: 'none', marginTop: 8, fontFamily: 'inherit', fontSize: '.88rem' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}><span style={{ fontSize: '.72rem', color: '#A4B6B9' }}>{ttsText.length} characters</span><span style={{ fontSize: '.72rem', color: '#A4B6B9', fontStyle: 'italic' }}>Recommended: 30-200 words</span></div>
         </div>
-        {ttsAudioUrl && <div style={{width:'100%',maxWidth:340,margin:'12px auto'}}><audio src={ttsAudioUrl} controls style={{width:'100%'}}/></div>}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,width:'100%',marginBottom:16}}>
-          <div><label style={{fontSize:'.75rem',fontWeight:700,color:'#64848D'}}>Language & Accent</label><select style={{width:'100%',padding:'10px 14px',border:'1px solid #EAEFEF',borderRadius:8,marginTop:6,fontSize:'.85rem'}}><option>English (US)</option><option>English (UK)</option></select></div>
-          <div><label style={{fontSize:'.75rem',fontWeight:700,color:'#64848D'}}>Voice style</label><select value={ttsVoice} onChange={e=>setTtsVoice(e.target.value)} style={{width:'100%',padding:'10px 14px',border:'1px solid #EAEFEF',borderRadius:8,marginTop:6,fontSize:'.85rem'}}><option value="Puck">Professional Male</option><option value="Kore">Warm Female</option><option value="Charon">Soft Male</option><option value="Fenrir">Bold Male</option></select></div>
+        {ttsAudioUrl && <div style={{ width: '100%', maxWidth: 340, margin: '12px auto' }}><audio src={ttsAudioUrl} controls style={{ width: '100%' }} /></div>}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, width: '100%', marginBottom: 16 }}>
+          <div><label style={{ fontSize: '.75rem', fontWeight: 700, color: '#64848D' }}>Language & Accent</label><select style={{ width: '100%', padding: '10px 14px', border: '1px solid #EAEFEF', borderRadius: 8, marginTop: 6, fontSize: '.85rem' }}><option>English (US)</option><option>English (UK)</option></select></div>
+          <div><label style={{ fontSize: '.75rem', fontWeight: 700, color: '#64848D' }}>Voice style</label><select value={ttsVoice} onChange={e => setTtsVoice(e.target.value)} style={{ width: '100%', padding: '10px 14px', border: '1px solid #EAEFEF', borderRadius: 8, marginTop: 6, fontSize: '.85rem' }}><option value="Puck">Professional Male</option><option value="Kore">Warm Female</option><option value="Charon">Soft Male</option><option value="Fenrir">Bold Male</option></select></div>
         </div>
-        <div style={{display:'flex',gap:12,width:'100%'}}>
-          <button className="su-ca-upload-btn" style={{flex:1,background:'#162B30'}} onClick={handleTtsGenerate} disabled={isTtsGenerating || !ttsText}>{isTtsGenerating?'Generating...':'Generate & Preview'}</button>
-          {ttsAudioUrl && !isTtsSaved && <button className="su-ca-upload-btn" style={{flex:0.5}} onClick={saveTts}><FaCheck size={12}/> Save</button>}
+        <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+          <button className="su-ca-upload-btn" style={{ flex: 1, background: '#162B30' }} onClick={handleTtsGenerate} disabled={isTtsGenerating || !ttsText}>{isTtsGenerating ? 'Generating...' : 'Generate & Preview'}</button>
+          {ttsAudioUrl && !isTtsSaved && <button className="su-ca-upload-btn" style={{ flex: 0.5 }} onClick={saveTts}><FaCheck size={12} /> Save</button>}
         </div>
       </div>
     );
     if (method === 'library') return (
-      <div style={{maxHeight:320,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
-        {loadingLibrary ? <div style={{padding:32,textAlign:'center',color:'#A4B6B9'}}>Loading library…</div>
-        : libraryMedia.length===0 ? <div style={{padding:32,textAlign:'center',color:'#A4B6B9',border:'1px dashed #D6E6E9',borderRadius:12}}>No saved announcements found.</div>
-        : libraryMedia.map(item => (
-          <div key={item._id} onClick={()=>setSelectedLibraryId(item._id)} style={{display:'flex',alignItems:'center',gap:14,padding:16,borderRadius:14,cursor:'pointer',border:`2px solid ${selectedLibraryId===item._id?'#F05A28':'#EAEFEF'}`,background:selectedLibraryId===item._id?'#FFF8F5':'#fff'}}>
-            <div style={{width:40,height:40,borderRadius:10,background:'#FFF2F2',color:'#F05A28',display:'flex',alignItems:'center',justifyContent:'center'}}><FaVolumeUp size={16}/></div>
-            <div style={{flex:1,minWidth:0}}><p style={{fontWeight:700,fontSize:'.85rem',color:'#162B30'}}>{item.name}</p><p style={{fontSize:'.72rem',color:'#64848D'}}>{item.type||'Uploaded'} • {item.duration||'0:45'}</p></div>
-            {selectedLibraryId===item._id && <div style={{width:22,height:22,borderRadius:'50%',border:'2px solid #F05A28',display:'flex',alignItems:'center',justifyContent:'center',color:'#F05A28'}}><FaCheck size={10}/></div>}
-          </div>
-        ))}
+      <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {loadingLibrary ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9' }}>Loading library…</div>
+          : libraryMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9', border: '1px dashed #D6E6E9', borderRadius: 12 }}>No saved announcements found.</div>
+            : libraryMedia.map(item => (
+              <div key={item._id} onClick={() => setSelectedLibraryId(item._id)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, cursor: 'pointer', border: `2px solid ${selectedLibraryId === item._id ? '#F05A28' : '#EAEFEF'}`, background: selectedLibraryId === item._id ? '#FFF8F5' : '#fff' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FFF2F2', color: '#F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaVolumeUp size={16} /></div>
+                <div style={{ flex: 1, minWidth: 0 }}><p style={{ fontWeight: 700, fontSize: '.85rem', color: '#162B30' }}>{item.name}</p><p style={{ fontSize: '.72rem', color: '#64848D' }}>{item.type || 'Uploaded'} • {item.duration || '0:45'}</p></div>
+                {selectedLibraryId === item._id && <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid #F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F05A28' }}><FaCheck size={10} /></div>}
+              </div>
+            ))}
       </div>
     );
     // default: upload
     return (
       <div className="su-ca-upload-container">
-        <div className="su-ca-upload-area" onClick={()=>fileInputRef.current?.click()}>
-          <div className="su-ca-upload-icon"><FaUpload size={24}/></div>
+        <div className="su-ca-upload-area" onClick={() => fileInputRef.current?.click()}>
+          <div className="su-ca-upload-icon"><FaUpload size={24} /></div>
           <h3>Upload file</h3>
           <p>Add media from your device. Audio, video, image.</p>
           <button className="su-ca-upload-btn">Browse files</button>
-          <input ref={fileInputRef} type="file" multiple hidden onChange={e=>{
-            const newFiles = Array.from(e.target.files||[]);
+          <input ref={fileInputRef} type="file" multiple hidden onChange={e => {
+            const newFiles = Array.from(e.target.files || []);
             setSelectedFiles(prev => [...prev, ...newFiles]);
-          }}/>
+          }} />
         </div>
 
         {selectedFiles.length > 0 && (
@@ -333,13 +333,13 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
               <div key={`${file.name}-${idx}`} className="su-ca-file-item">
                 <div className="su-ca-file-info">
                   <div className="su-ca-file-icon">
-                    {file.type.startsWith('image/') ? <FaDesktop size={12}/> : <FaVolumeUp size={12}/>}
+                    {file.type.startsWith('image/') ? <FaDesktop size={12} /> : <FaVolumeUp size={12} />}
                   </div>
                   <span className="su-ca-file-name">{file.name}</span>
                 </div>
                 <div className="su-ca-file-actions">
-                  <button className="su-ca-file-btn" onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}><FaEye size={12}/></button>
-                  <button className="su-ca-file-btn su-ca-file-btn--danger" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}><FaTrash size={11}/></button>
+                  <button className="su-ca-file-btn" onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}><FaEye size={12} /></button>
+                  <button className="su-ca-file-btn su-ca-file-btn--danger" onClick={(e) => { e.stopPropagation(); setSelectedFiles(prev => prev.filter((_, i) => i !== idx)); }}><FaTrash size={11} /></button>
                 </div>
               </div>
             ))}
@@ -402,9 +402,9 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
               )}
             </div>
             {!isInstant && (
-              <div className="su-ca-form-group su-ca-form-group--full" style={{marginTop:20}}>
+              <div className="su-ca-form-group su-ca-form-group--full" style={{ marginTop: 20 }}>
                 <label>Days of the week</label>
-                <div className="su-ca-days">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
+                <div className="su-ca-days">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
                   <button key={d} className={`su-ca-day ${selectedDays.includes(d) ? "su-ca-day--active" : ""}`} onClick={() => toggleDay(d)}>{d}</button>
                 ))}</div>
               </div>
@@ -413,7 +413,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
               <h4>Global volume settings</h4>
               <div className="su-ca-volume-row">
                 <span className="su-ca-vol-min">Min : {volumeMin}%</span>
-                <div className="su-ca-vol-track"><div className="su-ca-vol-fill" style={{left:`${volumeMin}%`,right:`${100-volumeMax}%`}}/></div>
+                <div className="su-ca-vol-track"><div className="su-ca-vol-fill" style={{ left: `${volumeMin}%`, right: `${100 - volumeMax}%` }} /></div>
                 <span className="su-ca-vol-max">Max : {volumeMax}%</span>
               </div>
               <button className="su-ca-vol-apply">Apply volume for all files</button>
@@ -426,9 +426,9 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
       <div className="su-ca-card su-ca-stores-section">
         <div className="su-ca-stores-header">
           <div><h3 className="su-ca-section-title">Select stores</h3><p className="su-ca-stores-sub">Choose which store will play this announcement</p></div>
-          <div style={{display:"flex",gap:12,alignItems:"center"}}>
-            <select style={{padding:"6px 12px",borderRadius:6,border:"1px solid #EAEFEF",fontSize:"0.8rem"}}><option>Location</option></select>
-            <button className="su-ip-select-all-btn2" onClick={() => { const all = devices.flatMap(d=>d.deviceIds); setSelectedDeviceIds(selectedDeviceIds.length===all.length ? [] : all); }}>Select All</button>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <select style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #EAEFEF", fontSize: "0.8rem" }}><option>Location</option></select>
+            <button className="su-ip-select-all-btn2" onClick={() => { const all = devices.flatMap(d => d.deviceIds); setSelectedDeviceIds(selectedDeviceIds.length === all.length ? [] : all); }}>Select All</button>
           </div>
         </div>
         {loadingDevices ? <div className="su-ip-empty">Loading…</div> : (
@@ -439,13 +439,13 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
               return (
                 <div key={s._id} className={`su-ip-store-card2 ${isSelected ? "su-ip-store-card2--sel" : ""}`} onClick={() => toggleStore(s._id)}>
                   <div className="su-ip-sicon"><FaStore size={16} /></div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <p className="su-ip-sname">{s.storeName} <span style={{color: isOnline ? "#16A34A" : "#DC2626", fontSize: 10}}>●</span></p>
-                    <p className="su-ip-sdev" style={{fontSize:'0.75rem',color:'#64848D',marginBottom:2}}>{s.name} ({s.serialNumber})</p>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p className="su-ip-sname">{s.storeName} <span style={{ color: isOnline ? "#16A34A" : "#DC2626", fontSize: 10 }}>●</span></p>
+                    <p className="su-ip-sdev" style={{ fontSize: '0.75rem', color: '#64848D', marginBottom: 2 }}>{s.name} ({s.serialNumber})</p>
                     <p className="su-ip-saddr">{s.address}</p>
-                    <p style={{fontSize:"0.7rem",fontWeight:700,color:isOnline ? "#16A34A" : "#DC2626",marginTop:4}}>{isOnline ? "Active" : "Offline"}</p>
+                    <p style={{ fontSize: "0.7rem", fontWeight: 700, color: isOnline ? "#16A34A" : "#DC2626", marginTop: 4 }}>{isOnline ? "Active" : "Offline"}</p>
                     {isSelected && editingPlaylist && (
-                      <button 
+                      <button
                         onClick={(e) => handleDisconnectDevice(e, s._id)}
                         disabled={disconnectingId === s._id}
                         style={{
@@ -490,13 +490,13 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
             </div>
             <div className="su-modal-body">
               {previewFile.type.startsWith('image/') ? (
-                <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{maxWidth:'100%', borderRadius:8}} />
+                <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{ maxWidth: '100%', borderRadius: 8 }} />
               ) : previewFile.type.startsWith('audio/') ? (
-                <audio src={URL.createObjectURL(previewFile)} controls style={{width:'100%'}} autoPlay />
+                <audio src={URL.createObjectURL(previewFile)} controls style={{ width: '100%' }} autoPlay />
               ) : previewFile.type.startsWith('video/') ? (
-                <video src={URL.createObjectURL(previewFile)} controls style={{maxWidth:'100%', borderRadius:8}} autoPlay />
+                <video src={URL.createObjectURL(previewFile)} controls style={{ maxWidth: '100%', borderRadius: 8 }} autoPlay />
               ) : (
-                <div style={{padding:40, textAlign:'center', color:'#64848D'}}>
+                <div style={{ padding: 40, textAlign: 'center', color: '#64848D' }}>
                   Preview not available for this file type ({previewFile.type})
                 </div>
               )}

@@ -50,19 +50,19 @@ export async function POST(req: NextRequest) {
       resolvedFiles = await Promise.all(files.map(async (file: any, index: number) => {
         let mediaDetails = { name: file.name, path: file.path, type: file.type };
         if (!file.path && (file.fileId || file._id || file.id)) {
-           const media = await MediaItem.findById(file.fileId || file._id || file.id);
-           if (media) {
-             mediaDetails.name = media.name;
-             mediaDetails.path = media.url || media.fileUrl;
-             mediaDetails.type = media.type;
-           }
+          const media = await MediaItem.findById(file.fileId || file._id || file.id);
+          if (media) {
+            mediaDetails.name = media.name;
+            mediaDetails.path = media.url || media.fileUrl;
+            mediaDetails.type = media.type;
+          }
         }
         let bgImage = file.backgroundImage || null;
         if (bgImage && mongoose.Types.ObjectId.isValid(bgImage)) {
-           const bgMedia = await MediaItem.findById(bgImage);
-           if (bgMedia) {
-             bgImage = bgMedia.url || bgMedia.fileUrl;
-           }
+          const bgMedia = await MediaItem.findById(bgImage);
+          if (bgMedia) {
+            bgImage = bgMedia.url || bgMedia.fileUrl;
+          }
         }
         return {
           ...file,
@@ -76,12 +76,12 @@ export async function POST(req: NextRequest) {
       resolvedFiles = await Promise.all(mediaIds.map(async (id: any, index: number) => {
         let mediaDetails = { name: undefined, path: undefined, type: undefined };
         if (id) {
-           const media = await MediaItem.findById(id);
-           if (media) {
-             mediaDetails.name = media.name;
-             mediaDetails.path = media.url || media.fileUrl;
-             mediaDetails.type = media.type;
-           }
+          const media = await MediaItem.findById(id);
+          if (media) {
+            mediaDetails.name = media.name;
+            mediaDetails.path = media.url || media.fileUrl;
+            mediaDetails.type = media.type;
+          }
         }
         return {
           fileId: id,
@@ -278,19 +278,19 @@ export async function PUT(req: NextRequest) {
       updateFields.files = await Promise.all(files.map(async (file: any, index: number) => {
         let mediaDetails = { name: file.name, path: file.path, type: file.type };
         if (!file.path && (file.fileId || file._id || file.id)) {
-           const media = await MediaItem.findById(file.fileId || file._id || file.id);
-           if (media) {
-             mediaDetails.name = media.name;
-             mediaDetails.path = media.url || media.fileUrl;
-             mediaDetails.type = media.type;
-           }
+          const media = await MediaItem.findById(file.fileId || file._id || file.id);
+          if (media) {
+            mediaDetails.name = media.name;
+            mediaDetails.path = media.url || media.fileUrl;
+            mediaDetails.type = media.type;
+          }
         }
         let bgImage = file.backgroundImage || null;
         if (bgImage && mongoose.Types.ObjectId.isValid(bgImage)) {
-           const bgMedia = await MediaItem.findById(bgImage);
-           if (bgMedia) {
-             bgImage = bgMedia.url || bgMedia.fileUrl;
-           }
+          const bgMedia = await MediaItem.findById(bgImage);
+          if (bgMedia) {
+            bgImage = bgMedia.url || bgMedia.fileUrl;
+          }
         }
         return {
           ...file,
@@ -304,12 +304,12 @@ export async function PUT(req: NextRequest) {
       updateFields.files = await Promise.all(mediaIds.map(async (mediaId: any, index: number) => {
         let mediaDetails = { name: undefined, path: undefined, type: undefined };
         if (mediaId) {
-           const media = await MediaItem.findById(mediaId);
-           if (media) {
-             mediaDetails.name = media.name;
-             mediaDetails.path = media.url || media.fileUrl;
-             mediaDetails.type = media.type;
-           }
+          const media = await MediaItem.findById(mediaId);
+          if (media) {
+            mediaDetails.name = media.name;
+            mediaDetails.path = media.url || media.fileUrl;
+            mediaDetails.type = media.type;
+          }
         }
         return {
           fileId: mediaId,
@@ -555,3 +555,6 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+
+
+

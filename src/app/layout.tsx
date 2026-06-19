@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import ChatWidget from "@/components/ChatWidget";
 
 export const metadata: Metadata = {
   title: "Iot Platform",
@@ -27,6 +28,7 @@ export default function RootLayout({
             duration: 3000,
           }}
         />
+        <ChatWidget />
       </body>
     </html>
   );

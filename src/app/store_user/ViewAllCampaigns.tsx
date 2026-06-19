@@ -60,7 +60,11 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this playlist?")) return;
     try {
-      await fetch(`/api/playlists?id=${id}`, { method: "DELETE" });
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+      await fetch(`/api/playlists?id=${id}`, { 
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
       setPlaylists(prev => prev.filter(p => (p._id || p.id) !== id));
     } catch {}
   };

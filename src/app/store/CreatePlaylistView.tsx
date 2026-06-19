@@ -224,7 +224,8 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
 
       // 2) Save Playlist Data
       const body = { userId, ...cfg, mediaIds: finalMediaIds };
-      const res = await fetch("/api/playlists", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+      const res = await fetch("/api/playlists", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify(body) });
       const data = await res.json();
       
       if (data.success) { 
