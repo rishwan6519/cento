@@ -1,0 +1,194 @@
+openapi: 3.0.0
+
+info:
+  title: Centelon IoT Platform API
+  version: 1.0.0
+  description: |
+    Centelon IoT Platform APIs
+    
+    Authentication Flow:
+    1. Call POST /auth/login
+    2. Copy the JWT token from the response
+    3. Click "Authorize" in Swagger UI
+    4. Enter: Bearer YOUR_TOKEN
+    5. Access protected APIs
+
+servers:
+  - url: https://iot.centelon.com/api
+    description: Production Server
+
+tags:
+  - name: Authentication
+    description: User authentication APIs
+  - name: Store Schedules
+    description: Store schedule management APIs
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login User
+      description: Authenticate user and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: store4
+                password:
+                  type: string
+                  example: your_password
+      responses:
+        '200':
+          description: Login Successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: login successful
+                  token:
+                    type: string
+                    example: JWT_TOKEN
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 69e9425426e6e857385b4fa6
+                      username:
+                        type: string
+                        example: store4
+                      role:
+                        type: string
+                        example: store
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Internal server error
+
+  /store-schedules:
+    get:
+      tags:
+        - Store Schedules
+      summary: Get Store Schedules
+      description: Retrieve all schedules associated with the authenticated store.
+      parameters:
+        - in: header
+          name: Authorization
+          description: "Bearer token for authentication (Format: Bearer <token>)"
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Schedules retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Schedules retrieved successfully
+                  storeDetails:
+                    type: object
+                    properties:
+                      storeName:
+                        type: string
+                        example: store4
+                      storeLocation:
+                        type: string
+                        example: testloc4
+                      operatorName:
+                        type: string
+                        example: ""
+                      phone:
+                        type: string
+                        example: ""
+                      email:
+                        type: string
+                        example: ""
+                      companyName:
+                        type: string
+                        example: ""
+                      location:
+                        type: string
+                        example: ""
+                  schedules:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: 6a15a607bbbbad7f5db71d1b
+                        name:
+                          type: string
+                          example: test-2
+                        devices:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                example: 69e5a3924defe183843d3d4f
+                              serialNumber:
+                                type: string
+                                example: test123
+                              name:
+                                type: string
+                                example: test device
+                        scheduleDays:
+                          type: array
+                          items:
+                            type: string
+                          example:
+                            - Mon
+                            - Tue
+                            - Wed
+                            - Thu
+                            - Fri
+                            - Sat
+                            - Sun
+                        startTime:
+                          type: string
+                          example: "00:00"
+                        endTime:
+                          type: string
+                          example: "23:59"
+                        startDate:
+                          type: string
+                          example: "2026-05-12"
+                        endDate:
+                          type: string
+                          example: "2026-06-26"
+                        allData:
+                          type: object
+                          description: Complete raw playlist configuration data
+        '401':
+          description: Unauthorized - Invalid or Missing Token
+        '404':
+          description: User Not Found
+        '500':
+          description: Internal Server Error

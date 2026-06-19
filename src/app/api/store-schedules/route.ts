@@ -5,19 +5,20 @@ import PlaylistConfig from "@/models/PlaylistConfig";
 import DevicePlaylist from "@/models/ConectPlaylist";
 import Device from "@/models/Device";
 import User from "@/models/User";
+import MediaItem from "@/models/MediaItems";
 
 export async function GET(request: Request) {
   try {
     const authorization = request.headers.get("authorization");
-    
+
     if (!authorization || !authorization.startsWith("Bearer ")) {
       return NextResponse.json({ message: "Unauthorized: No token provided" }, { status: 401 });
     }
-    
+
     const token = authorization.split(" ")[1];
-    
+
     await connectToDatabase();
-    
+
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
@@ -28,13 +29,13 @@ export async function GET(request: Request) {
     } catch (error) {
       return NextResponse.json({ message: "Unauthorized: Invalid token" }, { status: 401 });
     }
-    
+
     // Fetch the user to get store details
     const user = await User.findById(decoded.userId).lean();
     if (!user) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
-    
+
     const storeDetails = {
       storeName: (user as any).storeName || "",
       storeLocation: (user as any).storeLocation || "",
@@ -44,20 +45,34 @@ export async function GET(request: Request) {
       companyName: (user as any).companyName || "",
       location: (user as any).location || ""
     };
-    
+
     // Find all schedules (PlaylistConfig) for this user
-    const configs = await PlaylistConfig.find({ userId: decoded.userId }).lean();
-    
+    const configs = await PlaylistConfig.find({ userId: decoded.userId })
+      .populate({ path: 'files.mediaId', model: MediaItem })
+      .lean();
+
     const responseData = [];
-    
+
     for (const config of configs as any[]) {
+      // Map files to include the URL from the populated media item
+      if (config.files && Array.isArray(config.files)) {
+        config.files = config.files.map((file: any) => {
+          const url = file.mediaId?.url || file.path || "";
+          return {
+            ...file,
+            fileUrl: url,
+            url: url,
+            mediaId: file.mediaId?._id || file.mediaId
+          };
+        });
+      }
       // Try to find the device linked to this playlist
       const devicePlaylists = await DevicePlaylist.find({ playlistIds: config._id })
         .populate('deviceId')
         .lean();
-      
+
       const devices = [];
-      
+
       if (devicePlaylists && devicePlaylists.length > 0) {
         for (const dp of devicePlaylists) {
           const deviceId = dp.deviceId as any;
@@ -70,7 +85,7 @@ export async function GET(request: Request) {
           }
         }
       }
-      
+
       // Fallback: check config.deviceIds if no device playlists were found
       if (devices.length === 0 && config.deviceIds && config.deviceIds.length > 0) {
         const foundDevices = await Device.find({ _id: { $in: config.deviceIds } }).lean();
@@ -81,7 +96,7 @@ export async function GET(request: Request) {
             name: device.name || "N/A"
           });
         }
-        
+
         // If they are not object IDs but serial numbers directly stored in deviceIds
         if (foundDevices.length === 0) {
           for (const rawId of config.deviceIds) {
@@ -108,11 +123,11 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(
-      { 
+      {
         message: "Schedules retrieved successfully",
         storeDetails: storeDetails,
-        schedules: responseData 
-      }, 
+        schedules: responseData
+      },
       { status: 200 }
     );
 
