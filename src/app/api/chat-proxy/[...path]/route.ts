@@ -8,9 +8,14 @@ async function handleProxy(req: NextRequest, { params }: { params: Promise<{ pat
     const path = resolvedParams.path.join("/");
     const url = new URL(`${TARGET_BASE}/${path}${req.nextUrl.search}`);
     
-    // Forward headers but spoof origin
+    // Forward headers but sanitize them for the proxy fetch request
     const headers = new Headers(req.headers);
     headers.delete("host");
+    headers.delete("connection");
+    headers.delete("content-length"); // Let fetch calculate this automatically
+    headers.delete("transfer-encoding");
+    headers.delete("accept-encoding"); // Prevent compression issues
+    
     headers.set("origin", "https://smartagilehub.dev.centelon.com");
     headers.set("referer", "https://smartagilehub.dev.centelon.com/");
     
