@@ -65,15 +65,22 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
   };
   const getStatusColor = (s: string) => s === "Assigned" ? "#16A34A" : "#64848D";
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (p: any) => {
     if (!confirm("Delete this playlist?")) return;
     try {
+      const id = p._id || p.id;
+      const isAnn = !!p.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
-      await fetch(`/api/playlists?id=${id}`, {
+      
+      const endpoint = isAnn 
+        ? `/api/announcement/playlist/id?id=${id}` 
+        : `/api/playlists?id=${id}`;
+
+      await fetch(endpoint, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
-      setPlaylists(prev => prev.filter(p => (p._id || p.id) !== id));
+      setPlaylists(prev => prev.filter(item => (item._id || item.id) !== id));
     } catch { }
   };
 
@@ -153,7 +160,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                       <td>
                         <div className="su-vc-actions">
                           <button className="su-vc-action-btn su-vc-action-btn--edit" onClick={() => onEdit && onEdit(p)}><FaEdit size={12} /></button>
-                          <button className="su-vc-action-btn su-vc-action-btn--del" onClick={() => handleDelete(id)}><FaTrash size={11} /></button>
+                          <button className="su-vc-action-btn su-vc-action-btn--del" onClick={() => handleDelete(p)}><FaTrash size={11} /></button>
                         </div>
                       </td>
                     </tr>

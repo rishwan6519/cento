@@ -114,7 +114,10 @@ export async function POST(req: NextRequest) {
       status: status || 'active',
     });
 
-    return NextResponse.json({ playlist: newPlaylist }, { status: 201 });
+    return NextResponse.json({ 
+      message: 'Announcement playlist created successfully',
+      announcementPlaylistId: newPlaylist._id
+    }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating playlist:', error.message || error);
     return NextResponse.json({ error: 'Failed to create playlist' }, { status: 500 });
