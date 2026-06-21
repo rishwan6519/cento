@@ -33,11 +33,7 @@ export async function GET(req: NextRequest) {
     
     // 1. Fetch user's own playlists
     const ownPlaylists = await AnnouncementPlaylist.find({ userId: userObjectId })
-      .sort({ createdAt: -1 })
-      .populate({
-        path: 'announcements.file',
-        model: 'MediaItem', 
-      });
+      .sort({ createdAt: -1 });
 
     // 2. Fetch controller's playlists ONLY if they are actively connected to this user's devices
     let connectedControllerPlaylists: any[] = [];
@@ -64,9 +60,6 @@ export async function GET(req: NextRequest) {
           connectedControllerPlaylists = await AnnouncementPlaylist.find({
             _id: { $in: activePlaylistIds },
             userId: controllerId
-          }).populate({
-            path: 'announcements.file',
-            model: 'MediaItem',
           });
         }
       }
