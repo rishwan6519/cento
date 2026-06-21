@@ -3,8 +3,8 @@ import React, { useState, useEffect } from "react";
 import { FaEdit, FaTrash, FaPlus, FaSearch, FaArrowLeft } from "react-icons/fa";
 import { ViewKey } from "./page";
 
-interface Props { 
-  onNavigate: (view: ViewKey) => void; 
+interface Props {
+  onNavigate: (view: ViewKey) => void;
   onEdit?: (playlist: any) => void;
 }
 
@@ -18,11 +18,20 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
-    fetch(`/api/playlists?userId=${userId}`).then(r => r.json())
-      .then(data => {
-        const all = Array.isArray(data) ? data : (data.playlists || data.data || []);
+
+    Promise.all([
+      fetch(`/api/playlists?userId=${userId}`).then(r => r.json()).catch(() => []),
+      fetch(`/api/announcement/playlist?userId=${userId}`).then(r => r.json()).catch(() => [])
+    ])
+      .then(([playlistData, announcementData]) => {
+        const regularPlaylists = Array.isArray(playlistData) ? playlistData : (playlistData.playlists || playlistData.data || []);
+        const announcementPlaylists = Array.isArray(announcementData) ? announcementData : (announcementData.playlists || announcementData.data || []);
+
+        const all = [...regularPlaylists, ...announcementPlaylists].sort((a, b) =>
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
         setPlaylists(all);
-      }).catch(() => setPlaylists([]))
+      })
       .finally(() => setLoading(false));
   }, [userId]);
 
@@ -31,7 +40,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
     const type = (p.type || "").toLowerCase();
     if (filter === "media" && annTypes.some(t => type.includes(t.toLowerCase()))) return false;
     if (filter === "announcement" && !annTypes.some(t => type.includes(t.toLowerCase()))) return false;
-    
+
     // End Date Filter
     if (dateFilter && p.endDate) {
       const d = new Date(p.endDate);
@@ -42,7 +51,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
         const formattedPDate = `${pYear}-${pMonth}-${pDay}`;
         if (formattedPDate !== dateFilter) return false;
       } else {
-        return false; 
+        return false;
       }
     }
 
@@ -52,21 +61,20 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
 
   const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-AU') : "—";
   const getStatus = (p: any) => {
-    if (!p.endDate) return "Running";
-    return new Date(p.endDate) > new Date() ? "Running" : "Completed";
+    return p.isAssigned ? "Assigned" : "—";
   };
-  const getStatusColor = (s: string) => s === "Running" ? "#16A34A" : s === "Completed" ? "#A4B6B9" : "#F59E0B";
+  const getStatusColor = (s: string) => s === "Assigned" ? "#16A34A" : "#64848D";
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this playlist?")) return;
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
-      await fetch(`/api/playlists?id=${id}`, { 
+      await fetch(`/api/playlists?id=${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
       setPlaylists(prev => prev.filter(p => (p._id || p.id) !== id));
-    } catch {}
+    } catch { }
   };
 
   const showTypeColumn = filter === "all" || filter === "announcement";
@@ -114,10 +122,10 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
         ) : (
           <>
             <table className="su-vc-table">
-               <thead><tr>
-                 {showTypeColumn && <th>CAMPAIGN TYPE</th>}
-                 <th>NAME</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
-               </tr></thead>
+              <thead><tr>
+                {showTypeColumn && <th>CAMPAIGN TYPE</th>}
+                <th>NAME</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
+              </tr></thead>
               <tbody>
                 {filtered.map(p => {
                   const id = p._id || p.id;
@@ -125,26 +133,27 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                   const days = Array.isArray(p.daysOfWeek) ? p.daysOfWeek.join(",") : "";
                   const time = p.startTime && p.endTime ? `${p.startTime} to ${p.endTime}` : "";
                   const schedule = [days, time].filter(Boolean).join(" | ") || "—";
-                  const preview = p.mediaIds?.length ? `Display file link - uploaded by ${p.userId?.username || "user"}` : "—";
-                  const isAnn = ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
-                  
+                  const hasMedia = p.mediaIds?.length || p.announcements?.length;
+                  const preview = hasMedia ? `Display file link - uploaded by ${p.userId?.username || "user"}` : "—";
+                  const isAnn = !!p.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
+
                   return (
-                     <tr key={id}>
-                       {showTypeColumn && (
+                    <tr key={id}>
+                      {showTypeColumn && (
                         <td>
                           <span className={`su-vc-type-badge ${isAnn ? 'su-vc-type--ann' : 'su-vc-type--media'}`}>
                             {isAnn ? 'Announcement Playlist' : 'Media Playlist'}
                           </span>
                         </td>
-                       )}
-                       <td style={{fontWeight:600,color:"#162B30"}}>{p.name || "Playlist name"}</td>
+                      )}
+                      <td style={{ fontWeight: 600, color: "#162B30" }}>{p.name || "Playlist name"}</td>
                       <td>{schedule}</td>
-                      <td style={{fontSize:".8rem",color:"#64848D"}}>{preview}</td>
-                      <td><span className="su-vc-status" style={{color:getStatusColor(status),background:status==="Running"?"#F0FDF4":status==="Completed"?"#F8FAFB":"#FFFBEB"}}>{status}</span></td>
+                      <td style={{ fontSize: ".8rem", color: "#64848D" }}>{preview}</td>
+                      <td><span className="su-vc-status" style={{ color: getStatusColor(status), background: status === "Assigned" ? "#F0FDF4" : "transparent" }}>{status}</span></td>
                       <td>
                         <div className="su-vc-actions">
-                          <button className="su-vc-action-btn su-vc-action-btn--edit" onClick={() => onEdit && onEdit(p)}><FaEdit size={12}/></button>
-                          <button className="su-vc-action-btn su-vc-action-btn--del" onClick={()=>handleDelete(id)}><FaTrash size={11}/></button>
+                          <button className="su-vc-action-btn su-vc-action-btn--edit" onClick={() => onEdit && onEdit(p)}><FaEdit size={12} /></button>
+                          <button className="su-vc-action-btn su-vc-action-btn--del" onClick={() => handleDelete(id)}><FaTrash size={11} /></button>
                         </div>
                       </td>
                     </tr>

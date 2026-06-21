@@ -25,6 +25,7 @@ interface Schedule {
 export interface IAnnouncementPlaylist extends Document {
   userId: mongoose.Types.ObjectId;
   name: string;
+  type?: string;
   announcements: AnnouncementItem[]; // This now implicitly includes maxVolume
   schedule: Schedule;
   status: 'active' | 'inactive' | 'scheduled';
@@ -32,7 +33,7 @@ export interface IAnnouncementPlaylist extends Document {
 
 // 3. UPDATE THE MONGOOSE SCHEMA DEFINITION
 const announcementItemSchema = new Schema<AnnouncementItem>({
-  file: { type: mongoose.Schema.Types.ObjectId, ref: 'Announcement', required: true },
+  file: { type: mongoose.Schema.Types.ObjectId, ref: 'MediaItem', required: true },
   displayOrder: { type: Number, required: true },
   delay: { type: Number, required: true },
   maxVolume: { // <-- ADD THIS ENTIRE BLOCK
@@ -58,6 +59,7 @@ const scheduleSchema = new Schema<Schedule>({
 const playlistSchema = new Schema<IAnnouncementPlaylist>({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
+  type: { type: String, enum: ['announcement', 'offer', 'alert'], default: 'announcement' },
   announcements: [announcementItemSchema], // This array now uses the updated schema
   schedule: scheduleSchema,
   status: { type: String, enum: ['active', 'inactive', 'scheduled'], default: 'active' }

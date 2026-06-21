@@ -2,6 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 
+// GET: Fetch a single playlist by ID
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
+
+  if (!id) {
+    return NextResponse.json({ error: 'Missing playlist ID' }, { status: 400 });
+  }
+
+  try {
+    await connectToDatabase();
+    const playlist = await AnnouncementPlaylist.findById(id).populate({
+      path: 'announcements.file',
+      model: 'MediaItem', 
+    });
+
+    if (!playlist) {
+      return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ playlist }, { status: 200 });
+  } catch (error) {
+    console.error('Error fetching playlist:', error);
+    return NextResponse.json({ error: 'Failed to fetch playlist' }, { status: 500 });
+  }
+}
+
 // PUT: Update a playlist using query param ?id=...
 export async function PUT(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -12,13 +39,13 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, announcements, schedule, status } = body;
+  const { name, type, announcements, schedule, status } = body;
 
   try {
     await connectToDatabase();
     const updated = await AnnouncementPlaylist.findByIdAndUpdate(
       id,
-      { name, announcements, schedule, status },
+      { name, type, announcements, schedule, status },
       { new: true }
     );
 

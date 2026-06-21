@@ -232,13 +232,18 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
 
     Promise.all([
       fetch(`/api/playlists?userId=${userId}`).then(r => r.json()).catch(() => ([])),
-    ]).then(([playlistData]) => {
-      const allPlaylists = Array.isArray(playlistData) ? playlistData : (playlistData.playlists || playlistData.data || []);
-      const mediaPlaylists = allPlaylists.filter((p: any) => p.type !== 'announcement');
-      const announcementPlaylists = allPlaylists.filter((p: any) => p.type === 'announcement');
+      fetch(`/api/announcement/playlist?userId=${userId}`).then(r => r.json()).catch(() => ([]))
+    ]).then(([playlistData, announcementData]) => {
+      const regularPlaylists = Array.isArray(playlistData) ? playlistData : (playlistData.playlists || playlistData.data || []);
+      const announcementPlaylists = Array.isArray(announcementData) ? announcementData : (announcementData.playlists || announcementData.data || []);
+      
+      const allPlaylists = [...regularPlaylists, ...announcementPlaylists];
+      const mediaPlaylists = allPlaylists.filter((p: any) => p.type !== 'announcement' && p.type !== 'offer' && p.type !== 'alert');
+      const annPlaylists = allPlaylists.filter((p: any) => p.type === 'announcement' || p.type === 'offer' || p.type === 'alert');
+      
       setStats({
         playlists: mediaPlaylists.length,
-        announcements: announcementPlaylists.length,
+        announcements: annPlaylists.length,
       });
     }).finally(() => setLoadingStats(false));
   }, []);
@@ -472,8 +477,9 @@ export default function StoreUserPage() {
             onNavigate={handleNavigate}
             onEdit={(p: any) => {
               setEditingPlaylist(p);
-              if (p.type === "announcement") {
-                handleNavigate("createAnnouncementPlaylist");
+              const isAnn = !!p.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
+              if (isAnn) {
+                handleNavigate("createAnnouncement");
               } else {
                 handleNavigate("createMediaPlaylist");
               }

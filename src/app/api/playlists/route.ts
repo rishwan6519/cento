@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       globalMaxVolume,
       selectedDeviceId,
       description,
+      frequencyInMinutes,
     } = body;
 
     // Resolve type — accept either 'type' or 'category'
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
       daysOfWeek: daysOfWeek || [],
       globalMinVolume: globalMinVolume ?? 30,
       globalMaxVolume: globalMaxVolume ?? 80,
+      frequencyInMinutes: frequencyInMinutes ? Number(frequencyInMinutes) : null,
       selectedDeviceId: selectedDeviceId || null,
       deviceIds: deviceIds || [],
       description: description || '',
@@ -185,6 +187,37 @@ export async function POST(req: NextRequest) {
         for (const devId of devicesToConnect) {
           const existingConnection = await DevicePlaylist.findOne({ deviceId: devId });
           if (existingConnection) {
+            // Check for conflicts with existing media playlists
+            const existingPlaylists = await PlaylistConfig.find({
+              _id: { $in: existingConnection.playlistIds }
+            });
+
+            for (const ep of existingPlaylists) {
+              if (ep._id.toString() === playlist._id.toString()) continue;
+
+              const ns = playlist.startDate;
+              const ne = playlist.endDate;
+              const es = ep.startDate;
+              const ee = ep.endDate;
+              const datesOverlap = (!ns || !ee || ns <= ee) && (!es || !ne || es <= ne);
+
+              const nd = playlist.daysOfWeek || [];
+              const ed = ep.daysOfWeek || [];
+              const daysOverlap = nd.length === 0 || ed.length === 0 || nd.some((d: string) => ed.includes(d));
+
+              const nts = playlist.startTime;
+              const nte = playlist.endTime;
+              const ets = ep.startTime;
+              const ete = ep.endTime;
+              const timesOverlap = (!nts || !ete || nts < ete) && (!ets || !nte || ets < nte);
+
+              if (datesOverlap && daysOverlap && timesOverlap) {
+                return NextResponse.json({
+                  error: `Conflict alert: Device is already connected to an overlapping media playlist (${ep.name}). Disconnect the existing playlist and try again.`
+                }, { status: 409 });
+              }
+            }
+
             const currentPlaylistIds = existingConnection.playlistIds || [];
             const alreadyConnected = currentPlaylistIds.some(
               (pid: any) => pid.toString() === playlist._id.toString()
@@ -239,7 +272,8 @@ export async function PUT(req: NextRequest) {
       description,
       backgroundAudio,
       userId,
-      files
+      files,
+      frequencyInMinutes
     } = body;
 
     if (!id) {
@@ -257,6 +291,7 @@ export async function PUT(req: NextRequest) {
       daysOfWeek: daysOfWeek || [],
       globalMinVolume: globalMinVolume ?? 30,
       globalMaxVolume: globalMaxVolume ?? 80,
+      frequencyInMinutes: frequencyInMinutes ? Number(frequencyInMinutes) : null,
       selectedDeviceId: selectedDeviceId || null,
     };
 
@@ -410,6 +445,37 @@ export async function PUT(req: NextRequest) {
         for (const devId of devicesToConnect) {
           const existingConnection = await DevicePlaylist.findOne({ deviceId: devId });
           if (existingConnection) {
+            // Check for conflicts with existing media playlists
+            const existingPlaylists = await PlaylistConfig.find({
+              _id: { $in: existingConnection.playlistIds }
+            });
+
+            for (const ep of existingPlaylists) {
+              if (ep._id.toString() === playlist._id.toString()) continue;
+
+              const ns = playlist.startDate;
+              const ne = playlist.endDate;
+              const es = ep.startDate;
+              const ee = ep.endDate;
+              const datesOverlap = (!ns || !ee || ns <= ee) && (!es || !ne || es <= ne);
+
+              const nd = playlist.daysOfWeek || [];
+              const ed = ep.daysOfWeek || [];
+              const daysOverlap = nd.length === 0 || ed.length === 0 || nd.some((d: string) => ed.includes(d));
+
+              const nts = playlist.startTime;
+              const nte = playlist.endTime;
+              const ets = ep.startTime;
+              const ete = ep.endTime;
+              const timesOverlap = (!nts || !ete || nts < ete) && (!ets || !nte || ets < nte);
+
+              if (datesOverlap && daysOverlap && timesOverlap) {
+                return NextResponse.json({
+                  error: `Conflict alert: Device is already connected to an overlapping media playlist (${ep.name}). Disconnect the existing playlist and try again.`
+                }, { status: 409 });
+              }
+            }
+
             const currentPlaylistIds = existingConnection.playlistIds || [];
             const alreadyConnected = currentPlaylistIds.some(
               (pid: any) => pid.toString() === playlist._id.toString()
@@ -507,7 +573,16 @@ export async function GET(req: NextRequest) {
     const allPlaylists = [...ownPlaylists, ...connectedSuperUserPlaylists]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return NextResponse.json(allPlaylists);
+    // Check assignments
+    const allConnections = await DevicePlaylist.find().select('playlistIds');
+    const assignedIds = new Set(allConnections.flatMap(c => c.playlistIds.map((id: any) => id.toString())));
+    
+    const mappedPlaylists = allPlaylists.map(p => ({
+      ...p.toObject(),
+      isAssigned: assignedIds.has(p._id.toString())
+    }));
+
+    return NextResponse.json(mappedPlaylists);
   } catch (error) {
     console.error('Error fetching playlists:', error);
     return NextResponse.json(

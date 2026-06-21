@@ -18,6 +18,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [frequencyInMinutes, setFrequencyInMinutes] = useState("");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Tue", "Fri"]);
   const [volumeMin] = useState(30);
   const [volumeMax] = useState(80);
@@ -37,18 +38,28 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         return isNaN(date.getTime()) ? "" : date.toISOString().split('T')[0];
       };
 
+      // Support both PlaylistConfig and AnnouncementPlaylist structures
+      const schedule = editingPlaylist.schedule || {};
+      
       setPlaylistName(editingPlaylist.name || "");
       setAnnouncementType(editingPlaylist.type || "");
-      setStartDate(formatDate(editingPlaylist.startDate));
-      setEndDate(formatDate(editingPlaylist.endDate));
-      setStartTime(editingPlaylist.startTime || "");
-      setEndTime(editingPlaylist.endTime || "");
-      setSelectedDays(editingPlaylist.daysOfWeek || []);
+      setStartDate(formatDate(editingPlaylist.startDate || schedule.startDate));
+      setEndDate(formatDate(editingPlaylist.endDate || schedule.endDate));
+      setStartTime(editingPlaylist.startTime || schedule.startTime || "");
+      setEndTime(editingPlaylist.endTime || schedule.endTime || "");
+      setFrequencyInMinutes(editingPlaylist.frequencyInMinutes || schedule.frequency || "");
+      setSelectedDays(editingPlaylist.daysOfWeek || schedule.daysOfWeek || []);
+      
+      // Device IDs mapping (depends on how we fetch connections in ViewAllCampaigns)
       setSelectedDeviceIds(editingPlaylist.deviceIds || []);
 
-      if (editingPlaylist.files && editingPlaylist.files.length > 0) {
+      const items = editingPlaylist.announcements || editingPlaylist.files || [];
+      if (items.length > 0) {
         setMethod("library");
-        setSelectedLibraryId(editingPlaylist.files[0].fileId || editingPlaylist.files[0]._id);
+        // For AnnouncementPlaylist, the media ID is stored in item.file._id or item.file
+        // For PlaylistConfig, it's item.fileId or item._id
+        const mediaId = items.map((item: any) => item.file?._id || item.file || item.fileId || item._id);
+        setSelectedLibraryIds(mediaId);
       }
     }
   }, [editingPlaylist]);
@@ -72,7 +83,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
 
   // Library state
   const [libraryMedia, setLibraryMedia] = useState<any[]>([]);
-  const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(null);
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
 
@@ -194,7 +205,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
     if (method === 'upload') return selectedFiles.length > 0 ? 'Ready to upload' : 'Pending selection';
     if (method === 'record') return isRecordingSaved ? 'Recording saved' : isRecording ? 'Recording...' : 'Ready to record';
     if (method === 'tts') return isTtsSaved ? 'TTS saved' : isTtsGenerating ? 'Generating...' : ttsText ? 'Ready to generate' : 'Pending input';
-    if (method === 'library') return selectedLibraryId ? '1 item selected' : 'Pending selection';
+    if (method === 'library') return selectedLibraryIds.length > 0 ? `${selectedLibraryIds.length} item(s) selected` : 'Pending selection';
     return '';
   };
   const getMethodLabel = () => ({ upload: 'Upload new file', record: 'Record Audio', tts: 'Text to Speech', library: 'Library Selection' }[method]);
@@ -230,36 +241,82 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         const r = await fetch("/api/media/upload", { method: "POST", body: fd });
         const d = await r.json();
         if (d.success) mediaIds = d.files.map((f: any) => f._id || f.id);
-      } else if (method === "library" && selectedLibraryId) {
-        mediaIds = [selectedLibraryId];
+      } else if (method === "library" && selectedLibraryIds.length > 0) {
+        mediaIds = [...selectedLibraryIds];
       }
-      const body = {
+
+      // Convert edit data to keep previous media if no new media was provided
+      if (mediaIds.length === 0 && editingPlaylist?.announcements) {
+        mediaIds = editingPlaylist.announcements.map((a: any) => a.file._id || a.file);
+      }
+
+      const payload = {
         userId,
         name: playlistName,
         type: announcementType || "announcement",
-        startDate,
-        endDate,
-        startTime,
-        endTime,
-        daysOfWeek: selectedDays,
-        globalMinVolume: volumeMin,
-        globalMaxVolume: volumeMax,
-        deviceIds: selectedDeviceIds,
-        mediaIds,
-        id: editingPlaylist?._id || editingPlaylist?.id
+        announcements: mediaIds.map((id, index) => ({
+          file: id,
+          displayOrder: index + 1,
+          delay: 0,
+          maxVolume: volumeMax
+        })),
+        schedule: {
+          scheduleType: frequencyInMinutes ? 'hourly' : 'timed',
+          frequency: frequencyInMinutes ? Number(frequencyInMinutes) : undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          startTime: startTime || undefined,
+          endTime: endTime || undefined,
+          daysOfWeek: selectedDays.length > 0 ? selectedDays : undefined
+        },
+        status: 'active'
       };
+
+      const fetchUrl = editingPlaylist 
+        ? `/api/announcement/playlist/id?id=${editingPlaylist._id || editingPlaylist.id}`
+        : "/api/announcement/playlist";
       const fetchMethod = editingPlaylist ? "PUT" : "POST";
-      const res = await fetch("/api/playlists", {
+      
+      const res = await fetch(fetchUrl, {
         method: fetchMethod,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify(payload)
       });
+      
       const data = await res.json();
-      if (data.success) onNavigate("dashboard");
-    } catch { } finally { setSubmitting(false); }
+      
+      if (res.ok && data.playlist) {
+        // Assign to selected devices
+        const assignRes = await fetch("/api/announcement/assign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            deviceIds: selectedDeviceIds,
+            announcementPlaylistId: data.playlist._id
+          })
+        });
+        
+        const assignData = await assignRes.json();
+        
+        if (!assignRes.ok) {
+          alert(assignData.error || "Conflict occurred during assignment.");
+          // We don't navigate to dashboard if assignment failed due to conflict
+          return;
+        }
+        
+        onNavigate("dashboard");
+      } else {
+        alert(data.error || "Failed to save announcement");
+      }
+    } catch { 
+      alert("Error saving announcement");
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
-  const selectedStoreCount = devices.filter(s => s.deviceIds.every((id: string) => selectedDeviceIds.includes(id)) && s.deviceIds.length > 0).length;
+  const selectedStoreCount = devices.filter(s => s._id && selectedDeviceIds.includes(s._id)).length;
 
   const renderMethodContent = () => {
     if (method === 'record') return (
@@ -305,10 +362,10 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         {loadingLibrary ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9' }}>Loading library…</div>
           : libraryMedia.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9', border: '1px dashed #D6E6E9', borderRadius: 12 }}>No saved announcements found.</div>
             : libraryMedia.map(item => (
-              <div key={item._id} onClick={() => setSelectedLibraryId(item._id)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, cursor: 'pointer', border: `2px solid ${selectedLibraryId === item._id ? '#F05A28' : '#EAEFEF'}`, background: selectedLibraryId === item._id ? '#FFF8F5' : '#fff' }}>
+              <div key={item._id} onClick={() => setSelectedLibraryIds(p => p.includes(item._id) ? p.filter(id => id !== item._id) : [...p, item._id])} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, cursor: 'pointer', border: `2px solid ${selectedLibraryIds.includes(item._id) ? '#F05A28' : '#EAEFEF'}`, background: selectedLibraryIds.includes(item._id) ? '#FFF8F5' : '#fff' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FFF2F2', color: '#F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaVolumeUp size={16} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}><p style={{ fontWeight: 700, fontSize: '.85rem', color: '#162B30' }}>{item.name}</p><p style={{ fontSize: '.72rem', color: '#64848D' }}>{item.type || 'Uploaded'} • {item.duration || '0:45'}</p></div>
-                {selectedLibraryId === item._id && <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid #F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F05A28' }}><FaCheck size={10} /></div>}
+                {selectedLibraryIds.includes(item._id) && <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid #F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F05A28' }}><FaCheck size={10} /></div>}
               </div>
             ))}
       </div>
@@ -392,12 +449,14 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
                   <div className="su-ca-form-group"><label>End date</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
                   <div className="su-ca-form-group"><label>Start time</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
                   <div className="su-ca-form-group"><label>End time</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></div>
+                  <div className="su-ca-form-group"><label>Frequency (minutes)</label><input type="number" placeholder="e.g. 15" value={frequencyInMinutes} onChange={e => setFrequencyInMinutes(e.target.value)} min="1" /></div>
                 </>
               )}
               {isInstant && (
                 <>
                   <div className="su-ca-form-group"><label>End date (Optional)</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
                   <div className="su-ca-form-group"><label>End time (Optional)</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></div>
+                  <div className="su-ca-form-group"><label>Frequency (minutes)</label><input type="number" placeholder="e.g. 15" value={frequencyInMinutes} onChange={e => setFrequencyInMinutes(e.target.value)} min="1" /></div>
                 </>
               )}
             </div>

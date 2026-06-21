@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       .sort({ createdAt: -1 })
       .populate({
         path: 'announcements.file',
-        model: 'Announcement', 
+        model: 'MediaItem', 
       });
 
     // 2. Fetch controller's playlists ONLY if they are actively connected to this user's devices
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
             userId: controllerId
           }).populate({
             path: 'announcements.file',
-            model: 'Announcement',
+            model: 'MediaItem',
           });
         }
       }
@@ -76,7 +76,16 @@ export async function GET(req: NextRequest) {
     const allPlaylists = [...ownPlaylists, ...connectedControllerPlaylists]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return NextResponse.json({ playlists: allPlaylists }, { status: 200 });
+    // Check assignments
+    const allConnections = await DeviceAnnouncementConnection.find().select('announcementPlaylistIds');
+    const assignedIds = new Set(allConnections.flatMap(c => c.announcementPlaylistIds.map((id: any) => id.toString())));
+    
+    const mappedPlaylists = allPlaylists.map(p => ({
+      ...p.toObject(),
+      isAssigned: assignedIds.has(p._id.toString())
+    }));
+
+    return NextResponse.json({ playlists: mappedPlaylists }, { status: 200 });
   } catch (error: any) {
     console.error('Error fetching playlists:', error.message || error);
     return NextResponse.json({ error: 'Failed to fetch playlists' }, { status: 500 });
@@ -87,7 +96,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, name, announcements, schedule, status } = body;
+    const { userId, name, type, announcements, schedule, status } = body;
 
     if (!userId || !name || !Array.isArray(announcements) || !schedule) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -98,6 +107,7 @@ export async function POST(req: NextRequest) {
     const newPlaylist = await AnnouncementPlaylist.create({
       userId,
       name,
+      type: type || 'announcement',
       announcements,
       schedule,
       status: status || 'active',

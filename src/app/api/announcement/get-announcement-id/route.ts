@@ -185,28 +185,30 @@ export async function GET(req: NextRequest) {
     const melbourneTimeZone = 'Australia/Melbourne';
     const now = new Date();
 
-    // Get Melbourne time components
-    const melbourneTime = new Intl.DateTimeFormat('en-AU', {
+    // Use en-CA for reliable YYYY-MM-DD format
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
       timeZone: melbourneTimeZone,
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
+      day: '2-digit'
+    });
+    
+    // Use en-GB for reliable 24-hour HH:mm:ss format
+    const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: melbourneTimeZone,
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hour12: false
-    }).format(now);
-
-    // Parse Melbourne time components
-    const [datePart, timePart] = melbourneTime.split(', ');
-    const [day, month, year] = datePart.split('/');
-    const todayStr = `${year}-${month}-${day}`; // YYYY-MM-DD format
-    const currentTime = timePart; // HH:mm:ss format
+    });
 
     const weekDayFormatter = new Intl.DateTimeFormat('en-US', { 
       timeZone: melbourneTimeZone, 
       weekday: 'long' 
     });
+
+    const todayStr = dateFormatter.format(now);
+    const currentTime = timeFormatter.format(now);
     const todayWeekDay = weekDayFormatter.format(now).toLowerCase();
 
     // Step 4: Fetch all relevant playlists
@@ -231,7 +233,9 @@ export async function GET(req: NextRequest) {
 
       // Validation 2: Day of the week
       if (Array.isArray(schedule.daysOfWeek) && schedule.daysOfWeek.length > 0) {
-        if (!schedule.daysOfWeek.includes(todayWeekDay)) {
+        const validDays = schedule.daysOfWeek.map((d: string) => d.toLowerCase());
+        const isTodayValid = validDays.some((d: string) => todayWeekDay.startsWith(d));
+        if (!isTodayValid) {
           continue;
         }
       }

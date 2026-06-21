@@ -36,6 +36,7 @@ const playlistConfigSchema = new mongoose.Schema({
   selectedDeviceId: { type: mongoose.Schema.Types.Mixed, required: false },
   globalMinVolume: { type: Number, default: 30 },
   globalMaxVolume: { type: Number, default: 80 },
+  frequencyInMinutes: { type: Number, required: false },
   backgroundAudio: {
     enabled: { type: Boolean, default: false },
     file: { type: mongoose.Schema.Types.Mixed, default: null },
