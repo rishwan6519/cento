@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import mongoose from 'mongoose';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
-import Announcement from '@/models/AnnouncementFiles';
+import MediaItem from '@/models/MediaItems';
 
 export async function GET(req: NextRequest) {
   let playlistId: string | null = null;
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     const playlist = await AnnouncementPlaylist.findById(playlistId).populate({
       path: 'announcements.file',
-      model: Announcement,
+      model: MediaItem,
     });
 
     if (!playlist) {
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         if (!ann.file) return null;
         return {
           name: ann.file.name,
-          path: `https://iot.centelon.com${ann.file.path}`,
+          path: `https://iot.centelon.com${ann.file.url}`,
           displayOrder: ann.displayOrder,
           delay: ann.delay,
         };
