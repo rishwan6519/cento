@@ -13,10 +13,7 @@ export async function GET(req: NextRequest) {
 
   try {
     await connectToDatabase();
-    const playlist = await AnnouncementPlaylist.findById(id).populate({
-      path: 'announcements.file',
-      model: 'MediaItem', 
-    });
+    const playlist = await AnnouncementPlaylist.findById(id);
 
     if (!playlist) {
       return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });

@@ -215,14 +215,14 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
     if (selectedDeviceIds.length === 0) return;
     setSubmitting(true);
     try {
-      let mediaIds: string[] = [];
+      let mediaUrls: string[] = [];
       if (method === "upload" && selectedFiles.length > 0) {
         const fd = new FormData();
         fd.append("userId", userId); fd.append("userRole", "store");
         selectedFiles.forEach((f, i) => { fd.append(`files[${i}]`, f); fd.append(`fileNames[${i}]`, f.name); });
         const r = await fetch("/api/media/upload", { method: "POST", body: fd });
         const d = await r.json();
-        if (d.success) mediaIds = d.files.map((f: any) => f._id || f.id);
+        if (d.success) mediaUrls = d.files.map((f: any) => f.url);
       } else if (method === "record" && recordedBlob && isRecordingSaved) {
         const fd = new FormData();
         fd.append("userId", userId); fd.append("userRole", "store");
@@ -231,7 +231,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         fd.append('fileNames[0]', fn);
         const r = await fetch("/api/media/upload", { method: "POST", body: fd });
         const d = await r.json();
-        if (d.success) mediaIds = d.files.map((f: any) => f._id || f.id);
+        if (d.success) mediaUrls = d.files.map((f: any) => f.url);
       } else if (method === "tts" && ttsBlob && isTtsSaved) {
         const fd = new FormData();
         fd.append("userId", userId); fd.append("userRole", "store");
@@ -240,22 +240,26 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         fd.append('fileNames[0]', fn);
         const r = await fetch("/api/media/upload", { method: "POST", body: fd });
         const d = await r.json();
-        if (d.success) mediaIds = d.files.map((f: any) => f._id || f.id);
+        if (d.success) mediaUrls = d.files.map((f: any) => f.url);
       } else if (method === "library" && selectedLibraryIds.length > 0) {
-        mediaIds = [...selectedLibraryIds];
+        // Map selected library IDs to their corresponding URLs
+        mediaUrls = selectedLibraryIds.map(id => {
+          const item = libraryMedia.find((m: any) => (m._id || m.id) === id);
+          return item ? item.url : id;
+        });
       }
 
       // Convert edit data to keep previous media if no new media was provided
-      if (mediaIds.length === 0 && editingPlaylist?.announcements) {
-        mediaIds = editingPlaylist.announcements.map((a: any) => a.file._id || a.file);
+      if (mediaUrls.length === 0 && editingPlaylist?.announcements) {
+        mediaUrls = editingPlaylist.announcements.map((a: any) => a.file);
       }
 
       const payload = {
         userId,
         name: playlistName,
         type: announcementType || "announcement",
-        announcements: mediaIds.map((id, index) => ({
-          file: id,
+        announcements: mediaUrls.map((url, index) => ({
+          file: url,
           displayOrder: index + 1,
           delay: 0,
           maxVolume: volumeMax

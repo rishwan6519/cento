@@ -20,22 +20,19 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    const playlist = await AnnouncementPlaylist.findById(playlistId).populate({
-      path: 'announcements.file',
-      model: MediaItem,
-    });
+    const playlist = await AnnouncementPlaylist.findById(playlistId);
 
     if (!playlist) {
       return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
     }
 
-    // Format the announcements with file info
+    // Format the announcements using the direct URL stored in the `file` field
     const formattedAnnouncements = playlist.announcements
       .map((ann: any) => {
         if (!ann.file) return null;
         return {
-          name: ann.file.name,
-          path: `https://iot.centelon.com${ann.file.url}`,
+          name: ann.name || "Announcement", // Fallback name
+          path: `https://iot.centelon.com${ann.file}`, // ann.file is now the URL string
           displayOrder: ann.displayOrder,
           delay: ann.delay,
         };

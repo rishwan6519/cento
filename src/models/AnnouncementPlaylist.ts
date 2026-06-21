@@ -4,7 +4,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 // 1. UPDATE THE TYPESCRIPT INTERFACE
 interface AnnouncementItem {
-  file: mongoose.Types.ObjectId;
+  file: string;
   displayOrder: number;
   delay: number;
   maxVolume: number; // <-- ADD THIS LINE
@@ -33,7 +33,7 @@ export interface IAnnouncementPlaylist extends Document {
 
 // 3. UPDATE THE MONGOOSE SCHEMA DEFINITION
 const announcementItemSchema = new Schema<AnnouncementItem>({
-  file: { type: mongoose.Schema.Types.ObjectId, ref: 'MediaItem', required: true },
+  file: { type: String, required: true },
   displayOrder: { type: Number, required: true },
   delay: { type: Number, required: true },
   maxVolume: { // <-- ADD THIS ENTIRE BLOCK
