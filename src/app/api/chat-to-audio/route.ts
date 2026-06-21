@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
         audioUrl,
         filename,
         message: "Audio generated and saved successfully.",
-        playdemo: `https://iot.centelon.com/${audioUrl}`
+        playdemo: `https://iot.centelon.com${audioUrl}`
       },
       { status: 200 }
     );
