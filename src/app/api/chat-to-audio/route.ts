@@ -117,7 +117,6 @@ export async function POST(req: NextRequest) {
     const sanitizedUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "");
     const uploadDir = path.join(
       process.cwd(),
-      "public",
       "uploads",
       sanitizedUserId,
       "aiaudio"
