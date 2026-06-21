@@ -70,13 +70,21 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Check assignments
-    const allConnections = await DeviceAnnouncementConnection.find().select('announcementPlaylistIds');
+    const allConnections = await DeviceAnnouncementConnection.find().select('announcementPlaylistIds deviceId');
     const assignedIds = new Set(allConnections.flatMap(c => c.announcementPlaylistIds.map((id: any) => id.toString())));
     
-    const mappedPlaylists = allPlaylists.map(p => ({
-      ...p.toObject(),
-      isAssigned: assignedIds.has(p._id.toString())
-    }));
+    const mappedPlaylists = allPlaylists.map(p => {
+      const pIdStr = p._id.toString();
+      const deviceIds = allConnections
+        .filter(c => c.announcementPlaylistIds.some((id: any) => id.toString() === pIdStr))
+        .map(c => c.deviceId.toString());
+
+      return {
+        ...p.toObject(),
+        isAssigned: assignedIds.has(pIdStr),
+        deviceIds
+      };
+    });
 
     return NextResponse.json({ playlists: mappedPlaylists }, { status: 200 });
   } catch (error: any) {

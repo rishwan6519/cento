@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 
+import DeviceAnnouncementConnection from '@/models/AnnouncementConnection';
+
 // GET: Fetch a single playlist by ID
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -73,6 +75,12 @@ export async function DELETE(req: NextRequest) {
     if (!deleted) {
       return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
     }
+
+    // Also remove this playlist from any assigned devices
+    await DeviceAnnouncementConnection.updateMany(
+      { announcementPlaylistIds: id },
+      { $pull: { announcementPlaylistIds: id } }
+    );
 
     return NextResponse.json({ message: 'Playlist deleted' }, { status: 200 });
   } catch (error) {
