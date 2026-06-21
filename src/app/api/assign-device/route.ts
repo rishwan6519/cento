@@ -11,10 +11,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const customerId = searchParams.get('customerId');
-   console.log('User ID:', userId);
-    
+    console.log('User ID:', userId);
+
     const assignedBy = searchParams.get('assignedBy');
-    
+
     if (!userId && !customerId && !assignedBy) {
       return NextResponse.json({
         success: false,
@@ -31,11 +31,11 @@ export async function GET(request: Request) {
       // Find all users (stores) belonging to this customer
       const customerUsers = await User.find({ customerId }).select('_id');
       const userIds = customerUsers.map(u => u._id);
-      
+
       // Find all devices belonging to this customer
       const customerDevices = await Device.find({ customerId }).select('_id');
       const deviceIds = customerDevices.map(d => d._id);
-      
+
       query.$or = [
         { userId: { $in: userIds } },
         { deviceId: { $in: deviceIds } }
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         populate: {
           path: 'typeId',
           model: DeviceType,
-          select: 'name blcockCodingEnabled handMovements bodyMovements screenSize'
+          select: 'name type '
         }
       })
       .populate({
@@ -60,15 +60,15 @@ export async function GET(request: Request) {
       });
 
 
-console.log('Assignments:', assignments);
- 
-    
+    console.log('Assignments:', assignments);
+
+
     if (!assignments || assignments.length === 0) {
       return NextResponse.json({
         success: false,
         message: 'No assigned devices found for this user'
 
-        
+
       },);
     }
 
@@ -89,9 +89,9 @@ export async function POST(request: Request) {
   try {
     await connectToDatabase();
     const body = await request.json();
-    
+
     const { userId, deviceId, assignedBy, status } = body;
-    
+
     // Validate device exists
     const device = await Device.findById(deviceId);
     if (!device) {

@@ -529,7 +529,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
           {/* Select Stores - Real devices */}
           <div className="store-form-group store-form-group--full mt-4">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div><label style={{ fontSize: '.95rem', fontWeight: 700 }}>Select stores</label><p style={{ fontSize: '.78rem', color: '#64848D', marginTop: 4 }}>Choose which store will play this playlist</p></div>
+              <div><label style={{ fontSize: '.95rem', fontWeight: 700 }}>Select Device</label><p style={{ fontSize: '.78rem', color: '#64848D', marginTop: 4 }}>Choose which store will play this playlist</p></div>
               {devices.length > 0 && <button style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid #F05A28', color: '#F05A28', background: '#fff', fontWeight: 600, fontSize: '.8rem', cursor: 'pointer' }} onClick={() => { const all = devices.flatMap(d => d.deviceIds); setSelectedDeviceIds(selectedDeviceIds.length === all.length ? [] : all); }}>Select All</button>}
             </div>
             {loadingDevices ? <div style={{ padding: 24, textAlign: 'center', color: '#A4B6B9' }}>Loading stores…</div>
@@ -568,7 +568,6 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                     </div>);
                   })}
                 </div>}
-            {selectedDeviceIds.length > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#F0FDF4', borderRadius: 8, border: '1px dashed #BBF7D0', marginTop: 14 }}><div><p style={{ fontWeight: 700, fontSize: '.85rem', color: '#166534' }}>{selectedDeviceIds.length} device(s) selected</p><p style={{ fontSize: '.75rem', color: '#64848D' }}>Ready to push playlist</p></div><button style={{ border: 'none', background: 'none', color: '#F05A28', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }} onClick={() => setSelectedDeviceIds([])}>Clear</button></div>}
           </div>
 
           <div className="store-form-actions">

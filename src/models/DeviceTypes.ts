@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 
 export interface DeviceTypeDocument extends Document {
   name: string;
+  type: 'audio' | 'video';
   imageUrl: string;
   handMovements?: string[];
   bodyMovements?: string[];
@@ -16,6 +17,11 @@ const deviceTypeSchema = new mongoose.Schema({
   name: { 
     type: String, 
     required: true 
+  },
+  type: {
+    type: String,
+    enum: ['audio', 'video'],
+    default: 'audio'
   },
   imageUrl: { 
     type: String, 
