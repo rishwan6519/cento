@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import fs from "fs";
 import { connectToDatabase } from "@/lib/db";
-import Announcement from "@/models/AnnouncementFiles";
+import MediaItemModel from "@/models/MediaItems";
 import mongoose from "mongoose";
 
 /**
  * POST /api/chat-to-audio
  *
  * Receives a text message (chat), converts it to audio using OpenAI TTS,
- * saves the audio file to /public/uploads/{userId}/aiaudio/,
- * creates an AnnouncementFiles record so it appears in the user's available files,
+ * saves the audio file to /uploads/{userId}/audio/,
+ * creates a MediaItem record so it appears in the user's library,
  * and returns the public URL of the generated audio.
  *
  * Request Body:
@@ -21,7 +21,7 @@ import mongoose from "mongoose";
  *   - success:  boolean
  *   - audioUrl: string — Public URL to access the generated audio
  *   - filename: string — Name of the saved audio file
- *   - announcement: object — The saved AnnouncementFiles record
+ *   - mediaItem: object — The saved MediaItem record
  */
 
 // ── Default OpenAI TTS settings (best quality) ───────────────────────────
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
       process.cwd(),
       "uploads",
       sanitizedUserId,
-      "aiaudio"
+      "audio"
     );
 
     // Create directory if it doesn't exist
@@ -143,23 +143,22 @@ export async function POST(req: NextRequest) {
     console.log(`[chat-to-audio] Audio saved: ${filePath}`);
 
     // ── Build public URL ──────────────────────────────────────────────────
-    const audioUrl = `/uploads/${sanitizedUserId}/aiaudio/${filename}`;
+    const audioUrl = `/uploads/${sanitizedUserId}/audio/${filename}`;
 
-    // ── Save to AnnouncementFiles collection ──────────────────────────────
-    // This makes the audio file appear in the user's announcement available files
+    // ── Save to MediaItem collection ──────────────────────────────────────
+    // This makes the audio file appear in the user's library (available files)
     const displayName = `AI Audio - ${text.trim().substring(0, 50)}${text.length > 50 ? "..." : ""}`;
 
-    const announcement = await Announcement.create({
+    const mediaItem = await MediaItemModel.create({
       userId: new mongoose.Types.ObjectId(sanitizedUserId),
       name: displayName,
-      path: audioUrl,
-      type: "tts",
-      voice: DEFAULT_VOICE,
+      type: "audio",
+      url: audioUrl,
       createdAt: new Date(),
     });
 
     console.log(
-      `[chat-to-audio] AnnouncementFiles record created: ${announcement._id}`
+      `[chat-to-audio] MediaItem record created: ${mediaItem._id}`
     );
 
     return NextResponse.json(
