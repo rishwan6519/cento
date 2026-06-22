@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
         const storePlaylists = await DevicePlaylist.find({
           deviceId: { $in: storeUserIds }
         }, 'playlistIds');
-        
+
         storePlaylists.forEach((curr: any) => {
           if (curr.playlistIds) {
             curr.playlistIds.forEach((pid: any) => {
@@ -303,7 +303,7 @@ export async function GET(req: NextRequest) {
             maxVolume: file.maxVolume,
             minVolume: file.minVolume,
             backgroundImageEnabled: file.backgroundImageEnabled,
-            backgroundImage: file.backgroundImage,
+            backgroundImage: `https://iot.centelon.com${file.backgroundImage}`,
           };
         }),
       };
