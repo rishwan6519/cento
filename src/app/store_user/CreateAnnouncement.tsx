@@ -84,7 +84,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const [libraryMedia, setLibraryMedia] = useState<any[]>([]);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
-  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewFile, setPreviewFile] = useState<any>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -253,6 +253,55 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
         mediaUrls = editingPlaylist.announcements.map((a: any) => a.file);
       }
 
+      if (mediaUrls.length === 0) {
+        alert("Please select or upload at least one file.");
+        return;
+      }
+
+      // ========== INSTANT ANNOUNCEMENT FLOW ==========
+      if (isInstant) {
+        const audioUrl = mediaUrls[0]; // Use the first file for instant
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const deviceId of selectedDeviceIds) {
+          // Find the device's serial number
+          const device = devices.find((d: any) => d._id === deviceId);
+          const serialNumber = device?.serialNumber;
+          if (!serialNumber || serialNumber === "N/A") {
+            failCount++;
+            continue;
+          }
+
+          const sendRes = await fetch("/api/instant-announcement/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              deviceId: serialNumber,
+              audioUrl,
+              announcementName: playlistName || "Instant Announcement"
+            })
+          });
+
+          const sendData = await sendRes.json();
+          if (sendRes.ok && sendData.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        }
+
+        if (successCount > 0) {
+          alert(`Instant announcement broadcast to ${successCount} device(s)${failCount > 0 ? ` (${failCount} failed)` : ''}`);
+          onNavigate("dashboard");
+        } else {
+          alert("Failed to broadcast instant announcement to any device.");
+        }
+        return;
+      }
+
+      // ========== REGULAR ANNOUNCEMENT FLOW ==========
       const payload = {
         userId,
         name: playlistName,
@@ -459,13 +508,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
                   <div className="su-ca-form-group"><label>Frequency (minutes)</label><input type="number" placeholder="e.g. 15" value={frequencyInMinutes} onChange={e => setFrequencyInMinutes(e.target.value)} min="1" /></div>
                 </>
               )}
-              {isInstant && (
-                <>
-                  <div className="su-ca-form-group"><label>End date (Optional)</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
-                  <div className="su-ca-form-group"><label>End time (Optional)</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></div>
-                  <div className="su-ca-form-group"><label>Frequency (minutes)</label><input type="number" placeholder="e.g. 15" value={frequencyInMinutes} onChange={e => setFrequencyInMinutes(e.target.value)} min="1" /></div>
-                </>
-              )}
+
             </div>
             {!isInstant && (
               <div className="su-ca-form-group su-ca-form-group--full" style={{ marginTop: 20 }}>
@@ -558,16 +601,28 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
               <button className="su-modal-close" onClick={() => setPreviewFile(null)}>×</button>
             </div>
             <div className="su-modal-body">
-              {previewFile.type.startsWith('image/') ? (
-                <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{ maxWidth: '100%', borderRadius: 8 }} />
-              ) : previewFile.type.startsWith('audio/') ? (
-                <audio src={URL.createObjectURL(previewFile)} controls style={{ width: '100%' }} autoPlay />
-              ) : previewFile.type.startsWith('video/') ? (
-                <video src={URL.createObjectURL(previewFile)} controls style={{ maxWidth: '100%', borderRadius: 8 }} autoPlay />
+              {previewFile instanceof File ? (
+                // Browser File object (from upload)
+                previewFile.type.startsWith('image/') ? (
+                  <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{ maxWidth: '100%', borderRadius: 8 }} />
+                ) : previewFile.type.startsWith('audio/') ? (
+                  <audio src={URL.createObjectURL(previewFile)} controls style={{ width: '100%' }} autoPlay />
+                ) : previewFile.type.startsWith('video/') ? (
+                  <video src={URL.createObjectURL(previewFile)} controls style={{ maxWidth: '100%', borderRadius: 8 }} autoPlay />
+                ) : (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#64848D' }}>Preview not available</div>
+                )
               ) : (
-                <div style={{ padding: 40, textAlign: 'center', color: '#64848D' }}>
-                  Preview not available for this file type ({previewFile.type})
-                </div>
+                // Library item (API object with .url and .type)
+                (previewFile.type || '').includes('image') ? (
+                  <img src={previewFile.url} alt="Preview" style={{ maxWidth: '100%', borderRadius: 8 }} />
+                ) : (previewFile.type || '').includes('audio') ? (
+                  <audio src={previewFile.url} controls style={{ width: '100%' }} autoPlay />
+                ) : (previewFile.type || '').includes('video') ? (
+                  <video src={previewFile.url} controls style={{ maxWidth: '100%', borderRadius: 8 }} autoPlay />
+                ) : (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#64848D' }}>Preview not available</div>
+                )
               )}
             </div>
           </div>
