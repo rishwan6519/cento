@@ -303,7 +303,7 @@ export async function GET(req: NextRequest) {
             maxVolume: file.maxVolume,
             minVolume: file.minVolume,
             backgroundImageEnabled: file.backgroundImageEnabled,
-            backgroundImage: `https://iot.centelon.com${file.backgroundImage}`,
+            backgroundImage: file.backgroundImage && file.backgroundImage !== 'null' ? `https://iot.centelon.com${file.backgroundImage}` : null,
           };
         }),
       };

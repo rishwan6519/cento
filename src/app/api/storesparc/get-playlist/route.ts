@@ -75,7 +75,7 @@ export async function GET(req: Request) {
             maxVolume: file.maxVolume,
             minVolume: file.minVolume,
             backgroundImageEnabled: file.backgroundImageEnabled,
-            backgroundImage: file.backgroundImage,
+            backgroundImage: file.backgroundImage && file.backgroundImage !== 'null' ? `https://iot.centelon.com${file.backgroundImage}` : null,
           };
         }),
       },
