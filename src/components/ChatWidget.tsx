@@ -11,7 +11,7 @@ export default function ChatWidget() {
 
   useEffect(() => {
     const allowedRoles = ["reseller", "account", "admin", "marketing", "store_user", "store"];
-    
+
     if (role && allowedRoles.some(r => role.toLowerCase().includes(r))) {
       // Prevent adding the script multiple times
       if (document.getElementById("store-sparc-chat-widget-script")) return;
@@ -32,7 +32,7 @@ export default function ChatWidget() {
             embedToken: "pk_robotics_d9b89cfeb97c5fbb0a1f1c5115c991cbd3a44050b85e5c5f",
             title: "StoreSPARC Assistant",
             greeting: "Hi! 👋 Ask me about StoreSPARC Multimedia — pricing, plans, features.",
-            suggestions: ["How much does it cost?", "Annual vs Monthly?", "Book a demo"],
+            suggestions: ["Schedule a Playlist", "Schedule an Announcement", "Play an Instant Announcement"],
             accentColor: "#0066CC"
           });
           console.log("Chat widget initialized successfully");
