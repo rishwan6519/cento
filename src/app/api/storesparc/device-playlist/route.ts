@@ -40,31 +40,35 @@ export async function GET(req: NextRequest) {
     );
     const connectedPlaylistIds = devicePlaylists?.playlistIds || [];
 
-    // Step 3: Get current time in Melbourne timezone (HH:mm:ss format)
-    const melbourneFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Australia/Melbourne',
-      hour12: false,
+    // Step 3: Get current time, date, and day in Melbourne
+    const melbourneTimeZone = 'Australia/Melbourne';
+    const now = new Date();
+
+    // Use en-CA for reliable YYYY-MM-DD format
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: melbourneTimeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    
+    // Use en-GB for reliable 24-hour HH:mm:ss format
+    const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: melbourneTimeZone,
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     });
-    const currentTime = melbourneFormatter.format(new Date());
 
-    // Step 4: Get today's date and weekday in Melbourne
-    const melbourneNow = new Date(
-      new Date().toLocaleString('en-US', { timeZone: 'Australia/Melbourne' })
-    );
-    const todayStr = melbourneNow.toISOString().slice(0, 10); // 'YYYY-MM-DD'
-    const weekDays = [
-      'sunday',
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday'
-    ];
-    const todayWeekDay = weekDays[melbourneNow.getDay()];
+    const currentTime = timeFormatter.format(now);
+    const todayStr = dateFormatter.format(now);
+
+    // Get the correct weekday for Melbourne
+    const weekdayFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: melbourneTimeZone,
+      weekday: 'long'
+    });
+    const todayWeekDay = weekdayFormatter.format(now).toLowerCase();
 
     // Step 5: Fetch all playlists (from both DevicePlaylist and directly from PlaylistConfig references)
     const deviceIdStr = device._id.toString();
