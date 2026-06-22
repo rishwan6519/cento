@@ -133,7 +133,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
 
     setDisconnectingId(deviceId);
     try {
-      const res = await fetch('/api/playlists/disconnect', {
+      const res = await fetch('/api/announcement/disconnect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -369,6 +369,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
               <div key={item._id} onClick={() => setSelectedLibraryIds(p => p.includes(item._id) ? p.filter(id => id !== item._id) : [...p, item._id])} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, cursor: 'pointer', border: `2px solid ${selectedLibraryIds.includes(item._id) ? '#F05A28' : '#EAEFEF'}`, background: selectedLibraryIds.includes(item._id) ? '#FFF8F5' : '#fff' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FFF2F2', color: '#F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaVolumeUp size={16} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}><p style={{ fontWeight: 700, fontSize: '.85rem', color: '#162B30' }}>{item.name}</p><p style={{ fontSize: '.72rem', color: '#64848D' }}>{item.type || 'Uploaded'} • {item.duration || '0:45'}</p></div>
+                <button className="su-ca-file-btn" style={{ marginRight: selectedLibraryIds.includes(item._id) ? 8 : 0 }} onClick={(e) => { e.stopPropagation(); setPreviewFile(item); }}><FaEye size={12} /></button>
                 {selectedLibraryIds.includes(item._id) && <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid #F05A28', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F05A28' }}><FaCheck size={10} /></div>}
               </div>
             ))}
@@ -506,7 +507,10 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
                     <p className="su-ip-sname">{s.storeName} <span style={{ color: isOnline ? "#16A34A" : "#DC2626", fontSize: 10 }}>●</span></p>
                     <p className="su-ip-sdev" style={{ fontSize: '0.75rem', color: '#64848D', marginBottom: 2 }}>{s.name} ({s.serialNumber})</p>
                     <p className="su-ip-saddr">{s.address}</p>
-                    <p style={{ fontSize: "0.7rem", fontWeight: 700, color: isOnline ? "#16A34A" : "#DC2626", marginTop: 4 }}>{isOnline ? "Active" : "Offline"}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <p style={{ fontSize: "0.7rem", fontWeight: 700, color: isOnline ? "#16A34A" : "#DC2626", margin: 0 }}>{isOnline ? "Active" : "Offline"}</p>
+                      {isSelected && editingPlaylist && <span style={{ background: '#dcfce7', color: '#16a34a', padding: '2px 6px', borderRadius: 4, fontSize: '0.65rem', fontWeight: 600 }}>Assigned</span>}
+                    </div>
                     {isSelected && editingPlaylist && (
                       <button
                         onClick={(e) => handleDisconnectDevice(e, s._id)}
