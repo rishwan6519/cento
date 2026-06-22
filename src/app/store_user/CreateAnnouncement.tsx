@@ -546,7 +546,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
           <div><h3 className="su-ca-section-title">Select stores</h3><p className="su-ca-stores-sub">Choose which store will play this announcement</p></div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <select style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #EAEFEF", fontSize: "0.8rem" }}><option>Location</option></select>
-            <button className="su-ip-select-all-btn2" onClick={() => { const all = devices.flatMap(d => d.deviceIds); setSelectedDeviceIds(selectedDeviceIds.length === all.length ? [] : all); }}>Select All</button>
+            <button className="su-ip-select-all-btn2" onClick={(e) => { e.preventDefault(); const all = devices.map(d => d._id); setSelectedDeviceIds(selectedDeviceIds.length === all.length ? [] : all); }}>Select All</button>
           </div>
         </div>
         {loadingDevices ? <div className="su-ip-empty">Loading…</div> : (

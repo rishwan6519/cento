@@ -530,7 +530,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
           <div className="store-form-group store-form-group--full mt-4">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div><label style={{ fontSize: '.95rem', fontWeight: 700 }}>Select Device</label><p style={{ fontSize: '.78rem', color: '#64848D', marginTop: 4 }}>Choose which store will play this playlist</p></div>
-              {devices.length > 0 && <button style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid #F05A28', color: '#F05A28', background: '#fff', fontWeight: 600, fontSize: '.8rem', cursor: 'pointer' }} onClick={() => { const all = devices.flatMap(d => d.deviceIds); setSelectedDeviceIds(selectedDeviceIds.length === all.length ? [] : all); }}>Select All</button>}
+              {devices.length > 0 && <button style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid #F05A28', color: '#F05A28', background: '#fff', fontWeight: 600, fontSize: '.8rem', cursor: 'pointer' }} onClick={(e) => { e.preventDefault(); const all = devices.map(d => d._id); setSelectedDeviceIds(selectedDeviceIds.length === all.length ? [] : all); }}>Select All</button>}
             </div>
             {loadingDevices ? <div style={{ padding: 24, textAlign: 'center', color: '#A4B6B9' }}>Loading stores…</div>
               : devices.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9', border: '1px dashed #D6E6E9', borderRadius: 12, background: '#F8FAFB' }}>No devices connected to this store yet.</div>
