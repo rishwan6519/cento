@@ -221,12 +221,16 @@ export async function GET(req: NextRequest) {
     const activeAnnouncements = [];
     const scheduledHourlyAnnouncements = [];
 
+    console.log(`Checking ${playlists.length} playlists for device ${serialNumber}. Today: ${todayStr}, WeekDay: ${todayWeekDay}, Time: ${currentTime}`);
+
     for (const playlist of playlists) {
       const { schedule } = playlist;
+      console.log(`- Evaluating playlist ${playlist._id} "${playlist.name}"`);
 
       // Validation 1: Date range
       if (schedule.startDate && schedule.endDate) {
         if (todayStr < schedule.startDate || todayStr > schedule.endDate) {
+          console.log(`  -> FAILED Date Range: today ${todayStr} not in [${schedule.startDate}, ${schedule.endDate}]`);
           continue;
         }
       }
@@ -236,6 +240,7 @@ export async function GET(req: NextRequest) {
         const validDays = schedule.daysOfWeek.map((d: string) => d.toLowerCase());
         const isTodayValid = validDays.some((d: string) => todayWeekDay.startsWith(d));
         if (!isTodayValid) {
+          console.log(`  -> FAILED Day of Week: today ${todayWeekDay} not in [${validDays.join(',')}]`);
           continue;
         }
       }
@@ -255,16 +260,20 @@ export async function GET(req: NextRequest) {
         if (!startTime && !endTime) {
           // Active all day
           isCurrentlyActive = true;
+          console.log(`  -> PASSED Timed: active all day`);
         } else if (startTime && !endTime) {
           // Active from start time onwards (until end of day)
           isCurrentlyActive = currentTimeShort >= startTime;
+          console.log(`  -> ${isCurrentlyActive ? 'PASSED' : 'FAILED'} Timed: current ${currentTimeShort} >= start ${startTime}`);
         } else if (!startTime && endTime) {
           // Active from start of day until end time (EXCLUSIVE - stops at endTime)
           isCurrentlyActive = currentTimeShort < endTime;
+          console.log(`  -> ${isCurrentlyActive ? 'PASSED' : 'FAILED'} Timed: current ${currentTimeShort} < end ${endTime}`);
         } else if (startTime && endTime) {
           // Active within specific time window
           // Start time is INCLUSIVE, end time is EXCLUSIVE
           isCurrentlyActive = currentTimeShort >= startTime && currentTimeShort < endTime;
+          console.log(`  -> ${isCurrentlyActive ? 'PASSED' : 'FAILED'} Timed: current ${currentTimeShort} in [${startTime}, ${endTime})`);
         }
 
         if (isCurrentlyActive) {
@@ -280,20 +289,26 @@ export async function GET(req: NextRequest) {
         if (!startTime && !endTime) {
           // Available all day
           isInSchedule = true;
+          console.log(`  -> PASSED Hourly: active all day`);
         } else if (startTime && !endTime) {
           // Available from start time onwards
           isInSchedule = currentTimeShort >= startTime;
+          console.log(`  -> ${isInSchedule ? 'PASSED' : 'FAILED'} Hourly: current ${currentTimeShort} >= start ${startTime}`);
         } else if (!startTime && endTime) {
           // Available until end time (EXCLUSIVE)
           isInSchedule = currentTimeShort < endTime;
+          console.log(`  -> ${isInSchedule ? 'PASSED' : 'FAILED'} Hourly: current ${currentTimeShort} < end ${endTime}`);
         } else if (startTime && endTime) {
           // Available within specific time window
           isInSchedule = currentTimeShort >= startTime && currentTimeShort < endTime;
+          console.log(`  -> ${isInSchedule ? 'PASSED' : 'FAILED'} Hourly: current ${currentTimeShort} in [${startTime}, ${endTime})`);
         }
 
         if (isInSchedule) {
           scheduledHourlyAnnouncements.push(playlistDetails);
         }
+      } else {
+        console.log(`  -> FAILED: Unknown scheduleType "${schedule.scheduleType}"`);
       }
     }
 

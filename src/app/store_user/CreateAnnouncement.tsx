@@ -19,7 +19,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [frequencyInMinutes, setFrequencyInMinutes] = useState("");
-  const [selectedDays, setSelectedDays] = useState<string[]>(["Tue", "Fri"]);
+  const [selectedDays, setSelectedDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
   const [volumeMin] = useState(30);
   const [volumeMax] = useState(80);
   const [devices, setDevices] = useState<any[]>([]);
@@ -113,7 +113,16 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
     if (method !== "library" || !userId) return;
     setLoadingLibrary(true);
     fetch(`/api/media?userId=${userId}`).then(r => r.json())
-      .then(d => setLibraryMedia(d.media || d.mediaFiles || d.data || []))
+      .then(d => {
+        const mediaList = d.media || d.mediaFiles || d.data || [];
+        setLibraryMedia(mediaList);
+        
+        // Map any URLs currently in selectedLibraryIds to their actual _id
+        setSelectedLibraryIds(prev => prev.map(idOrUrl => {
+          const match = mediaList.find((m: any) => m.url === idOrUrl);
+          return match ? match._id : idOrUrl;
+        }));
+      })
       .catch(() => setLibraryMedia([]))
       .finally(() => setLoadingLibrary(false));
   }, [method, userId]);
