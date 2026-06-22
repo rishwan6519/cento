@@ -53,13 +53,12 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
       // Device IDs mapping (depends on how we fetch connections in ViewAllCampaigns)
       setSelectedDeviceIds(editingPlaylist.deviceIds || []);
 
-      const items = editingPlaylist.announcements || editingPlaylist.files || [];
+      const items = editingPlaylist.announcements || [];
       if (items.length > 0) {
         setMethod("library");
-        // For AnnouncementPlaylist, the media ID is stored in item.file._id or item.file
-        // For PlaylistConfig, it's item.fileId or item._id
-        const mediaId = items.map((item: any) => item.file?._id || item.file || item.fileId || item._id);
-        setSelectedLibraryIds(mediaId);
+        // For AnnouncementPlaylist, the URL is stored directly in item.file (string)
+        const mediaUrls = items.map((item: any) => item.file?._id || item.file || item._id);
+        setSelectedLibraryIds(mediaUrls);
       }
     }
   }, [editingPlaylist]);
@@ -289,7 +288,10 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
       
       const data = await res.json();
       
-      if (res.ok && data.playlist) {
+      if (res.ok) {
+        // Extract playlist ID from response — POST returns `announcementPlaylistId`, PUT returns `playlist`
+        const playlistId = data.announcementPlaylistId || data.playlist?._id || (editingPlaylist?._id || editingPlaylist?.id);
+        
         // Assign to selected devices
         const assignRes = await fetch("/api/announcement/assign", {
           method: "POST",
@@ -297,7 +299,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
           body: JSON.stringify({
             userId,
             deviceIds: selectedDeviceIds,
-            announcementPlaylistId: data.playlist._id
+            announcementPlaylistId: playlistId
           })
         });
         

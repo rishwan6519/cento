@@ -445,6 +445,20 @@ export default function StoreUserPage() {
   }, []);
 
   const handleNavigate = (view: ViewKey) => {
+    // Clear editingPlaylist when going to any creation view directly
+    // (the Edit flow sets editingPlaylist BEFORE calling handleNavigate, so it's safe)
+    if (
+      view === "createMediaPlaylist" ||
+      view === "createAnnouncement" ||
+      view === "createInstantAnnouncement" ||
+      view === "createAnnouncementPlaylist" ||
+      view === "instantPlaylist" ||
+      view === "mediaManagement" ||
+      view === "dashboard" ||
+      view === "viewAllCampaigns"
+    ) {
+      setEditingPlaylist(null);
+    }
     setActiveView(view);
     setMobileOpen(false);
     if (
@@ -476,13 +490,14 @@ export default function StoreUserPage() {
           <ViewAllCampaigns
             onNavigate={handleNavigate}
             onEdit={(p: any) => {
-              setEditingPlaylist(p);
               const isAnn = !!p.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
               if (isAnn) {
                 handleNavigate("createAnnouncement");
               } else {
                 handleNavigate("createMediaPlaylist");
               }
+              // Set editingPlaylist AFTER handleNavigate clears it
+              setTimeout(() => setEditingPlaylist(p), 0);
             }}
           />
         );
