@@ -2074,9 +2074,8 @@ const ResellerCreateCampaignFormView = ({ actingUser, onBack }: { actingUser: an
                   <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">Type</label>
                   <select value={cfg.type} onChange={e => setCfg({...cfg, type: e.target.value})} className="w-full p-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 font-medium text-gray-700">
                     <option value="">Select type</option>
-                    <option value="audio">Audio</option>
-                    <option value="video">Video</option>
-                    <option value="image">Image</option>
+                    <option value="media">Media</option>
+                    <option value="promotional">Promotional</option>
                   </select>
                 </div>
                 <div>

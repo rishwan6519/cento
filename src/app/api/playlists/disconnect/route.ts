@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import PlaylistConfig from '@/models/PlaylistConfig';
+import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 import DevicePlaylist from '@/models/ConectPlaylist';
 
 export async function POST(req: NextRequest) {
@@ -17,32 +18,47 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Remove deviceId from PlaylistConfig
-    const playlist = await PlaylistConfig.findById(playlistId);
+    // 1. Try to find as a regular PlaylistConfig first
+    let playlist = await PlaylistConfig.findById(playlistId);
+    let isAnnouncement = false;
+
     if (!playlist) {
-      return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
+      // Try AnnouncementPlaylist
+      playlist = await AnnouncementPlaylist.findById(playlistId);
+      isAnnouncement = !!playlist;
     }
 
-    // We keep selectedDeviceId intact or clear it if it matches?
-    // Since deviceIds is an array, we remove from there.
-    if (playlist.deviceIds && Array.isArray(playlist.deviceIds)) {
-      playlist.deviceIds = playlist.deviceIds.filter(
-        (id: any) => id.toString() !== deviceId.toString()
-      );
-    }
-    
-    if (playlist.selectedDeviceId && playlist.selectedDeviceId.toString() === deviceId.toString()) {
+    if (playlist && !isAnnouncement) {
+      // Remove deviceId from PlaylistConfig
+      if (playlist.deviceIds && Array.isArray(playlist.deviceIds)) {
+        playlist.deviceIds = playlist.deviceIds.filter(
+          (id: any) => id.toString() !== deviceId.toString()
+        );
+      }
+      if (playlist.selectedDeviceId && playlist.selectedDeviceId.toString() === deviceId.toString()) {
         playlist.selectedDeviceId = null;
+      }
+      await playlist.save();
     }
-
-    await playlist.save();
 
     // 2. Remove playlistId from DevicePlaylist connections
     const connection = await DevicePlaylist.findOne({ deviceId });
-    if (connection && connection.playlistIds) {
-      connection.playlistIds = connection.playlistIds.filter(
-        (pid: any) => pid.toString() !== playlistId.toString()
-      );
+    if (connection) {
+      if (isAnnouncement) {
+        // Remove from announcementPlaylistIds
+        if (connection.announcementPlaylistIds) {
+          connection.announcementPlaylistIds = connection.announcementPlaylistIds.filter(
+            (pid: any) => pid.toString() !== playlistId.toString()
+          );
+        }
+      } else {
+        // Remove from playlistIds
+        if (connection.playlistIds) {
+          connection.playlistIds = connection.playlistIds.filter(
+            (pid: any) => pid.toString() !== playlistId.toString()
+          );
+        }
+      }
       connection.updatedAt = new Date();
       await connection.save();
     }

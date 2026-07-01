@@ -7,6 +7,8 @@ import AssignedDevice from '@/models/AssignDevice';
 import Device from '@/models/Device';
 import mongoose from 'mongoose';
 import MediaItem from '@/models/MediaItems';
+import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
+import User from '@/models/User';
 
 export async function POST(req: NextRequest) {
   try {
@@ -94,28 +96,55 @@ export async function POST(req: NextRequest) {
     }
 
     // Create new playlist
-    const playlist = await PlaylistConfig.create({
-      name,
-      type: resolvedType,
-      startTime: startTime || null,
-      endTime: endTime || null,
-      startDate: startDate || null,
-      endDate: endDate || null,
-      daysOfWeek: daysOfWeek || [],
-      globalMinVolume: globalMinVolume ?? 30,
-      globalMaxVolume: globalMaxVolume ?? 80,
-      frequencyInMinutes: frequencyInMinutes ? Number(frequencyInMinutes) : null,
-      selectedDeviceId: selectedDeviceId || null,
-      deviceIds: deviceIds || [],
-      description: description || '',
-      userId: userId || null,
-      files: resolvedFiles,
-      backgroundAudio: {
-        enabled: backgroundAudio?.enabled || false,
-        file: backgroundAudio?.file || null,
-        volume: backgroundAudio?.volume || 50
-      }
-    });
+    const isAnnouncement = ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(resolvedType);
+    
+    let playlist;
+    if (isAnnouncement) {
+      playlist = await AnnouncementPlaylist.create({
+        name,
+        type: resolvedType === "Instant Announcement" ? "announcement" : resolvedType,
+        userId: userId || null,
+        announcements: resolvedFiles.map(f => ({
+          file: f.path || f.url || f.fileUrl,
+          displayOrder: f.displayOrder,
+          delay: f.delay || 0,
+          maxVolume: globalMaxVolume ?? 100
+        })),
+        schedule: {
+          scheduleType: frequencyInMinutes ? 'hourly' : 'timed',
+          frequency: frequencyInMinutes ? Number(frequencyInMinutes) : undefined,
+          startDate: startDate || null,
+          endDate: endDate || null,
+          daysOfWeek: daysOfWeek || [],
+          startTime: startTime || null,
+          endTime: endTime || null,
+        },
+        status: 'active'
+      });
+    } else {
+      playlist = await PlaylistConfig.create({
+        name,
+        type: resolvedType,
+        startTime: startTime || null,
+        endTime: endTime || null,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        daysOfWeek: daysOfWeek || [],
+        globalMinVolume: globalMinVolume ?? 30,
+        globalMaxVolume: globalMaxVolume ?? 80,
+        frequencyInMinutes: frequencyInMinutes ? Number(frequencyInMinutes) : null,
+        selectedDeviceId: selectedDeviceId || null,
+        deviceIds: deviceIds || [],
+        description: description || '',
+        userId: userId || null,
+        files: resolvedFiles,
+        backgroundAudio: {
+          enabled: backgroundAudio?.enabled || false,
+          file: backgroundAudio?.file || null,
+          volume: backgroundAudio?.volume || 50
+        }
+      });
+    }
     console.log('Playlist created successfully:', playlist);
 
     // Connect playlist to selected device(s) in DevicePlaylist collection
@@ -131,44 +160,62 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const devicesToConnect: string[] = [];
+    const devicesToConnect: { id: string, ownerId?: string }[] = [];
     for (const devId of rawDevices) {
       const directDevice = await Device.findById(devId);
       if (directDevice) {
-        if (!devicesToConnect.includes(devId)) {
-          devicesToConnect.push(devId);
+        if (!devicesToConnect.some(d => d.id === devId)) {
+          devicesToConnect.push({ id: devId });
         }
         continue;
       }
       const assignment = await AssignedDevice.findById(devId);
       if (assignment && assignment.deviceId) {
         const actualId = assignment.deviceId.toString();
-        if (!devicesToConnect.includes(actualId)) {
-          devicesToConnect.push(actualId);
+        if (!devicesToConnect.some(d => d.id === actualId)) {
+          devicesToConnect.push({ id: actualId });
         }
         continue;
       }
       const onboarding = await OnboardedDevice.findById(devId);
       if (onboarding && onboarding.deviceId) {
         const actualId = onboarding.deviceId.toString();
-        if (!devicesToConnect.includes(actualId)) {
-          devicesToConnect.push(actualId);
+        if (!devicesToConnect.some(d => d.id === actualId)) {
+          devicesToConnect.push({ id: actualId });
         }
         continue;
       }
-      if (!devicesToConnect.includes(devId)) {
-        devicesToConnect.push(devId);
+      
+      const storeUser = await User.findById(devId);
+      if (storeUser && storeUser.role === 'store') {
+         const storeAssignments = await AssignedDevice.find({ userId: devId });
+         for (const sa of storeAssignments) {
+            if (sa.deviceId) {
+               const actualId = sa.deviceId.toString();
+               if (!devicesToConnect.some(d => d.id === actualId)) {
+                  devicesToConnect.push({ id: actualId, ownerId: devId });
+               }
+            }
+         }
+         continue;
+      }
+
+      if (!devicesToConnect.some(d => d.id === devId)) {
+        devicesToConnect.push({ id: devId });
       }
     }
+
+    console.log('[Playlists API] rawDevices:', rawDevices);
+    console.log('[Playlists API] devicesToConnect:', devicesToConnect);
 
     if (devicesToConnect.length > 0) {
       let resolvedUserId = userId;
       if (!resolvedUserId || !mongoose.Types.ObjectId.isValid(resolvedUserId)) {
-        const onboarded = await OnboardedDevice.findOne({ deviceId: devicesToConnect[0] });
+        const onboarded = await OnboardedDevice.findOne({ deviceId: devicesToConnect[0].id });
         if (onboarded && onboarded.userId) {
           resolvedUserId = onboarded.userId;
         } else {
-          const assigned = await AssignedDevice.findOne({ deviceId: devicesToConnect[0] });
+          const assigned = await AssignedDevice.findOne({ deviceId: devicesToConnect[0].id });
           if (assigned && assigned.userId) {
             resolvedUserId = assigned.userId;
           } else {
@@ -184,58 +231,105 @@ export async function POST(req: NextRequest) {
       }
 
       if (resolvedUserId) {
-        for (const devId of devicesToConnect) {
+        const conflictWarnings: string[] = [];
+        let connectedCount = 0;
+
+        for (const dev of devicesToConnect) {
+          const devId = dev.id;
+          const connectionOwnerId = dev.ownerId || resolvedUserId;
           const existingConnection = await DevicePlaylist.findOne({ deviceId: devId });
-          if (existingConnection) {
-            // Check for conflicts with existing media playlists
+          
+          if (existingConnection && !isAnnouncement) {
+            // Check for conflicts with existing media playlists (only for media playlists, not announcements)
             const existingPlaylists = await PlaylistConfig.find({
               _id: { $in: existingConnection.playlistIds }
             });
 
+            let hasConflict = false;
             for (const ep of existingPlaylists) {
               if (ep._id.toString() === playlist._id.toString()) continue;
 
+              // Get schedule fields from the new playlist
               const ns = playlist.startDate;
               const ne = playlist.endDate;
+              const nd = playlist.daysOfWeek || [];
+              const nts = playlist.startTime;
+              const nte = playlist.endTime;
+
               const es = ep.startDate;
               const ee = ep.endDate;
               const datesOverlap = (!ns || !ee || ns <= ee) && (!es || !ne || es <= ne);
 
-              const nd = playlist.daysOfWeek || [];
               const ed = ep.daysOfWeek || [];
               const daysOverlap = nd.length === 0 || ed.length === 0 || nd.some((d: string) => ed.includes(d));
 
-              const nts = playlist.startTime;
-              const nte = playlist.endTime;
               const ets = ep.startTime;
               const ete = ep.endTime;
               const timesOverlap = (!nts || !ete || nts < ete) && (!ets || !nte || ets < nte);
 
               if (datesOverlap && daysOverlap && timesOverlap) {
-                return NextResponse.json({
-                  error: `Conflict alert: Device is already connected to an overlapping media playlist (${ep.name}). Disconnect the existing playlist and try again.`
-                }, { status: 409 });
+                // Find device name for better message
+                const deviceDoc = await Device.findById(devId);
+                const deviceName = deviceDoc?.name || deviceDoc?.serialNumber || devId;
+                conflictWarnings.push(`Device "${deviceName}" already has overlapping playlist "${ep.name}". Disconnect it first.`);
+                hasConflict = true;
+                break;
               }
             }
 
+            if (hasConflict) continue; // Skip this device, connect the rest
+          }
+
+          // No conflict — proceed to connect
+          if (existingConnection) {
             const currentPlaylistIds = existingConnection.playlistIds || [];
             const alreadyConnected = currentPlaylistIds.some(
               (pid: any) => pid.toString() === playlist._id.toString()
             );
-            if (!alreadyConnected) {
-              existingConnection.playlistIds.push(playlist._id);
+            const annIds = existingConnection.announcementPlaylistIds || [];
+            const alreadyConnectedAnn = annIds.some(
+              (pid: any) => pid.toString() === playlist._id.toString()
+            );
+
+            if (!alreadyConnected && !alreadyConnectedAnn) {
+              if (isAnnouncement) {
+                 if (!existingConnection.announcementPlaylistIds) existingConnection.announcementPlaylistIds = [];
+                 existingConnection.announcementPlaylistIds.push(playlist._id);
+              } else {
+                 existingConnection.playlistIds.push(playlist._id);
+              }
               existingConnection.updatedAt = new Date();
-              existingConnection.userId = resolvedUserId;
+              existingConnection.userId = connectionOwnerId;
               await existingConnection.save();
+              connectedCount++;
             }
           } else {
             await DevicePlaylist.create({
               deviceId: devId,
-              playlistIds: [playlist._id],
-              userId: resolvedUserId,
+              playlistIds: isAnnouncement ? [] : [playlist._id],
+              announcementPlaylistIds: isAnnouncement ? [playlist._id] : [],
+              userId: connectionOwnerId,
               updatedAt: new Date()
             });
+            connectedCount++;
           }
+        }
+
+        // If ALL devices had conflicts (none connected)
+        if (connectedCount === 0 && conflictWarnings.length > 0) {
+          return NextResponse.json({
+            success: false,
+            message: `Conflict alert: ${conflictWarnings.join(' | ')}`
+          }, { status: 409 });
+        }
+
+        // Some connected, some had conflicts
+        if (conflictWarnings.length > 0) {
+          return NextResponse.json({
+            success: true,
+            data: playlist,
+            warning: `Connected to ${connectedCount} device(s), but some devices had conflicts: ${conflictWarnings.join(' | ')}`
+          }, { status: 201 });
         }
       }
     }
@@ -527,55 +621,58 @@ export async function GET(req: NextRequest) {
     const User = mongoose.models.User;
     const userObjectId = new mongoose.Types.ObjectId(userId);
     let myPlaylistsQuery: any = { userId: userObjectId };
-    let controllerId: mongoose.Types.ObjectId | null = null;
-
-    if (User) {
-      const user = await User.findById(userId).select('controllerId');
-      if (user?.controllerId) {
-        controllerId = new mongoose.Types.ObjectId(user.controllerId);
-      }
-    }
+    // (Removed controllerId logic as it is no longer needed)
 
     // Fetch user's own playlists
-    const ownPlaylists = await PlaylistConfig.find(myPlaylistsQuery);
+    const ownPlaylists = await PlaylistConfig.find(myPlaylistsQuery)
+      .populate('userId', 'username')
+      .populate('files.fileId');
 
-    // For controller (super user) playlists, only include if they are CONNECTED to one of the user's devices
-    let connectedSuperUserPlaylists: any[] = [];
-    if (controllerId) {
-      // 1. Get all device IDs that this user owns or is assigned to
-      const onboarded = await OnboardedDevice.find({ userId: userObjectId }).select('deviceId');
-      const assigned = await AssignedDevice.find({ userId: userObjectId, status: 'active' }).select('deviceId');
+    // Look up the user's devices
+    const onboarded = await OnboardedDevice.find({ userId: userObjectId }).select('deviceId');
+    const assigned = await AssignedDevice.find({ userId: userObjectId }).select('deviceId');
 
-      const deviceIds = [
-        ...onboarded.map(d => d.deviceId),
-        ...assigned.map(d => d.deviceId)
-      ];
+    const deviceIds = [
+      ...onboarded.map(d => d.deviceId),
+      ...assigned.map(d => d.deviceId)
+    ];
 
-      if (deviceIds.length > 0) {
-        // 2. Find all active connections for these devices
-        const connections = await DevicePlaylist.find({ deviceId: { $in: deviceIds } }).select('playlistIds');
-        const activePlaylistIds = connections.reduce((acc: mongoose.Types.ObjectId[], curr) => {
-          if (curr.playlistIds) acc.push(...curr.playlistIds);
-          return acc;
-        }, []);
+    let connectedOtherPlaylists: any[] = [];
+    if (deviceIds.length > 0) {
+      // Find all active connections for these devices
+      const connections = await DevicePlaylist.find({ deviceId: { $in: deviceIds } }).select('playlistIds');
+      const activePlaylistIds = connections.reduce((acc: mongoose.Types.ObjectId[], curr) => {
+        if (curr.playlistIds) acc.push(...curr.playlistIds);
+        return acc;
+      }, []);
 
-        if (activePlaylistIds.length > 0) {
-          // 3. Find playlists from controller that are in our active list
-          connectedSuperUserPlaylists = await PlaylistConfig.find({
-            _id: { $in: activePlaylistIds },
-            userId: controllerId
-          });
-        }
+      if (activePlaylistIds.length > 0) {
+        // Find playlists connected to our devices but not owned by us
+        connectedOtherPlaylists = await PlaylistConfig.find({
+          _id: { $in: activePlaylistIds },
+          userId: { $ne: userObjectId }
+        })
+        .populate('userId', 'username')
+        .populate('files.fileId');
       }
     }
 
     // Combine both sets
-    const allPlaylists = [...ownPlaylists, ...connectedSuperUserPlaylists]
+    const allPlaylists = [...ownPlaylists, ...connectedOtherPlaylists]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+    // Fetch active device IDs
+    const onboardedDevices = await OnboardedDevice.find().select('deviceId');
+    const assignedDevices = await AssignedDevice.find({ status: 'active' }).select('deviceId');
+    const activeDeviceIds = new Set([
+      ...onboardedDevices.map(d => d.deviceId?.toString()).filter(Boolean),
+      ...assignedDevices.map(d => d.deviceId?.toString()).filter(Boolean)
+    ]);
+
     // Check assignments
-    const allConnections = await DevicePlaylist.find().select('playlistIds');
-    const assignedIds = new Set(allConnections.flatMap(c => c.playlistIds.map((id: any) => id.toString())));
+    const allConnections = await DevicePlaylist.find().select('playlistIds deviceId');
+    const activeConnections = allConnections.filter(c => c.deviceId && activeDeviceIds.has(c.deviceId.toString()));
+    const assignedIds = new Set(activeConnections.flatMap(c => c.playlistIds.map((id: any) => id.toString())));
     
     const mappedPlaylists = allPlaylists.map(p => ({
       ...p.toObject(),

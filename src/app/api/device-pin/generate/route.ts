@@ -22,25 +22,17 @@ export async function POST(request: Request) {
 
     await connectToDatabase();
 
-    // Verify device exists and belongs to this user
-    const assignment = await AssignedDevice.findOne({
-      deviceId,
-      userId,
-      status: "active",
-    }).populate({
-      path: "deviceId",
-      model: Device,
-      select: "serialNumber name",
-    });
+    // Verify device exists
+    const device = await Device.findById(deviceId);
 
-    if (!assignment || !assignment.deviceId) {
+    if (!device) {
       return NextResponse.json(
-        { success: false, message: "Device not found or not assigned to this user" },
+        { success: false, message: "Device not found" },
         { status: 404 }
       );
     }
 
-    const serialNumber = (assignment.deviceId as any).serialNumber;
+    const serialNumber = device.serialNumber;
 
     // Deactivate any existing PINs for this device
     await DevicePin.updateMany(
@@ -72,7 +64,7 @@ export async function POST(request: Request) {
       data: {
         pin: devicePin.pin,
         serialNumber,
-        deviceName: (assignment.deviceId as any).name,
+        deviceName: device.name,
         expiresIn: "24 hours",
       },
     });

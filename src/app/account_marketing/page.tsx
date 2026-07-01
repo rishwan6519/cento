@@ -364,7 +364,7 @@ return (
   );
 };
 
-const CreateCentralCampaignMenuView = ({ setActiveView }: { setActiveView: (v: string) => void }) => {
+const CreateCentralCampaignMenuView = ({ setActiveView, setEditingCampaign }: { setActiveView: any, setEditingCampaign?: any }) => {
   return (
     <div className="pb-12 max-w-[1200px] space-y-8">
       <div>
@@ -385,7 +385,7 @@ const CreateCentralCampaignMenuView = ({ setActiveView }: { setActiveView: (v: s
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Create new playlist</h3>
               <p className="text-sm text-gray-500 mb-8 h-10">Start building a new media playlist from scratch</p>
-              <button onClick={() => setActiveView("create_central_campaign_form")} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
+              <button onClick={() => { if(setEditingCampaign) setEditingCampaign(null); setActiveView("create_central_campaign_form"); }} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
                 Create playlist
               </button>
             </div>
@@ -405,7 +405,7 @@ const CreateCentralCampaignMenuView = ({ setActiveView }: { setActiveView: (v: s
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Instant playlist</h3>
               <p className="text-sm text-gray-500 mb-8 h-10">Quick access to create instant playlist</p>
-              <button onClick={() => setActiveView("create_instant_playlist")} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
+              <button onClick={() => { if(setEditingCampaign) setEditingCampaign(null); setActiveView("create_instant_playlist"); }} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
                 Instant playlist
               </button>
             </div>
@@ -431,7 +431,7 @@ const CreateCentralCampaignMenuView = ({ setActiveView }: { setActiveView: (v: s
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Create announcements</h3>
               <p className="text-sm text-gray-500 mb-8 h-10">Design new announcement campaigns and messages</p>
-              <button onClick={() => setActiveView("create_announcement")} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
+              <button onClick={() => { if(setEditingCampaign) setEditingCampaign(null); setActiveView("create_announcement"); }} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
                 Create announcements
               </button>
             </div>
@@ -451,7 +451,7 @@ const CreateCentralCampaignMenuView = ({ setActiveView }: { setActiveView: (v: s
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-2">Instant announcements</h3>
               <p className="text-sm text-gray-500 mb-8 h-10">Send urgent messages using instant announcements</p>
-              <button onClick={() => setActiveView("create_instant_announcement")} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
+              <button onClick={() => { if(setEditingCampaign) setEditingCampaign(null); setActiveView("create_instant_announcement"); }} className="w-full py-3 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-xl font-bold transition-all shadow-md shadow-[#FF5722]/20 mt-auto">
                 Instant announcements
               </button>
             </div>
@@ -466,6 +466,8 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
   const [sourceMode, setSourceMode] = useState<"none" | "upload" | "existing">("none");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewFiles, setPreviewFiles] = useState<any[] | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   const [selectedDays, setSelectedDays] = useState<string[]>(['Tue', 'Fri']);
   const [stores, setStores] = useState<any[]>([]);
@@ -616,6 +618,9 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
         const data = await res.json();
         if (data.success) {
            toast.success(`Playlist ${editData ? 'updated' : 'connected'} successfully!`);
+           if (data.warning) {
+             setTimeout(() => toast.error(data.warning, { duration: 8000 }), 500);
+           }
            setCfg({ name: "", type: "", startDate: "", endDate: "", startTime: "", endTime: "" });
            setSelectedStoreIds([]);
            setSelectedMediaIds([]);
@@ -625,7 +630,7 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
              setActiveView("view_central_campaigns");
            }
         } else {
-           toast.error(data.message || "Failed to create playlist");
+           toast.error(data.message || data.error || "Failed to create playlist");
         }
     } catch(err) { 
         toast.error("Error creating playlist"); 
@@ -679,7 +684,7 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full p-4 border border-gray-200 rounded-xl bg-gray-50 cursor-pointer text-gray-700 text-sm font-medium min-h-[52px] flex items-center"
                 >
-                  {uploadedFiles.length > 0 ? uploadedFiles.map(f => f.name).join(", ") : "Click to select filesâ€¦"}
+                  {uploadedFiles.length > 0 ? uploadedFiles.map(f => f.name).join(", ") : "Click to select files..."}
                 </div>
                 <input ref={fileInputRef} type="file" multiple hidden accept="audio/*,video/*,image/*" onChange={handleFileChange} />
                 
@@ -687,7 +692,9 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
                   <div className="flex flex-col sm:flex-row items-center justify-between mt-4 bg-gray-50 rounded-xl p-4 border border-gray-100">
                      <span className="text-sm text-[#FF5722] font-bold mb-4 sm:mb-0">{uploadedFiles.length} file{uploadedFiles.length > 1 ? 's' : ''} selected</span>
                      <div className="flex gap-4 w-full sm:w-auto">
-                       <button className="flex-1 sm:flex-none px-6 py-2.5 bg-white border border-gray-200 text-[#FF5722] rounded-lg text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors">
+                       <button
+                         onClick={(e) => { e.preventDefault(); setPreviewFiles(uploadedFiles); setPreviewIndex(0); }}
+                         className="flex-1 sm:flex-none px-6 py-2.5 bg-white border border-gray-200 text-[#FF5722] rounded-lg text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors">
                          Preview media
                        </button>
                        <button 
@@ -774,9 +781,8 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Type</label>
                 <select value={cfg.type} onChange={e => setCfg({...cfg, type: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 text-gray-500">
                   <option value="">Select type</option>
-                  <option value="audio">Audio</option>
-                  <option value="video">Video</option>
-                  <option value="image">Image</option>
+                  <option value="media">Media</option>
+                  <option value="promotional">Promotional</option>
                 </select>
               </div>
               <div>
@@ -907,6 +913,62 @@ const CreateCentralCampaignFormView = ({ userData, editData, setActiveView, setE
           </div>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewFiles && previewFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="bg-[#0E3B43] px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold">Media Preview</h3>
+              <button onClick={() => setPreviewFiles(null)} className="text-white/70 hover:text-white transition-colors text-xl font-bold">
+                ✕
+              </button>
+            </div>
+            <div className="p-8 flex flex-col items-center justify-center min-h-[300px] bg-gray-50">
+              {(() => {
+                const current = previewFiles[previewIndex];
+                const file = current?.fileId || current;
+                const type = (file?.type || '').toLowerCase();
+                let path = file?.url || file?.fileUrl || file?.path;
+                if (typeof File !== 'undefined' && file instanceof File) {
+                  path = URL.createObjectURL(file);
+                }
+                const name = file?.name || "Unknown file";
+
+                if (type.includes('image')) {
+                  return <img src={path} alt="Preview" className="max-h-[400px] object-contain rounded-xl shadow-sm" />;
+                } else if (type.includes('video')) {
+                  return <video src={path} controls className="max-h-[400px] rounded-xl shadow-sm w-full" />;
+                } else if (type.includes('audio')) {
+                  return <audio src={path} controls className="w-full" />;
+                } else {
+                  return <p className="font-bold text-gray-500">Preview not available for this file type</p>;
+                }
+              })()}
+              <p className="mt-4 text-sm font-bold text-gray-700">{(previewFiles[previewIndex]?.fileId || previewFiles[previewIndex])?.name || "Unknown file"}</p>
+            </div>
+            
+            {previewFiles.length > 1 && (
+              <div className="flex items-center justify-between px-8 py-4 bg-white border-t border-gray-100">
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev > 0 ? prev - 1 : previewFiles.length - 1))}
+                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-bold transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm font-bold text-gray-500">{previewIndex + 1} of {previewFiles.length}</span>
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev < previewFiles.length - 1 ? prev + 1 : 0))}
+                  className="px-4 py-2 bg-[#FF5722] text-white rounded-xl hover:bg-[#F4511E] text-sm font-bold transition-all shadow-md shadow-[#FF5722]/20"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -916,6 +978,8 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
+  const [previewFiles, setPreviewFiles] = useState<any[] | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   const fetchPlaylists = async () => {
     const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : "";
@@ -996,7 +1060,10 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
           </div>
         </div>
         <button 
-          onClick={() => setActiveView && setActiveView("create_central_campaign")}
+          onClick={() => {
+            if (setEditingCampaign) setEditingCampaign(null);
+            if (setActiveView) setActiveView("create_central_campaign");
+          }}
           className="flex items-center gap-2 px-8 py-4 bg-[#FF5722] hover:bg-[#F4511E] text-white rounded-2xl font-bold transition-all shadow-lg shadow-[#FF5722]/20 shrink-0"
         >
           <Plus size={20} /> Create new campaign
@@ -1013,32 +1080,58 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                 <th className="px-6 py-5">CAMPAIGN TYPE</th>
-                <th className="px-6 py-5">PLAYLIST NAME</th>
-                <th className="px-6 py-5">START DATE</th>
-                <th className="px-6 py-5">END DATE</th>
-                <th className="px-6 py-5 text-right">ACTIONS</th>
+                <th className="px-6 py-5">NAME</th>
+                <th className="px-6 py-5">SCHEDULE</th>
+                <th className="px-6 py-5">PREVIEW</th>
+                <th className="px-6 py-5">STATUS</th>
+                <th className="px-6 py-5 text-right">ACTION</th>
               </tr>
             </thead>
             <tbody className="text-sm font-medium">
               {loading ? (
-                <tr><td colSpan={5} className="p-12 text-center text-gray-500">
+                <tr><td colSpan={6} className="p-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="w-8 h-8 border-4 border-[#00BCD4] border-t-transparent rounded-full animate-spin"></div>
                     <p className="font-bold text-[#0E3B43]">Loading campaigns...</p>
                   </div>
                 </td></tr>
               ) : filteredPlaylists.length === 0 ? (
-                <tr><td colSpan={5} className="p-12 text-center text-gray-500 italic font-medium">No campaigns found matching filters</td></tr>
-              ) : filteredPlaylists.map((row, i) => (
+                <tr><td colSpan={6} className="p-12 text-center text-gray-500 italic font-medium">No campaigns found matching filters</td></tr>
+              ) : filteredPlaylists.map((row, i) => {
+                const days = Array.isArray(row.daysOfWeek) ? row.daysOfWeek.join(",") : "";
+                const time = row.startTime && row.endTime ? `${row.startTime} to ${row.endTime}` : "";
+                const schedule = [days, time].filter(Boolean).join(" | ") || "—";
+                const hasMedia = row.mediaIds?.length || row.announcements?.length;
+                const preview = hasMedia ? `Display file link - uploaded by ${row.userId?.username || "user"}` : "—";
+                const isAnn = !!row.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type);
+                const hasStoreConnected = (row.deviceIds && row.deviceIds.length > 0) || row.selectedDeviceId;
+                const status = (row.isAssigned && hasStoreConnected) ? "Assigned" : "";
+
+                return (
                 <tr key={row._id || i} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-6">
-                    <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase ${["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type) ? "bg-orange-50 text-[#FF5722] border border-orange-100" : "bg-cyan-50 text-[#00BCD4] border border-cyan-100"}`}>
-                      {["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type) ? "Announcement" : "Media"} Playlist
+                    <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase ${isAnn ? "bg-red-50 text-red-500 border border-red-100" : "bg-cyan-50 text-[#00BCD4] border border-cyan-100"}`}>
+                      {isAnn ? "Announcement Playlist" : "Media Playlist"}
                     </span>
                   </td>
-                  <td className="px-6 py-6 text-gray-900 font-bold">{row.name}</td>
-                  <td className="px-6 py-6 text-gray-600">{row.startDate ? new Date(row.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
-                  <td className="px-6 py-6 text-gray-600">{row.endDate ? new Date(row.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
+                  <td className="px-6 py-6 text-[#162B30] font-bold">{row.name || "Playlist name"}</td>
+                  <td className="px-6 py-6 text-gray-600 text-sm">{schedule}</td>
+                  <td className="px-6 py-6 text-[#64848D] text-xs">
+                    {hasMedia ? (
+                      <button 
+                        onClick={() => {
+                          setPreviewFiles(row.files || row.announcements || []);
+                          setPreviewIndex(0);
+                        }}
+                        className="hover:underline text-[#00BCD4] text-left"
+                      >
+                        {preview}
+                      </button>
+                    ) : "—"}
+                  </td>
+                  <td className="px-6 py-6">
+                    {status && <span className="px-3 py-1 rounded-full text-xs font-bold text-green-600 bg-green-50">{status}</span>}
+                  </td>
                   <td className="px-6 py-6">
                     <div className="flex items-center justify-end gap-3">
                       <button 
@@ -1048,26 +1141,82 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
                             setActiveView("create_central_campaign_form");
                           }
                         }}
-                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="w-8 h-8 flex items-center justify-center text-[#00BCD4] bg-cyan-50 hover:bg-cyan-100 rounded-lg transition-colors"
                         title="Edit Campaign"
                       >
-                        <Edit size={18} />
+                        <Edit size={16} />
                       </button>
                       <button 
                         onClick={() => row._id && handleDelete(row._id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        className="w-8 h-8 flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                         title="Delete Campaign"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewFiles && previewFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="bg-[#0E3B43] px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold">Media Preview</h3>
+              <button onClick={() => setPreviewFiles(null)} className="text-white/70 hover:text-white transition-colors text-xl font-bold">
+                ✕
+              </button>
+            </div>
+            <div className="p-8 flex flex-col items-center justify-center min-h-[300px] bg-gray-50">
+              {(() => {
+                const current = previewFiles[previewIndex];
+                const file = current?.fileId || current;
+                const type = (file?.type || '').toLowerCase();
+                let path = file?.url || file?.fileUrl || file?.path;
+                if (typeof File !== 'undefined' && file instanceof File) {
+                  path = URL.createObjectURL(file);
+                }
+                const name = file?.name || "Unknown file";
+
+                if (type.includes('image')) {
+                  return <img src={path} alt="Preview" className="max-h-[400px] object-contain rounded-xl shadow-sm" />;
+                } else if (type.includes('video')) {
+                  return <video src={path} controls className="max-h-[400px] rounded-xl shadow-sm w-full" />;
+                } else if (type.includes('audio')) {
+                  return <audio src={path} controls className="w-full" />;
+                } else {
+                  return <p className="font-bold text-gray-500">Preview not available for this file type</p>;
+                }
+              })()}
+              <p className="mt-4 text-sm font-bold text-gray-700">{(previewFiles[previewIndex]?.fileId || previewFiles[previewIndex])?.name || "Unknown file"}</p>
+            </div>
+            
+            {previewFiles.length > 1 && (
+              <div className="flex items-center justify-between px-8 py-4 bg-white border-t border-gray-100">
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev > 0 ? prev - 1 : previewFiles.length - 1))}
+                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-bold transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm font-bold text-gray-500">{previewIndex + 1} of {previewFiles.length}</span>
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev < previewFiles.length - 1 ? prev + 1 : 0))}
+                  className="px-4 py-2 bg-[#FF5722] text-white rounded-xl hover:bg-[#F4511E] text-sm font-bold transition-all shadow-md shadow-[#FF5722]/20"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -1077,6 +1226,8 @@ const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Status");
+  const [previewFiles, setPreviewFiles] = useState<any[] | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   const fetchPlaylists = async () => {
     const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : "";
@@ -1162,52 +1313,134 @@ const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-gray-100 text-xs font-bold text-gray-900 uppercase">
-                <th className="px-6 py-4">PLAYLIST NAME</th>
-                <th className="px-6 py-4">SCHEDULE</th>
-                <th className="px-6 py-4">PREVIEW</th>
-                <th className="px-6 py-4">STATUS</th>
-                <th className="px-6 py-4 text-right">ACTION</th>
+              <tr className="border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                <th className="px-6 py-5">CAMPAIGN TYPE</th>
+                <th className="px-6 py-5">NAME</th>
+                <th className="px-6 py-5">SCHEDULE</th>
+                <th className="px-6 py-5">PREVIEW</th>
+                <th className="px-6 py-5">STATUS</th>
+                <th className="px-6 py-5 text-right">ACTION</th>
               </tr>
             </thead>
             <tbody className="text-sm font-medium">
               {loading ? (
-                <tr><td colSpan={5} className="p-6 text-center text-gray-500">Loading playlists...</td></tr>
+                <tr><td colSpan={6} className="p-12 text-center text-gray-500">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-4 border-[#00BCD4] border-t-transparent rounded-full animate-spin"></div>
+                    <p className="font-bold text-[#0E3B43]">Loading playlists...</p>
+                  </div>
+                </td></tr>
               ) : filteredPlaylists.length === 0 ? (
-                <tr><td colSpan={5} className="p-6 text-center text-gray-500">No playlists found</td></tr>
-              ) : filteredPlaylists.map((row, i) => (
-                <tr key={row._id || i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  <td className="px-6 py-6 text-gray-800">
-                    <p className="font-bold">{row.name}</p>
-                    <p className="text-xs text-[#FF5722] uppercase">{["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type) ? 'Announcement Playlist' : 'Media Playlist'}</p>
+                <tr><td colSpan={6} className="p-12 text-center text-gray-500 italic font-medium">No playlists found matching filters</td></tr>
+              ) : filteredPlaylists.map((row, i) => {
+                const days = Array.isArray(row.daysOfWeek) ? row.daysOfWeek.join(",") : "";
+                const time = row.startTime && row.endTime ? `${row.startTime} to ${row.endTime}` : "";
+                const schedule = [days, time].filter(Boolean).join(" | ") || "—";
+                const hasMedia = row.mediaIds?.length || row.announcements?.length;
+                const preview = hasMedia ? `Display file link - uploaded by ${row.userId?.username || "user"}` : "—";
+                const isAnn = !!row.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(row.type);
+                const hasStoreConnected = (row.deviceIds && row.deviceIds.length > 0) || row.selectedDeviceId;
+                const status = (row.isAssigned && hasStoreConnected) ? "Assigned" : "";
+
+                return (
+                <tr key={row._id || i} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="px-6 py-6">
+                    <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase ${isAnn ? "bg-red-50 text-red-500 border border-red-100" : "bg-cyan-50 text-[#00BCD4] border border-cyan-100"}`}>
+                      {isAnn ? "Announcement Playlist" : "Media Playlist"}
+                    </span>
                   </td>
-                  <td className="px-6 py-6 text-gray-800">{renderSchedule(row)}</td>
-                  <td className="px-6 py-6 text-gray-500 text-sm">
-                    {row.files && row.files.length > 0 
-                      ? `${row.files.length} file(s)` 
-                      : "No files"}
+                  <td className="px-6 py-6 text-[#162B30] font-bold">{row.name || "Playlist name"}</td>
+                  <td className="px-6 py-6 text-gray-600 text-sm">{schedule}</td>
+                  <td className="px-6 py-6 text-[#64848D] text-xs">
+                    {hasMedia ? (
+                      <button 
+                        onClick={() => {
+                          setPreviewFiles(row.files || row.announcements || []);
+                          setPreviewIndex(0);
+                        }}
+                        className="hover:underline text-[#00BCD4] text-left"
+                      >
+                        {preview}
+                      </button>
+                    ) : "—"}
                   </td>
-                  <td className={`px-6 py-6 text-green-500 font-medium`}>Running</td>
-                  <td className="px-6 py-6 flex items-center justify-end gap-5">
-                    <button 
-                      onClick={() => {
-                        if (setActiveView && setEditingCampaign) {
-                          setEditingCampaign(row);
-                          setActiveView("create_central_campaign_form");
-                        }
-                      }}
-                      className="text-[#00BCD4] hover:text-[#00ACC1]"
-                    >
-                      <Edit size={18} />
-                    </button>
-                    <button onClick={() => handleDelete(row._id)} className="text-red-500 hover:text-red-600"><Trash2 size={18} /></button>
+                  <td className="px-6 py-6">
+                    {status && <span className="px-3 py-1 rounded-full text-xs font-bold text-green-600 bg-green-50">{status}</span>}
+                  </td>
+                  <td className="px-6 py-6">
+                    <div className="flex items-center justify-end gap-3">
+                      <button 
+                        onClick={() => {
+                          if (setActiveView && setEditingCampaign) {
+                            setEditingCampaign(row);
+                            setActiveView("create_central_campaign_form");
+                          }
+                        }}
+                        className="w-8 h-8 flex items-center justify-center text-[#00BCD4] bg-cyan-50 hover:bg-cyan-100 rounded-lg transition-colors"
+                        title="Edit Playlist"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={() => row._id && handleDelete(row._id)}
+                        className="w-8 h-8 flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Delete Playlist"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewFiles && previewFiles.length > 0 && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="bg-[#0E3B43] px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold">Media Preview</h3>
+              <button onClick={() => setPreviewFiles(null)} className="text-white/70 hover:text-white transition-colors text-xl font-bold">
+                ✕
+              </button>
+            </div>
+            <div className="p-8 flex flex-col items-center justify-center min-h-[300px] bg-gray-50">
+              {previewFiles[previewIndex]?.type?.startsWith('image/') ? (
+                <img src={previewFiles[previewIndex].path} alt="Preview" className="max-h-[400px] object-contain rounded-xl shadow-sm" />
+              ) : previewFiles[previewIndex]?.type?.startsWith('video/') ? (
+                <video src={previewFiles[previewIndex].path} controls className="max-h-[400px] rounded-xl shadow-sm w-full" />
+              ) : previewFiles[previewIndex]?.type?.startsWith('audio/') ? (
+                <audio src={previewFiles[previewIndex].path} controls className="w-full" />
+              ) : (
+                <p className="font-bold text-gray-500">Preview not available for this file type</p>
+              )}
+              <p className="mt-4 text-sm font-bold text-gray-700">{previewFiles[previewIndex]?.name || "Unknown file"}</p>
+            </div>
+            
+            {previewFiles.length > 1 && (
+              <div className="flex items-center justify-between px-8 py-4 bg-white border-t border-gray-100">
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev > 0 ? prev - 1 : previewFiles.length - 1))}
+                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-bold transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm font-bold text-gray-500">{previewIndex + 1} of {previewFiles.length}</span>
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev < previewFiles.length - 1 ? prev + 1 : 0))}
+                  className="px-4 py-2 bg-[#FF5722] text-white rounded-xl hover:bg-[#F4511E] text-sm font-bold transition-all shadow-md shadow-[#FF5722]/20"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -2368,6 +2601,9 @@ export default function AccountMarketingDashboard() {
     if (hasSubItems) {
       setExpandedMenu(expandedMenu === linkId ? "" : linkId);
     } else {
+      if (linkId === "create_central_campaign" || linkId === "create_announcement" || linkId === "create_central_campaign_form") {
+        setEditingCampaign(null);
+      }
       setActiveView(linkId);
       setExpandedMenu("");
     }
@@ -2377,7 +2613,7 @@ export default function AccountMarketingDashboard() {
     switch (activeView) {
       case "dashboard": return <DashboardView setActiveView={setActiveView} userData={userData} />;
       case "view_store_campaigns": return <ViewStoreCampaignsView userData={userData} setActiveView={setActiveView} setMailboxData={setMailboxData} />;
-      case "create_central_campaign": return <CreateCentralCampaignMenuView setActiveView={setActiveView} />;
+      case "create_central_campaign": return <CreateCentralCampaignMenuView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "create_central_campaign_form": return <CreateCentralCampaignFormView userData={userData} editData={editingCampaign} setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "view_central_campaigns": return <ViewCentralCampaignsView setActiveView={setActiveView} setEditingCampaign={setEditingCampaign} />;
       case "create_instant_announcement": return <CreateInstantAnnouncementView userData={userData} setActiveView={setActiveView} />;

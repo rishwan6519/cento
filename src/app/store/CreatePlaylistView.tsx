@@ -427,9 +427,8 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
                 <label style={labelStyle}>Type</label>
                 <select style={{ ...inputStyle, appearance: "none" }} value={cfg.type} onChange={e => setCfg(p => ({ ...p, type: e.target.value }))}>
                   <option value="">Select type</option>
-                  <option value="audio">Audio</option>
-                  <option value="video">Video</option>
-                  <option value="image">Image</option>
+                  <option value="media">Media</option>
+                  <option value="promotional">Promotional</option>
                 </select>
               </div>
             </div>

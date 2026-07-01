@@ -15,6 +15,10 @@ const devicePlaylistSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PlaylistConfig'
   }],
+  announcementPlaylistIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AnnouncementPlaylist'
+  }],
   priorities: {
     type: Map,
     of: Number,

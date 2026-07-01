@@ -201,20 +201,24 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Device ID is required' }, { status: 400 });
     }
 
-    // If a playlistId is provided, remove that specific playlist from the device.
-    if (playlistId) {
-      const result = await DevicePlaylist.updateOne(
-        { deviceId },
-        { $pull: { playlistIds: playlistId } }
-      );
-
-      if (result.modifiedCount === 0) {
-        return NextResponse.json({ error: 'Device or playlist not found' }, { status: 404 });
-      }
-    } else {
-      // If no playlistId is provided, you could choose to delete the entire device playlist record.
-      // For this use case, we'll assume we always get a playlistId.
+    if (!playlistId) {
       return NextResponse.json({ error: 'Playlist ID is required for disconnection' }, { status: 400 });
+    }
+
+    // Try removing from regular playlistIds first
+    const result = await DevicePlaylist.updateOne(
+      { deviceId },
+      { $pull: { playlistIds: playlistId } }
+    );
+
+    // Also try removing from announcementPlaylistIds
+    const annResult = await DevicePlaylist.updateOne(
+      { deviceId },
+      { $pull: { announcementPlaylistIds: playlistId } }
+    );
+
+    if (result.modifiedCount === 0 && annResult.modifiedCount === 0) {
+      return NextResponse.json({ error: 'Device or playlist not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, message: "Playlist disconnected successfully" });

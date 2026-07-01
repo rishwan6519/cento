@@ -14,6 +14,8 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
   const [filter, setFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [previewFiles, setPreviewFiles] = useState<any[] | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
 
   useEffect(() => {
@@ -61,7 +63,8 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
 
   const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-AU') : "—";
   const getStatus = (p: any) => {
-    return p.isAssigned ? "Assigned" : "—";
+    const hasDevices = (p.deviceIds && p.deviceIds.length > 0) || p.selectedDeviceId;
+    return (p.isAssigned && hasDevices) ? "Assigned" : "";
   };
   const getStatusColor = (s: string) => s === "Assigned" ? "#16A34A" : "#64848D";
 
@@ -155,7 +158,19 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                       )}
                       <td style={{ fontWeight: 600, color: "#162B30" }}>{p.name || "Playlist name"}</td>
                       <td>{schedule}</td>
-                      <td style={{ fontSize: ".8rem", color: "#64848D" }}>{preview}</td>
+                      <td style={{ fontSize: ".8rem", color: "#64848D" }}>
+                        {hasMedia ? (
+                          <button 
+                            onClick={() => {
+                              setPreviewFiles(p.files || p.announcements || []);
+                              setPreviewIndex(0);
+                            }}
+                            style={{ background: "none", border: "none", color: "#11B5BB", cursor: "pointer", padding: 0, textDecoration: "underline", textAlign: "left" }}
+                          >
+                            {preview}
+                          </button>
+                        ) : "—"}
+                      </td>
                       <td><span className="su-vc-status" style={{ color: getStatusColor(status), background: status === "Assigned" ? "#F0FDF4" : "transparent" }}>{status}</span></td>
                       <td>
                         <div className="su-vc-actions">
@@ -174,6 +189,56 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
           </>
         )}
       </div>
+
+      {/* Preview Modal */}
+      {previewFiles && previewFiles.length > 0 && (
+        <div className="su-vc-modal-overlay">
+          <div className="su-vc-modal">
+            <div className="su-vc-modal-header">
+              <h3>Media Preview</h3>
+              <button onClick={() => setPreviewFiles(null)} className="su-vc-modal-close">✕</button>
+            </div>
+            <div className="su-vc-modal-content">
+              {(() => {
+                const current = previewFiles[previewIndex];
+                const file = current?.fileId || current;
+                const type = (file?.type || '').toLowerCase();
+                const path = file?.url || file?.fileUrl || file?.path;
+                const name = file?.name || "Unknown file";
+
+                if (type.includes('image')) {
+                  return <img src={path} alt="Preview" className="su-vc-modal-media" />;
+                } else if (type.includes('video')) {
+                  return <video src={path} controls className="su-vc-modal-media" style={{ width: "100%" }} />;
+                } else if (type.includes('audio')) {
+                  return <audio src={path} controls style={{ width: "100%" }} />;
+                } else {
+                  return <p style={{ fontWeight: 700, color: "#64848D" }}>Preview not available for this file type</p>;
+                }
+              })()}
+              <p style={{ marginTop: "16px", fontSize: ".85rem", fontWeight: 700, color: "#162B30" }}>{(previewFiles[previewIndex]?.fileId || previewFiles[previewIndex])?.name || "Unknown file"}</p>
+            </div>
+            
+            {previewFiles.length > 1 && (
+              <div className="su-vc-modal-footer">
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev > 0 ? prev - 1 : previewFiles.length - 1))}
+                  className="su-vc-modal-btn"
+                >
+                  Previous
+                </button>
+                <span style={{ fontSize: ".85rem", fontWeight: 700, color: "#64848D" }}>{previewIndex + 1} of {previewFiles.length}</span>
+                <button 
+                  onClick={() => setPreviewIndex(prev => (prev < previewFiles.length - 1 ? prev + 1 : 0))}
+                  className="su-vc-modal-btn su-vc-modal-btn-primary"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style>{`
         .su-vc-view{display:flex;flex-direction:column;gap:24px}
@@ -207,6 +272,17 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
         .su-vc-date-filter{display:flex;align-items:center;gap:8px}
         .su-vc-date-label{font-size:.8rem;font-weight:600;color:#64848D}
         .su-vc-clear-date{background:none;border:none;color:#DC2626;font-size:.75rem;font-weight:600;cursor:pointer}
+        .su-vc-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)}
+        .su-vc-modal{background:#fff;border-radius:24px;width:100%;max-width:600px;overflow:hidden;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1)}
+        .su-vc-modal-header{background:#0B2830;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+        .su-vc-modal-header h3{color:#fff;margin:0;font-size:1.1rem}
+        .su-vc-modal-close{background:none;border:none;color:rgba(255,255,255,0.7);font-size:1.5rem;cursor:pointer}
+        .su-vc-modal-close:hover{color:#fff}
+        .su-vc-modal-content{padding:32px;background:#FAFCFC;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px}
+        .su-vc-modal-media{max-height:400px;border-radius:12px;box-shadow:0 1px 3px 0 rgba(0,0,0,0.1);max-width:100%}
+        .su-vc-modal-footer{padding:16px 32px;background:#fff;border-top:1px solid #EAEFEF;display:flex;align-items:center;justify-content:space-between}
+        .su-vc-modal-btn{padding:8px 16px;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;border:1px solid #EAEFEF;background:#fff;color:#162B30}
+        .su-vc-modal-btn-primary{background:#F05A28;color:#fff;border:none}
       `}</style>
     </div>
   );
