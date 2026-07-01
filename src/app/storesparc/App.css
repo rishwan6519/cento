@@ -1,5 +1,5 @@
-@import "../../../node_modules/tailwindcss/index.css";
-@plugin "tailwind-scrollbar-hide";
+@import "tailwindcss";
+/* @plugin "tailwind-scrollbar-hide"; */
 
 @theme inline {
     --color-background: hsl(var(--background));
@@ -27,6 +27,7 @@
     --font-sans: 'Inter', sans-serif;
     --font-display: 'Space Grotesk', sans-serif;
 }
+
 
 /* ===== Theme Tokens ===== */
 @layer base {

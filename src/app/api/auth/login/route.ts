@@ -24,6 +24,14 @@ export async function POST(request: Request) {
         { status: 401 }
       );
     }
+
+    // Reject demo_store users from main login — they must use /demo/login
+    if (user.role === "demo_store") {
+      return NextResponse.json(
+        { message: "Please use the demo portal to login at /demo/login" },
+        { status: 403 }
+      );
+    }
     
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);

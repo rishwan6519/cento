@@ -72,6 +72,7 @@ export enum UserRole {
   AccountAdmin = 'account_admin',
   AccountMarketing = 'account_marketing',
   Store = 'store',
+  DemoStore = 'demo_store',
 }
 
 export interface UserDocument extends Document {
