@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       storeName,
       storeLocation: storeLocation || "",
       role: "demo_store",
+      approvalStatus: "pending",
     });
 
     // Find or create the "Demo Audio Speaker" device type
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
         userId: newUser._id,
         userName: newUser.username,
         role: "demo_store",
+        approvalStatus: newUser.approvalStatus,
       },
       process.env.JWT_SECRET!,
       { expiresIn: "7d" }
@@ -119,6 +121,7 @@ export async function POST(request: Request) {
           id: newUser._id,
           username: newUser.username,
           role: "demo_store",
+          approvalStatus: newUser.approvalStatus,
           storeName: newUser.storeName,
           storeLocation: newUser.storeLocation,
         },

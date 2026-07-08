@@ -108,6 +108,7 @@ export async function POST(request: Request) {
         userId: user._id,
         userName: user.username,
         role: "demo_store",
+        approvalStatus: user.approvalStatus,
       },
       process.env.JWT_SECRET!,
       { expiresIn: "7d" }
@@ -123,6 +124,7 @@ export async function POST(request: Request) {
           id: user._id,
           username: user.username,
           role: "demo_store",
+          approvalStatus: user.approvalStatus,
           storeName: user.storeName,
           storeLocation: user.storeLocation,
         },

@@ -12,6 +12,7 @@ interface User {
   phone?: string;
   companyName?: string;
   location?: string;
+  approvalStatus?: string;
 }
 
 interface UserFormData {
@@ -27,6 +28,7 @@ interface UserFormData {
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
+  const [activeTab, setActiveTab] = useState<'resellers' | 'demo'>('resellers');
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
@@ -52,13 +54,20 @@ export default function UserManagement() {
         ? `/api/user?controllerId=${controllerId}`
         : `/api/user`;
 
+      // Fetch controller's users (resellers, etc.)
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
-      if (data.success) {
-        // Only show resellers in the list
-        const filteredUsers = data.data.filter((u: User) => u.role === 'reseller');
-        setUsers(filteredUsers);
+      
+      // Fetch demo users (they don't have controllerId)
+      const demoResponse = await fetch('/api/user?role=demo_store');
+      const demoData = await demoResponse.json();
+
+      if (data.success && demoData.success) {
+        // Combine and remove duplicates just in case
+        const combined = [...data.data, ...demoData.data];
+        const unique = Array.from(new Map(combined.map(item => [item._id, item])).values());
+        setUsers(unique);
       }
     } catch (error) {
       toast.error('Failed to fetch users');
@@ -117,6 +126,25 @@ export default function UserManagement() {
     }
   };
 
+  const handleApproveDemo = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/user?userId=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalStatus: 'approved' }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Demo user approved successfully');
+        fetchUsers();
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to approve user');
+    }
+  };
+
   const handleDelete = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     
@@ -147,13 +175,37 @@ export default function UserManagement() {
               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Identity Access</h2>
               <p className="text-slate-500 font-medium">Control operational permissions and system roles.</p>
             </div>
-            <button
-              onClick={() => setIsAddingUser(true)}
-              className="flex items-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-slate-900/20"
-            >
-              <UserPlus size={20} />
-              Onboard User
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="flex bg-slate-100 p-1 rounded-2xl">
+                <button
+                  onClick={() => setActiveTab('resellers')}
+                  className={`px-6 py-2.5 rounded-xl font-bold transition-all ${
+                    activeTab === 'resellers' 
+                      ? 'bg-white text-slate-900 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Resellers
+                </button>
+                <button
+                  onClick={() => setActiveTab('demo')}
+                  className={`px-6 py-2.5 rounded-xl font-bold transition-all ${
+                    activeTab === 'demo' 
+                      ? 'bg-white text-slate-900 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Demo Users
+                </button>
+              </div>
+              <button
+                onClick={() => setIsAddingUser(true)}
+                className="flex items-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-slate-900/20"
+              >
+                <UserPlus size={20} />
+                Onboard User
+              </button>
+            </div>
           </div>
 
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -165,11 +217,12 @@ export default function UserManagement() {
                 <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Contact Info</th>
                 <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Organization</th>
                 <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Access Role</th>
+                <th className="px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.2em]">Status</th>
                 <th className="px-8 py-5 text-right text-[10px] font-bold uppercase tracking-[0.2em]">Operations</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {users.map((user) => (
+              {users.filter(u => u.role === (activeTab === 'resellers' ? 'reseller' : 'demo_store')).map((user) => (
                 <tr key={user._id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-8 py-6 whitespace-nowrap">
                     {editingUser === user._id ? (
@@ -245,9 +298,20 @@ export default function UserManagement() {
                     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
                       user.role === 'reseller' 
                         ? 'bg-blue-100 text-blue-600' 
+                        : user.role === 'demo_store' ? 'bg-purple-100 text-purple-600'
                         : 'bg-slate-100 text-slate-500'
                     }`}>
                       {user.role}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 whitespace-nowrap">
+                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      user.approvalStatus === 'approved' 
+                        ? 'bg-green-100 text-green-600' 
+                        : user.approvalStatus === 'pending' ? 'bg-orange-100 text-orange-600'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {user.approvalStatus || 'approved'}
                     </span>
                   </td>
                   <td className="px-8 py-6 whitespace-nowrap text-right">
@@ -272,6 +336,14 @@ export default function UserManagement() {
                         </div>
                       ) : (
                         <>
+                          {user.role === 'demo_store' && user.approvalStatus === 'pending' && (
+                            <button
+                              onClick={() => handleApproveDemo(user._id)}
+                              className="px-4 py-2 bg-green-500 text-white hover:bg-green-600 rounded-xl font-bold text-xs shadow-sm transition-all mr-2"
+                            >
+                              Approve
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setEditingUser(user._id);

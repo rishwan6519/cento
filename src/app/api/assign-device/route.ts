@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       .populate({
         path: 'deviceId',
         model: Device,
-        select: 'name serialNumber status imageUrl color typeId',
+        select: 'name serialNumber status imageUrl color typeId lastConnection',
         populate: {
           path: 'typeId',
           model: DeviceType,

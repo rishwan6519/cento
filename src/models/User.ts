@@ -149,6 +149,11 @@ const UserSchema: Schema = new Schema({
     enum: Object.values(UserRole), 
     default: UserRole.User
   },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved'
+  },
   hasAllStoreAccess: {
     type: Boolean,
     default: false

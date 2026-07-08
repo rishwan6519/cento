@@ -57,6 +57,7 @@ export default function DemoSignupPage() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("userId", data.user.id);
       localStorage.setItem("userRole", data.user.role);
+      localStorage.setItem("approvalStatus", data.user.approvalStatus || "pending");
       localStorage.setItem("demoDeviceSerial", data.device?.serialNumber || "");
 
       router.push("/demo/dashboard");

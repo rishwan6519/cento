@@ -19,6 +19,7 @@ import {
   FaBars,
   FaMusic,
   FaBullhorn,
+  FaGooglePlay
 } from "react-icons/fa";
 import { MdCampaign, MdComputer } from "react-icons/md";
 import { BsMusicNoteList } from "react-icons/bs";
@@ -44,6 +45,7 @@ interface OfflineDevice {
   sn: string;
   lastSync: string;
   status: string;
+  hasConnected?: boolean;
 }
 
 // ─── Sidebar Component ────────────────────────────────────────────────────────
@@ -240,7 +242,7 @@ const DevicePinModal: React.FC<PinModalProps> = ({ pinData, loading, onClose, on
   // Poll for verification status
   useEffect(() => {
     if (!pinData?.pin || isVerified) return;
-    
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/device-pin/status?pin=${pinData.pin}`);
@@ -298,12 +300,35 @@ const DevicePinModal: React.FC<PinModalProps> = ({ pinData, loading, onClose, on
                 </div>
 
                 <div className="dpin-qr-section">
+                  <div style={{ marginBottom: '20px', width: '100%' }}>
+                    <a 
+                      href="https://play.google.com/store/apps/details?id=com.yourapp" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                        background: '#0D4954', color: '#fff', textDecoration: 'none',
+                        padding: '12px', borderRadius: '12px', fontWeight: 600, fontSize: '0.85rem',
+                        transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(13,73,84,0.2)'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = '#155E68'}
+                      onMouseOut={(e) => e.currentTarget.style.background = '#0D4954'}
+                    >
+                      <FaGooglePlay size={18} />
+                      Install Demo App via Playstore
+                    </a>
+                  </div>
+
+                  <p style={{ fontSize: '0.85rem', color: '#162B30', fontWeight: 600, marginBottom: '12px' }}>
+                    Then connect via QR or PIN:
+                  </p>
+
                   <div className="dpin-qr-wrap">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pinData.pin)}&bgcolor=ffffff&color=0B2830&margin=8`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(pinData.pin)}&bgcolor=ffffff&color=0B2830&margin=8`}
                       alt="QR Code"
-                      width={180}
-                      height={180}
+                      width={140}
+                      height={140}
                       className="dpin-qr-img"
                     />
                   </div>
@@ -354,6 +379,12 @@ const DemoDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNavi
   const [connectedDeviceIds, setConnectedDeviceIds] = useState<string[]>([]);
 
   useEffect(() => {
+    if (devices && devices.length > 0) {
+      setConnectedDeviceIds(devices.filter(d => d.hasConnected).map(d => d.id));
+    }
+  }, [devices]);
+
+  useEffect(() => {
     const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
     if (!userId) { setLoadingStats(false); return; }
 
@@ -363,11 +394,11 @@ const DemoDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNavi
     ]).then(([playlistData, announcementData]) => {
       const regularPlaylists = Array.isArray(playlistData) ? playlistData : (playlistData.playlists || playlistData.data || []);
       const announcementPlaylists = Array.isArray(announcementData) ? announcementData : (announcementData.playlists || announcementData.data || []);
-      
+
       const allPlaylists = [...regularPlaylists, ...announcementPlaylists];
       const mediaPlaylists = allPlaylists.filter((p: any) => p.type !== 'announcement' && p.type !== 'offer' && p.type !== 'alert');
       const annPlaylists = allPlaylists.filter((p: any) => p.type === 'announcement' || p.type === 'offer' || p.type === 'alert');
-      
+
       setStats({
         playlists: mediaPlaylists.length,
         announcements: annPlaylists.length,
@@ -375,10 +406,20 @@ const DemoDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNavi
     }).finally(() => setLoadingStats(false));
   }, []);
 
+  useEffect(() => {
+    // Wait until we have devices and finished loading basic stats
+    if (loadingStats || !devices || devices.length === 0) return;
+    
+    // Automatically open if exactly 1 device and it has NEVER connected to the mobile app
+    if (devices.length === 1 && !devices[0].hasConnected && !showPinModal) {
+      handleConnect(devices[0].id);
+    }
+  }, [devices, loadingStats]);
+
   const handleConnect = async (deviceId: string) => {
     const userId = localStorage.getItem("userId") || "";
     if (!userId) return;
-    
+
     setPinLoading(true);
     setPinData(null);
     setShowPinModal(true);
@@ -492,14 +533,14 @@ const DemoDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNavi
                         </p>
                         <p className="store-device-card__sync">Last sync : {device.lastSync}</p>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <button 
+                          <button
                             className={`store-device-card__connect-btn ${isConnected ? 'store-device-card__connect-btn--reconnect' : ''}`}
                             onClick={() => handleConnect(device.id)}
                           >
                             <FaLink size={11} /> {isConnected ? 'Reconnect' : 'Connect'}
                           </button>
-                          <button 
-                            className="store-device-card__raise-btn" 
+                          <button
+                            className="store-device-card__raise-btn"
                             style={{ color: isOnline ? '#16A34A' : '#F05A28' }}
                             onClick={() => { window.location.href = "mailto:contact@centelonrobotics.tech"; }}
                           >
@@ -548,27 +589,27 @@ import dynamic from "next/dynamic";
 
 const MediaManagementOverview = dynamic(
   () => import("@/app/store_user/MediaManagementOverview"),
-  { ssr: false, loading: () => <div style={{padding:40,textAlign:'center',color:'#A4B6B9'}}>Loading...</div> }
+  { ssr: false, loading: () => <div style={{ padding: 40, textAlign: 'center', color: '#A4B6B9' }}>Loading...</div> }
 );
 const ViewAllCampaigns = dynamic(
   () => import("@/app/store_user/ViewAllCampaigns"),
-  { ssr: false, loading: () => <div style={{padding:40,textAlign:'center',color:'#A4B6B9'}}>Loading...</div> }
+  { ssr: false, loading: () => <div style={{ padding: 40, textAlign: 'center', color: '#A4B6B9' }}>Loading...</div> }
 );
 const CreateMediaPlaylist = dynamic(
   () => import("@/app/store_user/CreateMediaPlaylist"),
-  { ssr: false, loading: () => <div style={{padding:40,textAlign:'center',color:'#A4B6B9'}}>Loading...</div> }
+  { ssr: false, loading: () => <div style={{ padding: 40, textAlign: 'center', color: '#A4B6B9' }}>Loading...</div> }
 );
 const CreateInstantPlaylist = dynamic(
   () => import("@/app/store_user/CreateInstantPlaylist"),
-  { ssr: false, loading: () => <div style={{padding:40,textAlign:'center',color:'#A4B6B9'}}>Loading...</div> }
+  { ssr: false, loading: () => <div style={{ padding: 40, textAlign: 'center', color: '#A4B6B9' }}>Loading...</div> }
 );
 const CreateAnnouncement = dynamic(
   () => import("@/app/store_user/CreateAnnouncement"),
-  { ssr: false, loading: () => <div style={{padding:40,textAlign:'center',color:'#A4B6B9'}}>Loading...</div> }
+  { ssr: false, loading: () => <div style={{ padding: 40, textAlign: 'center', color: '#A4B6B9' }}>Loading...</div> }
 );
 const ProfileView = dynamic(
   () => import("@/app/store_user/ProfileView"),
-  { ssr: false, loading: () => <div style={{padding:40,textAlign:'center',color:'#A4B6B9'}}>Loading...</div> }
+  { ssr: false, loading: () => <div style={{ padding: 40, textAlign: 'center', color: '#A4B6B9' }}>Loading...</div> }
 );
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -579,6 +620,8 @@ export default function DemoDashboardPage() {
   const [devices, setDevices] = useState<OfflineDevice[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<any>(null);
+  const [approvalStatus, setApprovalStatus] = useState<string>("approved"); // Default to approved for safety
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const router = useRouter();
 
@@ -598,6 +641,10 @@ export default function DemoDashboardPage() {
       return;
     }
 
+    const storedStatus = localStorage.getItem("approvalStatus");
+    if (storedStatus) setApprovalStatus(storedStatus);
+    setCheckingAuth(false);
+
     const fetchUser = async () => {
       const id = localStorage.getItem("userId");
       if (!id) return;
@@ -607,6 +654,10 @@ export default function DemoDashboardPage() {
         if (data.success && data.data && data.data.length > 0) {
           const user = data.data[0];
           setUserName(user.storeName || user.username || "Demo User");
+          if (user.approvalStatus) {
+            setApprovalStatus(user.approvalStatus);
+            localStorage.setItem("approvalStatus", user.approvalStatus);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch user", err);
@@ -630,6 +681,7 @@ export default function DemoDashboardPage() {
             sn: a.deviceId?.serialNumber || "N/A",
             lastSync: a.updatedAt ? new Date(a.updatedAt).toLocaleDateString() : "N/A",
             status: a.deviceId?.status || "active",
+            hasConnected: !!a.deviceId?.lastConnection
           }));
           setDevices(mapped);
         } else {
@@ -977,10 +1029,17 @@ export default function DemoDashboardPage() {
           background: #fff;
           border-radius: 24px;
           width: 100%; max-width: 400px;
+          max-height: calc(100vh - 40px);
+          overflow-y: auto;
+          -ms-overflow-style: none; /* IE and Edge */
+          scrollbar-width: none; /* Firefox */
           padding: 36px;
           position: relative;
           box-shadow: 0 24px 64px rgba(0,0,0,0.25);
           animation: dpin-slidein 0.3s ease;
+        }
+        .dpin-modal::-webkit-scrollbar {
+          display: none;
         }
         @keyframes dpin-slidein { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -1110,9 +1169,53 @@ export default function DemoDashboardPage() {
         .dpin-done-btn:hover {
           transform: translateY(-2px); box-shadow: 0 6px 20px rgba(17,181,187,0.4);
         }
+
+        /* ── Responsive adjustments ── */
+        @media (max-width: 480px) {
+          .dpin-overlay { padding: 16px; }
+          .dpin-modal { padding: 24px; border-radius: 20px; width: 100%; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); }
+          .dpin-digit { width: 38px; height: 46px; font-size: 1.3rem; }
+          .dpin-pin-display { gap: 6px; }
+          .dpin-qr-img { width: 140px; height: 140px; }
+          .dpin-header h2 { font-size: 1.1rem; }
+          .dpin-header-icon { width: 44px; height: 44px; margin-bottom: 12px; }
+        }
+        @media (max-width: 360px) {
+          .dpin-overlay { padding: 12px; }
+          .dpin-modal { padding: 20px; border-radius: 16px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+          .dpin-digit { width: 32px; height: 40px; font-size: 1.1rem; }
+          .dpin-pin-display { gap: 4px; }
+          .dpin-qr-img { width: 120px; height: 120px; }
+        }
       `}</style>
 
-      <div className="store-root">
+      {checkingAuth ? (
+        <div className="store-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="dpin-spinner" />
+        </div>
+      ) : approvalStatus === "pending" ? (
+        <div className="store-root" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFB' }}>
+          <div style={{ textAlign: 'center', maxWidth: '400px', padding: '40px', background: '#fff', borderRadius: '24px', boxShadow: '0 24px 64px rgba(0,0,0,0.1)' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #F59E0B, #D97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#fff' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#162B30', marginBottom: '12px' }}>Waiting for Approval</h2>
+            <p style={{ fontSize: '0.95rem', color: '#64848D', lineHeight: 1.5, marginBottom: '24px' }}>
+              Your demo store account has been created successfully, but it requires admin approval before you can access the dashboard.
+            </p>
+            <div style={{ padding: '12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', color: '#92400E', fontSize: '0.85rem', fontWeight: 500 }}>
+              Please check back later or contact the administrator.
+            </div>
+            <button 
+              onClick={() => { localStorage.clear(); router.push('/demo/login'); }}
+              style={{ marginTop: '24px', width: '100%', padding: '12px', background: '#F3F4F6', color: '#4B5563', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="store-root">
         <DemoSidebar
           activeView={activeView}
           onNavigate={handleNavigate}
@@ -1124,6 +1227,7 @@ export default function DemoDashboardPage() {
           <main className="store-content">{renderContent()}</main>
         </div>
       </div>
+      )}
     </>
   );
 }

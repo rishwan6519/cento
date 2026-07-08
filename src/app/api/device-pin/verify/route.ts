@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import DevicePin from "@/models/DevicePin";
+import Device from "@/models/Device";
 
 // POST — Verify a PIN and return the associated serial number
 export async function POST(request: Request) {
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
     // Mark as verified
     devicePin.isVerified = true;
     await devicePin.save();
+
+    await Device.findByIdAndUpdate(devicePin.deviceId, { lastConnection: new Date() });
 
     return NextResponse.json({
       success: true,
