@@ -97,6 +97,7 @@ export interface UserDocument extends Document {
   provisionedFiles?: { name: string; url: string }[];
   fcmTokens?: string[];
   notificationFrequency?: number;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 const UserSchema: Schema = new Schema({
