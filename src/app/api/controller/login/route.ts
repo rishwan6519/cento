@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const userResponse = {
       id: user._id,
       username: user.username,
-      role: "store", // Hardcoded for mobile app compatibility
+      role: user.role === "user" ? "store" : user.role, // Override 'user' to 'store' for mobile
       storeName: user.storeName,
       storeLocation: user.storeLocation,
       openingTime: "09:00",

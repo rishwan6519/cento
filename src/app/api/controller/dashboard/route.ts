@@ -75,20 +75,55 @@ export async function GET(request: Request) {
     };
 
     // --- Global Shared Data for ALL Roles ---
-    // 1. Devices directly assigned to this user (if any)
-    const assignments = await AssignedDevice.find({ userId: userObjectId }).populate('deviceId').lean();
-    const assignedDevices = assignments.map((a: any) => {
-      const d = a.deviceId;
-      if (!d) return null;
-      return {
+    let assignedDevices: any[] = [];
+
+    if (user.role === UserRole.Reseller) {
+      const customers = await Customer.find({ resellerId: userObjectId }).lean();
+      const customerIds = customers.map((c: any) => c._id);
+      
+      const orConditions: any[] = [{ resellerId: userObjectId }];
+      if (customerIds.length > 0) {
+        orConditions.push({ customerId: { $in: customerIds } });
+      }
+      const devices = await Device.find({ $or: orConditions }).populate('typeId', 'name type').lean();
+      
+      assignedDevices = devices.map((d: any) => ({
         _id: d._id,
         name: d.name,
         serialNumber: d.serialNumber,
         lastConnection: d.lastConnection,
         status: getDeviceStatus(d.lastConnection),
         type: d.type || d.typeId?.type || "audio"
-      };
-    }).filter(Boolean);
+      }));
+
+    } else if (user.role === UserRole.AccountAdmin) {
+      const devices = await Device.find({ customerId: user.customerId }).populate('typeId', 'name type').lean();
+      
+      assignedDevices = devices.map((d: any) => ({
+        _id: d._id,
+        name: d.name,
+        serialNumber: d.serialNumber,
+        lastConnection: d.lastConnection,
+        status: getDeviceStatus(d.lastConnection),
+        type: d.type || d.typeId?.type || "audio"
+      }));
+
+    } else {
+      // Store, User, AccountMarketing, etc.
+      const assignments = await AssignedDevice.find({ userId: userObjectId }).populate({ path: 'deviceId', populate: { path: 'typeId' } }).lean();
+      assignedDevices = assignments.map((a: any) => {
+        const d = a.deviceId;
+        if (!d) return null;
+        return {
+          _id: d._id,
+          name: d.name,
+          serialNumber: d.serialNumber,
+          lastConnection: d.lastConnection,
+          status: getDeviceStatus(d.lastConnection),
+          type: d.type || d.typeId?.type || "audio"
+        };
+      }).filter(Boolean);
+    }
 
     // 2. Playlists applicable to this user
     const orConditions: any[] = [{ userId: userObjectId }];
@@ -102,7 +137,7 @@ export async function GET(request: Request) {
     const baseUserInfo = {
       _id: user._id,
       username: user.username,
-      role: "store", // Hardcoded for mobile app compatibility
+      role: user.role === "user" ? "store" : user.role, // Override 'user' to 'store' for mobile
       storeName: user.storeName,
       storeLocation: user.storeLocation,
       companyName: user.companyName,
