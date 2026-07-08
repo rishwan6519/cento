@@ -263,7 +263,7 @@ export async function GET(request: Request) {
         }
       };
 
-    } else if (user.role === UserRole.Store) {
+    } else if (user.role === UserRole.Store || user.role === UserRole.User) {
       dashboard = {
         section: "Store Dashboard"
       };
