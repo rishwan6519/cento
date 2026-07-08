@@ -263,7 +263,7 @@ export async function GET(request: Request) {
         }
       };
 
-    } else if (user.role === UserRole.Store) {
+    } else {
       const assignments = await AssignedDevice.find({ userId: userObjectId }).populate('deviceId').lean();
 
       const assignedDevices = assignments.map((a: any) => {
@@ -278,19 +278,20 @@ export async function GET(request: Request) {
         };
       }).filter(Boolean);
 
-      // Playlists for this store
+      // Playlists for this user
       const playlists = await PlaylistConfig.find({
         $or: [{ userId: userObjectId }, { userId: user.controllerId }]
       }).sort({ createdAt: -1 });
 
-      // Announcements for this store
+      // Announcements for this user
       const announcements = await AnnouncementPlaylist.find({
         $or: [{ userId: userObjectId }, { userId: user.controllerId }]
       }).sort({ createdAt: -1 });
 
       dashboard = {
-        section: "Store Dashboard",
+        section: user.role === UserRole.Store ? "Store Dashboard" : "General Dashboard",
         _id: user._id,
+        role: user.role === UserRole.User ? UserRole.Store : user.role,
         storeName: user.storeName,
         storeLocation: user.storeLocation,
         openingTime: "09:00",
@@ -299,8 +300,6 @@ export async function GET(request: Request) {
         playlists,
         announcements
       };
-    } else {
-      dashboard = { section: "General Dashboard", message: "No specific dashboard for this role" };
     }
 
     return NextResponse.json(
