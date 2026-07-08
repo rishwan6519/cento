@@ -85,7 +85,8 @@ export async function GET(request: Request) {
         name: d.name,
         serialNumber: d.serialNumber,
         lastConnection: d.lastConnection,
-        status: getDeviceStatus(d.lastConnection)
+        status: getDeviceStatus(d.lastConnection),
+        type: d.type || d.typeId?.type || "audio"
       };
     }).filter(Boolean);
 
