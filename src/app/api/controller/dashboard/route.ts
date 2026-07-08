@@ -70,48 +70,203 @@ export async function GET(request: Request) {
       return formatted;
     };
 
-    dashboard = {
-      section: "Store Dashboard"
-    };
-
-    // --- Global Shared Data for ALL Roles ---
-    let assignedDevices: any[] = [];
-
     if (user.role === UserRole.Reseller) {
+      // Find all customers created by this reseller
       const customers = await Customer.find({ resellerId: userObjectId }).lean();
       const customerIds = customers.map((c: any) => c._id);
-      
+
+      // All stores under the reseller's customers (flat list)
+      const stores = await User.find(
+        { role: UserRole.Store, customerId: { $in: customerIds } },
+        'username storeName storeLocation operatorName customerId'
+      ).lean();
+
       const orConditions: any[] = [{ resellerId: userObjectId }];
       if (customerIds.length > 0) {
         orConditions.push({ customerId: { $in: customerIds } });
       }
-      const devices = await Device.find({ $or: orConditions }).populate('typeId', 'name type').lean();
-      
-      assignedDevices = devices.map((d: any) => ({
-        _id: d._id,
-        name: d.name,
-        serialNumber: d.serialNumber,
-        lastConnection: d.lastConnection,
-        status: getDeviceStatus(d.lastConnection),
-        type: d.type || d.typeId?.type || "audio"
-      }));
+      const devices = await Device.find({ $or: orConditions }).populate('typeId', 'name imageUrl').lean();
+
+      const deviceIds = devices.map(d => d._id);
+      const assignments = await AssignedDevice.find({ deviceId: { $in: deviceIds } }).populate('userId', 'username storeName storeLocation').lean();
+
+      const mappedDevices = devices.map((d: any) => {
+        const assignment: any = assignments.find((a: any) => a.deviceId.toString() === d._id.toString());
+        return {
+          _id: d._id,
+          name: d.name,
+          serialNumber: d.serialNumber,
+          type: formatDeviceType(d.typeId),
+          lastConnection: d.lastConnection,
+          status: getDeviceStatus(d.lastConnection),
+          connectedStore: assignment && assignment.userId ? {
+            ...assignment.userId,
+            openingTime: "09:00",
+            closingTime: "18:00"
+          } : null,
+          customerId: d.customerId
+        };
+      });
+
+      // Group entities by Organization (Customer)
+      const organizations = customers.map((customer: any) => {
+        const customerIdStr = customer._id.toString();
+
+        const customerDevices = mappedDevices.filter(
+          (d: any) => d.customerId && d.customerId.toString() === customerIdStr
+        );
+
+        const customerStores = stores
+          .filter((store: any) => store.customerId && store.customerId.toString() === customerIdStr)
+          .map((store: any) => {
+            const storeIdStr = store._id.toString();
+            const storeDevices = customerDevices.filter(
+              (d: any) => d.connectedStore && d.connectedStore._id.toString() === storeIdStr
+            );
+            return {
+              ...store,
+              openingTime: "09:00",
+              closingTime: "18:00",
+              devices: storeDevices
+            };
+          });
+
+        const customerUnassignedDevices = customerDevices.filter(
+          (d: any) => !d.connectedStore || !d.connectedStore._id
+        );
+
+        return {
+          _id: customer._id,
+          organizationName: customer.organizationName,
+          contactName: customer.contactName,
+          phone: customer.phone,
+          email: customer.email,
+          addressLine1: customer.addressLine1,
+          addressLine2: customer.addressLine2,
+          pinCode: customer.pinCode,
+          city: customer.city,
+          stores: customerStores,
+          unassignedDevices: customerUnassignedDevices
+        };
+      });
+
+      const unassignedDevices = mappedDevices.filter((d: any) => !d.customerId);
+
+      dashboard = {
+        section: "Reseller Dashboard",
+        organizations,
+        unassignedDevices
+      };
 
     } else if (user.role === UserRole.AccountAdmin) {
-      const devices = await Device.find({ customerId: user.customerId }).populate('typeId', 'name type').lean();
-      
-      assignedDevices = devices.map((d: any) => ({
-        _id: d._id,
-        name: d.name,
-        serialNumber: d.serialNumber,
-        lastConnection: d.lastConnection,
-        status: getDeviceStatus(d.lastConnection),
-        type: d.type || d.typeId?.type || "audio"
+      // Stores created under this admin's customer
+      const rawStores = await User.find(
+        { role: UserRole.Store, customerId: user.customerId },
+        'username storeName storeLocation operatorName'
+      ).lean();
+
+      const stores = rawStores.map((store: any) => ({
+        ...store,
+        openingTime: "09:00",
+        closingTime: "18:00"
       }));
 
-    } else {
-      // Store, User, AccountMarketing, etc.
-      const assignments = await AssignedDevice.find({ userId: userObjectId }).populate({ path: 'deviceId', populate: { path: 'typeId' } }).lean();
-      assignedDevices = assignments.map((a: any) => {
+      // Marketing users enriched with their assigned store
+      // Filter by controllerId (this admin's _id) so each admin only sees
+      // the marketing users they created, not those of sibling admins.
+      const rawMarketingUsers = await User.find(
+        { role: UserRole.AccountMarketing, controllerId: userObjectId },
+        'username email phone hasAllStoreAccess assignedStoreId controllerId'
+      ).lean();
+
+      const marketingUsers = await Promise.all(
+        rawMarketingUsers.map(async (mu: any) => {
+          let assignedStore = null;
+          if (mu.hasAllStoreAccess) {
+            assignedStore = stores; // all stores under this admin
+          } else if (mu.assignedStoreId) {
+            const rawStore = await User.findById(
+              mu.assignedStoreId,
+              'username storeName storeLocation operatorName'
+            ).lean();
+            if (rawStore) {
+              assignedStore = {
+                ...rawStore,
+                openingTime: "09:00",
+                closingTime: "18:00"
+              };
+            }
+          }
+          return { ...mu, assignedStore };
+        })
+      );
+
+      const devices = await Device.find({ customerId: user.customerId }).populate('typeId', 'name imageUrl').lean();
+
+      const deviceIds = devices.map(d => d._id);
+      const assignments = await AssignedDevice.find({ deviceId: { $in: deviceIds } }).populate('userId', 'username storeName storeLocation').lean();
+
+      const mappedDevices = devices.map((d: any) => {
+        const assignment: any = assignments.find((a: any) => a.deviceId.toString() === d._id.toString());
+        return {
+          _id: d._id,
+          name: d.name,
+          serialNumber: d.serialNumber,
+          type: formatDeviceType(d.typeId),
+          lastConnection: d.lastConnection,
+          status: getDeviceStatus(d.lastConnection),
+          connectedStore: assignment && assignment.userId ? {
+            ...assignment.userId,
+            openingTime: "09:00",
+            closingTime: "18:00"
+          } : null
+        };
+      });
+
+      dashboard = {
+        section: "Account Admin Dashboard",
+        stores,
+        marketingUsers,
+        devices: mappedDevices
+      };
+
+    } else if (user.role === UserRole.AccountMarketing) {
+      let rawAvailableStores = [];
+      if (user.hasAllStoreAccess) {
+        rawAvailableStores = await User.find({ role: UserRole.Store, customerId: user.customerId }, 'username storeName storeLocation').lean();
+      } else {
+        // Find stores associated with the same customer if no specific assigned stores property exists
+        // This handles cases where Marketing user has limited stores but simplified here to find by controllerId or similar logic.
+        rawAvailableStores = await User.find({ role: UserRole.Store, customerId: user.customerId }, 'username storeName storeLocation').lean();
+      }
+      const availableStores = rawAvailableStores.map((store: any) => ({
+        ...store,
+        openingTime: "09:00",
+        closingTime: "18:00"
+      }));
+
+      // Check for available campaigns (playlists & announcements)
+      const playlists = await PlaylistConfig.find({
+        $or: [{ userId: userObjectId }, { userId: user.controllerId }, { userId: user.customerId }]
+      }).sort({ createdAt: -1 });
+
+      const announcements = await AnnouncementPlaylist.find({
+        $or: [{ userId: userObjectId }, { userId: user.controllerId }, { userId: user.customerId }]
+      }).sort({ createdAt: -1 });
+
+      dashboard = {
+        section: "Account Marketing Dashboard",
+        availableStores,
+        campaigns: {
+          playlists,
+          announcements
+        }
+      };
+
+    } else if (user.role === UserRole.Store) {
+      const assignments = await AssignedDevice.find({ userId: userObjectId }).populate('deviceId').lean();
+
+      const assignedDevices = assignments.map((a: any) => {
         const d = a.deviceId;
         if (!d) return null;
         return {
@@ -119,41 +274,39 @@ export async function GET(request: Request) {
           name: d.name,
           serialNumber: d.serialNumber,
           lastConnection: d.lastConnection,
-          status: getDeviceStatus(d.lastConnection),
-          type: d.type || d.typeId?.type || "audio"
+          status: getDeviceStatus(d.lastConnection)
         };
       }).filter(Boolean);
+
+      // Playlists for this store
+      const playlists = await PlaylistConfig.find({
+        $or: [{ userId: userObjectId }, { userId: user.controllerId }]
+      }).sort({ createdAt: -1 });
+
+      // Announcements for this store
+      const announcements = await AnnouncementPlaylist.find({
+        $or: [{ userId: userObjectId }, { userId: user.controllerId }]
+      }).sort({ createdAt: -1 });
+
+      dashboard = {
+        section: "Store Dashboard",
+        _id: user._id,
+        storeName: user.storeName,
+        storeLocation: user.storeLocation,
+        openingTime: "09:00",
+        closingTime: "18:00",
+        assignedDevices,
+        playlists,
+        announcements
+      };
+    } else {
+      dashboard = { section: "General Dashboard", message: "No specific dashboard for this role" };
     }
-
-    // 2. Playlists applicable to this user
-    const orConditions: any[] = [{ userId: userObjectId }];
-    if (user.controllerId) orConditions.push({ userId: user.controllerId });
-    if (user.customerId) orConditions.push({ userId: user.customerId });
-
-    const playlists = await PlaylistConfig.find({ $or: orConditions }).sort({ createdAt: -1 });
-    const announcements = await AnnouncementPlaylist.find({ $or: orConditions }).sort({ createdAt: -1 });
-
-    // Include basic user info at the root for ALL dashboards
-    const baseUserInfo = {
-      _id: user._id,
-      username: user.username,
-      role: user.role === "user" ? "store" : user.role, // Override 'user' to 'store' for mobile
-      storeName: user.storeName,
-      storeLocation: user.storeLocation,
-      companyName: user.companyName,
-      operatorName: user.operatorName,
-      openingTime: "09:00",
-      closingTime: "18:00",
-    };
 
     return NextResponse.json(
       {
         success: true,
         notificationFrequency: thresholdMinutes,
-        ...baseUserInfo,
-        assignedDevices,
-        playlists,
-        announcements,
         ...dashboard
       },
       { status: 200 }
