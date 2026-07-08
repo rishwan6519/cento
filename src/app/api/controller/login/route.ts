@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const userResponse = {
       id: user._id,
       username: user.username,
-      role: user.role,
+      role: "store", // Hardcoded for mobile app compatibility
       storeName: user.storeName,
       storeLocation: user.storeLocation,
       openingTime: "09:00",

@@ -298,7 +298,7 @@ export async function GET(request: Request) {
     const baseUserInfo = {
       _id: user._id,
       username: user.username,
-      role: user.role,
+      role: "store", // Hardcoded for mobile app compatibility
       storeName: user.storeName,
       storeLocation: user.storeLocation,
       companyName: user.companyName,
