@@ -62,6 +62,10 @@ export async function POST(request: Request) {
           id: user._id,
           username: user.username,
           role: user.role,
+          storeName: user.storeName,
+          storeLocation: user.storeLocation,
+          openingTime: "09:00",
+          closingTime: "18:00",
         },
       },
       { status: 200 }

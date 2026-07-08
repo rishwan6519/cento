@@ -57,6 +57,8 @@ export async function POST(request: Request) {
       role: user.role,
       storeName: user.storeName,
       storeLocation: user.storeLocation,
+      openingTime: "09:00",
+      closingTime: "18:00",
       operatorName: user.operatorName,
       phone: user.phone,
       email: user.email,

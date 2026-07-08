@@ -264,46 +264,57 @@ export async function GET(request: Request) {
       };
 
     } else if (user.role === UserRole.Store) {
-      const assignments = await AssignedDevice.find({ userId: userObjectId }).populate('deviceId').lean();
-      
-      const assignedDevices = assignments.map((a: any) => {
-        const d = a.deviceId;
-        if (!d) return null;
-        return {
-          _id: d._id,
-          name: d.name,
-          serialNumber: d.serialNumber,
-          lastConnection: d.lastConnection,
-          status: getDeviceStatus(d.lastConnection)
-        };
-      }).filter(Boolean);
-
-      // Playlists for this store
-      const playlists = await PlaylistConfig.find({ 
-        $or: [{ userId: userObjectId }, { userId: user.controllerId }] 
-      }).sort({ createdAt: -1 });
-
-      // Announcements for this store
-      const announcements = await AnnouncementPlaylist.find({ 
-        $or: [{ userId: userObjectId }, { userId: user.controllerId }] 
-      }).sort({ createdAt: -1 });
-
       dashboard = {
-        section: "Store Dashboard",
-        openingTime: "09:00",
-        closingTime: "18:00",
-        assignedDevices,
-        playlists,
-        announcements
+        section: "Store Dashboard"
       };
     } else {
       dashboard = { section: "General Dashboard", message: "No specific dashboard for this role" };
     }
 
+    // --- Global Shared Data for ALL Roles ---
+    // 1. Devices directly assigned to this user (if any)
+    const assignments = await AssignedDevice.find({ userId: userObjectId }).populate('deviceId').lean();
+    const assignedDevices = assignments.map((a: any) => {
+      const d = a.deviceId;
+      if (!d) return null;
+      return {
+        _id: d._id,
+        name: d.name,
+        serialNumber: d.serialNumber,
+        lastConnection: d.lastConnection,
+        status: getDeviceStatus(d.lastConnection)
+      };
+    }).filter(Boolean);
+
+    // 2. Playlists applicable to this user
+    const orConditions: any[] = [{ userId: userObjectId }];
+    if (user.controllerId) orConditions.push({ userId: user.controllerId });
+    if (user.customerId) orConditions.push({ userId: user.customerId });
+
+    const playlists = await PlaylistConfig.find({ $or: orConditions }).sort({ createdAt: -1 });
+    const announcements = await AnnouncementPlaylist.find({ $or: orConditions }).sort({ createdAt: -1 });
+
+    // Include basic user info at the root for ALL dashboards
+    const baseUserInfo = {
+      _id: user._id,
+      username: user.username,
+      role: user.role,
+      storeName: user.storeName,
+      storeLocation: user.storeLocation,
+      companyName: user.companyName,
+      operatorName: user.operatorName,
+      openingTime: "09:00",
+      closingTime: "18:00",
+    };
+
     return NextResponse.json(
       {
         success: true,
         notificationFrequency: thresholdMinutes,
+        ...baseUserInfo,
+        assignedDevices,
+        playlists,
+        announcements,
         ...dashboard
       },
       { status: 200 }
