@@ -303,7 +303,7 @@ export async function GET(request: Request) {
       dashboard = {
         section: user.role === UserRole.Store ? "Store Dashboard" : "Store Dashboard",
         _id: user._id,
-        role: user.role === UserRole.User ? UserRole.Store : user.role,
+        role: user.role === "user" ? "store" : user.role,
         storeName: user.storeName || "",
         storeLocation: user.storeLocation || "",
         openingTime: "09:00",
