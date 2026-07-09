@@ -301,7 +301,7 @@ export async function GET(request: Request) {
       }).sort({ createdAt: -1 });
 
       dashboard = {
-        section: user.role === UserRole.Store ? "Store Dashboard" : "General Dashboard",
+        section: user.role === UserRole.Store ? "Store Dashboard" : "Store Dashboard",
         _id: user._id,
         role: user.role === UserRole.User ? UserRole.Store : user.role,
         storeName: user.storeName || "",
