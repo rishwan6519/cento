@@ -264,7 +264,10 @@ export async function GET(request: Request) {
       };
 
     } else {
-      const assignments = await AssignedDevice.find({ userId: userObjectId }).populate('deviceId').lean();
+      const assignments = await AssignedDevice.find({ userId: userObjectId }).populate({
+        path: 'deviceId',
+        populate: { path: 'typeId', select: 'name imageUrl' }
+      }).lean();
 
       const assignedDevices = assignments.map((a: any) => {
         const d = a.deviceId;
@@ -273,6 +276,7 @@ export async function GET(request: Request) {
           _id: d._id,
           name: d.name,
           serialNumber: d.serialNumber,
+          type: formatDeviceType(d.typeId),
           lastConnection: d.lastConnection,
           status: getDeviceStatus(d.lastConnection)
         };
@@ -292,8 +296,8 @@ export async function GET(request: Request) {
         section: user.role === UserRole.Store ? "Store Dashboard" : "General Dashboard",
         _id: user._id,
         role: user.role === UserRole.User ? UserRole.Store : user.role,
-        storeName: user.storeName,
-        storeLocation: user.storeLocation,
+        storeName: user.storeName || "",
+        storeLocation: user.storeLocation || "",
         openingTime: "09:00",
         closingTime: "18:00",
         assignedDevices,
