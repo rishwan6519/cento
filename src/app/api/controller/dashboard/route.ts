@@ -64,6 +64,14 @@ export async function GET(request: Request) {
     const formatDeviceType = (typeId: any) => {
       if (!typeId) return null;
       let formatted = { ...typeId };
+
+      // Enforce only "Audio" or "Video"
+      if (formatted.name && formatted.name.toLowerCase() === "video") {
+        formatted.name = "Video";
+      } else {
+        formatted.name = "Audio";
+      }
+
       if (formatted.imageUrl && !formatted.imageUrl.startsWith('http')) {
         formatted.imageUrl = `https://iot.centelon.com${formatted.imageUrl.startsWith('/') ? '' : '/'}${formatted.imageUrl}`;
       }
