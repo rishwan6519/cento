@@ -9,6 +9,7 @@ import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 import Announcement from '@/models/AnnouncementFiles';
 import MediaGroup from '@/models/MediaGroups';
 import MediaItem from '@/models/MediaItems';
+import crypto from 'crypto';
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,28 +69,34 @@ export async function GET(req: NextRequest) {
 
     if (devicePlaylist && devicePlaylist.playlistIds.length > 0) {
       const playlists = await Playlist.find({ _id: { $in: devicePlaylist.playlistIds } });
-      playlistDetails = playlists.map((p: any) => ({
-        id: p._id,
-        versionId: p.updatedAt.getTime().toString(),
-        contentType: p.contentType,
-        startDate: p.startDate,
-        endDate: p.endDate,
-        daysOfWeek: p.daysOfWeek,
-        startTime: p.startTime,
-        endTime: p.endTime,
-        shuffle: p.shuffle,
-        priority: p.priority !== undefined ? p.priority : (devicePlaylist.priorities ? (devicePlaylist.priorities.get(p._id.toString()) || 0) : 0),
-        files: p.files.map((f: any) => ({
-          path: `https://iot.centelon.com/${(f.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
-          displayOrder: f.displayOrder,
-          type: f.type,
-          delay: f.delay,
-          maxVolume: f.maxVolume,
-          minVolume: f.minVolume,
-          backgroundImageEnabled: f.backgroundImageEnabled,
-          backgroundImage: f.backgroundImage
-        }))
-      }));
+      playlistDetails = playlists.map((p: any) => {
+        const payload = {
+          contentType: p.contentType,
+          startDate: p.startDate,
+          endDate: p.endDate,
+          daysOfWeek: p.daysOfWeek,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          shuffle: p.shuffle,
+          priority: p.priority !== undefined ? p.priority : (devicePlaylist.priorities ? (devicePlaylist.priorities.get(p._id.toString()) || 0) : 0),
+          files: p.files.map((f: any) => ({
+            path: `https://iot.centelon.com/${(f.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
+            displayOrder: f.displayOrder,
+            type: f.type,
+            delay: f.delay,
+            maxVolume: f.maxVolume,
+            minVolume: f.minVolume,
+            backgroundImageEnabled: f.backgroundImageEnabled,
+            backgroundImage: f.backgroundImage
+          }))
+        };
+        
+        return {
+          id: p._id,
+          versionId: crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex'),
+          ...payload
+        };
+      });
     }
 
     // 3️⃣ Fetch linked Announcement Playlists
@@ -113,37 +120,40 @@ export async function GET(req: NextRequest) {
         model: Announcement
       });
 
-      announcementDetails = announcementPlaylists.map((ap: any) => ({
-        id: ap._id.toString(),
-        versionId: ap.updatedAt.getTime().toString(),
-        schedule: ap.schedule,
-        announcements: ap.announcements
-          .map((a: any) => {
-            if (!a.file) return null;
-            return {
-              name: a.file.name,
-              path: `https://iot.centelon.com/${(a.file.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
-              displayOrder: a.displayOrder,
-              delay: a.delay
-            };
-          })
-          .filter(Boolean)
-      }));
+      announcementDetails = announcementPlaylists.map((ap: any) => {
+        const payload = {
+          schedule: ap.schedule,
+          announcements: ap.announcements
+            .map((a: any) => {
+              if (!a.file) return null;
+              return {
+                name: a.file.name,
+                path: `https://iot.centelon.com/${(a.file.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
+                displayOrder: a.displayOrder,
+                delay: a.delay
+              };
+            })
+            .filter(Boolean)
+        };
+        
+        return {
+          id: ap._id.toString(),
+          versionId: crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex'),
+          ...payload
+        };
+      });
     }
 
     // 4️⃣ Fetch group information for the device
     const deviceObjectId = new mongoose.Types.ObjectId(device._id);
-    const groups = await MediaGroup.find({ deviceIds: deviceObjectId });
+    const groups = await MediaGroup.find({ deviceIds: deviceObjectId })
+      .populate('mediaIds')
+      .populate('deviceIds');
     
     // 5️⃣ Fetch media files for each group
-    const groupDetails = await Promise.all(groups.map(async (group) => {
-      // Populate media files for the group
-      const populatedGroup = await MediaGroup.findById(group._id)
-        .populate('mediaIds')
-        .populate('deviceIds');
-      
+    const groupDetails = groups.map((group: any) => {
       // Extract media file URLs
-      const mediaUrls = populatedGroup?.mediaIds.map((media: any) => ({
+      const mediaUrls = group.mediaIds?.map((media: any) => ({
         id: media._id,
         name: media.name,
         url: `https://iot.centelon.com/${(media.url || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
@@ -155,13 +165,13 @@ export async function GET(req: NextRequest) {
         id: group._id,
         name: group.name,
         description: group.description,
-        mediaCount: group.mediaIds.length,
-        deviceCount: group.deviceIds.length,
+        mediaCount: group.mediaIds?.length || 0,
+        deviceCount: group.deviceIds?.length || 0,
         mediaUrls: mediaUrls, // Include the actual media file URLs
         createdAt: group.createdAt,
         updatedAt: group.updatedAt
       };
-    }));
+    });
 
     // 6️⃣ Response
     return NextResponse.json({
