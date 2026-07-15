@@ -122,11 +122,13 @@ export async function GET(request: Request) {
         const thresholdMinutes = user.notificationFrequency !== undefined ? user.notificationFrequency : 60;
         const userCutoffTime = new Date(Date.now() - thresholdMinutes * 60 * 1000);
 
-        // Check if device is offline for this user (i.e. lastConnection is older than their threshold)
+        // We only notify if the device has been offline for AT LEAST the user's notificationFrequency
         if (device.lastConnection && new Date(device.lastConnection) < userCutoffTime) {
           const lastNotified = device.notifiedUsers.get(user._id.toString());
 
-          // Send notification if not notified yet, OR if the last notification was longer than their threshold ago
+          // Notify if:
+          // 1. We haven't notified them yet for this offline event
+          // 2. OR the last notification was sent before the threshold (reminder alert)
           if (!lastNotified || new Date(lastNotified) < userCutoffTime) {
             if (user.fcmTokens && user.fcmTokens.length > 0) {
               tokensToNotify.push(...user.fcmTokens);
@@ -145,13 +147,13 @@ export async function GET(request: Request) {
           device.name || device._id.toString(),
           false
         );
-        
+
         // Also update standard lastNotifiedOffline for backward compatibility
         device.lastNotifiedOffline = new Date();
-        
+
         // Save the updated map & notification timestamps
         await device.save();
-        
+
         totalNotified++;
       } catch (fcmError) {
         console.error(`Failed to send offline notification for device ${device._id}:`, fcmError);
