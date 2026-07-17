@@ -39,8 +39,16 @@ export async function POST(req: NextRequest) {
               const storeUser = await User.findById(assignment.userId);
               if (storeUser) {
                 const parsedAlert = typeof alertDataStr === 'string' ? JSON.parse(alertDataStr) : alertDataStr;
+                
+                // Add unique ID and timestamp if not provided
+                parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
+                parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
+
                 storeUser.activeAlerts = storeUser.activeAlerts || [];
                 storeUser.activeAlerts.push(parsedAlert);
+                
+                // CRITICAL: Mongoose requires markModified for Mixed types/arrays
+                storeUser.markModified('activeAlerts');
                 await storeUser.save();
 
                 if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
@@ -142,8 +150,16 @@ export async function POST(req: NextRequest) {
             const storeUser = await User.findById(assignment.userId);
             if (storeUser) {
               const parsedAlert = typeof alertData === 'string' ? JSON.parse(alertData) : alertData;
+              
+              // Add unique ID and timestamp if not provided
+              parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
+              parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
+
               storeUser.activeAlerts = storeUser.activeAlerts || [];
               storeUser.activeAlerts.push(parsedAlert);
+              
+              // CRITICAL: Mongoose requires markModified for Mixed types/arrays
+              storeUser.markModified('activeAlerts');
               await storeUser.save();
 
               if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
