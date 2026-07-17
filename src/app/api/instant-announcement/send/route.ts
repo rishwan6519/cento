@@ -39,17 +39,15 @@ export async function POST(req: NextRequest) {
               const storeUser = await User.findById(assignment.userId);
               if (storeUser) {
                 const parsedAlert = typeof alertDataStr === 'string' ? JSON.parse(alertDataStr) : alertDataStr;
-                
+
                 // Add unique ID and timestamp if not provided
                 parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
                 parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
 
-                storeUser.activeAlerts = storeUser.activeAlerts || [];
-                storeUser.activeAlerts.push(parsedAlert);
-                
-                // CRITICAL: Mongoose requires markModified for Mixed types/arrays
-                storeUser.markModified('activeAlerts');
-                await storeUser.save();
+                // Natively push to the database using $push
+                await User.findByIdAndUpdate(storeUser._id, {
+                  $push: { activeAlerts: parsedAlert }
+                });
 
                 if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
                   const title = parsedAlert.title || 'New Alert';
@@ -68,16 +66,16 @@ export async function POST(req: NextRequest) {
       }
 
       if (!userId || !file || !name || !type) {
-        return NextResponse.json({ 
-          success: false, 
+        return NextResponse.json({
+          success: false,
           message: 'Missing required fields',
           received: { userId: !!userId, file: !!file, name: !!name, type: !!type }
         }, { status: 400 });
       }
 
       // Save file to filesystem
-      const baseUploadPath = join(process.cwd(),  'uploads', 'instantaneous', userId, type);
-      
+      const baseUploadPath = join(process.cwd(), 'uploads', 'instantaneous', userId, type);
+
       if (!existsSync(baseUploadPath)) {
         await mkdir(baseUploadPath, { recursive: true });
       }
@@ -109,11 +107,11 @@ export async function POST(req: NextRequest) {
       await writeFile(filePath, buffer);
 
       const relPath = `/uploads/instantaneous/${userId}/${type}/${uniqueFileName}`;
-      
+
       console.log(`File saved successfully: ${relPath}`);
-      
-      return NextResponse.json({ 
-        success: true, 
+
+      return NextResponse.json({
+        success: true,
         fileUrl: relPath,
         fileName: uniqueFileName
       });
@@ -150,17 +148,15 @@ export async function POST(req: NextRequest) {
             const storeUser = await User.findById(assignment.userId);
             if (storeUser) {
               const parsedAlert = typeof alertData === 'string' ? JSON.parse(alertData) : alertData;
-              
+
               // Add unique ID and timestamp if not provided
               parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
               parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
 
-              storeUser.activeAlerts = storeUser.activeAlerts || [];
-              storeUser.activeAlerts.push(parsedAlert);
-              
-              // CRITICAL: Mongoose requires markModified for Mixed types/arrays
-              storeUser.markModified('activeAlerts');
-              await storeUser.save();
+              // Natively push to the database using $push
+              await User.findByIdAndUpdate(storeUser._id, {
+                $push: { activeAlerts: parsedAlert }
+              });
 
               if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
                 const title = parsedAlert.title || 'New Alert';
@@ -179,7 +175,7 @@ export async function POST(req: NextRequest) {
 
       // Create or find the announcement file record
       let announcementFile = await Announcement.findOne({ path: audioUrl });
-      
+
       if (!announcementFile) {
         // Create new announcement file record
         announcementFile = await Announcement.create({
@@ -197,7 +193,7 @@ export async function POST(req: NextRequest) {
         deviceId: device._id,
         file: announcementFile._id,
         userId,
-      
+
       });
 
       console.log('Instant announcement created:', instantAnnouncement);
@@ -213,8 +209,8 @@ export async function POST(req: NextRequest) {
       });
 
     } else {
-      return NextResponse.json({ 
-        success: false, 
+      return NextResponse.json({
+        success: false,
         message: 'Unsupported Content-Type',
         receivedContentType: contentType
       }, { status: 415 });
