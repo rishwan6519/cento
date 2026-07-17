@@ -318,6 +318,7 @@ export async function GET(request: Request) {
       {
         success: true,
         notificationFrequency: thresholdMinutes,
+        activeAlerts: user.activeAlerts || [],
         ...dashboard
       },
       { status: 200 }

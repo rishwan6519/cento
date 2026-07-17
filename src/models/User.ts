@@ -98,6 +98,7 @@ export interface UserDocument extends Document {
   fcmTokens?: string[];
   notificationFrequency?: number;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  activeAlerts?: any[];
 }
 
 const UserSchema: Schema = new Schema({
@@ -180,6 +181,10 @@ const UserSchema: Schema = new Schema({
     type: Number,
     required: false,
     default: 60
+  },
+  activeAlerts: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: []
   }
 }, { 
   timestamps: true 

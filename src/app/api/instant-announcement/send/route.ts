@@ -8,6 +8,9 @@ import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
 import InstantAnnouncement from '@/models/InstantAnnouncement';
 import Announcement from '@/models/AnnouncementFiles';
+import User from '@/models/User';
+import AssignedDevice from '@/models/AssignDevice';
+import { sendPushNotification } from '@/lib/firebase-admin';
 
 // ==================== POST - Upload and Save Announcement ====================
 export async function POST(req: NextRequest) {
@@ -21,8 +24,40 @@ export async function POST(req: NextRequest) {
       const name = formData.get('name') as string;
       const userId = formData.get('userId') as string;
       const type = formData.get('type') as string;
+      const alertDataStr = formData.get('alertData') as string;
+      const serialNumber = formData.get('serialNumber') as string || formData.get('deviceId') as string;
 
-      console.log("Received data:", { userId, fileName: file?.name, name, type });
+      console.log("Received data:", { userId, fileName: file?.name, name, type, hasAlert: !!alertDataStr });
+
+      if (alertDataStr && serialNumber) {
+        try {
+          await connectToDatabase();
+          const device = await Device.findOne({ serialNumber });
+          if (device) {
+            const assignment = await AssignedDevice.findOne({ deviceId: device._id });
+            if (assignment && assignment.userId) {
+              const storeUser = await User.findById(assignment.userId);
+              if (storeUser) {
+                const parsedAlert = typeof alertDataStr === 'string' ? JSON.parse(alertDataStr) : alertDataStr;
+                storeUser.activeAlerts = storeUser.activeAlerts || [];
+                storeUser.activeAlerts.push(parsedAlert);
+                await storeUser.save();
+
+                if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
+                  const title = parsedAlert.title || 'New Alert';
+                  const message = parsedAlert.message || 'You have a new alert.';
+                  await sendPushNotification(storeUser.fcmTokens, title, message, {
+                    action: 'refresh_dashboard',
+                    type: parsedAlert.type || 'alert'
+                  });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error processing alertData in formData:", err);
+        }
+      }
 
       if (!userId || !file || !name || !type) {
         return NextResponse.json({ 
@@ -80,9 +115,9 @@ export async function POST(req: NextRequest) {
       await connectToDatabase();
 
       const body = await req.json();
-      const { userId, deviceId, audioUrl, announcementName } = body;
+      const { userId, deviceId, audioUrl, announcementName, alertData } = body;
 
-      console.log("Sending announcement:", { userId, deviceId, audioUrl, announcementName });
+      console.log("Sending announcement:", { userId, deviceId, audioUrl, announcementName, hasAlert: !!alertData });
 
       if (!userId || !deviceId || !audioUrl || !announcementName) {
         return NextResponse.json({
@@ -98,6 +133,32 @@ export async function POST(req: NextRequest) {
           success: false,
           message: 'Device not found'
         }, { status: 404 });
+      }
+
+      if (alertData) {
+        try {
+          const assignment = await AssignedDevice.findOne({ deviceId: device._id });
+          if (assignment && assignment.userId) {
+            const storeUser = await User.findById(assignment.userId);
+            if (storeUser) {
+              const parsedAlert = typeof alertData === 'string' ? JSON.parse(alertData) : alertData;
+              storeUser.activeAlerts = storeUser.activeAlerts || [];
+              storeUser.activeAlerts.push(parsedAlert);
+              await storeUser.save();
+
+              if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
+                const title = parsedAlert.title || 'New Alert';
+                const message = parsedAlert.message || 'You have a new alert.';
+                await sendPushNotification(storeUser.fcmTokens, title, message, {
+                  action: 'refresh_dashboard',
+                  type: parsedAlert.type || 'alert'
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error processing alertData in JSON:", err);
+        }
       }
 
       // Create or find the announcement file record
