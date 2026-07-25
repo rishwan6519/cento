@@ -226,7 +226,7 @@ async function checkAndResolveJob(jobId: string) {
 
             const mediaItem = new MediaItemModel({
               userId: new mongoose.Types.ObjectId(job.userId),
-              name: `External AI Video (${i + 1}/${job.videoCount}) – ${job.model} – ${new Date().toLocaleString()}`,
+              name: `External AI Video (${i + 1}/${job.videoCount}) – ${job.modelName} – ${new Date().toLocaleString()}`,
               type: "video",
               url: localVideoUrl,
               createdAt: new Date(),
@@ -480,7 +480,7 @@ export async function POST(req: NextRequest) {
     const videoJob = new VideoJobModel({
       jobId,
       userId,
-      model,
+      modelName: model || "Wan 2.1",
       status: "processing",
       voiceoverScript,
       videoCount,

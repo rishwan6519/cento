@@ -22,7 +22,7 @@ export interface IVideoJob extends Document {
 const VideoJobSchema = new Schema<IVideoJob>({
   jobId: { type: String, required: true, unique: true },
   userId: { type: String, required: true },
-  modelName: { type: String, required: true },
+  modelName: { type: String, required: true, default: "Wan 2.1" },
   status: { type: String, enum: ["processing", "completed", "failed"], default: "processing" },
   voiceoverScript: { type: String, default: "" },
   videoCount: { type: Number, default: 1 },
@@ -38,4 +38,9 @@ const VideoJobSchema = new Schema<IVideoJob>({
   createdAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.models.VideoJob || mongoose.model<IVideoJob>("VideoJob", VideoJobSchema);
+if (mongoose.models && mongoose.models.VideoJob) {
+  delete mongoose.models.VideoJob;
+}
+
+export default mongoose.model<IVideoJob>("VideoJob", VideoJobSchema);
+
