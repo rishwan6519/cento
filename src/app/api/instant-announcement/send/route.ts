@@ -32,32 +32,27 @@ export async function POST(req: NextRequest) {
       if (alertDataStr && serialNumber) {
         try {
           await connectToDatabase();
-          const device = await Device.findOne({ serialNumber });
-          if (device) {
-            const assignment = await AssignedDevice.findOne({ deviceId: device._id });
-            if (assignment && assignment.userId) {
-              const storeUser = await User.findById(assignment.userId);
-              if (storeUser) {
-                const parsedAlert = typeof alertDataStr === 'string' ? JSON.parse(alertDataStr) : alertDataStr;
+          const storeUser = await User.findById(userId);
+          
+          if (storeUser) {
+            const parsedAlert = typeof alertDataStr === 'string' ? JSON.parse(alertDataStr) : alertDataStr;
+            
+            // Add unique ID and timestamp if not provided
+            parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
+            parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
 
-                // Add unique ID and timestamp if not provided
-                parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
-                parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
+            // Natively push to the database using $push
+            await User.findByIdAndUpdate(userId, {
+              $push: { activeAlerts: parsedAlert }
+            });
 
-                // Natively push to the database using $push
-                await User.findByIdAndUpdate(storeUser._id, {
-                  $push: { activeAlerts: parsedAlert }
-                });
-
-                if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
-                  const title = parsedAlert.title || 'New Alert';
-                  const message = parsedAlert.message || 'You have a new alert.';
-                  await sendPushNotification(storeUser.fcmTokens, title, message, {
-                    action: 'refresh_dashboard',
-                    type: parsedAlert.type || 'alert'
-                  });
-                }
-              }
+            if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
+              const title = parsedAlert.title || 'New Alert';
+              const message = parsedAlert.message || 'You have a new alert.';
+              await sendPushNotification(storeUser.fcmTokens, title, message, {
+                action: 'refresh_dashboard',
+                type: parsedAlert.type || 'alert'
+              });
             }
           }
         } catch (err) {
@@ -143,29 +138,27 @@ export async function POST(req: NextRequest) {
 
       if (alertData) {
         try {
-          const assignment = await AssignedDevice.findOne({ deviceId: device._id });
-          if (assignment && assignment.userId) {
-            const storeUser = await User.findById(assignment.userId);
-            if (storeUser) {
-              const parsedAlert = typeof alertData === 'string' ? JSON.parse(alertData) : alertData;
+          const storeUser = await User.findById(userId);
+          
+          if (storeUser) {
+            const parsedAlert = typeof alertData === 'string' ? JSON.parse(alertData) : alertData;
+            
+            // Add unique ID and timestamp if not provided
+            parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
+            parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
 
-              // Add unique ID and timestamp if not provided
-              parsedAlert._id = parsedAlert._id || `alert_${uuidv4()}`;
-              parsedAlert.timestamp = parsedAlert.timestamp || new Date().toISOString();
+            // Natively push to the database using $push
+            await User.findByIdAndUpdate(userId, {
+              $push: { activeAlerts: parsedAlert }
+            });
 
-              // Natively push to the database using $push
-              await User.findByIdAndUpdate(storeUser._id, {
-                $push: { activeAlerts: parsedAlert }
+            if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
+              const title = parsedAlert.title || 'New Alert';
+              const message = parsedAlert.message || 'You have a new alert.';
+              await sendPushNotification(storeUser.fcmTokens, title, message, {
+                action: 'refresh_dashboard',
+                type: parsedAlert.type || 'alert'
               });
-
-              if (storeUser.fcmTokens && storeUser.fcmTokens.length > 0) {
-                const title = parsedAlert.title || 'New Alert';
-                const message = parsedAlert.message || 'You have a new alert.';
-                await sendPushNotification(storeUser.fcmTokens, title, message, {
-                  action: 'refresh_dashboard',
-                  type: parsedAlert.type || 'alert'
-                });
-              }
             }
           }
         } catch (err) {

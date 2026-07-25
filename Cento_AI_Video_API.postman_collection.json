@@ -1,0 +1,274 @@
+{
+  "info": {
+    "name": "Cento — AI Video Creation API",
+    "_postman_id": "cento-ai-video-external-api-v1",
+    "description": "External API for AI Video Generation.\n\nSend one request with plain text + settings → get back:\n1. `videoUrl` — hosted video file\n2. `ttsAudio` — base64 MP3 audio of the spoken prompt\n\n**Base URL variable:** Set `{{base_url}}` in your environment (e.g. `http://localhost:3000` for local testing).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Change this to your deployed domain (e.g. https://your-domain.com)"
+    }
+  ],
+  "item": [
+    {
+      "name": "📁 External API",
+      "item": [
+        {
+          "name": "Create AI Video (plain text → video + TTS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "",
+                  "pm.test('Status code is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('success is true', () => {",
+                  "    pm.expect(res.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('videoUrl is present', () => {",
+                  "    pm.expect(res.videoUrl).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('ttsAudio is present (base64 string)', () => {",
+                  "    pm.expect(res.ttsAudio).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('enhancedPrompt is present', () => {",
+                  "    pm.expect(res.enhancedPrompt).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "// Auto-save videoUrl to environment for reuse",
+                  "if (res.videoUrl) {",
+                  "    pm.environment.set('last_video_url', res.videoUrl);",
+                  "    console.log('Video URL saved to environment variable: last_video_url');",
+                  "}",
+                  "",
+                  "// Log enhanced prompt",
+                  "if (res.enhancedPrompt) {",
+                  "    console.log('Enhanced Prompt:', res.enhancedPrompt);",
+                  "}",
+                  "",
+                  "// Log TTS audio length",
+                  "if (res.ttsAudio) {",
+                  "    console.log('TTS Audio base64 length:', res.ttsAudio.length, 'chars');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"a premium skincare serum product launch ad\",\n  \"userId\": \"64f3b2c1a4e2d1234567890a\",\n  \"model\": \"Wan 2.7\",\n  \"resolution\": \"1080p\",\n  \"aspectRatio\": \"16:9\",\n  \"duration\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/external/create-video",
+              "host": ["{{base_url}}"],
+              "path": ["api", "external", "create-video"]
+            },
+            "description": "**The main external endpoint.**\n\nProvide plain text + video settings. The server will automatically:\n1. Enhance your text into a cinematic prompt (GPT-4o-mini)\n2. Generate the video (fal.ai)\n3. Generate TTS audio of the prompt (OpenAI TTS)\n\n**Response contains:**\n- `videoUrl` — relative path to the video file (prefix with your domain)\n- `ttsAudio` — base64 MP3 string\n- `enhancedPrompt` — the AI-refined prompt used for generation\n\n⚠️ This request takes **1–3 minutes** — increase Postman timeout:\nSettings → General → Request timeout → set to `300000` (5 min)"
+          },
+          "response": [
+            {
+              "name": "✅ Success Example",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": "{\n  \"success\": true,\n  \"videoUrl\": \"/uploads/64f3b2c1a4e2d1234567890a/video/a1b2c3d4-ext-ai-generated.mp4\",\n  \"ttsAudio\": \"//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAAB...(base64 mp3 string)...\",\n  \"enhancedPrompt\": \"A breathtaking slow dolly shot gliding through a neon-drenched futuristic megacity at midnight. Holographic billboards reflect off rain-slicked streets below as sleek autonomous vehicles streak through layered skyways above...\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"text\": \"a premium skincare serum product launch ad\",\n  \"userId\": \"64f3b2c1a4e2d1234567890a\",\n  \"model\": \"Wan 2.7\",\n  \"resolution\": \"1080p\",\n  \"aspectRatio\": \"16:9\",\n  \"duration\": 5\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/external/create-video",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "external", "create-video"]
+                }
+              }
+            },
+            {
+              "name": "❌ Missing Required Field",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Field 'text' is required — provide your video description\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"64f3b2c1a4e2d1234567890a\",\n  \"model\": \"Wan 2.7\",\n  \"resolution\": \"1080p\",\n  \"aspectRatio\": \"16:9\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/external/create-video",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "external", "create-video"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📁 Internal APIs (Reference)",
+      "description": "These are the underlying internal APIs. Third parties should use the External API above instead.",
+      "item": [
+        {
+          "name": "Enhance Prompt Only",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success is true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('refinedPrompt returned', () => {",
+                  "    pm.expect(res.refinedPrompt).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "if (res.refinedPrompt) {",
+                  "    pm.environment.set('refined_prompt', res.refinedPrompt);",
+                  "    console.log('Refined Prompt:', res.refinedPrompt);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roughPrompt\": \"a luxury perfume brand ad with elegant visuals\",\n  \"resolution\": \"1080p\",\n  \"aspectRatio\": \"16:9\",\n  \"model\": \"Wan 2.7\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai-video/generate-prompt",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai-video", "generate-prompt"]
+            },
+            "description": "Enhances a rough text idea into a detailed cinematic video prompt.\n\nThe refined prompt is auto-saved to environment variable `refined_prompt` by the test script."
+          },
+          "response": [
+            {
+              "name": "✅ Success Example",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"refinedPrompt\": \"A breathtaking slow dolly shot gliding through a neon-drenched futuristic megacity at midnight...\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"roughPrompt\": \"a luxury perfume brand ad with elegant visuals\",\n  \"resolution\": \"1080p\",\n  \"aspectRatio\": \"16:9\",\n  \"model\": \"Wan 2.7\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/ai-video/generate-prompt",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "ai-video", "generate-prompt"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Video Only",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success is true', () => pm.expect(res.success).to.be.true);",
+                  "pm.test('videos array returned', () => {",
+                  "    pm.expect(res.videos).to.be.an('array').and.not.empty;",
+                  "});",
+                  "",
+                  "if (res.videos && res.videos[0]) {",
+                  "    pm.environment.set('last_video_url', res.videos[0].videoUrl);",
+                  "    console.log('Video URL:', res.videos[0].videoUrl);",
+                  "    console.log('Media ID:', res.videos[0].mediaId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"{{refined_prompt}}\",\n  \"userId\": \"64f3b2c1a4e2d1234567890a\",\n  \"model\": \"Wan 2.7\",\n  \"resolution\": \"1080p\",\n  \"aspectRatio\": \"16:9\",\n  \"duration\": 5,\n  \"numVideos\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai-video/generate-video",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai-video", "generate-video"]
+            },
+            "description": "Generates video from an enhanced prompt.\n\nTip: Run 'Enhance Prompt Only' first — it saves `refined_prompt` to the environment which this request uses automatically via `{{refined_prompt}}`.\n\n⚠️ Takes 1–3 minutes. Set Postman timeout to 300000ms."
+          },
+          "response": [
+            {
+              "name": "✅ Success Example",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"videos\": [\n    {\n      \"videoUrl\": \"/uploads/64f3b2c1a4e2d1234567890a/video/a1b2c3d4-ai-generated.mp4\",\n      \"mediaId\": \"64f3b2c1a4e2d1234567890b\"\n    }\n  ]\n}",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"prompt\": \"A breathtaking slow dolly shot...\",\n  \"userId\": \"64f3b2c1a4e2d1234567890a\",\n  \"model\": \"Wan 2.7\",\n  \"resolution\": \"1080p\",\n  \"aspectRatio\": \"16:9\",\n  \"duration\": 5,\n  \"numVideos\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/ai-video/generate-video",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "ai-video", "generate-video"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
