@@ -4,10 +4,11 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { connectToDatabase } from "@/lib/db";
 import MediaItemModel from "@/models/MediaItems";
+import VideoJobModel, { IVideoJob } from "@/models/VideoJob";
 import { v4 as uuidv4 } from "uuid";
 import mongoose from "mongoose";
 
-export const maxDuration = 300; // Allow up to 5 minutes (300s) for AI video generation
+export const maxDuration = 300; // Allow sufficient execution duration for background tasks
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
@@ -122,219 +123,218 @@ You MUST respond ONLY with a valid JSON object matching this schema:
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — Generate video via fal.ai
+// Helper: Check status of a video job and download results when ready
 // ---------------------------------------------------------------------------
-async function generateVideo(
-  prompt: string,
-  model: string,
-  aspectRatio: string,
-  duration: number,
-  falKey: string
-): Promise<string> {
-  const modelSlug = MODEL_SLUG_MAP[model] || "fal-ai/wan-t2v";
-  const imageSizeKey = ASPECT_MAP[aspectRatio] || "landscape_16_9";
+async function checkAndResolveJob(jobId: string) {
+  await connectToDatabase();
+  const job: IVideoJob | null = await VideoJobModel.findOne({ jobId });
+  if (!job) {
+    return NextResponse.json(
+      { success: false, message: `No video generation job found with jobId '${jobId}'` },
+      { status: 404 }
+    );
+  }
 
-  let falResponse: Response | null = null;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  if (job.status === "failed") {
+    return NextResponse.json({
+      success: false,
+      status: "failed",
+      jobId,
+      message: "One or more video generation tasks failed during processing at fal.ai.",
+    });
+  }
+
+  const falKey = process.env.FAL_KEY || "";
+  const uploadDir = join(process.cwd(), "uploads", job.userId, "video");
+  if (!existsSync(uploadDir)) {
+    await mkdir(uploadDir, { recursive: true });
+  }
+
+  let allCompleted = true;
+  let hasFailure = false;
+
+  for (let i = 0; i < job.falRequests.length; i++) {
+    const reqItem = job.falRequests[i];
+    if (reqItem.status === "completed") continue;
+    if (reqItem.status === "failed") {
+      hasFailure = true;
+      allCompleted = false;
+      continue;
+    }
+
+    // Check status in fal.ai (fast <1s HTTP check)
     try {
-      falResponse = await fetch(`https://queue.fal.run/${modelSlug}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Key ${falKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          image_size: imageSizeKey,     // For models expecting image_size keyword (Wan, Hunyuan)
-          aspect_ratio: aspectRatio,    // For models expecting aspect_ratio string (Kling, Veo, Seedance)
-          num_inference_steps: 30,
-          enable_safety_checker: true,
-          duration,
-        }),
+      const statusRes = await fetch(reqItem.statusUrl, {
+        headers: { Authorization: `Key ${falKey}` },
       });
-      if (!falResponse.ok && attempt < 3 && falResponse.status >= 500) {
-        await new Promise((r) => setTimeout(r, attempt * 2000));
+      if (!statusRes.ok) {
+        allCompleted = false;
         continue;
       }
-      break;
-    } catch (err: any) {
-      console.warn(`[fal.ai submit attempt ${attempt}/3] Network error: ${err.message || err}`);
-      if (attempt < 3) {
-        await new Promise((r) => setTimeout(r, attempt * 2000));
-      } else {
-        throw new Error(`Failed to connect to fal.ai after 3 attempts (Network/DNS error: ${err.message || "ENOTFOUND"})`);
-      }
-    }
-  }
 
-  if (!falResponse || !falResponse.ok) {
-    const errText = falResponse ? await falResponse.text().catch(() => "") : "No response";
-    throw new Error(`fal.ai submission error (${falResponse?.status || "network failure"}): ${errText}`);
-  }
-
-  let queueData: any = null;
-  try {
-    queueData = await falResponse.json();
-  } catch {
-    throw new Error("fal.ai returned an invalid (non-JSON) queue response");
-  }
-
-  const requestId: string = queueData?.request_id;
-  if (!requestId) {
-    throw new Error("fal.ai did not return a request_id — " + JSON.stringify(queueData));
-  }
-
-  // Use fal.ai's own status_url for polling and response_url for result.
-  // Note: Constructing full slug URLs manually (e.g. /wan/v2.1/1.3b/text-to-video/requests/ID)
-  // fails with 405 Method Not Allowed because fal.ai queues register requests under the base namespace.
-  const statusUrl: string =
-    queueData?.status_url ||
-    `https://queue.fal.run/${modelSlug}/requests/${requestId}/status`;
-  const responseUrl: string =
-    queueData?.response_url ||
-    statusUrl.replace(/\/status$/, "") ||
-    `https://queue.fal.run/${modelSlug}/requests/${requestId}`;
-
-  console.log("[fal.ai external] Polling status_url:", statusUrl);
-  console.log("[fal.ai external] Will fetch response_url:", responseUrl);
-
-  // Poll until COMPLETED (max ~6 minutes)
-  const maxAttempts = 120;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await new Promise((r) => setTimeout(r, 3000));
-
-    let statusRes: Response;
-    try {
-      statusRes = await fetch(statusUrl, {
-        headers: { Authorization: `Key ${falKey}` },
-      });
-    } catch (fetchErr) {
-      console.warn(`[poll attempt ${attempt}] Network error, retrying:`, fetchErr);
-      continue;
-    }
-
-    // Guard: only parse JSON if the response actually has a JSON body
-    const contentType = statusRes.headers.get("content-type") || "";
-    if (!statusRes.ok || !contentType.includes("application/json")) {
-      const raw = await statusRes.text().catch(() => "(unreadable)");
-      console.warn(`[poll attempt ${attempt}] Non-JSON or error response (${statusRes.status}): ${raw}`);
-      continue;
-    }
-
-    let statusJson: any;
-    try {
-      statusJson = await statusRes.json();
-    } catch {
-      console.warn(`[poll attempt ${attempt}] Failed to parse status JSON, retrying...`);
-      continue;
-    }
-
-    if (statusJson.status === "COMPLETED") {
-      // Some models return the result directly in the COMPLETED status response
-      const inlineUrl: string =
-        statusJson?.video?.url ||
-        statusJson?.videos?.[0]?.url ||
-        statusJson?.output?.video?.url ||
-        statusJson?.output?.video_url ||
-        statusJson?.output?.url ||
-        statusJson?.payload?.video?.url ||
-        statusJson?.data?.video?.url ||
-        "";
-
-      if (inlineUrl) {
-        return inlineUrl;
+      const statusJson = await statusRes.json().catch(() => null);
+      if (!statusJson) {
+        allCompleted = false;
+        continue;
       }
 
-      // Fetch result from fal.ai's own response_url
-      const resultRes = await fetch(responseUrl, {
-        headers: { Authorization: `Key ${falKey}` },
-      });
-      if (!resultRes.ok) {
-        const raw = await resultRes.text().catch(() => "(unreadable)");
-        throw new Error(`fal.ai result fetch failed (${resultRes.status}): ${raw}`);
-      }
-      let videoData: any;
-      try {
-        videoData = await resultRes.json();
-      } catch {
-        throw new Error("fal.ai result response was not valid JSON");
-      }
+      if (statusJson.status === "COMPLETED") {
+        let videoUrl: string =
+          statusJson?.video?.url ||
+          statusJson?.videos?.[0]?.url ||
+          statusJson?.output?.video?.url ||
+          statusJson?.output?.video_url ||
+          statusJson?.output?.url ||
+          statusJson?.payload?.video?.url ||
+          statusJson?.data?.video?.url ||
+          "";
 
-      const videoUrl: string =
-        videoData?.video?.url ||
-        videoData?.videos?.[0]?.url ||
-        videoData?.output?.video?.url ||
-        videoData?.output?.video_url ||
-        videoData?.output?.url ||
-        videoData?.payload?.video?.url ||
-        videoData?.data?.video?.url ||
-        "";
-
-      if (!videoUrl) throw new Error("No video URL returned by fal.ai: " + JSON.stringify(videoData).slice(0, 300));
-      return videoUrl;
-    }
-
-    if (statusJson.status === "FAILED") {
-      throw new Error("fal.ai generation failed: " + JSON.stringify(statusJson));
-    }
-    // PENDING / IN_QUEUE / IN_PROGRESS → keep polling
-  }
-
-  throw new Error("Video generation timed out after 6 minutes");
-}
-
-// ---------------------------------------------------------------------------
-// Step 3 — Convert commercial voiceover text → TTS audio (OpenAI TTS → base64)
-// ---------------------------------------------------------------------------
-async function _generateTtsAudio(text: string, openAiKey: string): Promise<string> {
-  const ttsInput = text.slice(0, 4096);
-
-  const maxRetries = 3;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch("https://api.openai.com/v1/audio/speech", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openAiKey}`,
-        },
-        body: JSON.stringify({
-          model: "tts-1",
-          input: ttsInput,
-          voice: "nova", // nova and alloy give an uplifting, clear commercial voice
-          response_format: "mp3",
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.text();
-        console.warn(`[OpenAI TTS attempt ${attempt}/${maxRetries}] Failed (${response.status}): ${err}`);
-        if ((response.status >= 500 || response.status === 429) && attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, attempt * 1500));
-          continue;
+        if (!videoUrl && reqItem.responseUrl) {
+          const resultRes = await fetch(reqItem.responseUrl, {
+            headers: { Authorization: `Key ${falKey}` },
+          });
+          if (resultRes.ok) {
+            const resultData = await resultRes.json().catch(() => null);
+            videoUrl =
+              resultData?.video?.url ||
+              resultData?.videos?.[0]?.url ||
+              resultData?.output?.video?.url ||
+              resultData?.output?.video_url ||
+              resultData?.output?.url ||
+              resultData?.payload?.video?.url ||
+              resultData?.data?.video?.url ||
+              "";
+          }
         }
-        throw new Error(`OpenAI TTS error ${response.status}`);
-      }
 
-      const arrayBuffer = await response.arrayBuffer();
-      return Buffer.from(arrayBuffer).toString("base64");
-    } catch (err) {
-      if (attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, attempt * 1500));
+        if (videoUrl) {
+          // Download and save locally with retries
+          let videoResponse: Response | null = null;
+          for (let att = 1; att <= 3; att++) {
+            try {
+              videoResponse = await fetch(videoUrl);
+              if (videoResponse.ok) break;
+            } catch (err) {}
+            if (att < 3) await new Promise((r) => setTimeout(r, att * 1500));
+          }
+
+          if (videoResponse && videoResponse.ok) {
+            const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+            const fileName = `${uuidv4()}-ext-ai-generated.mp4`;
+            await writeFile(join(uploadDir, fileName), videoBuffer);
+            const localVideoUrl = `/uploads/${job.userId}/video/${fileName}`;
+
+            const mediaItem = new MediaItemModel({
+              userId: new mongoose.Types.ObjectId(job.userId),
+              name: `External AI Video (${i + 1}/${job.videoCount}) – ${job.model} – ${new Date().toLocaleString()}`,
+              type: "video",
+              url: localVideoUrl,
+              createdAt: new Date(),
+            });
+            await mediaItem.save();
+
+            reqItem.videoUrl = localVideoUrl;
+            reqItem.status = "completed";
+          } else {
+            allCompleted = false;
+          }
+        } else {
+          allCompleted = false;
+        }
+      } else if (statusJson.status === "FAILED") {
+        reqItem.status = "failed";
+        hasFailure = true;
+        allCompleted = false;
       } else {
-        console.warn("[OpenAI TTS] All attempts failed due to OpenAI server load. Returning empty audio string.");
+        // PENDING / IN_QUEUE / IN_PROGRESS
+        allCompleted = false;
       }
+    } catch (err) {
+      console.warn(`[job polling] Error checking fal request ${reqItem.requestId}:`, err);
+      allCompleted = false;
     }
   }
 
-  return ""; // Return empty string if OpenAI TTS is down, so video creation still finishes normally
+  if (hasFailure && !allCompleted) {
+    job.status = "failed";
+    await job.save();
+    return NextResponse.json({
+      success: false,
+      status: "failed",
+      jobId,
+      message: "Video generation failed at fal.ai during rendering.",
+    });
+  }
+
+  if (allCompleted) {
+    job.status = "completed";
+    await job.save();
+  } else {
+    await job.save();
+    return NextResponse.json({
+      success: true,
+      status: "processing",
+      jobId,
+      message: `Video generation is still rendering at fal.ai. Please check again in 5 seconds using GET /api/external/create-video?jobId=${jobId}`,
+    });
+  }
+
+  // Once completed, construct exact requested response payload!
+  const responsePayload: Record<string, any> = {
+    success: true,
+    status: "completed",
+    jobId,
+  };
+
+  const generatedUrls = job.falRequests.map((r) => r.videoUrl || "").filter(Boolean);
+  generatedUrls.forEach((url, index) => {
+    responsePayload[`video ${index + 1}`] = url;
+  });
+
+  responsePayload.videoUrl = generatedUrls[0] || "";
+  responsePayload.videos = generatedUrls;
+  responsePayload.voiceoverScript = job.voiceoverScript;
+
+  return NextResponse.json(responsePayload);
 }
 
 // ---------------------------------------------------------------------------
-// Main POST handler — the single external endpoint
+// GET Handler — check status of a video job (fast, no CloudFront timeouts)
+// ---------------------------------------------------------------------------
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const jobId = searchParams.get("jobId") || searchParams.get("id") || searchParams.get("requestId");
+
+    if (!jobId) {
+      return NextResponse.json(
+        { success: false, message: "Missing required parameter 'jobId' in query string (e.g. ?jobId=...)" },
+        { status: 400 }
+      );
+    }
+
+    return await checkAndResolveJob(jobId);
+  } catch (error) {
+    console.error("[external/create-video GET] Error:", error);
+    return NextResponse.json(
+      { success: false, message: error instanceof Error ? error.message : "Unknown error occurred" },
+      { status: 500 }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST Handler — submits generation immediately without waiting for rendering
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json().catch(() => ({}));
+
+    // If caller passes jobId in POST body, resolve status immediately!
+    if (body.jobId || body.requestId) {
+      return await checkAndResolveJob(body.jobId || body.requestId);
+    }
+
     const {
       text,       // rough description — third party provides this plain text
       userId,     // third party user/account ID
@@ -344,7 +344,7 @@ export async function POST(req: NextRequest) {
       duration,   // optional — video length in seconds (default: 5)
       numVideos,  // optional — number of videos to generate (default: 1, max: 10)
       count,      // fallback property in case caller sends 'count' instead of 'numVideos'
-    } = await req.json();
+    } = body;
 
     // ----- Validate required fields -----
     if (!text?.trim()) {
@@ -398,128 +398,104 @@ export async function POST(req: NextRequest) {
     const videoDuration = Math.max(1, Math.min(60, Number(duration) || 5));
     const videoCount = Math.max(1, Math.min(10, Number(numVideos || count) || 1));
 
-    // ----- Streaming Heartbeat Workaround for AWS CloudFront 504 Timeouts -----
-    // CloudFront terminates origins that don't send data within 30 seconds.
-    // We stream whitespace heartbeats instantly to keep the connection alive while rendering,
-    // then write the final valid JSON object. All standard JSON parsers ignore the leading whitespace!
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        // Send immediate heartbeat so CloudFront sees an HTTP 200 response within 50ms
-        controller.enqueue(encoder.encode("   \n"));
+    // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script -----
+    const { enhancedPrompt, voiceoverScript } = await enhancePromptAndScript(
+      text,
+      model,
+      resolution,
+      aspectRatio,
+      videoDuration,
+      openAiKey
+    );
 
-        // Keep CloudFront & firewall proxy connections alive with an 8-second heartbeat
-        const heartbeatInterval = setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode("   \n"));
-          } catch {
-            clearInterval(heartbeatInterval);
-          }
-        }, 8000);
+    const modelSlug = MODEL_SLUG_MAP[model] || "fal-ai/wan-t2v";
+    const imageSizeKey = ASPECT_MAP[aspectRatio] || "landscape_16_9";
 
+    // ----- Step 2: Submit all video generation requests to fal.ai queue instantly (< 1s) -----
+    const falRequests = [];
+
+    for (let i = 0; i < videoCount; i++) {
+      let falResponse: Response | null = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script -----
-          const { enhancedPrompt, voiceoverScript } = await enhancePromptAndScript(
-            text,
-            model,
-            resolution,
-            aspectRatio,
-            videoDuration,
-            openAiKey
-          );
-
-          // Ensure upload directory exists before concurrent writes
-          const uploadDir = join(process.cwd(), "uploads", userId, "video");
-          if (!existsSync(uploadDir)) {
-            await mkdir(uploadDir, { recursive: true });
+          falResponse = await fetch(`https://queue.fal.run/${modelSlug}`, {
+            method: "POST",
+            headers: {
+              Authorization: `Key ${falKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prompt: enhancedPrompt,
+              image_size: imageSizeKey,
+              aspect_ratio: aspectRatio,
+              num_inference_steps: 30,
+              enable_safety_checker: true,
+              duration: videoDuration,
+            }),
+          });
+          if (!falResponse.ok && attempt < 3 && falResponse.status >= 500) {
+            await new Promise((r) => setTimeout(r, attempt * 1500));
+            continue;
           }
-
-          await connectToDatabase();
-
-          // ----- Step 2: Generate video(s) with the cinematic enhanced prompt concurrently -----
-          const videoPromises = Array.from({ length: videoCount }, async (_, idx) => {
-            const falVideoUrl = await generateVideo(
-              enhancedPrompt,
-              model,
-              aspectRatio,
-              videoDuration,
-              falKey
-            );
-
-            // Download and save the video file locally (with retries for network resilience)
-            let videoResponse: Response | null = null;
-            for (let attempt = 1; attempt <= 3; attempt++) {
-              try {
-                videoResponse = await fetch(falVideoUrl);
-                if (videoResponse.ok) break;
-              } catch (err: any) {
-                console.warn(`[Video download attempt ${attempt}/3] Error downloading video #${idx + 1}: ${err.message || err}`);
-              }
-              if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 2000));
-            }
-            if (!videoResponse || !videoResponse.ok) {
-              throw new Error(`Failed to download generated video #${idx + 1} (${videoResponse?.status || "Network/DNS failure"})`);
-            }
-            const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
-            const fileName = `${uuidv4()}-ext-ai-generated.mp4`;
-            const filePath = join(uploadDir, fileName);
-
-            await writeFile(filePath, videoBuffer);
-            const localVideoUrl = `/uploads/${userId}/video/${fileName}`;
-
-            const mediaItem = new MediaItemModel({
-              userId: new mongoose.Types.ObjectId(userId),
-              name: `External AI Video (${idx + 1}/${videoCount}) – ${model} – ${new Date().toLocaleString()}`,
-              type: "video",
-              url: localVideoUrl,
-              createdAt: new Date(),
-            });
-            await mediaItem.save();
-
-            return localVideoUrl;
-          });
-
-          // Run all video generations in parallel for fastest execution
-          const generatedUrls = await Promise.all(videoPromises);
-
-          // ----- Final response -----
-          const responsePayload: Record<string, any> = {
-            success: true,
-          };
-
-          // Dynamically assign "video 1", "video 2", etc. as separate properties
-          generatedUrls.forEach((url, index) => {
-            responsePayload[`video ${index + 1}`] = url;
-          });
-
-          // Also include standard fallback fields for convenience
-          responsePayload.videoUrl = generatedUrls[0];
-          responsePayload.videos = generatedUrls;
-          responsePayload.voiceoverScript = voiceoverScript;
-
-          clearInterval(heartbeatInterval);
-          controller.enqueue(encoder.encode(JSON.stringify(responsePayload) + "\n"));
-          controller.close();
+          break;
         } catch (err: any) {
-          clearInterval(heartbeatInterval);
-          console.error("[external/create-video] Stream error:", err);
-          const errPayload = {
-            success: false,
-            message: err instanceof Error ? err.message : "Unknown error occurred during video generation",
-          };
-          controller.enqueue(encoder.encode(JSON.stringify(errPayload) + "\n"));
-          controller.close();
+          if (attempt === 3) {
+            throw new Error(`Failed to connect to fal.ai queue (Network/DNS error: ${err.message})`);
+          }
+          await new Promise((r) => setTimeout(r, attempt * 1500));
         }
-      },
-    });
+      }
 
-    return new Response(stream, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache, no-transform",
-        "X-Content-Type-Options": "nosniff",
-      },
+      if (!falResponse || !falResponse.ok) {
+        const errText = falResponse ? await falResponse.text().catch(() => "") : "No response";
+        throw new Error(`fal.ai submission error (${falResponse?.status || "network error"}): ${errText}`);
+      }
+
+      const queueData = await falResponse.json();
+      const requestId: string = queueData?.request_id;
+      if (!requestId) {
+        throw new Error("fal.ai did not return a request_id: " + JSON.stringify(queueData));
+      }
+
+      const statusUrl: string =
+        queueData?.status_url ||
+        `https://queue.fal.run/${modelSlug}/requests/${requestId}/status`;
+      const responseUrl: string =
+        queueData?.response_url ||
+        statusUrl.replace(/\/status$/, "") ||
+        `https://queue.fal.run/${modelSlug}/requests/${requestId}`;
+
+      falRequests.push({
+        requestId,
+        statusUrl,
+        responseUrl,
+        videoUrl: "",
+        status: "processing" as const,
+      });
+    }
+
+    // Save job tracking to MongoDB
+    await connectToDatabase();
+    const jobId = uuidv4();
+    const videoJob = new VideoJobModel({
+      jobId,
+      userId,
+      model,
+      status: "processing",
+      voiceoverScript,
+      videoCount,
+      falRequests,
+      createdAt: new Date(),
+    });
+    await videoJob.save();
+
+    // Immediately return processing status (total execution time ~1-2 seconds!)
+    return NextResponse.json({
+      success: true,
+      status: "processing",
+      jobId,
+      voiceoverScript,
+      message: `Video generation initiated successfully. Poll status using GET /api/external/create-video?jobId=${jobId}`,
     });
   } catch (error) {
     console.error("[external/create-video] Error:", error);
