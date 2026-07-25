@@ -398,86 +398,129 @@ export async function POST(req: NextRequest) {
     const videoDuration = Math.max(1, Math.min(60, Number(duration) || 5));
     const videoCount = Math.max(1, Math.min(10, Number(numVideos || count) || 1));
 
-    // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script -----
-    const { enhancedPrompt, voiceoverScript } = await enhancePromptAndScript(
-      text,
-      model,
-      resolution,
-      aspectRatio,
-      videoDuration,
-      openAiKey
-    );
+    // ----- Streaming Heartbeat Workaround for AWS CloudFront 504 Timeouts -----
+    // CloudFront terminates origins that don't send data within 30 seconds.
+    // We stream whitespace heartbeats instantly to keep the connection alive while rendering,
+    // then write the final valid JSON object. All standard JSON parsers ignore the leading whitespace!
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Send immediate heartbeat so CloudFront sees an HTTP 200 response within 50ms
+        controller.enqueue(encoder.encode("   \n"));
 
-    // Ensure upload directory exists before concurrent writes
-    const uploadDir = join(process.cwd(), "uploads", userId, "video");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+        // Keep CloudFront & firewall proxy connections alive with an 8-second heartbeat
+        const heartbeatInterval = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode("   \n"));
+          } catch {
+            clearInterval(heartbeatInterval);
+          }
+        }, 8000);
 
-    await connectToDatabase();
-
-    // ----- Step 2: Generate video(s) with the cinematic enhanced prompt concurrently -----
-    const videoPromises = Array.from({ length: videoCount }, async (_, idx) => {
-      const falVideoUrl = await generateVideo(
-        enhancedPrompt,
-        model,
-        aspectRatio,
-        videoDuration,
-        falKey
-      );
-
-      // Download and save the video file locally (with retries for network resilience)
-      let videoResponse: Response | null = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          videoResponse = await fetch(falVideoUrl);
-          if (videoResponse.ok) break;
+          // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script -----
+          const { enhancedPrompt, voiceoverScript } = await enhancePromptAndScript(
+            text,
+            model,
+            resolution,
+            aspectRatio,
+            videoDuration,
+            openAiKey
+          );
+
+          // Ensure upload directory exists before concurrent writes
+          const uploadDir = join(process.cwd(), "uploads", userId, "video");
+          if (!existsSync(uploadDir)) {
+            await mkdir(uploadDir, { recursive: true });
+          }
+
+          await connectToDatabase();
+
+          // ----- Step 2: Generate video(s) with the cinematic enhanced prompt concurrently -----
+          const videoPromises = Array.from({ length: videoCount }, async (_, idx) => {
+            const falVideoUrl = await generateVideo(
+              enhancedPrompt,
+              model,
+              aspectRatio,
+              videoDuration,
+              falKey
+            );
+
+            // Download and save the video file locally (with retries for network resilience)
+            let videoResponse: Response | null = null;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                videoResponse = await fetch(falVideoUrl);
+                if (videoResponse.ok) break;
+              } catch (err: any) {
+                console.warn(`[Video download attempt ${attempt}/3] Error downloading video #${idx + 1}: ${err.message || err}`);
+              }
+              if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 2000));
+            }
+            if (!videoResponse || !videoResponse.ok) {
+              throw new Error(`Failed to download generated video #${idx + 1} (${videoResponse?.status || "Network/DNS failure"})`);
+            }
+            const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+            const fileName = `${uuidv4()}-ext-ai-generated.mp4`;
+            const filePath = join(uploadDir, fileName);
+
+            await writeFile(filePath, videoBuffer);
+            const localVideoUrl = `/uploads/${userId}/video/${fileName}`;
+
+            const mediaItem = new MediaItemModel({
+              userId: new mongoose.Types.ObjectId(userId),
+              name: `External AI Video (${idx + 1}/${videoCount}) – ${model} – ${new Date().toLocaleString()}`,
+              type: "video",
+              url: localVideoUrl,
+              createdAt: new Date(),
+            });
+            await mediaItem.save();
+
+            return localVideoUrl;
+          });
+
+          // Run all video generations in parallel for fastest execution
+          const generatedUrls = await Promise.all(videoPromises);
+
+          // ----- Final response -----
+          const responsePayload: Record<string, any> = {
+            success: true,
+          };
+
+          // Dynamically assign "video 1", "video 2", etc. as separate properties
+          generatedUrls.forEach((url, index) => {
+            responsePayload[`video ${index + 1}`] = url;
+          });
+
+          // Also include standard fallback fields for convenience
+          responsePayload.videoUrl = generatedUrls[0];
+          responsePayload.videos = generatedUrls;
+          responsePayload.voiceoverScript = voiceoverScript;
+
+          clearInterval(heartbeatInterval);
+          controller.enqueue(encoder.encode(JSON.stringify(responsePayload) + "\n"));
+          controller.close();
         } catch (err: any) {
-          console.warn(`[Video download attempt ${attempt}/3] Error downloading video #${idx + 1}: ${err.message || err}`);
+          clearInterval(heartbeatInterval);
+          console.error("[external/create-video] Stream error:", err);
+          const errPayload = {
+            success: false,
+            message: err instanceof Error ? err.message : "Unknown error occurred during video generation",
+          };
+          controller.enqueue(encoder.encode(JSON.stringify(errPayload) + "\n"));
+          controller.close();
         }
-        if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 2000));
-      }
-      if (!videoResponse || !videoResponse.ok) {
-        throw new Error(`Failed to download generated video #${idx + 1} (${videoResponse?.status || "Network/DNS failure"})`);
-      }
-      const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
-      const fileName = `${uuidv4()}-ext-ai-generated.mp4`;
-      const filePath = join(uploadDir, fileName);
-
-      await writeFile(filePath, videoBuffer);
-      const localVideoUrl = `/uploads/${userId}/video/${fileName}`;
-
-      const mediaItem = new MediaItemModel({
-        userId: new mongoose.Types.ObjectId(userId),
-        name: `External AI Video (${idx + 1}/${videoCount}) – ${model} – ${new Date().toLocaleString()}`,
-        type: "video",
-        url: localVideoUrl,
-        createdAt: new Date(),
-      });
-      await mediaItem.save();
-
-      return localVideoUrl;
+      },
     });
 
-    // Run all video generations in parallel for fastest execution
-    const generatedUrls = await Promise.all(videoPromises);
-
-    // ----- Final response -----
-    const responsePayload: Record<string, any> = {
-      success: true,
-    };
-
-    // Dynamically assign "video 1", "video 2", etc. as separate properties
-    generatedUrls.forEach((url, index) => {
-      responsePayload[`video ${index + 1}`] = url;
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Content-Type-Options": "nosniff",
+      },
     });
-
-    // Also include standard fallback fields for convenience
-    responsePayload.videoUrl = generatedUrls[0];
-    responsePayload.videos = generatedUrls;
-    responsePayload.voiceoverScript = voiceoverScript;
-
-    return NextResponse.json(responsePayload);
   } catch (error) {
     console.error("[external/create-video] Error:", error);
     return NextResponse.json(
