@@ -7,6 +7,9 @@ import MediaItemModel from "@/models/MediaItems";
 import { v4 as uuidv4 } from "uuid";
 import mongoose from "mongoose";
 
+export const maxDuration = 300; // Allow up to 5 minutes (300s) for AI video generation
+export const dynamic = "force-dynamic";
+
 // Resolution → width x height mapping
 const RESOLUTION_MAP: Record<string, { width: number; height: number }> = {
   "480p": { width: 854, height: 480 },
