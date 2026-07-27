@@ -24,6 +24,17 @@ async function checkAndResolveJob(jobId: string) {
     );
   }
 
+  // If job is already completed, instantly return the processed data forever!
+  if (job.status === "completed") {
+    const responsePayload: Record<string, any> = {};
+    const generatedUrls = job.falRequests.map((r) => r.videoUrl || "").filter(Boolean);
+    generatedUrls.forEach((url, index) => {
+      responsePayload[`video ${index + 1}`] = url;
+    });
+    responsePayload.voiceoverScript = job.voiceoverScript;
+    return NextResponse.json(responsePayload);
+  }
+
   if (job.status === "failed") {
     return NextResponse.json({
       success: false,

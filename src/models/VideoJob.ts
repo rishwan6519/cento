@@ -38,9 +38,6 @@ const VideoJobSchema = new Schema<IVideoJob>({
   createdAt: { type: Date, default: Date.now },
 });
 
-if (mongoose.models && mongoose.models.VideoJob) {
-  delete mongoose.models.VideoJob;
-}
-
-export default mongoose.model<IVideoJob>("VideoJob", VideoJobSchema);
+export default (mongoose.models.VideoJob as mongoose.Model<IVideoJob>) ||
+  mongoose.model<IVideoJob>("VideoJob", VideoJobSchema);
 
