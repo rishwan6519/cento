@@ -52,13 +52,18 @@ async function checkAndResolveJob(jobId: string) {
 
   let allCompleted = true;
   let hasFailure = false;
+  const renderDetails: string[] = [];
 
   for (let i = 0; i < job.falRequests.length; i++) {
     const reqItem = job.falRequests[i];
-    if (reqItem.status === "completed") continue;
+    if (reqItem.status === "completed") {
+      renderDetails.push(`Video ${i + 1}: Rendered successfully`);
+      continue;
+    }
     if (reqItem.status === "failed") {
       hasFailure = true;
       allCompleted = false;
+      renderDetails.push(`Video ${i + 1}: Failed during fal.ai rendering`);
       continue;
     }
 
@@ -69,12 +74,14 @@ async function checkAndResolveJob(jobId: string) {
       });
       if (!statusRes.ok) {
         allCompleted = false;
+        renderDetails.push(`Video ${i + 1}: Waiting on fal.ai queue (HTTP ${statusRes.status})`);
         continue;
       }
 
       const statusJson = await statusRes.json().catch(() => null);
       if (!statusJson) {
         allCompleted = false;
+        renderDetails.push(`Video ${i + 1}: Checking GPU render queue...`);
         continue;
       }
 
@@ -135,23 +142,30 @@ async function checkAndResolveJob(jobId: string) {
 
             reqItem.videoUrl = localVideoUrl;
             reqItem.status = "completed";
+            renderDetails.push(`Video ${i + 1}: Rendered and saved to media library`);
           } else {
             allCompleted = false;
+            renderDetails.push(`Video ${i + 1}: COMPLETED at fal.ai (Downloading file to cloud library...)`);
           }
         } else {
           allCompleted = false;
+          renderDetails.push(`Video ${i + 1}: COMPLETED at fal.ai (Finalizing media encoding...)`);
         }
       } else if (statusJson.status === "FAILED") {
         reqItem.status = "failed";
         hasFailure = true;
         allCompleted = false;
+        renderDetails.push(`Video ${i + 1}: Generation failed at fal.ai – ${statusJson?.error || "GPU error"}`);
       } else {
         // PENDING / IN_QUEUE / IN_PROGRESS
         allCompleted = false;
+        const queuePos = statusJson.queue_position !== undefined ? ` (Queue Position: ${statusJson.queue_position})` : "";
+        renderDetails.push(`Video ${i + 1}: ${statusJson.status || "IN_PROGRESS"}${queuePos}`);
       }
     } catch (err) {
       console.warn(`[job polling] Error checking fal request ${reqItem.requestId}:`, err);
       allCompleted = false;
+      renderDetails.push(`Video ${i + 1}: Synchronizing status with fal.ai GPU cluster...`);
     }
   }
 
@@ -162,6 +176,7 @@ async function checkAndResolveJob(jobId: string) {
       success: false,
       status: "failed",
       jobId,
+      details: renderDetails,
       message: "Video generation failed at fal.ai during rendering.",
     });
   }
@@ -175,7 +190,8 @@ async function checkAndResolveJob(jobId: string) {
       success: true,
       status: "processing",
       jobId,
-      message: `Video generation is still rendering at fal.ai. Please check again in 5 seconds by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
+      renderProgress: renderDetails,
+      message: `AI Video generation takes 2 to 5 minutes depending on model complexity. Please poll again in 10 seconds.`,
     });
   }
 
