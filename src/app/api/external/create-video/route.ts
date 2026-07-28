@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoJobModel from "@/models/VideoJob";
 import VideoTemplate from "@/models/VideoTemplate";
-import { DUMMY_TEMPLATES } from "@/app/api/external/get-templates/route";
+import { DUMMY_TEMPLATES } from "@/lib/dummyTemplates";
 import { v4 as uuidv4 } from "uuid";
 
 export const maxDuration = 300; // Allow sufficient execution duration for background tasks
