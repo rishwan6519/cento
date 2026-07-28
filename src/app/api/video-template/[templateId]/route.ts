@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
     await connectToDatabase();
     const { templateId } = await context.params;
-    const template = await VideoTemplate.findById(templateId).lean();
+    const template: any = await VideoTemplate.findById(templateId).lean();
 
     if (!template) {
       return NextResponse.json(
@@ -94,7 +94,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     await connectToDatabase();
     const { templateId } = await context.params;
-    const template = await VideoTemplate.findById(templateId);
+    const template: any = await VideoTemplate.findById(templateId);
 
     if (!template) {
       return NextResponse.json(
@@ -156,7 +156,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
     await connectToDatabase();
     const { templateId } = await context.params;
-    const template = await VideoTemplate.findById(templateId);
+    const template: any = await VideoTemplate.findById(templateId);
 
     if (!template) {
       return NextResponse.json(
