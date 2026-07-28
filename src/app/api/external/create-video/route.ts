@@ -324,6 +324,7 @@ export async function POST(req: NextRequest) {
       status: "processing",
       voiceoverScript,
       enhancedPrompt,
+      templateId: templateId ? String(templateId).trim() : "",
       images: imagesList,
       socialMedia: socialMediaList,
       videoCount,
@@ -337,10 +338,11 @@ export async function POST(req: NextRequest) {
       success: true,
       status: "processing",
       jobId,
+      templateId: templateId ? String(templateId).trim() : "",
       enhancedPrompt,
       voiceoverScript,
       socialMedia: socialMediaList,
-      message: `Video generation initiated successfully. Retrieve your completed videos by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
+      message: ` AI Video generation takes 2 to 5 minutes depending on model complexity.. Retrieve your completed videos by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });
   } catch (error) {
     console.error("[external/create-video] Error:", error);

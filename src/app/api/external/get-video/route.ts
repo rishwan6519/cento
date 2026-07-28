@@ -31,6 +31,7 @@ async function checkAndResolveJob(jobId: string) {
     generatedUrls.forEach((url, index) => {
       responsePayload[`video ${index + 1}`] = url;
     });
+    responsePayload.templateId = job.templateId || "";
     responsePayload.enhancedPrompt = job.enhancedPrompt || "";
     responsePayload.voiceoverScript = job.voiceoverScript || "";
     responsePayload.socialMedia = job.socialMedia || [];
@@ -133,7 +134,7 @@ async function checkAndResolveJob(jobId: string) {
             try {
               videoResponse = await fetch(videoUrl);
               if (videoResponse.ok) break;
-            } catch (err) {}
+            } catch (err) { }
             if (att < 3) await new Promise((r) => setTimeout(r, att * 1500));
           }
 
@@ -202,10 +203,11 @@ async function checkAndResolveJob(jobId: string) {
       success: true,
       status: "processing",
       jobId,
+      renderProgress: renderDetails,
       enhancedPrompt: job.enhancedPrompt || "",
       voiceoverScript: job.voiceoverScript || "",
       socialMedia: job.socialMedia || [],
-      renderProgress: renderDetails,
+
       message: `AI Video generation takes 2 to 5 minutes depending on model complexity. Please poll again in 10 seconds.`,
     });
   }
@@ -218,6 +220,7 @@ async function checkAndResolveJob(jobId: string) {
     responsePayload[`video ${index + 1}`] = url;
   });
 
+  responsePayload.templateId = job.templateId || "";
   responsePayload.enhancedPrompt = job.enhancedPrompt || "";
   responsePayload.voiceoverScript = job.voiceoverScript || "";
   responsePayload.socialMedia = job.socialMedia || [];

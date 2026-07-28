@@ -15,6 +15,7 @@ export interface IVideoJob extends Document {
   status: "processing" | "completed" | "failed";
   voiceoverScript: string;
   enhancedPrompt?: string;
+  templateId?: string;
   images?: string[];
   socialMedia?: string[];
   videoCount: number;
@@ -29,6 +30,7 @@ const VideoJobSchema = new Schema<IVideoJob>({
   status: { type: String, enum: ["processing", "completed", "failed"], default: "processing" },
   voiceoverScript: { type: String, default: "" },
   enhancedPrompt: { type: String, default: "" },
+  templateId: { type: String, default: "" },
   images: { type: [String], default: [] },
   socialMedia: { type: [String], default: [] },
   videoCount: { type: Number, default: 1 },
