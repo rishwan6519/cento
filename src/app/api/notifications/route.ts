@@ -35,21 +35,23 @@ function getAuthenticatedUser(req: NextRequest): {
 export async function GET(req: NextRequest) {
   try {
     const auth = getAuthenticatedUser(req);
-    if (!auth) {
+    const { searchParams } = new URL(req.url);
+    const targetUserId = auth?.userId || searchParams.get('userId') || searchParams.get('storeUserId');
+
+    if (!targetUserId) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: 'Unauthorized: Missing token or userId parameter' },
         { status: 401 }
       );
     }
 
     await connectToDatabase();
 
-    const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
 
-    const query: Record<string, unknown> = { storeUserId: auth.userId };
+    const query: Record<string, unknown> = { storeUserId: targetUserId };
     if (unreadOnly) {
       query.isRead = false;
     }
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const unreadCount = await Notification.countDocuments({
-      storeUserId: auth.userId,
+      storeUserId: targetUserId,
       isRead: false,
     });
 

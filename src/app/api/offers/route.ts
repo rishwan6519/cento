@@ -46,23 +46,24 @@ function getAuthenticatedUser(req: NextRequest): {
 export async function POST(req: NextRequest) {
   try {
     const auth = getAuthenticatedUser(req);
-    if (!auth) {
+    await connectToDatabase();
+
+    const body = await req.json();
+    const { offerName, offerDescription, startDate, endDate, userId, storeUserId } = body;
+    const targetUserId = auth?.userId || userId || storeUserId || req.nextUrl.searchParams.get('userId') || req.nextUrl.searchParams.get('storeUserId');
+
+    if (!targetUserId) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: 'Unauthorized: Missing token or userId in request body/query' },
         { status: 401 }
       );
     }
-    if (!['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
+    if (auth && !['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
       return NextResponse.json(
         { success: false, message: 'Forbidden: Store users only' },
         { status: 403 }
       );
     }
-
-    await connectToDatabase();
-
-    const body = await req.json();
-    const { offerName, offerDescription, startDate, endDate } = body;
 
     // ── Validation ─────────────────────────────────────────────────────────
     if (!offerName?.trim()) {
@@ -108,7 +109,7 @@ export async function POST(req: NextRequest) {
 
     // ── Duplicate active offer name check for the same store user ──────────
     const existing = await Offer.findOne({
-      storeUserId: auth.userId,
+      storeUserId: targetUserId,
       offerName: { $regex: new RegExp(`^${offerName.trim()}$`, 'i') },
       isActive: true,
     });
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
 
     // ── Create offer ───────────────────────────────────────────────────────
     const offer = await Offer.create({
-      storeUserId: auth.userId,
+      storeUserId: targetUserId,
       offerName: offerName.trim(),
       offerDescription: offerDescription.trim(),
       startDate: start,
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
     const notifBody = `Your offer '${offerName.trim()}' has been created successfully.`;
     
     let notificationDetails = {
-      storeUserId: auth.userId,
+      storeUserId: String(targetUserId),
       username: 'N/A',
       storeName: 'N/A',
       mobileTokensNotified: [] as string[],
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-      const user = await User.findById(auth.userId).select('username storeName fcmTokens');
+      const user = await User.findById(targetUserId).select('username storeName fcmTokens');
       if (user) {
         notificationDetails.username = user.username || 'N/A';
         notificationDetails.storeName = user.storeName || 'N/A';
@@ -160,7 +161,7 @@ export async function POST(req: NextRequest) {
 
       // Save notification to DB
       const dbNotif = await Notification.create({
-        storeUserId: auth.userId,
+        storeUserId: targetUserId,
         title: notifTitle,
         body: notifBody,
         action: 'offer_alert',
@@ -179,7 +180,7 @@ export async function POST(req: NextRequest) {
             {
               action: 'offer_alert',
               offerId: String(offer._id),
-              storeUserId: String(auth.userId),
+              storeUserId: String(targetUserId),
             }
           );
           notificationDetails.fcmSendStatus = `SUCCESS (${response?.successCount || 0} sent, ${response?.failureCount || 0} failed)`;
@@ -222,13 +223,16 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const auth = getAuthenticatedUser(req);
-    if (!auth) {
+    const { searchParams } = new URL(req.url);
+    const targetUserId = auth?.userId || searchParams.get('userId') || searchParams.get('storeUserId');
+
+    if (!targetUserId) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: 'Unauthorized: Missing token or userId parameter' },
         { status: 401 }
       );
     }
-    if (!['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
+    if (auth && !['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
       return NextResponse.json(
         { success: false, message: 'Forbidden: Store users only' },
         { status: 403 }
@@ -237,14 +241,13 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10', 10)));
     const search = searchParams.get('search') || '';
     const sort = searchParams.get('sort') || 'createdAt';
     const order: SortOrder = searchParams.get('order') === 'asc' ? 1 : -1;
 
-    const query: Record<string, unknown> = { storeUserId: auth.userId };
+    const query: Record<string, unknown> = { storeUserId: targetUserId };
     if (search.trim()) {
       query.$or = [
         { offerName: { $regex: search.trim(), $options: 'i' } },

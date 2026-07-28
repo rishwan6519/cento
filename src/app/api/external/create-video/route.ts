@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoJobModel from "@/models/VideoJob";
+import VideoTemplate from "@/models/VideoTemplate";
 import { v4 as uuidv4 } from "uuid";
 
 export const maxDuration = 300; // Allow sufficient execution duration for background tasks
@@ -132,18 +133,53 @@ export async function POST(req: NextRequest) {
       duration,   // optional — video length in seconds (default: 5)
       numVideos,  // optional — number of videos to generate (default: 1, max: 10)
       count,      // fallback property in case caller sends 'count' instead of 'numVideos'
+      socialMedia,// optional — platforms to share to e.g. ["insta", "facebook", "twitter"]
+      share,      // fallback alias for socialMedia
+      shareTo,    // fallback alias for socialMedia
+      images,     // optional — array of image URLs
+      imageUrls,  // fallback alias for images
+      templateId, // optional — AI Video Template ID from video_templates collection
     } = body;
 
-    // ----- Validate required fields -----
-    if (!text?.trim()) {
-      return NextResponse.json(
-        { success: false, message: "Field 'text' is required — provide your video description" },
-        { status: 400 }
-      );
-    }
+    // ----- Validate required userId first -----
     if (!userId?.trim()) {
       return NextResponse.json(
         { success: false, message: "Field 'userId' is required" },
+        { status: 400 }
+      );
+    }
+
+    let finalText = text || "";
+    let finalAspectRatio = aspectRatio;
+    let finalDuration = duration;
+
+    // Retrieve template from database automatically if templateId is provided
+    if (templateId?.trim()) {
+      await connectToDatabase();
+      const template: any = await VideoTemplate.findOne({
+        _id: templateId.trim(),
+        storeUserId: userId.trim(),
+      }).lean();
+
+      if (!template) {
+        return NextResponse.json(
+          { success: false, message: `Template not found with ID '${templateId}' for userId '${userId}'` },
+          { status: 404 }
+        );
+      }
+      if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = template.aspectRatio;
+      if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
+
+      // Build advertising script/text from template details if explicit 'text' was omitted
+      if (!finalText.trim()) {
+        finalText = `Commercial ad campaign titled '${template.templateName}'. Theme: ${template.templateDescription || template.offerTitle}. Promotional headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}' displaying discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text and ${template.buttonColor} button labeled '${template.ctaButtonText}'. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}. Footer text: '${template.footerText}'. Professional broadcast quality in ${template.language}.`;
+      }
+    }
+
+    // ----- Validate required fields -----
+    if (!finalText?.trim()) {
+      return NextResponse.json(
+        { success: false, message: "Field 'text' (or a valid 'templateId') is required — provide your video description" },
         { status: 400 }
       );
     }
@@ -159,7 +195,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (!aspectRatio?.trim()) {
+    if (!finalAspectRatio?.trim()) {
       return NextResponse.json(
         { success: false, message: "Field 'aspectRatio' is required: '16:9' | '9:16' | '1:1' | '4:3'" },
         { status: 400 }
@@ -183,21 +219,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const videoDuration = Math.max(1, Math.min(60, Number(duration) || 5));
+    const videoDuration = Math.max(1, Math.min(60, Number(finalDuration) || 5));
     const videoCount = Math.max(1, Math.min(10, Number(numVideos || count) || 1));
+
+    const rawSocialMedia = socialMedia || share || shareTo || [];
+    let socialMediaList: string[] = [];
+    if (Array.isArray(rawSocialMedia)) {
+      socialMediaList = rawSocialMedia.map((item: any) => String(item).trim()).filter(Boolean);
+    } else if (typeof rawSocialMedia === "string") {
+      socialMediaList = rawSocialMedia.split(",").map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    const rawImages = images || imageUrls || [];
+    let imagesList: string[] = [];
+    if (Array.isArray(rawImages)) {
+      imagesList = rawImages.map((item: any) => String(item).trim()).filter(Boolean);
+    } else if (typeof rawImages === "string") {
+      imagesList = rawImages.split(",").map((s: string) => s.trim()).filter(Boolean);
+    }
 
     // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script -----
     const { enhancedPrompt, voiceoverScript } = await enhancePromptAndScript(
-      text,
+      finalText,
       model,
       resolution,
-      aspectRatio,
+      finalAspectRatio,
       videoDuration,
       openAiKey
     );
 
     const modelSlug = MODEL_SLUG_MAP[model] || "fal-ai/wan-t2v";
-    const imageSizeKey = ASPECT_MAP[aspectRatio] || "landscape_16_9";
+    const imageSizeKey = ASPECT_MAP[finalAspectRatio] || "landscape_16_9";
 
     // ----- Step 2: Submit all video generation requests to fal.ai queue instantly (< 1s) -----
     const falRequests = [];
@@ -215,7 +267,7 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify({
               prompt: enhancedPrompt,
               image_size: imageSizeKey,
-              aspect_ratio: aspectRatio,
+              aspect_ratio: finalAspectRatio,
               num_inference_steps: 30,
               enable_safety_checker: true,
               duration: videoDuration,
@@ -271,6 +323,9 @@ export async function POST(req: NextRequest) {
       modelName: model || "Wan 2.1",
       status: "processing",
       voiceoverScript,
+      enhancedPrompt,
+      images: imagesList,
+      socialMedia: socialMediaList,
       videoCount,
       falRequests,
       createdAt: new Date(),
@@ -282,7 +337,9 @@ export async function POST(req: NextRequest) {
       success: true,
       status: "processing",
       jobId,
+      enhancedPrompt,
       voiceoverScript,
+      socialMedia: socialMediaList,
       message: `Video generation initiated successfully. Retrieve your completed videos by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });
   } catch (error) {

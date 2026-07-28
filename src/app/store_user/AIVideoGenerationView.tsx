@@ -284,7 +284,37 @@ const AIVideoGenerationView: React.FC = () => {
   const [generationProgress, setGenerationProgress] = useState(0);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [videoTemplates, setVideoTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+    fetch("/api/video-template?sort=createdAt&order=desc", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          setVideoTemplates(data.data.filter((t: any) => t.status === "Active"));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleTemplateChange = (tId: string) => {
+    setSelectedTemplateId(tId);
+    const tmpl = videoTemplates.find((t) => t._id === tId);
+    if (tmpl) {
+      if (tmpl.aspectRatio) setAspectRatio(tmpl.aspectRatio as AspectRatio);
+      if (tmpl.videoDuration) setDuration(Number(tmpl.videoDuration));
+      if (!roughPrompt && !refinedPrompt) {
+        setRefinedPrompt(`Video generation using active template "${tmpl.templateName}"`);
+        setStatus("prompt-ready");
+      }
+    }
+  };
 
   // Derive selected model info
   const selectedModel = MODELS.find((m) => m.name === aiModel) ?? MODELS[0];
@@ -341,12 +371,12 @@ const AIVideoGenerationView: React.FC = () => {
   };
 
   const handleGenerateVideo = async () => {
-    if (!refinedPrompt.trim() || !userId) return;
+    if ((!refinedPrompt.trim() && !selectedTemplateId) || !userId) return;
     setStatus("generating-video"); setErrorMsg(""); setGeneratedVideos([]); startProgress();
     try {
       const res = await fetch("/api/ai-video/generate-video", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: refinedPrompt, resolution, aspectRatio, model: aiModel, numVideos, duration, userId }),
+        body: JSON.stringify({ prompt: refinedPrompt, resolution, aspectRatio, model: aiModel, numVideos, duration, userId, templateId: selectedTemplateId || undefined }),
       });
       const data = await res.json();
       finishProgress();
@@ -447,6 +477,11 @@ const AIVideoGenerationView: React.FC = () => {
 
           {/* Row 1 — dropdowns */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 16, marginBottom: 28 }}>
+            <Select id="aivg-tmpl" label="AI Video Template (Optional)" value={selectedTemplateId} onChange={handleTemplateChange}
+              options={[
+                { value: "", label: "None – Custom Setup" },
+                ...videoTemplates.map((t) => ({ value: t._id, label: `${t.templateName} (${t.aspectRatio})` })),
+              ]} />
             <Select id="aivg-res" label="Resolution" value={resolution} onChange={handleResolutionChange}
               options={[
                 { value: "480p", label: "480p – SD" },

@@ -38,16 +38,24 @@ interface RouteContext {
 export async function PUT(req: NextRequest, context: RouteContext) {
   try {
     const auth = getAuthenticatedUser(req);
-    if (!auth) {
+    await connectToDatabase();
+    const { notificationId } = await context.params;
+
+    let bodyUserId = '';
+    try {
+      const body = await req.json();
+      bodyUserId = body.userId || body.storeUserId || '';
+    } catch {
+      // JSON body is optional
+    }
+    const targetUserId = auth?.userId || req.nextUrl.searchParams.get('userId') || req.nextUrl.searchParams.get('storeUserId') || bodyUserId;
+
+    if (!targetUserId) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: 'Unauthorized: Missing token or userId parameter' },
         { status: 401 }
       );
     }
-
-    await connectToDatabase();
-
-    const { notificationId } = await context.params;
 
     // Verify ownership before marking as read
     const notification = await Notification.findById(notificationId);
@@ -57,7 +65,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         { status: 404 }
       );
     }
-    if (String(notification.storeUserId) !== String(auth.userId)) {
+    if (String(notification.storeUserId) !== String(targetUserId)) {
       return NextResponse.json(
         {
           success: false,

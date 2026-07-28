@@ -40,24 +40,25 @@ interface RouteContext {
 export async function PUT(req: NextRequest, context: RouteContext) {
   try {
     const auth = getAuthenticatedUser(req);
-    if (!auth) {
+    await connectToDatabase();
+
+    const { offerId } = await context.params;
+    const body = await req.json();
+    const { offerName, offerDescription, startDate, endDate, userId, storeUserId } = body;
+    const targetUserId = auth?.userId || userId || storeUserId || req.nextUrl.searchParams.get('userId') || req.nextUrl.searchParams.get('storeUserId');
+
+    if (!targetUserId) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: 'Unauthorized: Missing token or userId parameter' },
         { status: 401 }
       );
     }
-    if (!['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
+    if (auth && !['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
       return NextResponse.json(
         { success: false, message: 'Forbidden: Store users only' },
         { status: 403 }
       );
     }
-
-    await connectToDatabase();
-
-    const { offerId } = await context.params;
-    const body = await req.json();
-    const { offerName, offerDescription, startDate, endDate } = body;
 
     // ── Validation ─────────────────────────────────────────────────────────
     if (!offerName?.trim()) {
@@ -103,7 +104,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         { status: 404 }
       );
     }
-    if (String(offer.storeUserId) !== String(auth.userId)) {
+    if (String(offer.storeUserId) !== String(targetUserId)) {
       return NextResponse.json(
         { success: false, message: 'Forbidden: You do not own this offer' },
         { status: 403 }
@@ -112,7 +113,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     // ── Duplicate name check (exclude current offer) ──────────────────────
     const duplicate = await Offer.findOne({
-      storeUserId: auth.userId,
+      storeUserId: targetUserId,
       offerName: { $regex: new RegExp(`^${offerName.trim()}$`, 'i') },
       isActive: true,
       _id: { $ne: offerId },
@@ -155,22 +156,30 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
     const auth = getAuthenticatedUser(req);
-    if (!auth) {
+    await connectToDatabase();
+    const { offerId } = await context.params;
+
+    let bodyUserId = '';
+    try {
+      const body = await req.json();
+      bodyUserId = body.userId || body.storeUserId || '';
+    } catch {
+      // Body may not be provided in DELETE request
+    }
+    const targetUserId = auth?.userId || req.nextUrl.searchParams.get('userId') || req.nextUrl.searchParams.get('storeUserId') || bodyUserId;
+
+    if (!targetUserId) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: 'Unauthorized: Missing token or userId parameter' },
         { status: 401 }
       );
     }
-    if (!['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
+    if (auth && !['store', 'store_user', 'demo_store', 'user', 'admin'].includes(auth.role)) {
       return NextResponse.json(
         { success: false, message: 'Forbidden: Store users only' },
         { status: 403 }
       );
     }
-
-    await connectToDatabase();
-
-    const { offerId } = await context.params;
 
     // ── Ownership check ───────────────────────────────────────────────────
     const offer = await Offer.findById(offerId);
@@ -180,7 +189,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
         { status: 404 }
       );
     }
-    if (String(offer.storeUserId) !== String(auth.userId)) {
+    if (String(offer.storeUserId) !== String(targetUserId)) {
       return NextResponse.json(
         { success: false, message: 'Forbidden: You do not own this offer' },
         { status: 403 }

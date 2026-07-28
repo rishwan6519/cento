@@ -14,6 +14,9 @@ export interface IVideoJob extends Document {
   modelName: string;
   status: "processing" | "completed" | "failed";
   voiceoverScript: string;
+  enhancedPrompt?: string;
+  images?: string[];
+  socialMedia?: string[];
   videoCount: number;
   falRequests: IFalRequest[];
   createdAt: Date;
@@ -25,6 +28,9 @@ const VideoJobSchema = new Schema<IVideoJob>({
   modelName: { type: String, required: true, default: "Wan 2.1" },
   status: { type: String, enum: ["processing", "completed", "failed"], default: "processing" },
   voiceoverScript: { type: String, default: "" },
+  enhancedPrompt: { type: String, default: "" },
+  images: { type: [String], default: [] },
+  socialMedia: { type: [String], default: [] },
   videoCount: { type: Number, default: 1 },
   falRequests: [
     {

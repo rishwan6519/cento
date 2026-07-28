@@ -4,6 +4,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { connectToDatabase } from "@/lib/db";
 import MediaItemModel from "@/models/MediaItems";
+import VideoTemplate from "@/models/VideoTemplate";
 import { v4 as uuidv4 } from "uuid";
 import mongoose from "mongoose";
 
@@ -53,12 +54,31 @@ async function downloadVideoToBuffer(url: string): Promise<Buffer> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, resolution, aspectRatio, model, numVideos, duration, userId } =
+    const { prompt, resolution, aspectRatio, model, numVideos, duration, userId, templateId } =
       await req.json();
 
-    if (!prompt?.trim() || !userId) {
+    let finalPrompt = prompt || "";
+    let finalAspectRatio = aspectRatio || "16:9";
+    let finalDuration = Number(duration) || 5;
+
+    // Retrieve template from database automatically if templateId is provided
+    if (templateId) {
+      await connectToDatabase();
+      const template = await VideoTemplate.findById(templateId).lean();
+      if (template) {
+        if (!aspectRatio && template.aspectRatio) finalAspectRatio = template.aspectRatio;
+        if (!duration && template.videoDuration) finalDuration = Number(template.videoDuration);
+
+        // Build a cinematic commercial advertisement video prompt directly from template configuration
+        if (!finalPrompt.trim()) {
+          finalPrompt = `Cinematic television commercial ad for campaign '${template.templateName}'. Theme & story: ${template.templateDescription || template.offerTitle}. High-contrast display featuring bold promotional headline '${template.offerTitle}', secondary detail '${template.offerDescription}', badge label '${template.offerLabel}' displaying '${template.discountLabel}' starting from '${template.priceLabel}'. Dynamic ${template.animationStyle} camera animation, harmonious studio styling combining vibrant ${template.backgroundColor} ambiance with ${template.primaryTextColor} and ${template.secondaryTextColor} accents. Hero product focal point positioned at ${template.productImagePosition} of screen, store visual element at ${template.storeImagePosition}, logo emblem at ${template.logoPosition}. Concluding frame highlights call-to-action button labeled '${template.ctaButtonText}' rendered in bright ${template.buttonColor}, alongside footer disclosure '${template.footerText}' (${template.website}, ${template.phoneNumber}). Shot on ARRI Alexa anamorphic lens, crystal-clear commercial motion in ${template.language}.`;
+        }
+      }
+    }
+
+    if (!finalPrompt?.trim() || !userId) {
       return NextResponse.json(
-        { success: false, message: "Prompt and userId are required" },
+        { success: false, message: "Prompt (or valid templateId) and userId are required" },
         { status: 400 }
       );
     }
@@ -81,7 +101,7 @@ export async function POST(req: NextRequest) {
       "1:1": "square",
       "4:3": "landscape_4_3",
     };
-    const imageSizeKey = aspectMap[aspectRatio] || "landscape_16_9";
+    const imageSizeKey = aspectMap[finalAspectRatio] || "landscape_16_9";
 
     const count = Math.max(1, Math.min(4, Number(numVideos) || 1));
     const uploadDir = join(process.cwd(), "uploads", userId, "video");
@@ -114,11 +134,11 @@ export async function POST(req: NextRequest) {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                prompt,
+                prompt: finalPrompt,
                 image_size: imageSizeKey,
                 num_inference_steps: 30,
                 enable_safety_checker: true,
-                duration: Number(duration) || 5,
+                duration: finalDuration,
               }),
             });
 
