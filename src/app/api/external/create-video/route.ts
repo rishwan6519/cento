@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoJobModel from "@/models/VideoJob";
 import VideoTemplate from "@/models/VideoTemplate";
+import { DUMMY_TEMPLATES } from "@/app/api/external/get-templates/route";
 import { v4 as uuidv4 } from "uuid";
 
 export const maxDuration = 300; // Allow sufficient execution duration for background tasks
@@ -156,23 +157,33 @@ export async function POST(req: NextRequest) {
     // Retrieve template from database automatically if templateId is provided
     if (templateId?.trim()) {
       await connectToDatabase();
+      const targetTmplId = templateId.trim();
       const template: any = await VideoTemplate.findOne({
-        _id: templateId.trim(),
+        _id: targetTmplId,
         storeUserId: userId.trim(),
       }).lean();
 
-      if (!template) {
+      const dummyTemplate = DUMMY_TEMPLATES.find((d) => d._id === targetTmplId);
+
+      if (!template && !dummyTemplate) {
         return NextResponse.json(
           { success: false, message: `Template not found with ID '${templateId}' for userId '${userId}'` },
           { status: 404 }
         );
       }
-      if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = template.aspectRatio;
-      if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
 
-      // Build advertising script/text from template details if explicit 'text' was omitted
-      if (!finalText.trim()) {
-        finalText = `Commercial ad campaign titled '${template.templateName}'. Theme: ${template.templateDescription || template.offerTitle}. Promotional headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}' displaying discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text and ${template.buttonColor} button labeled '${template.ctaButtonText}'. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}. Footer text: '${template.footerText}'. Professional broadcast quality in ${template.language}.`;
+      if (template) {
+        if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = template.aspectRatio;
+        if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
+
+        // Build advertising script/text from template details if explicit 'text' was omitted
+        if (!finalText.trim()) {
+          finalText = `Commercial ad campaign titled '${template.templateName}'. Theme: ${template.templateDescription || template.offerTitle}. Promotional headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}' displaying discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text and ${template.buttonColor} button labeled '${template.ctaButtonText}'. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}. Footer text: '${template.footerText}'. Professional broadcast quality in ${template.language}.`;
+        }
+      } else if (dummyTemplate) {
+        if (!finalText.trim()) {
+          finalText = `Professional broadcast advertisement for campaign: '${dummyTemplate.templateName}'. ${dummyTemplate.description}`;
+        }
       }
     }
 

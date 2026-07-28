@@ -1,9 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoTemplate from "@/models/VideoTemplate";
-import type { SortOrder } from "mongoose";
 
 export const dynamic = "force-dynamic";
+
+// ─── Dummy Templates (with MongoDB-like 24-character hex ObjectIds) ───────────
+export const DUMMY_TEMPLATES = [
+  {
+    _id: "6797a1f8b1a3e9c4d2800001",
+    templateName: "Welcome to Our Store",
+    description: "A friendly AI avatar introduces your business, welcomes customers, highlights your brand values, and invites them to explore your products and services.",
+  },
+  {
+    _id: "6797a1f8b1a3e9c4d2800002",
+    templateName: "Brand Introduction",
+    description: "Tell your brand's story through a professional AI presenter, showcasing your mission, vision, and what makes your business unique.",
+  },
+  {
+    _id: "6797a1f8b1a3e9c4d2800003",
+    templateName: "New Product Launch",
+    description: "An AI avatar presents your newest product with engaging visuals, key features, pricing, and reasons why customers should buy it.",
+  },
+  {
+    _id: "6797a1f8b1a3e9c4d2800004",
+    templateName: "Product Spotlight",
+    description: "Highlight a single product in detail, demonstrating its benefits, unique selling points, and ideal use cases.",
+  },
+  {
+    _id: "6797a1f8b1a3e9c4d2800005",
+    templateName: "Best Seller Showcase",
+    description: "Promote your most popular products with an AI host explaining why they are customer favorites.",
+  },
+];
 
 // ─── Shared helper to fetch templates using userId ────────────────────────────
 async function getTemplatesForUser(userId: string, templateId?: string, search?: string) {
@@ -12,18 +40,35 @@ async function getTemplatesForUser(userId: string, templateId?: string, search?:
 
     // If a specific templateId is requested
     if (templateId && templateId.trim()) {
-      const template = await VideoTemplate.findOne({
-        _id: templateId.trim(),
+      const targetId = templateId.trim();
+
+      // Check dummy templates first
+      const dummyMatch = DUMMY_TEMPLATES.find((d) => d._id === targetId);
+      if (dummyMatch) {
+        return NextResponse.json({ success: true, count: 1, "template 1": dummyMatch });
+      }
+
+      // Check MongoDB database
+      const template: any = await VideoTemplate.findOne({
+        _id: targetId,
         storeUserId: userId.trim(),
       }).lean();
 
       if (!template) {
         return NextResponse.json(
-          { success: false, message: `No template found with ID '${templateId}' belonging to userId '${userId}'` },
+          { success: false, message: `No template found with ID '${targetId}'` },
           { status: 404 }
         );
       }
-      return NextResponse.json({ success: true, count: 1, "template 1": template });
+
+      // Restrict output strictly to _id, templateName, description
+      const cleanTemplate = {
+        _id: template._id,
+        templateName: template.templateName,
+        description: template.templateDescription || template.offerDescription || template.offerTitle || "AI Video Template",
+      };
+
+      return NextResponse.json({ success: true, count: 1, "template 1": cleanTemplate });
     }
 
     // Otherwise list templates for userId
@@ -32,22 +77,33 @@ async function getTemplatesForUser(userId: string, templateId?: string, search?:
       status: "Active",
     };
 
-    if (search && search.trim()) {
-      query.$or = [
-        { templateName: { $regex: search.trim(), $options: "i" } },
-        { templateDescription: { $regex: search.trim(), $options: "i" } },
-        { offerTitle: { $regex: search.trim(), $options: "i" } },
-      ];
-    }
+    const dbTemplates: any[] = await VideoTemplate.find(query).sort({ createdAt: -1 }).lean();
 
-    const templates = await VideoTemplate.find(query).sort({ createdAt: -1 }).lean();
+    // Map DB templates to strictly ONLY _id, templateName, description
+    const cleanDbTemplates = dbTemplates.map((t) => ({
+      _id: t._id,
+      templateName: t.templateName,
+      description: t.templateDescription || t.offerDescription || t.offerTitle || "AI Video Template",
+    }));
+
+    // Combine custom DB templates with the standard dummy templates
+    let combinedTemplates = [...cleanDbTemplates, ...DUMMY_TEMPLATES];
+
+    if (search && search.trim()) {
+      const keyword = search.trim().toLowerCase();
+      combinedTemplates = combinedTemplates.filter(
+        (t) =>
+          t.templateName.toLowerCase().includes(keyword) ||
+          t.description.toLowerCase().includes(keyword)
+      );
+    }
 
     const responsePayload: Record<string, any> = {
       success: true,
-      count: templates.length,
+      count: combinedTemplates.length,
     };
 
-    templates.forEach((tmpl, index) => {
+    combinedTemplates.forEach((tmpl, index) => {
       responsePayload[`template ${index + 1}`] = tmpl;
     });
 
