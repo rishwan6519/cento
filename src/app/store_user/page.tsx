@@ -18,6 +18,7 @@ import {
   FaMusic,
   FaBullhorn,
   FaFilm,
+  FaTag,
 } from "react-icons/fa";
 import { MdCampaign, MdComputer } from "react-icons/md";
 import { BsMusicNoteList } from "react-icons/bs";
@@ -29,6 +30,7 @@ import CreateInstantPlaylist from "./CreateInstantPlaylist";
 import CreateAnnouncement from "./CreateAnnouncement";
 import ProfileView from "./ProfileView";
 import AIVideoGenerationView from "./AIVideoGenerationView";
+import OfferCreation from "./OfferCreation";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ViewKey =
@@ -42,7 +44,8 @@ export type ViewKey =
   | "createInstantAnnouncement"
   | "profile"
   | "support"
-  | "aiVideoGeneration";
+  | "aiVideoGeneration"
+  | "offerCreation";
 
 interface OfflineDevice {
   id: string;
@@ -143,6 +146,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <FaFilm className="store-nav-item__icon" />
             <span>AI Video Generation</span>
+          </button>
+
+          <button
+            className={`store-nav-item ${isActive("offerCreation") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("offerCreation")}
+          >
+            <FaTag className="store-nav-item__icon" />
+            <span>Offer Creation</span>
           </button>
 
           <button
@@ -467,7 +478,8 @@ export default function StoreUserPage() {
       view === "mediaManagement" ||
       view === "dashboard" ||
       view === "viewAllCampaigns" ||
-      view === "aiVideoGeneration"
+      view === "aiVideoGeneration" ||
+      view === "offerCreation"
     ) {
       setEditingPlaylist(null);
     }
@@ -555,6 +567,8 @@ export default function StoreUserPage() {
         return <ProfileView onNavigate={handleNavigate} />;
       case "aiVideoGeneration":
         return <AIVideoGenerationView />;
+      case "offerCreation":
+        return <OfferCreation />;
       default:
         return (
           <div className="store-placeholder">
