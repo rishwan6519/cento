@@ -67,21 +67,31 @@ async function checkAndResolveJob(jobId: string) {
       continue;
     }
 
-    // Check status in fal.ai (fast <1s HTTP check)
+    // Check status in fal.ai with up to 3 automatic retries for transient DNS/network drops
     try {
-      const statusRes = await fetch(reqItem.statusUrl, {
-        headers: { Authorization: `Key ${falKey}` },
-      });
-      if (!statusRes.ok) {
+      let statusRes: Response | null = null;
+      for (let att = 1; att <= 3; att++) {
+        try {
+          statusRes = await fetch(reqItem.statusUrl, {
+            headers: { Authorization: `Key ${falKey}` },
+          });
+          if (statusRes.ok) break;
+        } catch (fetchErr) {
+          if (att === 3) throw fetchErr;
+          await new Promise((r) => setTimeout(r, 1000 * att));
+        }
+      }
+
+      if (!statusRes || !statusRes.ok) {
         allCompleted = false;
-        renderDetails.push(`Video ${i + 1}: Waiting on fal.ai queue (HTTP ${statusRes.status})`);
+        renderDetails.push(`Video ${i + 1}: Waiting on fal.ai render queue (HTTP ${statusRes?.status || "timeout"})`);
         continue;
       }
 
       const statusJson = await statusRes.json().catch(() => null);
       if (!statusJson) {
         allCompleted = false;
-        renderDetails.push(`Video ${i + 1}: Checking GPU render queue...`);
+        renderDetails.push(`Video ${i + 1}: Synchronizing render state with GPU cluster...`);
         continue;
       }
 
