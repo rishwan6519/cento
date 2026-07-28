@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     // Retrieve template from database automatically if templateId is provided
     if (templateId) {
       await connectToDatabase();
-      const template = await VideoTemplate.findById(templateId).lean();
+      const template: any = await VideoTemplate.findById(templateId).lean();
       if (template) {
         if (!aspectRatio && template.aspectRatio) finalAspectRatio = template.aspectRatio;
         if (!duration && template.videoDuration) finalDuration = Number(template.videoDuration);
