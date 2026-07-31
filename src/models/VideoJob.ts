@@ -16,6 +16,12 @@ export interface IVideoJob extends Document {
   voiceoverScript: string;
   enhancedPrompt?: string;
   templateId?: string;
+  offerId?: string;
+  videoId?: string;
+  approvalStatus?: "pending" | "success" | "rejected";
+  socialMediaHeading?: string;
+  socialMediaCaption?: string;
+  hashTags?: string[];
   images?: string[];
   channels?: string[];
   socialMedia?: string[];
@@ -32,6 +38,12 @@ const VideoJobSchema = new Schema<IVideoJob>({
   voiceoverScript: { type: String, default: "" },
   enhancedPrompt: { type: String, default: "" },
   templateId: { type: String, default: "" },
+  offerId: { type: String, default: "" },
+  videoId: { type: String, default: "" },
+  approvalStatus: { type: String, enum: ["pending", "success", "rejected"], default: "pending" },
+  socialMediaHeading: { type: String, default: "" },
+  socialMediaCaption: { type: String, default: "" },
+  hashTags: { type: [String], default: [] },
   images: { type: [String], default: [] },
   channels: { type: [String], default: [] },
   socialMedia: { type: [String], default: [] },

@@ -6,6 +6,12 @@ export interface IMediaItem extends Document {
   type: string;
   url: string;
   channels?: string[];
+  voiceoverScript?: string;
+  socialMediaHeading?: string;
+  socialMediaCaption?: string;
+  hashTags?: string[];
+  approvalStatus?: string;
+  offerId?: string;
   createdAt: Date;
 }
 
@@ -15,6 +21,12 @@ const MediaItemSchema = new Schema<IMediaItem>({
   type: { type: String, required: true },
   url: { type: String, required: true },
   channels: { type: [String], default: [] },
+  voiceoverScript: { type: String, required: false },
+  socialMediaHeading: { type: String, required: false },
+  socialMediaCaption: { type: String, required: false },
+  hashTags: { type: [String], default: undefined },
+  approvalStatus: { type: String, required: false },
+  offerId: { type: String, required: false },
   createdAt: { type: Date, default: Date.now }
 });
 

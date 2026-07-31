@@ -48,7 +48,7 @@ async function enhancePromptAndScript(
   aspectRatio: string,
   duration: number,
   openAiKey: string
-): Promise<{ enhancedPrompt: string; voiceoverScript: string }> {
+): Promise<{ enhancedPrompt: string; voiceoverScript: string; socialMediaHeading: string; socialMediaCaption: string; hashTags: string[] }> {
   const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for AI video generation models such as Google Flow, Veo, Higgsfield AI, Seedance, Kling, Runway, Pika, Luma and similar models (${model}).
 
 Your job is NOT to create marketing copy inside the visual prompt.
@@ -150,7 +150,10 @@ Commercial quality
 You MUST respond ONLY with a valid JSON object matching this schema:
 {
   "enhancedPrompt": "The final video generation prompt strictly following all the rules above. No explanations. No markdown. No headings. No bullet points.",
-  "voiceoverScript": "An emotionally compelling television advertisement narration voiceover matching the product (${duration} seconds, ~15-30 words)."
+  "voiceoverScript": "An emotionally compelling television advertisement narration voiceover matching the product (${duration} seconds, ~15-30 words).",
+  "socialMediaHeading": "An attention-grabbing, promotional social media heading/title for this video ad (approx 5-10 words).",
+  "socialMediaCaption": "A highly engaging, interaction-driven social media caption designed to maximize clicks and shares (approx 15-30 words).",
+  "hashTags": ["#Tag1", "#Tag2", "#Tag3", "#Tag4", "#Tag5"]
 }`;
 
   const maxRetries = 3;
@@ -172,7 +175,7 @@ You MUST respond ONLY with a valid JSON object matching this schema:
               content: `User's rough idea: "${roughText}"\nTarget resolution: ${resolution}, aspect ratio: ${aspectRatio}\n\nGenerate the structured advertising JSON:`,
             },
           ],
-          max_tokens: 600,
+          max_tokens: 650,
           temperature: 0.8,
         }),
       });
@@ -193,6 +196,9 @@ You MUST respond ONLY with a valid JSON object matching this schema:
       return {
         enhancedPrompt: parsed.enhancedPrompt || roughText,
         voiceoverScript: parsed.voiceoverScript || roughText,
+        socialMediaHeading: parsed.socialMediaHeading || "Special Promotion",
+        socialMediaCaption: parsed.socialMediaCaption || `Check out our exclusive offer for ${roughText.slice(0, 40)}...`,
+        hashTags: Array.isArray(parsed.hashTags) ? parsed.hashTags : ["#Viral", "#Ad", "#Trending", "#Exclusive"],
       };
     } catch (err) {
       if (attempt === maxRetries) {
@@ -206,6 +212,9 @@ You MUST respond ONLY with a valid JSON object matching this schema:
   return {
     enhancedPrompt: `Macro extreme close-up commercial product feature: ${roughText}. Dynamic slow-motion environmental interaction, robotic techno-dolly camera orbital pan, bright volumetric rays, gleaming specular surface highlights against shallow depth of field studio bokeh. Shot on an ARRI Alexa Mini with a 35mm Master Prime anamorphic lens, pristine crystal-clear motion, television commercial production quality.`,
     voiceoverScript: `Experience ${roughText}. Uncompromising luxury, elevated performance, and flawless design. Discover perfection today.`,
+    socialMediaHeading: "Experience Uncompromising Luxury",
+    socialMediaCaption: `Elevated performance and flawless design. Discover the ultimate experience with our exclusive collection today!`,
+    hashTags: ["#Luxury", "#Trending", "#Viral", "#NewRelease", "#Ad"],
   };
 }
 
@@ -268,6 +277,8 @@ export async function POST(req: NextRequest) {
       images,     // optional — array of image URLs
       imageUrls,  // fallback alias for images
       templateId, // optional (not mandatory) — AI Video Template ID from video_templates collection
+      offerId,    // optional (not mandatory) — Offer ID to associate with the video
+      offer_id,   // fallback alias for offerId
     } = body;
 
     // Automatically trim inputs to strip hidden tabs (\t), spaces, or newlines from Postman/form copy-pasting
@@ -276,6 +287,7 @@ export async function POST(req: NextRequest) {
     const resolution = typeof rawResolution === "string" ? rawResolution.trim() : "";
     const text = typeof rawText === "string" ? rawText.trim() : "";
     const aspectRatio = typeof rawAspectRatio === "string" ? rawAspectRatio.trim() : "";
+    const cleanOfferId = (offerId || offer_id) ? String(offerId || offer_id).trim() : "";
 
     // ----- Validate required userId first -----
     if (!userId) {
@@ -405,8 +417,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script -----
-    const { enhancedPrompt, voiceoverScript } = await enhancePromptAndScript(
+    // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script + social metadata -----
+    const { enhancedPrompt, voiceoverScript, socialMediaHeading, socialMediaCaption, hashTags } = await enhancePromptAndScript(
       finalText,
       model,
       resolution,
@@ -491,7 +503,12 @@ export async function POST(req: NextRequest) {
       status: "processing",
       voiceoverScript,
       enhancedPrompt,
+      socialMediaHeading,
+      socialMediaCaption,
+      hashTags,
+      approvalStatus: "pending",
       templateId: templateId ? String(templateId).trim() : "",
+      offerId: cleanOfferId,
       images: imagesList,
       channels: channelsList,
       socialMedia: channelsList,
@@ -506,9 +523,13 @@ export async function POST(req: NextRequest) {
       success: true,
       status: "processing",
       jobId,
+      ...(cleanOfferId ? { offerId: cleanOfferId } : {}),
       templateId: templateId ? String(templateId).trim() : "",
       enhancedPrompt,
       voiceoverScript,
+      socialMediaHeading,
+      socialMediaCaption,
+      hashTags,
       images: imagesList,
       channels: channelsList,
       socialMedia: channelsList,

@@ -193,10 +193,17 @@ async function checkAndResolveJob(jobId: string) {
               type: "video",
               url: localVideoUrl,
               channels: job.channels || job.socialMedia || [],
+              voiceoverScript: job.voiceoverScript || "",
+              socialMediaHeading: job.socialMediaHeading || "",
+              socialMediaCaption: job.socialMediaCaption || "",
+              hashTags: job.hashTags || [],
+              approvalStatus: job.approvalStatus || "pending",
+              offerId: job.offerId || undefined,
               createdAt: new Date(),
             });
             await mediaItem.save();
 
+            job.videoId = mediaItem._id.toString();
             reqItem.videoUrl = localVideoUrl;
             reqItem.status = "completed";
             renderDetails.push(`Video ${i + 1}: Rendered and saved to media library`);
@@ -251,23 +258,46 @@ async function checkAndResolveJob(jobId: string) {
       renderProgress: renderDetails,
       enhancedPrompt: job.enhancedPrompt || "",
       voiceoverScript: job.voiceoverScript || "",
+      socialMediaHeading: job.socialMediaHeading || "",
+      socialMediaCaption: job.socialMediaCaption || "",
+      hashTags: job.hashTags || [],
       channels: job.channels || job.socialMedia || [],
+      ...(job.offerId ? { offerId: job.offerId } : {}),
 
       message: `AI Video generation is processing depending on model complexity. Please check after 10 minutes.`,
     });
   }
 
-  // Once completed, output strictly only the generated results!
-  const responsePayload: Record<string, any> = {};
+  // Once completed, output strictly only the generated results along with approval status and videoId!
+  const responsePayload: Record<string, any> = {
+    status: job.approvalStatus || "pending",
+    videoId: job.videoId || "",
+  };
 
   const generatedUrls = job.falRequests.map((r) => r.videoUrl || "").filter(Boolean);
+  if (!responsePayload.videoId && generatedUrls[0]) {
+    const foundMedia: any = await MediaItemModel.findOne({ url: generatedUrls[0] }).select("_id").lean();
+    if (foundMedia && foundMedia._id) {
+      responsePayload.videoId = foundMedia._id.toString();
+      job.videoId = responsePayload.videoId;
+      await job.save().catch(() => {});
+    }
+  }
+
   generatedUrls.forEach((url, index) => {
     responsePayload[`video ${index + 1}`] = url;
   });
 
+  if (job.offerId) {
+    responsePayload.offerId = job.offerId;
+  }
+
   responsePayload.templateId = job.templateId || "";
   responsePayload.enhancedPrompt = job.enhancedPrompt || "";
   responsePayload.voiceoverScript = job.voiceoverScript || "";
+  responsePayload.socialMediaHeading = job.socialMediaHeading || "";
+  responsePayload.socialMediaCaption = job.socialMediaCaption || "";
+  responsePayload.hashTags = job.hashTags || [];
   responsePayload.channels = job.channels || job.socialMedia || [];
   responsePayload.socialMedia = job.channels || job.socialMedia || [];
 
