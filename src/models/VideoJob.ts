@@ -17,6 +17,7 @@ export interface IVideoJob extends Document {
   enhancedPrompt?: string;
   templateId?: string;
   images?: string[];
+  channels?: string[];
   socialMedia?: string[];
   videoCount: number;
   falRequests: IFalRequest[];
@@ -32,6 +33,7 @@ const VideoJobSchema = new Schema<IVideoJob>({
   enhancedPrompt: { type: String, default: "" },
   templateId: { type: String, default: "" },
   images: { type: [String], default: [] },
+  channels: { type: [String], default: [] },
   socialMedia: { type: [String], default: [] },
   videoCount: { type: Number, default: 1 },
   falRequests: [

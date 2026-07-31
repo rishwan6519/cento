@@ -34,7 +34,8 @@ async function checkAndResolveJob(jobId: string) {
     responsePayload.templateId = job.templateId || "";
     responsePayload.enhancedPrompt = job.enhancedPrompt || "";
     responsePayload.voiceoverScript = job.voiceoverScript || "";
-    responsePayload.socialMedia = job.socialMedia || [];
+    responsePayload.channels = job.channels || job.socialMedia || [];
+    responsePayload.socialMedia = job.channels || job.socialMedia || [];
     return NextResponse.json(responsePayload);
   }
 
@@ -149,6 +150,7 @@ async function checkAndResolveJob(jobId: string) {
               name: `External AI Video (${i + 1}/${job.videoCount}) – ${job.modelName} – ${new Date().toLocaleString()}`,
               type: "video",
               url: localVideoUrl,
+              channels: job.channels || job.socialMedia || [],
               createdAt: new Date(),
             });
             await mediaItem.save();
@@ -206,9 +208,10 @@ async function checkAndResolveJob(jobId: string) {
       renderProgress: renderDetails,
       enhancedPrompt: job.enhancedPrompt || "",
       voiceoverScript: job.voiceoverScript || "",
-      socialMedia: job.socialMedia || [],
+      channels: job.channels || job.socialMedia || [],
+      socialMedia: job.channels || job.socialMedia || [],
 
-      message: `AI Video generation takes 2 to 5 minutes depending on model complexity. Please poll again in 10 seconds.`,
+      message: `AI Video generation is processing depending on model complexity. Please check after 10 minutes.`,
     });
   }
 
@@ -223,7 +226,8 @@ async function checkAndResolveJob(jobId: string) {
   responsePayload.templateId = job.templateId || "";
   responsePayload.enhancedPrompt = job.enhancedPrompt || "";
   responsePayload.voiceoverScript = job.voiceoverScript || "";
-  responsePayload.socialMedia = job.socialMedia || [];
+  responsePayload.channels = job.channels || job.socialMedia || [];
+  responsePayload.socialMedia = job.channels || job.socialMedia || [];
 
   return NextResponse.json(responsePayload);
 }

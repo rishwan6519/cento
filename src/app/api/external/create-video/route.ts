@@ -4,6 +4,9 @@ import VideoJobModel from "@/models/VideoJob";
 import VideoTemplate from "@/models/VideoTemplate";
 import { DUMMY_TEMPLATES } from "@/lib/dummyTemplates";
 import { v4 as uuidv4 } from "uuid";
+import { existsSync } from "fs";
+import { mkdir, writeFile } from "fs/promises";
+import { join } from "path";
 
 export const maxDuration = 300; // Allow sufficient execution duration for background tasks
 export const dynamic = "force-dynamic";
@@ -46,20 +49,108 @@ async function enhancePromptAndScript(
   duration: number,
   openAiKey: string
 ): Promise<{ enhancedPrompt: string; voiceoverScript: string }> {
-  const systemContent = `You are a world-class Director of Photography (DoP), TV Commercial Film Director, and Advertising Voiceover Copywriter for premium global brands (Apple, Nike, Lexus, Sephora). Your job is to take the user's rough concept and produce TWO distinct professional assets for a ${duration}-second video commercial:
+  const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for AI video generation models such as Google Flow, Veo, Higgsfield AI, Seedance, Kling, Runway, Pika, Luma and similar models (${model}).
 
-1. **enhancedPrompt**: A masterclass cinematic video generation prompt optimized for AI diffusers (${model}).
-   - DO NOT use abstract jargon like "a promotional video" or "an inspiring ad". Describe physical reality: Scene & Set Architecture, Dynamic Physics, Kinetic Camera Choreography, Material Textures, and Cinematographically Graded Lighting.
-   - Structure chronologically: Opening Hook (0-2s with dramatic lighting/macro shots), Kinetic Action & Flow (mid-scene movement and fluid mechanics), and Hero Product Climax (razor-sharp focus, shallow depth of field bokeh, specular reflections).
-   - Weave in optical camera specs (e.g. shot on ARRI Alexa Mini, 35mm Master Prime anamorphic lens, high dynamic range color grading).
+Your job is NOT to create marketing copy inside the visual prompt.
+Your job is to convert a simple offer instruction into an extremely detailed, production-quality video generation prompt, along with an accompanying commercial voiceover script.
 
-2. **voiceoverScript**: A crisp, emotionally engaging, and persuasive television commercial voiceover (VO) narration script matching the product and length of the spot (${duration} seconds, roughly 15 to 30 words).
-   - Must sound natural, elevated, and impactful when spoken out loud by an advertising voice actor. DO NOT mention camera directions or lighting specs here!
+The user may provide:
+• Product name
+• Offer details
+• Offer duration
+• One or more product images (optional)
+• Brand name (optional)
+• Store name (optional)
+• Colors (optional)
+• Additional instructions (optional)
+
+If product images are provided, treat them as the exact reference product.
+Do NOT change:
+- product shape
+- color
+- packaging
+- logo
+- branding
+- label
+- size
+- text on product
+
+The product in the generated video must exactly match the reference image.
+If no image is supplied, create a realistic version of the described product.
+The generated prompt should focus on producing a premium commercial advertisement.
+
+Always include:
+• Hero product shot
+• Cinematic camera movements
+• Luxury lighting
+• Dynamic transitions
+• Product closeups
+• Premium reflections
+• Floating particles when appropriate
+• Motion graphics placeholders
+• Realistic materials
+• Highly detailed textures
+• Professional commercial style
+• Eye-catching composition
+
+The generated prompt should be optimized for modern AI video generators.
+Avoid mentioning camera brands.
+Describe camera movements only.
+Examples:
+- slow push in
+- orbit shot
+- dolly
+- crane shot
+- macro closeup
+- smooth tracking
+- slow motion
+- rotating product
+- cinematic reveal
+
+Mention lighting such as:
+- studio lighting
+- soft lighting
+- rim lighting
+- volumetric lighting
+- luxury reflections
+- glossy highlights
+
+Mention environment only if suitable.
+Examples:
+- Luxury studio
+- Dark premium background
+- Minimal white studio
+- Modern retail
+- Wooden tabletop
+- Kitchen
+- Cafe
+- Electronics showroom
+- Fashion studio
+
+Do not create unnecessary environments.
+The focus must remain on the product.
+
+Offer text should NOT be baked into the scene.
+Instead, include instructions such as:
+"Reserve clean space on left side for offer text overlay."
+or
+"Leave negative space above product for promotional graphics."
+
+Never hardcode pricing into the scene unless explicitly requested.
+Always produce videos suitable for the requested aspect ratio (${aspectRatio}).
+Preferred duration: ${duration} seconds.
+
+Tone:
+Premium
+Modern
+Luxury
+Highly engaging
+Commercial quality
 
 You MUST respond ONLY with a valid JSON object matching this schema:
 {
-  "enhancedPrompt": "string",
-  "voiceoverScript": "string"
+  "enhancedPrompt": "The final video generation prompt strictly following all the rules above. No explanations. No markdown. No headings. No bullet points.",
+  "voiceoverScript": "An emotionally compelling television advertisement narration voiceover matching the product (${duration} seconds, ~15-30 words)."
 }`;
 
   const maxRetries = 3;
@@ -123,7 +214,43 @@ You MUST respond ONLY with a valid JSON object matching this schema:
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
+    const contentType = req.headers.get("content-type") || "";
+    let body: Record<string, any> = {};
+    const uploadedFiles: File[] = [];
+
+    if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+      const formData = await req.formData().catch(() => new FormData());
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File && value.name && value.size > 0) {
+          if (key === "images" || key === "image" || key === "file" || key === "files" || key.startsWith("image")) {
+            uploadedFiles.push(value);
+          } else {
+            body[key] = value.name;
+          }
+        } else if (typeof value === "string") {
+          if (["images", "imageUrls", "channels", "socialMedia", "share", "shareTo"].includes(key)) {
+            if (body[key]) {
+              if (Array.isArray(body[key])) body[key].push(value);
+              else body[key] = [body[key], value];
+            } else {
+              try {
+                if (value.startsWith("[") && value.endsWith("]")) {
+                  body[key] = JSON.parse(value);
+                } else {
+                  body[key] = value;
+                }
+              } catch {
+                body[key] = value;
+              }
+            }
+          } else {
+            body[key] = value;
+          }
+        }
+      }
+    } else {
+      body = await req.json().catch(() => ({}));
+    }
 
     const {
       text,       // rough description — third party provides this plain text
@@ -134,12 +261,13 @@ export async function POST(req: NextRequest) {
       duration,   // optional — video length in seconds (default: 5)
       numVideos,  // optional — number of videos to generate (default: 1, max: 10)
       count,      // fallback property in case caller sends 'count' instead of 'numVideos'
-      socialMedia,// optional — platforms to share to e.g. ["insta", "facebook", "twitter"]
-      share,      // fallback alias for socialMedia
-      shareTo,    // fallback alias for socialMedia
+      channels,   // optional — platforms/channels to publish to e.g. ["insta", "facebook", "twitter"]
+      socialMedia,// optional — fallback alias for channels
+      share,      // fallback alias for channels
+      shareTo,    // fallback alias for channels
       images,     // optional — array of image URLs
       imageUrls,  // fallback alias for images
-      templateId, // optional — AI Video Template ID from video_templates collection
+      templateId, // optional (not mandatory) — AI Video Template ID from video_templates collection
     } = body;
 
     // ----- Validate required userId first -----
@@ -233,12 +361,12 @@ export async function POST(req: NextRequest) {
     const videoDuration = Math.max(1, Math.min(60, Number(finalDuration) || 5));
     const videoCount = Math.max(1, Math.min(10, Number(numVideos || count) || 1));
 
-    const rawSocialMedia = socialMedia || share || shareTo || [];
-    let socialMediaList: string[] = [];
-    if (Array.isArray(rawSocialMedia)) {
-      socialMediaList = rawSocialMedia.map((item: any) => String(item).trim()).filter(Boolean);
-    } else if (typeof rawSocialMedia === "string") {
-      socialMediaList = rawSocialMedia.split(",").map((s: string) => s.trim()).filter(Boolean);
+    const rawChannels = channels || socialMedia || share || shareTo || [];
+    let channelsList: string[] = [];
+    if (Array.isArray(rawChannels)) {
+      channelsList = rawChannels.map((item: any) => String(item).trim()).filter(Boolean);
+    } else if (typeof rawChannels === "string") {
+      channelsList = rawChannels.split(",").map((s: string) => s.trim()).filter(Boolean);
     }
 
     const rawImages = images || imageUrls || [];
@@ -247,6 +375,27 @@ export async function POST(req: NextRequest) {
       imagesList = rawImages.map((item: any) => String(item).trim()).filter(Boolean);
     } else if (typeof rawImages === "string") {
       imagesList = rawImages.split(",").map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    // Save uploaded multipart image files into local uploads/userId/image folder
+    if (uploadedFiles.length > 0 && userId?.trim()) {
+      const imgUploadDir = join(process.cwd(), "uploads", userId.trim(), "image");
+      if (!existsSync(imgUploadDir)) {
+        await mkdir(imgUploadDir, { recursive: true });
+      }
+      for (const file of uploadedFiles) {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const ext = file.name.split(".").pop() || "png";
+          const fileName = `${uuidv4()}.${ext}`;
+          await writeFile(join(imgUploadDir, fileName), buffer);
+          const localImageUrl = `/uploads/${userId.trim()}/image/${fileName}`;
+          imagesList.push(localImageUrl);
+        } catch (err) {
+          console.warn("[external/create-video] Failed to save uploaded image file:", err);
+        }
+      }
     }
 
     // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script -----
@@ -337,7 +486,8 @@ export async function POST(req: NextRequest) {
       enhancedPrompt,
       templateId: templateId ? String(templateId).trim() : "",
       images: imagesList,
-      socialMedia: socialMediaList,
+      channels: channelsList,
+      socialMedia: channelsList,
       videoCount,
       falRequests,
       createdAt: new Date(),
@@ -352,8 +502,10 @@ export async function POST(req: NextRequest) {
       templateId: templateId ? String(templateId).trim() : "",
       enhancedPrompt,
       voiceoverScript,
-      socialMedia: socialMediaList,
-      message: ` AI Video generation takes 2 to 5 minutes depending on model complexity.. Retrieve your completed videos by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
+      images: imagesList,
+      channels: channelsList,
+      socialMedia: channelsList,
+      message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });
   } catch (error) {
     console.error("[external/create-video] Error:", error);

@@ -5,6 +5,7 @@ export interface IMediaItem extends Document {
   name: string;
   type: string;
   url: string;
+  channels?: string[];
   createdAt: Date;
 }
 
@@ -13,6 +14,7 @@ const MediaItemSchema = new Schema<IMediaItem>({
   name: { type: String, required: true },
   type: { type: String, required: true },
   url: { type: String, required: true },
+  channels: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now }
 });
 
