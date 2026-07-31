@@ -253,11 +253,11 @@ export async function POST(req: NextRequest) {
     }
 
     const {
-      text,       // rough description — third party provides this plain text
-      userId,     // third party user/account ID
-      model,      // AI video model name
-      resolution, // "480p" | "720p" | "1080p" | "4K"
-      aspectRatio,// "16:9" | "9:16" | "1:1" | "4:3"
+      text: rawText,       // rough description — third party provides this plain text
+      userId: rawUserId,     // third party user/account ID
+      model: rawModel,      // AI video model name
+      resolution: rawResolution, // "480p" | "720p" | "1080p" | "4K"
+      aspectRatio: rawAspectRatio,// "16:9" | "9:16" | "1:1" | "4:3"
       duration,   // optional — video length in seconds (default: 5)
       numVideos,  // optional — number of videos to generate (default: 1, max: 10)
       count,      // fallback property in case caller sends 'count' instead of 'numVideos'
@@ -270,15 +270,22 @@ export async function POST(req: NextRequest) {
       templateId, // optional (not mandatory) — AI Video Template ID from video_templates collection
     } = body;
 
+    // Automatically trim inputs to strip hidden tabs (\t), spaces, or newlines from Postman/form copy-pasting
+    const userId = typeof rawUserId === "string" ? rawUserId.trim() : "";
+    const model = typeof rawModel === "string" ? rawModel.trim() : "";
+    const resolution = typeof rawResolution === "string" ? rawResolution.trim() : "";
+    const text = typeof rawText === "string" ? rawText.trim() : "";
+    const aspectRatio = typeof rawAspectRatio === "string" ? rawAspectRatio.trim() : "";
+
     // ----- Validate required userId first -----
-    if (!userId?.trim()) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, message: "Field 'userId' is required" },
         { status: 400 }
       );
     }
 
-    let finalText = text || "";
+    let finalText = text;
     let finalAspectRatio = aspectRatio;
     let finalDuration = duration;
 
