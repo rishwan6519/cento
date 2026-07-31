@@ -48,7 +48,9 @@ async function getMediaForUser(userId: string, mediaType?: string, search?: stri
         type: item.type,
         url: item.url,
         channels: item.channels || item.socialMedia || [],
-        socialMedia: item.channels || item.socialMedia || [],
+        ...(item.metadataId ? { metadataId: item.metadataId } : {}),
+        ...(item.offerId ? { offerId: item.offerId } : {}),
+        ...(item.approvalStatus ? { approvalStatus: item.approvalStatus } : {}),
         createdAt: item.createdAt,
       };
     });

@@ -5,6 +5,8 @@ import { existsSync } from "fs";
 import { connectToDatabase } from "@/lib/db";
 import MediaItemModel from "@/models/MediaItems";
 import VideoJobModel, { IVideoJob } from "@/models/VideoJob";
+import Offer from "@/models/Offer";
+import MediaMetadataModel from "@/models/MediaMetadata";
 import { v4 as uuidv4 } from "uuid";
 import mongoose from "mongoose";
 
@@ -203,6 +205,20 @@ async function checkAndResolveJob(jobId: string) {
             });
             await mediaItem.save();
 
+            const metadataDoc = await MediaMetadataModel.create({
+              mediaId: mediaItem._id,
+              userId: new mongoose.Types.ObjectId(job.userId),
+              channels: job.channels || job.socialMedia || [],
+              voiceoverScript: job.voiceoverScript || "",
+              socialMediaHeading: job.socialMediaHeading || "",
+              socialMediaCaption: job.socialMediaCaption || "",
+              hashTags: job.hashTags || [],
+              approvalStatus: job.approvalStatus || "pending",
+              offerId: job.offerId || undefined,
+            });
+            mediaItem.metadataId = metadataDoc._id;
+            await mediaItem.save();
+
             job.videoId = mediaItem._id.toString();
             reqItem.videoUrl = localVideoUrl;
             reqItem.status = "completed";
@@ -258,10 +274,14 @@ async function checkAndResolveJob(jobId: string) {
       renderProgress: renderDetails,
       enhancedPrompt: job.enhancedPrompt || "",
       voiceoverScript: job.voiceoverScript || "",
-      socialMediaHeading: job.socialMediaHeading || "",
-      socialMediaCaption: job.socialMediaCaption || "",
-      hashTags: job.hashTags || [],
-      channels: job.channels || job.socialMedia || [],
+      ...((job.channels || job.socialMedia || []).length > 0
+        ? {
+            socialMediaHeading: job.socialMediaHeading || "",
+            socialMediaCaption: job.socialMediaCaption || "",
+            hashTags: job.hashTags || [],
+            channels: job.channels || job.socialMedia || [],
+          }
+        : {}),
       ...(job.offerId ? { offerId: job.offerId } : {}),
 
       message: `AI Video generation is processing depending on model complexity. Please check after 10 minutes.`,
@@ -282,14 +302,7 @@ async function checkAndResolveJob(jobId: string) {
     }
   }
 
-  generatedUrls.forEach((url: string, index: number) => {
-    responsePayload[`video ${index + 1}`] = url;
-  });
-
-  if (job.offerId) {
-    responsePayload.offerId = job.offerId;
-  }
-
+  const currentChannels = job.channels || job.socialMedia || [];
   const defaultHeading = "Experience Uncompromising Quality!";
   const defaultCaption = job.voiceoverScript 
     ? `${job.voiceoverScript.slice(0, 80)}... Discover the ultimate experience today!` 
@@ -298,13 +311,33 @@ async function checkAndResolveJob(jobId: string) {
 
   responsePayload.status = job.approvalStatus || "pending";
   responsePayload.videoId = resolvedVideoId;
+  if (job.offerId) {
+    responsePayload.offerId = job.offerId;
+    if (mongoose.Types.ObjectId.isValid(String(job.offerId).trim())) {
+      const linkedOffer: any = await Offer.findById(String(job.offerId).trim()).lean().catch(() => null);
+      if (linkedOffer) {
+        if (linkedOffer.offerName) responsePayload.offerName = linkedOffer.offerName;
+        if (linkedOffer.offerDescription) responsePayload.offerDescription = linkedOffer.offerDescription;
+        if (linkedOffer.startDate) responsePayload.startDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
+        if (linkedOffer.endDate) responsePayload.endDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
+      }
+    }
+  }
   responsePayload.templateId = job.templateId || "";
+
+  generatedUrls.forEach((url: string, index: number) => {
+    responsePayload[`video ${index + 1}`] = url;
+  });
+
   responsePayload.enhancedPrompt = job.enhancedPrompt || "";
   responsePayload.voiceoverScript = job.voiceoverScript || "";
-  responsePayload.socialMediaHeading = job.socialMediaHeading || defaultHeading;
-  responsePayload.socialMediaCaption = job.socialMediaCaption || defaultCaption;
-  responsePayload.hashTags = (job.hashTags && job.hashTags.length > 0) ? job.hashTags : defaultTags;
-  responsePayload.channels = job.channels || job.socialMedia || [];
+
+  if (currentChannels && currentChannels.length > 0) {
+    responsePayload.socialMediaHeading = job.socialMediaHeading || defaultHeading;
+    responsePayload.socialMediaCaption = job.socialMediaCaption || defaultCaption;
+    responsePayload.hashTags = (job.hashTags && job.hashTags.length > 0) ? job.hashTags : defaultTags;
+    responsePayload.channels = currentChannels;
+  }
 
   return NextResponse.json(responsePayload);
 }

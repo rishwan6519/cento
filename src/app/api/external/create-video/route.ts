@@ -299,6 +299,8 @@ export async function POST(req: NextRequest) {
 
     let finalText = text;
     let finalAspectRatio = aspectRatio;
+    let finalResolution = resolution;
+    let finalModel = model;
     let finalDuration = duration;
 
     // Retrieve template from database automatically if templateId is provided
@@ -320,7 +322,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (template) {
-        if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = template.aspectRatio;
+        if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = String(template.aspectRatio).trim();
+        if (!finalResolution && template.resolution) finalResolution = String(template.resolution).trim();
         if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
 
         // Build advertising script/text from template details if explicit 'text' was omitted
@@ -328,34 +331,24 @@ export async function POST(req: NextRequest) {
           finalText = `Commercial ad campaign titled '${template.templateName}'. Theme: ${template.templateDescription || template.offerTitle}. Promotional headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}' displaying discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text and ${template.buttonColor} button labeled '${template.ctaButtonText}'. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}. Footer text: '${template.footerText}'. Professional broadcast quality in ${template.language}.`;
         }
       } else if (dummyTemplate) {
+        if (!finalAspectRatio && (dummyTemplate as any).aspectRatio) finalAspectRatio = String((dummyTemplate as any).aspectRatio).trim();
+        if (!finalResolution && (dummyTemplate as any).resolution) finalResolution = String((dummyTemplate as any).resolution).trim();
+
         if (!finalText.trim()) {
           finalText = `Professional broadcast advertisement for campaign: '${dummyTemplate.templateName}'. ${dummyTemplate.description}`;
         }
       }
     }
 
+    // Apply intelligent defaults if omitted by user and not available on template
+    if (!finalModel?.trim()) finalModel = "Wan 2.1 (1.3B)";
+    if (!finalResolution?.trim()) finalResolution = "720p";
+    if (!finalAspectRatio?.trim()) finalAspectRatio = "9:16";
+
     // ----- Validate required fields -----
     if (!finalText?.trim()) {
       return NextResponse.json(
         { success: false, message: "Field 'text' (or a valid 'templateId') is required — provide your video description" },
-        { status: 400 }
-      );
-    }
-    if (!model?.trim()) {
-      return NextResponse.json(
-        { success: false, message: "Field 'model' is required — see supported models list" },
-        { status: 400 }
-      );
-    }
-    if (!resolution?.trim()) {
-      return NextResponse.json(
-        { success: false, message: "Field 'resolution' is required: '480p' | '720p' | '1080p' | '4K'" },
-        { status: 400 }
-      );
-    }
-    if (!finalAspectRatio?.trim()) {
-      return NextResponse.json(
-        { success: false, message: "Field 'aspectRatio' is required: '16:9' | '9:16' | '1:1' | '4:3'" },
         { status: 400 }
       );
     }
@@ -420,15 +413,15 @@ export async function POST(req: NextRequest) {
     // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script + social metadata -----
     const { enhancedPrompt, voiceoverScript, socialMediaHeading, socialMediaCaption, hashTags } = await enhancePromptAndScript(
       finalText,
-      model,
-      resolution,
+      finalModel,
+      finalResolution,
       finalAspectRatio,
       videoDuration,
       openAiKey
     );
 
-    const modelSlug = MODEL_SLUG_MAP[model] || "fal-ai/wan-t2v";
-    const imageSizeKey = ASPECT_MAP[finalAspectRatio] || "landscape_16_9";
+    const modelSlug = MODEL_SLUG_MAP[finalModel] || "fal-ai/wan-t2v";
+    const imageSizeKey = ASPECT_MAP[finalAspectRatio] || "portrait_9_16";
 
     // ----- Step 2: Submit all video generation requests to fal.ai queue instantly (< 1s) -----
     const falRequests = [];
@@ -499,7 +492,7 @@ export async function POST(req: NextRequest) {
     const videoJob = new VideoJobModel({
       jobId,
       userId,
-      modelName: model || "Wan 2.1",
+      modelName: finalModel || "Wan 2.1 (1.3B)",
       status: "processing",
       voiceoverScript,
       enhancedPrompt,
@@ -523,15 +516,22 @@ export async function POST(req: NextRequest) {
       success: true,
       status: "processing",
       jobId,
+      model: finalModel,
+      resolution: finalResolution,
+      aspectRatio: finalAspectRatio,
       ...(cleanOfferId ? { offerId: cleanOfferId } : {}),
       templateId: templateId ? String(templateId).trim() : "",
       enhancedPrompt,
       voiceoverScript,
-      socialMediaHeading,
-      socialMediaCaption,
-      hashTags,
+      ...(channelsList && channelsList.length > 0
+        ? {
+            socialMediaHeading,
+            socialMediaCaption,
+            hashTags,
+            channels: channelsList,
+          }
+        : {}),
       images: imagesList,
-      channels: channelsList,
       message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });
   } catch (error) {
