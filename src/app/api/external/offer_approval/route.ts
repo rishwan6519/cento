@@ -17,11 +17,10 @@ export async function POST(req: NextRequest) {
 
     const rawId = body.videoId || body.id || body.mediaId || body.jobId;
     const videoUrlParam = body["video 1"] || body.videoUrl || body.url;
-    const inputOfferId = body.offerId || body.offer_id;
 
-    if (!rawId && !videoUrlParam && !inputOfferId) {
+    if (!rawId && !videoUrlParam) {
       return NextResponse.json(
-        { error: "Missing 'videoId', 'offerId', or 'video 1' URL parameter in request body" },
+        { success: false, error: "Missing required property 'videoId' (or 'video 1' URL parameter) in request body" },
         { status: 400 }
       );
     }
@@ -31,18 +30,15 @@ export async function POST(req: NextRequest) {
     let mediaItem: any = null;
     let videoJob: any = null;
 
-    // 1. Locate MediaItem by ObjectId, URL, or offerId
+    // 1. Locate MediaItem primarily by ObjectId or URL
     if (rawId && mongoose.Types.ObjectId.isValid(String(rawId).trim())) {
       mediaItem = await MediaItemModel.findById(String(rawId).trim());
     }
     if (!mediaItem && videoUrlParam) {
       mediaItem = await MediaItemModel.findOne({ url: String(videoUrlParam).trim() });
     }
-    if (!mediaItem && inputOfferId) {
-      mediaItem = await MediaItemModel.findOne({ offerId: String(inputOfferId).trim() });
-    }
 
-    // 2. Locate associated VideoJob by videoId, jobId, video URL, or offerId
+    // 2. Locate associated VideoJob by videoId, jobId, or video URL
     if (rawId && typeof rawId === "string") {
       videoJob = await VideoJobModel.findOne({
         $or: [{ videoId: rawId.trim() }, { jobId: rawId.trim() }],
@@ -59,13 +55,11 @@ export async function POST(req: NextRequest) {
     if (!videoJob && videoUrlParam) {
       videoJob = await VideoJobModel.findOne({ "falRequests.videoUrl": String(videoUrlParam).trim() });
     }
-    if (!videoJob && inputOfferId) {
-      videoJob = await VideoJobModel.findOne({ offerId: String(inputOfferId).trim() });
-    }
 
-    if (!mediaItem && !videoJob && !inputOfferId) {
+    // STRICT VALIDATION: Check if video exists first! If videoId is invalid or non-existent, stop immediately and return error.
+    if (!mediaItem && !videoJob) {
       return NextResponse.json(
-        { error: "No video or offer found matching the provided ID or URL" },
+        { success: false, error: `Invalid video: No matching video found in media library or jobs for the provided videoId '${rawId || videoUrlParam}'. You must provide a valid videoId before processing approval or editing fields.` },
         { status: 404 }
       );
     }
@@ -201,6 +195,7 @@ export async function POST(req: NextRequest) {
       if (socialMediaCaption !== undefined) mediaItem.socialMediaCaption = String(socialMediaCaption).trim();
       if (newHashTags !== undefined) mediaItem.hashTags = newHashTags;
       if (newOfferId !== undefined) mediaItem.offerId = newOfferId;
+      if (newTemplateId !== undefined) mediaItem.templateId = newTemplateId;
       mediaItem.approvalStatus = "success";
       await mediaItem.save();
     }
@@ -224,13 +219,13 @@ export async function POST(req: NextRequest) {
 
     // 4. Return updated approved metadata in clean, logical ordering
     const finalVideoUrl = mediaItem?.url || videoJob?.falRequests?.find((r: any) => r.videoUrl)?.videoUrl || "";
-    const finalScript = mediaItem?.voiceoverScript || videoJob?.voiceoverScript || "";
-    const finalHeading = mediaItem?.socialMediaHeading || videoJob?.socialMediaHeading || "";
-    const finalCaption = mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "";
-    const finalTags = mediaItem?.hashTags || videoJob?.hashTags || [];
-    const finalChannels = mediaItem?.channels || videoJob?.channels || videoJob?.socialMedia || [];
+    const finalScript = voiceoverScript !== undefined ? String(voiceoverScript).trim() : (mediaItem?.voiceoverScript || videoJob?.voiceoverScript || "");
+    const finalHeading = socialMediaHeading !== undefined ? String(socialMediaHeading).trim() : (mediaItem?.socialMediaHeading || videoJob?.socialMediaHeading || "");
+    const finalCaption = socialMediaCaption !== undefined ? String(socialMediaCaption).trim() : (mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
+    const finalTags = newHashTags !== undefined ? newHashTags : (mediaItem?.hashTags || videoJob?.hashTags || []);
+    const finalChannels = newChannels !== undefined ? newChannels : (mediaItem?.channels || videoJob?.channels || videoJob?.socialMedia || []);
     const finalOfferId = newOfferId !== undefined ? newOfferId : (mediaItem?.offerId || videoJob?.offerId || "");
-    const finalTemplateId = newTemplateId !== undefined ? newTemplateId : (videoJob?.templateId || "");
+    const finalTemplateId = newTemplateId !== undefined ? newTemplateId : (mediaItem?.templateId || videoJob?.templateId || "");
 
     // Update or create dedicated MediaMetadata record
     let mediaMetadata: any = null;
@@ -254,6 +249,7 @@ export async function POST(req: NextRequest) {
       mediaMetadata.hashTags = finalTags;
       mediaMetadata.approvalStatus = "success";
       if (finalOfferId) mediaMetadata.offerId = finalOfferId;
+      if (finalTemplateId) mediaMetadata.templateId = finalTemplateId;
       await mediaMetadata.save();
 
       if (mediaItem && (!mediaItem.metadataId || mediaItem.metadataId.toString() !== mediaMetadata._id.toString())) {

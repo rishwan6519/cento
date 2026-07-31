@@ -10,6 +10,7 @@ export interface IMediaMetadata extends Document {
   hashTags?: string[];
   approvalStatus?: string;
   offerId?: string;
+  templateId?: string;
   createdAt: Date;
 }
 
@@ -23,6 +24,7 @@ const MediaMetadataSchema = new Schema<IMediaMetadata>({
   hashTags: { type: [String], default: undefined },
   approvalStatus: { type: String, required: false },
   offerId: { type: String, required: false },
+  templateId: { type: String, required: false },
   createdAt: { type: Date, default: Date.now }
 });
 
