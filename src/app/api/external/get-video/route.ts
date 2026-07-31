@@ -12,6 +12,41 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
+// Helper: Recursively search any fal.ai payload to find the media file URL
+// ---------------------------------------------------------------------------
+function extractMediaUrl(obj: any, visited = new Set()): string {
+  if (!obj || visited.has(obj)) return "";
+  if (typeof obj === "string") {
+    const trimmed = obj.trim();
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      if (trimmed.includes(".mp4") || trimmed.includes(".mov") || trimmed.includes("fal.media") || trimmed.includes("v1.fal.run") || trimmed.includes("blob") || trimmed.includes(".webm")) {
+        return trimmed;
+      }
+    }
+    return "";
+  }
+  if (typeof obj === "object") {
+    visited.add(obj);
+  }
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = extractMediaUrl(item, visited);
+      if (found) return found;
+    }
+  } else if (typeof obj === "object") {
+    if (obj.url && typeof obj.url === "string") return obj.url.trim();
+    if (obj.video_url && typeof obj.video_url === "string") return obj.video_url.trim();
+    if (obj.video_file && typeof obj.video_file === "string") return obj.video_file.trim();
+    for (const key of Object.keys(obj)) {
+      if (key === "status_url" || key === "response_url" || key === "status" || key === "request_id") continue;
+      const found = extractMediaUrl(obj[key], visited);
+      if (found) return found;
+    }
+  }
+  return "";
+}
+
+// ---------------------------------------------------------------------------
 // Helper: Check status of a video job and download results when ready
 // ---------------------------------------------------------------------------
 async function checkAndResolveJob(jobId: string) {
@@ -100,31 +135,27 @@ async function checkAndResolveJob(jobId: string) {
       }
 
       if (statusJson.status === "COMPLETED") {
-        let videoUrl: string =
-          statusJson?.video?.url ||
-          statusJson?.videos?.[0]?.url ||
-          statusJson?.output?.video?.url ||
-          statusJson?.output?.video_url ||
-          statusJson?.output?.url ||
-          statusJson?.payload?.video?.url ||
-          statusJson?.data?.video?.url ||
-          "";
+        let videoUrl = extractMediaUrl(statusJson);
 
         if (!videoUrl && reqItem.responseUrl) {
-          const resultRes = await fetch(reqItem.responseUrl, {
-            headers: { Authorization: `Key ${falKey}` },
-          });
-          if (resultRes.ok) {
-            const resultData = await resultRes.json().catch(() => null);
-            videoUrl =
-              resultData?.video?.url ||
-              resultData?.videos?.[0]?.url ||
-              resultData?.output?.video?.url ||
-              resultData?.output?.video_url ||
-              resultData?.output?.url ||
-              resultData?.payload?.video?.url ||
-              resultData?.data?.video?.url ||
-              "";
+          for (let rAtt = 1; rAtt <= 4; rAtt++) {
+            try {
+              const resultRes = await fetch(reqItem.responseUrl, {
+                headers: { Authorization: `Key ${falKey}` },
+              });
+              if (resultRes.ok) {
+                const resultData = await resultRes.json().catch(() => null);
+                console.log(`[external/get-video] fal.ai completion resultData (attempt ${rAtt}):`, JSON.stringify(resultData));
+                videoUrl = extractMediaUrl(resultData);
+                if (videoUrl) break;
+              } else {
+                const errText = await resultRes.text().catch(() => "");
+                console.warn(`[external/get-video] fal result fetch error (${resultRes.status}): ${errText}`);
+              }
+            } catch (err) {
+              console.warn(`[external/get-video] fal result fetch network error:`, err);
+            }
+            if (!videoUrl && rAtt < 4) await new Promise((r) => setTimeout(r, rAtt * 1500));
           }
         }
 
