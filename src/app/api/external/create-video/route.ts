@@ -172,7 +172,7 @@ You MUST respond ONLY with a valid JSON object matching this schema:
             { role: "system", content: systemContent },
             {
               role: "user",
-              content: `User's rough idea: "${roughText}"\nTarget resolution: ${resolution}, aspect ratio: ${aspectRatio}\n\nGenerate the structured advertising JSON:`,
+              content: `User's advertising concept and template specifications:\n"${roughText}"\n\nTarget resolution: ${resolution}, aspect ratio: ${aspectRatio}\n\nCarefully merge the user's advertisement ideas with any provided template name & structural design guidelines to generate the structured advertising JSON:`,
             },
           ],
           max_tokens: 650,
@@ -326,17 +326,16 @@ export async function POST(req: NextRequest) {
         if (!finalResolution && template.resolution) finalResolution = String(template.resolution).trim();
         if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
 
-        // Build advertising script/text from template details if explicit 'text' was omitted
-        if (!finalText.trim()) {
-          finalText = `Commercial ad campaign titled '${template.templateName}'. Theme: ${template.templateDescription || template.offerTitle}. Promotional headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}' displaying discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text and ${template.buttonColor} button labeled '${template.ctaButtonText}'. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}. Footer text: '${template.footerText}'. Professional broadcast quality in ${template.language}.`;
-        }
+        const tmplDetails = `[Selected Template Name: ${template.templateName}]\n[Template Specifications & Visual Guidelines: Theme: ${template.templateDescription || template.offerTitle}. Headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}', discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}.]`;
+
+        finalText = finalText.trim() ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these AI Video Template structural requirements:\n${tmplDetails}` : `Generate video following these exact AI Video Template specifications:\n${tmplDetails}`;
       } else if (dummyTemplate) {
         if (!finalAspectRatio && (dummyTemplate as any).aspectRatio) finalAspectRatio = String((dummyTemplate as any).aspectRatio).trim();
         if (!finalResolution && (dummyTemplate as any).resolution) finalResolution = String((dummyTemplate as any).resolution).trim();
 
-        if (!finalText.trim()) {
-          finalText = `Professional broadcast advertisement for campaign: '${dummyTemplate.templateName}'. ${dummyTemplate.description}`;
-        }
+        const tmplDetails = `[Selected Template Name: ${dummyTemplate.templateName}]\n[Template Architecture & Design Instructions:\n${dummyTemplate.description.trim()}]`;
+
+        finalText = finalText.trim() ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these exact AI Video Template architectural requirements and visual layout:\n${tmplDetails}` : `Generate commercial advertisement strictly following these AI Video Template instructions:\n${tmplDetails}`;
       }
     }
 
