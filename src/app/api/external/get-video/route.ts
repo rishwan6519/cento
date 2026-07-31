@@ -15,11 +15,11 @@ export const dynamic = "force-dynamic";
 // Helper: Recursively search any fal.ai payload to find the media file URL
 // ---------------------------------------------------------------------------
 function extractMediaUrl(obj: any, visited = new Set()): string {
-  if (!obj || visited.has(obj)) return "";
+  if (!obj || typeof obj === "number" || typeof obj === "boolean" || visited.has(obj)) return "";
   if (typeof obj === "string") {
     const trimmed = obj.trim();
     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-      if (trimmed.includes(".mp4") || trimmed.includes(".mov") || trimmed.includes("fal.media") || trimmed.includes("v1.fal.run") || trimmed.includes("blob") || trimmed.includes(".webm")) {
+      if (!trimmed.includes("/status") && !trimmed.includes("/requests/")) {
         return trimmed;
       }
     }
@@ -34,11 +34,17 @@ function extractMediaUrl(obj: any, visited = new Set()): string {
       if (found) return found;
     }
   } else if (typeof obj === "object") {
-    if (obj.url && typeof obj.url === "string") return obj.url.trim();
-    if (obj.video_url && typeof obj.video_url === "string") return obj.video_url.trim();
-    if (obj.video_file && typeof obj.video_file === "string") return obj.video_file.trim();
+    // Check all known media URL property names directly without filtering domain or file extension
+    for (const k of ["url", "video_url", "video_file", "file", "src", "link", "media"]) {
+      if (obj[k] && typeof obj[k] === "string" && (obj[k].startsWith("http://") || obj[k].startsWith("https://"))) {
+        const urlStr = obj[k].trim();
+        if (!urlStr.includes("/status") && !urlStr.includes("/requests/")) {
+          return urlStr;
+        }
+      }
+    }
     for (const key of Object.keys(obj)) {
-      if (key === "status_url" || key === "response_url" || key === "status" || key === "request_id") continue;
+      if (["status_url", "response_url", "status", "request_id", "logs", "metrics"].includes(key)) continue;
       const found = extractMediaUrl(obj[key], visited);
       if (found) return found;
     }
@@ -136,6 +142,7 @@ async function checkAndResolveJob(jobId: string) {
 
       if (statusJson.status === "COMPLETED") {
         let videoUrl = extractMediaUrl(statusJson);
+        let debugRaw = "";
 
         if (!videoUrl && reqItem.responseUrl) {
           for (let rAtt = 1; rAtt <= 4; rAtt++) {
@@ -143,17 +150,21 @@ async function checkAndResolveJob(jobId: string) {
               const resultRes = await fetch(reqItem.responseUrl, {
                 headers: { Authorization: `Key ${falKey}` },
               });
-              if (resultRes.ok) {
-                const resultData = await resultRes.json().catch(() => null);
-                console.log(`[external/get-video] fal.ai completion resultData (attempt ${rAtt}):`, JSON.stringify(resultData));
+              debugRaw = await resultRes.text().catch(() => "");
+              if (resultRes.ok && debugRaw) {
+                let resultData: any;
+                try {
+                  resultData = JSON.parse(debugRaw);
+                } catch {
+                  resultData = debugRaw;
+                }
                 videoUrl = extractMediaUrl(resultData);
                 if (videoUrl) break;
               } else {
-                const errText = await resultRes.text().catch(() => "");
-                console.warn(`[external/get-video] fal result fetch error (${resultRes.status}): ${errText}`);
+                console.warn(`[external/get-video] fal result fetch error (${resultRes.status}): ${debugRaw}`);
               }
-            } catch (err) {
-              console.warn(`[external/get-video] fal result fetch network error:`, err);
+            } catch (err: any) {
+              debugRaw = err?.message || "Network fetch error";
             }
             if (!videoUrl && rAtt < 4) await new Promise((r) => setTimeout(r, rAtt * 1500));
           }
@@ -195,7 +206,8 @@ async function checkAndResolveJob(jobId: string) {
           }
         } else {
           allCompleted = false;
-          renderDetails.push(`Video ${i + 1}: COMPLETED at fal.ai (Finalizing media encoding...)`);
+          const diag = debugRaw ? debugRaw.slice(0, 200) : JSON.stringify(statusJson).slice(0, 200);
+          renderDetails.push(`Video ${i + 1}: COMPLETED at fal.ai (Finalizing media encoding... Debug: ${diag})`);
         }
       } else if (statusJson.status === "FAILED") {
         reqItem.status = "failed";
@@ -240,7 +252,6 @@ async function checkAndResolveJob(jobId: string) {
       enhancedPrompt: job.enhancedPrompt || "",
       voiceoverScript: job.voiceoverScript || "",
       channels: job.channels || job.socialMedia || [],
-      socialMedia: job.channels || job.socialMedia || [],
 
       message: `AI Video generation is processing depending on model complexity. Please check after 10 minutes.`,
     });
