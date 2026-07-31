@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     const media = await MediaItemModel.find({ userId: new mongoose.Types.ObjectId(userId) })
       .sort({ createdAt: -1 });
-      console.log( "Media items fetched successfully:", media);
+    console.log("Media items fetched successfully:", media);
 
     return NextResponse.json({ media });
   } catch (error) {
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 }
 export async function DELETE(request: NextRequest) {
   try {
-   const id = request.nextUrl.searchParams.get('userId');
+    const id = request.nextUrl.searchParams.get('userId');
     if (!id) {
       return NextResponse.json({ error: 'Media ID is required' }, { status: 400 });
     }
