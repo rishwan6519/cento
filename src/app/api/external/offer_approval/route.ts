@@ -129,7 +129,6 @@ export async function POST(req: NextRequest) {
       socialMediaCaption: finalCaption,
       hashTags: finalTags,
       channels: finalChannels,
-      socialMedia: finalChannels,
     };
 
     if (videoJob?.templateId) {

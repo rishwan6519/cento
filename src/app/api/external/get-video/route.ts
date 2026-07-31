@@ -268,23 +268,21 @@ async function checkAndResolveJob(jobId: string) {
     });
   }
 
-  // Once completed, output strictly only the generated results along with approval status and videoId!
-  const responsePayload: Record<string, any> = {
-    status: job.approvalStatus || "pending",
-    videoId: job.videoId || "",
-  };
+  // Once completed, output strictly all required generated results, status, videoId, and social media metadata!
+  const responsePayload: Record<string, any> = {};
 
-  const generatedUrls = job.falRequests.map((r) => r.videoUrl || "").filter(Boolean);
-  if (!responsePayload.videoId && generatedUrls[0]) {
+  const generatedUrls = job.falRequests.map((r: any) => r.videoUrl || "").filter(Boolean);
+  let resolvedVideoId = job.videoId || "";
+  if (!resolvedVideoId && generatedUrls[0]) {
     const foundMedia: any = await MediaItemModel.findOne({ url: generatedUrls[0] }).select("_id").lean();
     if (foundMedia && foundMedia._id) {
-      responsePayload.videoId = foundMedia._id.toString();
-      job.videoId = responsePayload.videoId;
+      resolvedVideoId = foundMedia._id.toString();
+      job.videoId = resolvedVideoId;
       await job.save().catch(() => {});
     }
   }
 
-  generatedUrls.forEach((url, index) => {
+  generatedUrls.forEach((url: string, index: number) => {
     responsePayload[`video ${index + 1}`] = url;
   });
 
@@ -292,14 +290,21 @@ async function checkAndResolveJob(jobId: string) {
     responsePayload.offerId = job.offerId;
   }
 
+  const defaultHeading = "Experience Uncompromising Quality!";
+  const defaultCaption = job.voiceoverScript 
+    ? `${job.voiceoverScript.slice(0, 80)}... Discover the ultimate experience today!` 
+    : "Elevated performance and flawless design. Check out our exclusive promotional offer today!";
+  const defaultTags = ["#Exclusive", "#Trending", "#Viral", "#Ad", "#NewRelease"];
+
+  responsePayload.status = job.approvalStatus || "pending";
+  responsePayload.videoId = resolvedVideoId;
   responsePayload.templateId = job.templateId || "";
   responsePayload.enhancedPrompt = job.enhancedPrompt || "";
   responsePayload.voiceoverScript = job.voiceoverScript || "";
-  responsePayload.socialMediaHeading = job.socialMediaHeading || "";
-  responsePayload.socialMediaCaption = job.socialMediaCaption || "";
-  responsePayload.hashTags = job.hashTags || [];
+  responsePayload.socialMediaHeading = job.socialMediaHeading || defaultHeading;
+  responsePayload.socialMediaCaption = job.socialMediaCaption || defaultCaption;
+  responsePayload.hashTags = (job.hashTags && job.hashTags.length > 0) ? job.hashTags : defaultTags;
   responsePayload.channels = job.channels || job.socialMedia || [];
-  responsePayload.socialMedia = job.channels || job.socialMedia || [];
 
   return NextResponse.json(responsePayload);
 }

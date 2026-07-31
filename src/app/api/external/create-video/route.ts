@@ -532,7 +532,6 @@ export async function POST(req: NextRequest) {
       hashTags,
       images: imagesList,
       channels: channelsList,
-      socialMedia: channelsList,
       message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });
   } catch (error) {
