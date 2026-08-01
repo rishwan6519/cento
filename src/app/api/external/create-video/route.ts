@@ -322,16 +322,46 @@ export async function POST(req: NextRequest) {
       }
 
       if (template) {
+        const descText = String(template.templateDescription || template.offerTitle || "");
         if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = String(template.aspectRatio).trim();
         if (!finalResolution && template.resolution) finalResolution = String(template.resolution).trim();
         if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
+
+        // Automatically extract aspect ratio from template description if not otherwise provided
+        if (!finalAspectRatio) {
+          const ratioMatch = descText.match(/\b(9:16|16:9|1:1|4:3|3:4|21:9)\b/);
+          if (ratioMatch) finalAspectRatio = ratioMatch[1];
+        }
+        // Automatically extract resolution from template description if not otherwise provided
+        if (!finalResolution) {
+          const resMatch = descText.match(/\b(720p|1080p|480p|4k|2k|720×1280|1080×1920)\b/i);
+          if (resMatch) {
+            const m = resMatch[1].toLowerCase();
+            finalResolution = m.includes("1080") ? "1080p" : m.includes("4k") ? "4K" : "720p";
+          }
+        }
 
         const tmplDetails = `[Selected Template Name: ${template.templateName}]\n[Template Specifications & Visual Guidelines: Theme: ${template.templateDescription || template.offerTitle}. Headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}', discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}.]`;
 
         finalText = finalText.trim() ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these AI Video Template structural requirements:\n${tmplDetails}` : `Generate video following these exact AI Video Template specifications:\n${tmplDetails}`;
       } else if (dummyTemplate) {
+        const descText = String(dummyTemplate.description || "");
         if (!finalAspectRatio && (dummyTemplate as any).aspectRatio) finalAspectRatio = String((dummyTemplate as any).aspectRatio).trim();
         if (!finalResolution && (dummyTemplate as any).resolution) finalResolution = String((dummyTemplate as any).resolution).trim();
+
+        // Automatically extract aspect ratio from template description if not otherwise provided
+        if (!finalAspectRatio) {
+          const ratioMatch = descText.match(/\b(9:16|16:9|1:1|4:3|3:4|21:9)\b/);
+          if (ratioMatch) finalAspectRatio = ratioMatch[1];
+        }
+        // Automatically extract resolution from template description if not otherwise provided
+        if (!finalResolution) {
+          const resMatch = descText.match(/\b(720p|1080p|480p|4k|2k|720×1280|1080×1920)\b/i);
+          if (resMatch) {
+            const m = resMatch[1].toLowerCase();
+            finalResolution = m.includes("1080") ? "1080p" : m.includes("4k") ? "4K" : "720p";
+          }
+        }
 
         const tmplDetails = `[Selected Template Name: ${dummyTemplate.templateName}]\n[Template Architecture & Design Instructions:\n${dummyTemplate.description.trim()}]`;
 
@@ -540,8 +570,6 @@ export async function POST(req: NextRequest) {
       status: "processing",
       jobId,
       model: finalModel,
-      resolution: finalResolution,
-      aspectRatio: finalAspectRatio,
       ...(cleanOfferId ? { offerId: cleanOfferId } : {}),
       ...(templateId ? { templateId: String(templateId).trim() } : {}),
       message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
