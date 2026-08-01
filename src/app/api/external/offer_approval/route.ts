@@ -131,8 +131,8 @@ export async function POST(req: NextRequest) {
     if (targetUserId && mongoose.Types.ObjectId.isValid(String(targetUserId).trim())) {
       try {
         const notifTitle = createdOffer ? "New Offer Created" : "Offer & Video Approved";
-        const notifBody = createdOffer 
-          ? `Your offer '${String(offerName).trim()}' has been created successfully.` 
+        const notifBody = createdOffer
+          ? `Your offer '${String(offerName).trim()}' has been created successfully.`
           : `Your promotional video & offer have been approved successfully.`;
 
         const user = await User.findById(String(targetUserId).trim()).select("username storeName fcmTokens");
