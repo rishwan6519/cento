@@ -287,11 +287,11 @@ async function checkAndResolveJob(jobId: string) {
       voiceoverScript: job.voiceoverScript || "",
       ...((job.channels || job.socialMedia || []).length > 0
         ? {
-            socialMediaHeading: job.socialMediaHeading || "",
-            socialMediaCaption: job.socialMediaCaption || "",
-            hashTags: job.hashTags || [],
-            channels: job.channels || job.socialMedia || [],
-          }
+          socialMediaHeading: job.socialMediaHeading || "",
+          socialMediaCaption: job.socialMediaCaption || "",
+          hashTags: job.hashTags || [],
+          channels: job.channels || job.socialMedia || [],
+        }
         : {}),
       ...(job.offerId ? { offerId: job.offerId } : {}),
 
@@ -309,14 +309,14 @@ async function checkAndResolveJob(jobId: string) {
     if (foundMedia && foundMedia._id) {
       resolvedVideoId = foundMedia._id.toString();
       job.videoId = resolvedVideoId;
-      await job.save().catch(() => {});
+      await job.save().catch(() => { });
     }
   }
 
   const currentChannels = job.channels || job.socialMedia || [];
   const defaultHeading = "Experience Uncompromising Quality!";
-  const defaultCaption = job.voiceoverScript 
-    ? `${job.voiceoverScript.slice(0, 80)}... Discover the ultimate experience today!` 
+  const defaultCaption = job.voiceoverScript
+    ? `${job.voiceoverScript.slice(0, 80)}... Discover the ultimate experience today!`
     : "Elevated performance and flawless design. Check out our exclusive promotional offer today!";
   const defaultTags = ["#Exclusive", "#Trending", "#Viral", "#Ad", "#NewRelease"];
 

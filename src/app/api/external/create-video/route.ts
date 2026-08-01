@@ -484,7 +484,7 @@ export async function POST(req: NextRequest) {
           activeJob.socialMediaHeading = socialMediaHeading;
           activeJob.socialMediaCaption = socialMediaCaption;
           activeJob.hashTags = hashTags;
-          await activeJob.save().catch(() => {});
+          await activeJob.save().catch(() => { });
         }
 
         const modelSlug = MODEL_SLUG_MAP[finalModel] || "fal-ai/wan-t2v";
@@ -560,7 +560,7 @@ export async function POST(req: NextRequest) {
         try {
           await connectToDatabase();
           await VideoJobModel.findOneAndUpdate({ jobId }, { status: "failed" });
-        } catch (_) {}
+        } catch (_) { }
       }
     })();
 
