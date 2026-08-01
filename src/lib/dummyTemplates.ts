@@ -37,102 +37,31 @@ export const DUMMY_TEMPLATES = [
   {
     _id: "6797a1f8b1a3e9c4d2800001",
     templateName: "Welcome to Our Store",
-    description: `
-Create a professional vertical retail advertisement in 9:16 aspect ratio with 720×1280 HD resolution.
-
-Place the AI avatar in the center with a warm and welcoming expression. Use the uploaded store image as the background and display the store logo in the top-left corner. Apply the brand colors throughout the video with clean animations and modern typography.
-
-Include:
-- Store Name: {{store_name}}
-- Business Category: {{business_category}}
-- Store Logo: {{store_logo}}
-- Store Images: {{store_images}}
-- Brand Colors: {{brand_colors}}
-
-Generate a welcoming script introducing the store, highlighting the products and services, and inviting customers to visit.
-
-Finish with the logo, contact details, and a strong call-to-action encouraging customers to visit the store.
-`,
+    description:
+      "Designed for a vertical 9:16 aspect ratio in crisp 720p HD resolution. Features a welcoming cinematic presentation that introduces your retail store and core offerings. Utilizes warm ambient studio lighting, elegant camera panning over your uploaded store and product imagery, and smooth brand-matched graphical overlays. Concludes with an engaging voiceover invitation and a clear visual call-to-action encouraging customers to visit your location.",
   },
   {
     _id: "6797a1f8b1a3e9c4d2800002",
     templateName: "Brand Introduction",
-    description: `
-Create a premium brand introduction video in 9:16 aspect ratio with 720×1280 HD resolution.
-
-Display the company logo, business images, and brand colors. Position the AI avatar on the left while brand visuals appear on the right with smooth transitions.
-
-Include:
-- Company Name: {{store_name}}
-- Logo: {{store_logo}}
-- Business Images: {{store_images}}
-- Business Category: {{business_category}}
-- Brand Colors: {{brand_colors}}
-
-Generate a professional script explaining the company's mission, values, and what makes the business unique.
-
-End with the company logo, contact information, and brand slogan.
-`,
+    description:
+      "Tailored for a vertical 9:16 aspect ratio in 720p HD resolution to tell your company's story with premium corporate aesthetics. Seamlessly fuses dynamic visual transitions, sophisticated typography, and brand-inspired color palettes to highlight your core mission and values. The visual narrative combines professional b-roll style pacing with a persuasive voiceover script, finishing with an authoritative display of your brand logo and slogan.",
   },
   {
     _id: "6797a1f8b1a3e9c4d2800003",
     templateName: "New Product Launch",
-    description: `
-Create a modern product launch advertisement in vertical 9:16 format with 720×1280 HD resolution.
-
-Present the AI avatar beside the featured product. Use dynamic product animations, pricing highlights, and attractive text overlays.
-
-Include:
-- Product Name: {{product_name}}
-- Product Images: {{product_images}}
-- Price: {{price}}
-- Discount: {{discount}}
-- Product Features: {{features}}
-- Store Logo: {{store_logo}}
-
-Generate an engaging promotional script introducing the new product, explaining its benefits, and encouraging customers to purchase.
-
-Finish with a bold Buy Now call-to-action.
-`,
+    description:
+      "Engineered for a vertical 9:16 aspect ratio in dramatic 720p HD resolution to create massive excitement for your newest product release. Employs macro cinematic camera shots, floating lighting effects, and punchy motion typography to showcase key features, pricing highlights, and promotional discounts. Concludes with an energetic soundtrack build-up, persuasive commercial narration, and a bold 'Buy Now' visual display.",
   },
   {
     _id: "6797a1f8b1a3e9c4d2800004",
     templateName: "Special Offer",
-    description: `
-Create a promotional offer advertisement in 9:16 aspect ratio with 720×1280 HD resolution.
-
-Display promotional banners, product images, attractive discount badges, and store branding using vibrant colors.
-
-Include:
-- Store Name: {{store_name}}
-- Offer Percentage: {{discount}}
-- Offer End Date: {{offer_end}}
-- Product Images: {{product_images}}
-- Store Logo: {{store_logo}}
-
-Generate an exciting promotional script that highlights the limited-time offer and motivates customers to visit immediately.
-
-Finish with the store logo, contact details, and a Limited Time Offer banner.
-`,
+    description:
+      "Optimized for a vertical 9:16 aspect ratio in vibrant 720p HD resolution to drive immediate urgency and boost customer foot traffic. Features high-energy visual banners, bold discount badges, and dynamic product spotlights set against an attention-grabbing background. Supported by a thrilling voiceover emphasizing limited-time savings, and wrapping up with a highly prominent promotional closing screen.",
   },
   {
     _id: "6797a1f8b1a3e9c4d2800005",
     templateName: "Best Seller Showcase",
-    description: `
-Create a premium retail showcase video in 9:16 aspect ratio with 720×1280 HD resolution.
-
-Present the AI avatar alongside the best-selling products with elegant transitions, feature highlights, customer ratings, and pricing.
-
-Include:
-- Product Name: {{product_name}}
-- Product Images: {{product_images}}
-- Price: {{price}}
-- Customer Rating: {{rating}}
-- Store Logo: {{store_logo}}
-
-Generate a persuasive script explaining why this product is the customer's favorite and why viewers should purchase it.
-
-End with the store logo and a Shop Now call-to-action.
-`,
+    description:
+      "Crafted for a vertical 9:16 aspect ratio in luxury 720p HD resolution to highlight your top-performing products and customer favorites. Integrates sleek gallery transitions, star rating emblems, value points, and polished reflections to elevate perceived product value. A confident and persuasive voiceover explains why these items are fan favorites, finishing strong with a compelling 'Shop Now' call-to-action.",
   },
 ];
