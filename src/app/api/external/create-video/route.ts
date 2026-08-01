@@ -409,83 +409,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ----- Step 1: Enhance rough text into cinematic DoP prompt + commercial VO script + social metadata -----
-    const { enhancedPrompt, voiceoverScript, socialMediaHeading, socialMediaCaption, hashTags } = await enhancePromptAndScript(
-      finalText,
-      finalModel,
-      finalResolution,
-      finalAspectRatio,
-      videoDuration,
-      openAiKey
-    );
-
-    const modelSlug = MODEL_SLUG_MAP[finalModel] || "fal-ai/wan-t2v";
-    const imageSizeKey = ASPECT_MAP[finalAspectRatio] || "portrait_9_16";
-
-    // ----- Step 2: Submit all video generation requests to fal.ai queue instantly (< 1s) -----
-    const falRequests = [];
-
-    for (let i = 0; i < videoCount; i++) {
-      let falResponse: Response | null = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          falResponse = await fetch(`https://queue.fal.run/${modelSlug}`, {
-            method: "POST",
-            headers: {
-              Authorization: `Key ${falKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              prompt: enhancedPrompt,
-              image_size: imageSizeKey,
-              aspect_ratio: finalAspectRatio,
-              num_inference_steps: 30,
-              enable_safety_checker: true,
-              duration: videoDuration,
-            }),
-          });
-          if (!falResponse.ok && attempt < 3 && falResponse.status >= 500) {
-            await new Promise((r) => setTimeout(r, attempt * 1500));
-            continue;
-          }
-          break;
-        } catch (err: any) {
-          if (attempt === 3) {
-            throw new Error(`Failed to connect to fal.ai queue (Network/DNS error: ${err.message})`);
-          }
-          await new Promise((r) => setTimeout(r, attempt * 1500));
-        }
-      }
-
-      if (!falResponse || !falResponse.ok) {
-        const errText = falResponse ? await falResponse.text().catch(() => "") : "No response";
-        throw new Error(`fal.ai submission error (${falResponse?.status || "network error"}): ${errText}`);
-      }
-
-      const queueData = await falResponse.json();
-      const requestId: string = queueData?.request_id;
-      if (!requestId) {
-        throw new Error("fal.ai did not return a request_id: " + JSON.stringify(queueData));
-      }
-
-      const statusUrl: string =
-        queueData?.status_url ||
-        `https://queue.fal.run/${modelSlug}/requests/${requestId}/status`;
-      const responseUrl: string =
-        queueData?.response_url ||
-        statusUrl.replace(/\/status$/, "") ||
-        `https://queue.fal.run/${modelSlug}/requests/${requestId}`;
-
-      falRequests.push({
-        requestId,
-        statusUrl,
-        responseUrl,
-        videoUrl: "",
-        status: "processing" as const,
-      });
-    }
-
-    // Save job tracking to MongoDB
+    // ----- Save initial job tracking to MongoDB immediately (< 50ms) -----
     await connectToDatabase();
     const jobId = uuidv4();
     const videoJob = new VideoJobModel({
@@ -493,11 +417,11 @@ export async function POST(req: NextRequest) {
       userId,
       modelName: finalModel || "Wan 2.1 (1.3B)",
       status: "processing",
-      voiceoverScript,
-      enhancedPrompt,
-      socialMediaHeading,
-      socialMediaCaption,
-      hashTags,
+      voiceoverScript: "",
+      enhancedPrompt: "",
+      socialMediaHeading: "",
+      socialMediaCaption: "",
+      hashTags: [],
       approvalStatus: "pending",
       templateId: templateId ? String(templateId).trim() : "",
       offerId: cleanOfferId,
@@ -505,12 +429,112 @@ export async function POST(req: NextRequest) {
       channels: channelsList,
       socialMedia: channelsList,
       videoCount,
-      falRequests,
+      falRequests: [],
       createdAt: new Date(),
     });
     await videoJob.save();
 
-    // Immediately return processing status pointing to the separate /api/external/get-video endpoint!
+    // ----- Step 1 & 2 Background Execution: Enhance prompt with OpenAI and submit to fal.ai queue -----
+    (async () => {
+      try {
+        const { enhancedPrompt, voiceoverScript, socialMediaHeading, socialMediaCaption, hashTags } = await enhancePromptAndScript(
+          finalText,
+          finalModel,
+          finalResolution,
+          finalAspectRatio,
+          videoDuration,
+          openAiKey
+        );
+
+        await connectToDatabase();
+        const activeJob: any = await VideoJobModel.findOne({ jobId });
+        if (activeJob) {
+          activeJob.enhancedPrompt = enhancedPrompt;
+          activeJob.voiceoverScript = voiceoverScript;
+          activeJob.socialMediaHeading = socialMediaHeading;
+          activeJob.socialMediaCaption = socialMediaCaption;
+          activeJob.hashTags = hashTags;
+          await activeJob.save().catch(() => {});
+        }
+
+        const modelSlug = MODEL_SLUG_MAP[finalModel] || "fal-ai/wan-t2v";
+        const imageSizeKey = ASPECT_MAP[finalAspectRatio] || "portrait_9_16";
+
+        const falRequests = [];
+        for (let i = 0; i < videoCount; i++) {
+          let falResponse: Response | null = null;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              falResponse = await fetch(`https://queue.fal.run/${modelSlug}`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Key ${falKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  prompt: enhancedPrompt,
+                  image_size: imageSizeKey,
+                  aspect_ratio: finalAspectRatio,
+                  num_inference_steps: 30,
+                  enable_safety_checker: true,
+                  duration: videoDuration,
+                }),
+              });
+              if (!falResponse.ok && attempt < 3 && falResponse.status >= 500) {
+                await new Promise((r) => setTimeout(r, attempt * 1500));
+                continue;
+              }
+              break;
+            } catch (err: any) {
+              if (attempt === 3) {
+                throw new Error(`Failed to connect to fal.ai queue (Network/DNS error: ${err.message})`);
+              }
+              await new Promise((r) => setTimeout(r, attempt * 1500));
+            }
+          }
+
+          if (!falResponse || !falResponse.ok) {
+            const errText = falResponse ? await falResponse.text().catch(() => "") : "No response";
+            throw new Error(`fal.ai submission error (${falResponse?.status || "network error"}): ${errText}`);
+          }
+
+          const queueData = await falResponse.json();
+          const requestId: string = queueData?.request_id;
+          if (!requestId) {
+            throw new Error("fal.ai did not return a request_id: " + JSON.stringify(queueData));
+          }
+
+          const statusUrl: string =
+            queueData?.status_url ||
+            `https://queue.fal.run/${modelSlug}/requests/${requestId}/status`;
+          const responseUrl: string =
+            queueData?.response_url ||
+            statusUrl.replace(/\/status$/, "") ||
+            `https://queue.fal.run/${modelSlug}/requests/${requestId}`;
+
+          falRequests.push({
+            requestId,
+            statusUrl,
+            responseUrl,
+            videoUrl: "",
+            status: "processing" as const,
+          });
+        }
+
+        if (activeJob) {
+          activeJob.falRequests = falRequests;
+          await activeJob.save();
+        }
+      } catch (err: any) {
+        console.error(`[external/create-video background task error for jobId ${jobId}]:`, err);
+        try {
+          await connectToDatabase();
+          await VideoJobModel.findOneAndUpdate({ jobId }, { status: "failed" });
+        } catch (_) {}
+      }
+    })();
+
+    // Immediately return processing status without waiting for OpenAI prompt creation or queue rendering!
     return NextResponse.json({
       success: true,
       status: "processing",
@@ -519,18 +543,7 @@ export async function POST(req: NextRequest) {
       resolution: finalResolution,
       aspectRatio: finalAspectRatio,
       ...(cleanOfferId ? { offerId: cleanOfferId } : {}),
-      templateId: templateId ? String(templateId).trim() : "",
-      enhancedPrompt,
-      voiceoverScript,
-      ...(channelsList && channelsList.length > 0
-        ? {
-            socialMediaHeading,
-            socialMediaCaption,
-            hashTags,
-            channels: channelsList,
-          }
-        : {}),
-      images: imagesList,
+      ...(templateId ? { templateId: String(templateId).trim() } : {}),
       message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });
   } catch (error) {

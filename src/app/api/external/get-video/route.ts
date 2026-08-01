@@ -97,6 +97,17 @@ async function checkAndResolveJob(jobId: string) {
     await mkdir(uploadDir, { recursive: true });
   }
 
+  if (!job.falRequests || job.falRequests.length === 0) {
+    return NextResponse.json({
+      success: true,
+      status: "processing",
+      jobId,
+      ...(job.offerId ? { offerId: job.offerId } : {}),
+      ...(job.templateId ? { templateId: job.templateId } : {}),
+      message: `AI Prompt engineering and video generation queue submission is currently processing in the background. Please check after 10 minutes.`,
+    });
+  }
+
   let allCompleted = true;
   let hasFailure = false;
   const renderDetails: string[] = [];
