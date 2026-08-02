@@ -269,6 +269,8 @@ export async function POST(req: NextRequest) {
       aspectRatio: rawAspectRatio,// "16:9" | "9:16" | "1:1" | "4:3"
       duration,   // optional — video length in seconds (default: 5)
       numVideos,  // optional — number of videos to generate (default: 1, max: 10)
+      numberOfVideos, // fallback alias for numVideos
+      number_of_videos, // fallback alias for numVideos
       count,      // fallback property in case caller sends 'count' instead of 'numVideos'
       channels,   // optional — platforms/channels to publish to e.g. ["insta", "facebook", "twitter"]
       socialMedia,// optional — fallback alias for channels
@@ -399,8 +401,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const videoDuration = Math.max(1, Math.min(60, Number(finalDuration) || 5));
-    const videoCount = Math.max(1, Math.min(10, Number(numVideos || count) || 1));
+    const videoDuration = Math.max(1, Math.min(60, Number(String(finalDuration || 5).replace("s", "")) || 5));
+    const videoCount = Math.max(1, Math.min(10, Number(numVideos || numberOfVideos || number_of_videos || count) || 1));
 
     const rawChannels = channels || socialMedia || share || shareTo || [];
     let channelsList: string[] = [];
@@ -570,6 +572,8 @@ export async function POST(req: NextRequest) {
       status: "processing",
       jobId,
       model: finalModel,
+      duration: typeof finalDuration === "string" && finalDuration ? finalDuration : `${videoDuration}s`,
+      numberOfVideos: videoCount,
       ...(cleanOfferId ? { offerId: cleanOfferId } : {}),
       ...(templateId ? { templateId: String(templateId).trim() } : {}),
       message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,

@@ -55,6 +55,63 @@ function extractMediaUrl(obj: any, visited = new Set()): string {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: Build standardized response payload for a completed video job
+// ---------------------------------------------------------------------------
+async function buildCompletedJobResponse(job: any): Promise<NextResponse> {
+  const responsePayload: Record<string, any> = {};
+
+  const generatedUrls = job.falRequests.map((r: any) => r.videoUrl || "").filter(Boolean);
+  let resolvedVideoId = job.videoId || "";
+  if (!resolvedVideoId && generatedUrls[0]) {
+    const foundMedia: any = await MediaItemModel.findOne({ url: generatedUrls[0] }).select("_id").lean();
+    if (foundMedia && foundMedia._id) {
+      resolvedVideoId = foundMedia._id.toString();
+      job.videoId = resolvedVideoId;
+      await job.save().catch(() => { });
+    }
+  }
+
+  const currentChannels = job.channels || job.socialMedia || [];
+  const defaultHeading = "Experience Uncompromising Quality!";
+  const defaultCaption = job.voiceoverScript
+    ? `${job.voiceoverScript.slice(0, 80)}... Discover the ultimate experience today!`
+    : "Elevated performance and flawless design. Check out our exclusive promotional offer today!";
+  const defaultTags = ["#Exclusive", "#Trending", "#Viral", "#Ad", "#NewRelease"];
+
+  responsePayload.status = job.approvalStatus || "pending";
+  responsePayload.videoId = resolvedVideoId;
+  if (job.offerId) {
+    responsePayload.offerId = job.offerId;
+    if (mongoose.Types.ObjectId.isValid(String(job.offerId).trim())) {
+      const linkedOffer: any = await Offer.findById(String(job.offerId).trim()).lean().catch(() => null);
+      if (linkedOffer) {
+        if (linkedOffer.offerName) responsePayload.offerName = linkedOffer.offerName;
+        if (linkedOffer.offerDescription) responsePayload.offerDescription = linkedOffer.offerDescription;
+        if (linkedOffer.startDate) responsePayload.startDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
+        if (linkedOffer.endDate) responsePayload.endDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
+      }
+    }
+  }
+  responsePayload.templateId = job.templateId || "";
+
+  generatedUrls.forEach((url: string, index: number) => {
+    responsePayload[`video ${index + 1}`] = url;
+  });
+
+  responsePayload.enhancedPrompt = job.enhancedPrompt || "";
+  responsePayload.voiceoverScript = job.voiceoverScript || "";
+
+  if (currentChannels && currentChannels.length > 0) {
+    responsePayload.socialMediaHeading = job.socialMediaHeading || defaultHeading;
+    responsePayload.socialMediaCaption = job.socialMediaCaption || defaultCaption;
+    responsePayload.hashTags = (job.hashTags && job.hashTags.length > 0) ? job.hashTags : defaultTags;
+    responsePayload.channels = currentChannels;
+  }
+
+  return NextResponse.json(responsePayload);
+}
+
+// ---------------------------------------------------------------------------
 // Helper: Check status of a video job and download results when ready
 // ---------------------------------------------------------------------------
 async function checkAndResolveJob(jobId: string) {
@@ -67,19 +124,9 @@ async function checkAndResolveJob(jobId: string) {
     );
   }
 
-  // If job is already completed, instantly return the processed data forever!
+  // If job is already completed, instantly return the standardized complete processed data!
   if (job.status === "completed") {
-    const responsePayload: Record<string, any> = {};
-    const generatedUrls = job.falRequests.map((r) => r.videoUrl || "").filter(Boolean);
-    generatedUrls.forEach((url, index) => {
-      responsePayload[`video ${index + 1}`] = url;
-    });
-    responsePayload.templateId = job.templateId || "";
-    responsePayload.enhancedPrompt = job.enhancedPrompt || "";
-    responsePayload.voiceoverScript = job.voiceoverScript || "";
-    responsePayload.channels = job.channels || job.socialMedia || [];
-    responsePayload.socialMedia = job.channels || job.socialMedia || [];
-    return NextResponse.json(responsePayload);
+    return await buildCompletedJobResponse(job);
   }
 
   if (job.status === "failed") {
@@ -300,57 +347,7 @@ async function checkAndResolveJob(jobId: string) {
   }
 
   // Once completed, output strictly all required generated results, status, videoId, and social media metadata!
-  const responsePayload: Record<string, any> = {};
-
-  const generatedUrls = job.falRequests.map((r: any) => r.videoUrl || "").filter(Boolean);
-  let resolvedVideoId = job.videoId || "";
-  if (!resolvedVideoId && generatedUrls[0]) {
-    const foundMedia: any = await MediaItemModel.findOne({ url: generatedUrls[0] }).select("_id").lean();
-    if (foundMedia && foundMedia._id) {
-      resolvedVideoId = foundMedia._id.toString();
-      job.videoId = resolvedVideoId;
-      await job.save().catch(() => { });
-    }
-  }
-
-  const currentChannels = job.channels || job.socialMedia || [];
-  const defaultHeading = "Experience Uncompromising Quality!";
-  const defaultCaption = job.voiceoverScript
-    ? `${job.voiceoverScript.slice(0, 80)}... Discover the ultimate experience today!`
-    : "Elevated performance and flawless design. Check out our exclusive promotional offer today!";
-  const defaultTags = ["#Exclusive", "#Trending", "#Viral", "#Ad", "#NewRelease"];
-
-  responsePayload.status = job.approvalStatus || "pending";
-  responsePayload.videoId = resolvedVideoId;
-  if (job.offerId) {
-    responsePayload.offerId = job.offerId;
-    if (mongoose.Types.ObjectId.isValid(String(job.offerId).trim())) {
-      const linkedOffer: any = await Offer.findById(String(job.offerId).trim()).lean().catch(() => null);
-      if (linkedOffer) {
-        if (linkedOffer.offerName) responsePayload.offerName = linkedOffer.offerName;
-        if (linkedOffer.offerDescription) responsePayload.offerDescription = linkedOffer.offerDescription;
-        if (linkedOffer.startDate) responsePayload.startDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
-        if (linkedOffer.endDate) responsePayload.endDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
-      }
-    }
-  }
-  responsePayload.templateId = job.templateId || "";
-
-  generatedUrls.forEach((url: string, index: number) => {
-    responsePayload[`video ${index + 1}`] = url;
-  });
-
-  responsePayload.enhancedPrompt = job.enhancedPrompt || "";
-  responsePayload.voiceoverScript = job.voiceoverScript || "";
-
-  if (currentChannels && currentChannels.length > 0) {
-    responsePayload.socialMediaHeading = job.socialMediaHeading || defaultHeading;
-    responsePayload.socialMediaCaption = job.socialMediaCaption || defaultCaption;
-    responsePayload.hashTags = (job.hashTags && job.hashTags.length > 0) ? job.hashTags : defaultTags;
-    responsePayload.channels = currentChannels;
-  }
-
-  return NextResponse.json(responsePayload);
+  return await buildCompletedJobResponse(job);
 }
 
 // ---------------------------------------------------------------------------
