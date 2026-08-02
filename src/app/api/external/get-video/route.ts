@@ -78,7 +78,7 @@ async function buildCompletedJobResponse(job: any): Promise<NextResponse> {
     : "Elevated performance and flawless design. Check out our exclusive promotional offer today!";
   const defaultTags = ["#Exclusive", "#Trending", "#Viral", "#Ad", "#NewRelease"];
 
-  responsePayload.status = job.approvalStatus || "pending";
+  responsePayload.status = "success";
   responsePayload.videoId = resolvedVideoId;
   if (job.offerId) {
     responsePayload.offerId = job.offerId;
@@ -87,8 +87,8 @@ async function buildCompletedJobResponse(job: any): Promise<NextResponse> {
       if (linkedOffer) {
         if (linkedOffer.offerName) responsePayload.offerName = linkedOffer.offerName;
         if (linkedOffer.offerDescription) responsePayload.offerDescription = linkedOffer.offerDescription;
-        if (linkedOffer.startDate) responsePayload.startDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
-        if (linkedOffer.endDate) responsePayload.endDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
+        if (linkedOffer.startDate) responsePayload.offerStartDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
+        if (linkedOffer.endDate) responsePayload.offerEndDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
       }
     }
   }
