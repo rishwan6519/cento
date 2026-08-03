@@ -247,8 +247,12 @@ async function checkAndResolveJob(jobId: string) {
             await writeFile(join(uploadDir, fileName), videoBuffer);
             const localVideoUrl = `/uploads/${job.userId}/video/${fileName}`;
 
+            const targetUserObj = mongoose.Types.ObjectId.isValid(job.userId)
+              ? new mongoose.Types.ObjectId(job.userId)
+              : job.userId;
+
             const mediaItem = new MediaItemModel({
-              userId: new mongoose.Types.ObjectId(job.userId),
+              userId: targetUserObj,
               name: `External AI Video (${i + 1}/${job.videoCount}) – ${job.modelName} – ${new Date().toLocaleString()}`,
               type: "video",
               url: localVideoUrl,
@@ -259,13 +263,14 @@ async function checkAndResolveJob(jobId: string) {
               hashTags: job.hashTags || [],
               approvalStatus: job.approvalStatus || "pending",
               offerId: job.offerId || undefined,
+              templateId: job.templateId || undefined,
               createdAt: new Date(),
             });
             await mediaItem.save();
 
             const metadataDoc = await MediaMetadataModel.create({
               mediaId: mediaItem._id,
-              userId: new mongoose.Types.ObjectId(job.userId),
+              userId: targetUserObj,
               channels: job.channels || job.socialMedia || [],
               voiceoverScript: job.voiceoverScript || "",
               socialMediaHeading: job.socialMediaHeading || "",
@@ -273,6 +278,7 @@ async function checkAndResolveJob(jobId: string) {
               hashTags: job.hashTags || [],
               approvalStatus: job.approvalStatus || "pending",
               offerId: job.offerId || undefined,
+              templateId: job.templateId || undefined,
             });
             mediaItem.metadataId = metadataDoc._id;
             await mediaItem.save();
@@ -301,10 +307,10 @@ async function checkAndResolveJob(jobId: string) {
         const queuePos = statusJson.queue_position !== undefined ? ` (Queue Position: ${statusJson.queue_position})` : "";
         renderDetails.push(`Video ${i + 1}: ${statusJson.status || "IN_PROGRESS"}${queuePos}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn(`[job polling] Error checking fal request ${reqItem.requestId}:`, err);
       allCompleted = false;
-      renderDetails.push(`Video ${i + 1}: Synchronizing status with fal.ai GPU cluster...`);
+      renderDetails.push(`Video ${i + 1}: Error processing status - ${err?.message || String(err)}`);
     }
   }
 
