@@ -28,6 +28,7 @@ export interface VideoTemplateDocument extends Document {
   videoDuration: number;
   aspectRatio: string;
   language: string;
+  aiModel?: string;
   status: TemplateStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -155,6 +156,11 @@ const VideoTemplateSchema: Schema = new Schema(
     language: {
       type: String,
       default: 'English',
+      trim: true,
+    },
+    aiModel: {
+      type: String,
+      default: 'Google Flow Veo 3.1 Lite',
       trim: true,
     },
     status: {

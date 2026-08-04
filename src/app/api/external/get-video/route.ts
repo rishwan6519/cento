@@ -7,6 +7,8 @@ import MediaItemModel from "@/models/MediaItems";
 import VideoJobModel, { IVideoJob } from "@/models/VideoJob";
 import Offer from "@/models/Offer";
 import MediaMetadataModel from "@/models/MediaMetadata";
+import GoogleFlowJobModel from "@/models/GoogleFlowJob";
+import { checkAndResolveGoogleJob } from "@/app/api/external/google-flow/get-video/route";
 import { v4 as uuidv4 } from "uuid";
 import mongoose from "mongoose";
 
@@ -118,6 +120,10 @@ async function checkAndResolveJob(jobId: string) {
   await connectToDatabase();
   const job: IVideoJob | null = await VideoJobModel.findOne({ jobId });
   if (!job) {
+    const googleJob = await GoogleFlowJobModel.findOne({ jobId });
+    if (googleJob) {
+      return await checkAndResolveGoogleJob(jobId, true);
+    }
     return NextResponse.json(
       { success: false, message: `No video generation job found with jobId '${jobId}'` },
       { status: 404 }

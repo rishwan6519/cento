@@ -48,6 +48,7 @@ export interface VideoTemplate {
   videoDuration: number;
   aspectRatio: string;
   language: string;
+  aiModel?: string;
   status: TemplateStatus;
   createdAt: string;
   updatedAt: string;
@@ -164,6 +165,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ template, onClose, onEdit }) => (
             <div><span className="aivt-view-label">Video Duration:</span> <strong className="aivt-view-val">{template.videoDuration}s</strong></div>
             <div><span className="aivt-view-label">Aspect Ratio:</span> <strong className="aivt-view-val">{template.aspectRatio}</strong></div>
             <div><span className="aivt-view-label">Language:</span> <strong className="aivt-view-val">{template.language || "English"}</strong></div>
+            <div><span className="aivt-view-label">AI Generator Engine:</span> <span className="aivt-badge-pill" style={{ background: (template.aiModel || "Google Flow Veo 3.1 Lite").includes("Google") ? "#4285F4" : "#7C3AED", color: "#fff", fontWeight: 700, padding: "3px 10px", borderRadius: 12 }}>{template.aiModel || "Google Flow Veo 3.1 Lite"}</span></div>
             <div><span className="aivt-view-label">Status:</span> <span className={`aivt-status-badge aivt-status-badge--${template.status.toLowerCase()}`}>{template.status}</span></div>
             <div><span className="aivt-view-label">Last Updated:</span> <span className="aivt-view-val">{formatDate(template.updatedAt)}</span></div>
           </div>
@@ -259,6 +261,7 @@ export default function AIVideoTemplatesView() {
   const [videoDuration, setVideoDuration] = useState<number>(15);
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [language, setLanguage] = useState("English");
+  const [aiModel, setAiModel] = useState("Google Flow Veo 3.1 Lite");
   const [status, setStatus] = useState<TemplateStatus>("Active");
 
   const [submitting, setSubmitting] = useState(false);
@@ -359,6 +362,7 @@ export default function AIVideoTemplatesView() {
     setVideoDuration(15);
     setAspectRatio("9:16");
     setLanguage("English");
+    setAiModel("Google Flow Veo 3.1 Lite");
     setStatus("Active");
     setFormErrors({});
   };
@@ -390,6 +394,7 @@ export default function AIVideoTemplatesView() {
     setVideoDuration(t.videoDuration || 15);
     setAspectRatio(t.aspectRatio || "9:16");
     setLanguage(t.language || "English");
+    setAiModel(t.aiModel || "Google Flow Veo 3.1 Lite");
     setStatus(t.status || "Active");
     setFormErrors({});
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -426,6 +431,7 @@ export default function AIVideoTemplatesView() {
         videoDuration: Number(videoDuration),
         aspectRatio,
         language,
+        aiModel,
         status,
       };
 
@@ -888,6 +894,22 @@ export default function AIVideoTemplatesView() {
               </div>
 
               <div className="aivt-form-group">
+                <label className="aivt-form-label" htmlFor="v-model">AI Video Engine / Model</label>
+                <select
+                  id="v-model"
+                  className="aivt-form-select"
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  style={{ fontWeight: 700, color: aiModel.includes("Google") ? "#1A73E8" : "#202124", border: aiModel.includes("Google") ? "2px solid #4285F4" : undefined }}
+                >
+                  <option value="Google Flow Veo 3.1 Lite">🎬 Google Flow Veo 3.1 Lite (Google API)</option>
+                  <option value="Wan 2.1">⚡ Wan 2.1 (Fal AI)</option>
+                  <option value="Wan Pro">🔥 Wan Pro (Fal AI)</option>
+                  <option value="Kling 2.0 Pro">✨ Kling 2.0 Pro (Fal AI)</option>
+                </select>
+              </div>
+
+              <div className="aivt-form-group">
                 <label className="aivt-form-label" htmlFor="v-status">Status</label>
                 <select
                   id="v-status"
@@ -1019,6 +1041,9 @@ export default function AIVideoTemplatesView() {
                     <td className="aivt-td-name">
                       <strong>{t.templateName}</strong>
                       <span className="aivt-td-sub">{t.templateDescription || "No description"}</span>
+                      <span style={{ display: "inline-block", marginTop: 4, background: (t.aiModel || "Google Flow Veo 3.1 Lite").includes("Google") ? "#E8F0FE" : "#F3E8FF", color: (t.aiModel || "Google Flow Veo 3.1 Lite").includes("Google") ? "#1A73E8" : "#6B21A8", padding: "2px 8px", borderRadius: 10, fontSize: "0.72rem", fontWeight: 700, border: (t.aiModel || "Google Flow Veo 3.1 Lite").includes("Google") ? "1px solid #ADCBF8" : "1px solid #D8B4FE" }}>
+                        🎬 {t.aiModel || "Google Flow Veo 3.1 Lite"}
+                      </span>
                     </td>
                     <td>
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>

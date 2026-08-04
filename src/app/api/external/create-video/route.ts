@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
+import { startGoogleFlowVideoJob } from "@/app/api/external/google-flow/create-video/route";
 
 export const maxDuration = 300; // Allow sufficient execution duration for background tasks
 export const dynamic = "force-dynamic";
@@ -229,9 +230,10 @@ export async function POST(req: NextRequest) {
 
     if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData().catch(() => new FormData());
-      for (const [key, value] of formData.entries()) {
+      for (const [rawKey, value] of formData.entries()) {
+        const key = rawKey.trim();
         if (value instanceof File && value.name && value.size > 0) {
-          if (key === "images" || key === "image" || key === "file" || key === "files" || key.startsWith("image")) {
+          if (key.includes("image") || key.includes("file") || key === "asset" || value.type.startsWith("image/") || /\.(webp|png|jpe?g|bmp|gif)$/i.test(value.name)) {
             uploadedFiles.push(value);
           } else {
             body[key] = value.name;
@@ -328,6 +330,7 @@ export async function POST(req: NextRequest) {
         if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = String(template.aspectRatio).trim();
         if (!finalResolution && template.resolution) finalResolution = String(template.resolution).trim();
         if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
+        if (!finalModel && template.aiModel) finalModel = String(template.aiModel).trim();
 
         // Automatically extract aspect ratio from template description if not otherwise provided
         if (!finalAspectRatio) {
@@ -372,9 +375,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Apply intelligent defaults if omitted by user and not available on template
-    if (!finalModel?.trim()) finalModel = "Wan 2.1 (1.3B)";
+    if (!finalModel?.trim()) finalModel = "Veo 3.1 Lite";
     if (!finalResolution?.trim()) finalResolution = "720p";
     if (!finalAspectRatio?.trim()) finalAspectRatio = "9:16";
+
+    const isGoogleModel = String(finalModel).toLowerCase().includes("veo") || String(finalModel).toLowerCase().includes("google") || String(finalModel).toLowerCase().includes("flow") || String(body.provider || "").toLowerCase().includes("google");
 
     // ----- Validate required fields -----
     if (!finalText?.trim()) {
@@ -394,7 +399,7 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    if (!falKey) {
+    if (!falKey && !isGoogleModel) {
       return NextResponse.json(
         { success: false, message: "Server configuration error: FAL_KEY not set" },
         { status: 500 }
@@ -439,6 +444,47 @@ export async function POST(req: NextRequest) {
           console.warn("[external/create-video] Failed to save uploaded image file:", err);
         }
       }
+    }
+
+    if (isGoogleModel) {
+      const googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+      if (!googleApiKey) {
+        return NextResponse.json(
+          { success: false, message: "Server configuration error: GOOGLE_API_KEY not set for Google Flow Veo 3.1 Lite generation" },
+          { status: 500 }
+        );
+      }
+
+      let refImageBase64 = String(body.imageBase64 || body.referenceImage || "");
+      let refMimeType = String(body.imageMimeType || "image/jpeg");
+      if (!refImageBase64 && uploadedFiles.length > 0) {
+        try {
+          const arrayBuffer = await uploadedFiles[0].arrayBuffer();
+          refImageBase64 = Buffer.from(arrayBuffer).toString("base64");
+          refMimeType = uploadedFiles[0].type || "image/webp";
+        } catch (e) {
+          if (imagesList.length > 0) refImageBase64 = imagesList[0];
+        }
+      } else if (!refImageBase64 && imagesList.length > 0) {
+        refImageBase64 = imagesList[0];
+      }
+
+      return await startGoogleFlowVideoJob({
+        userId: userId.trim(),
+        text: finalText || text,
+        aspectRatio: finalAspectRatio || "16:9",
+        duration: Math.max(4, Math.min(8, Number(String(finalDuration || "4").replace("s", "")) || 4)),
+        offerId: cleanOfferId || "",
+        templateId: templateId ? String(templateId).trim() : "",
+        channels: channelsList,
+        images: imagesList,
+        numberOfVideos: videoCount,
+        imageBase64: refImageBase64,
+        imageMimeType: refMimeType,
+        openAiKey,
+        googleApiKey,
+        fromUnifiedEndpoint: true,
+      });
     }
 
     // ----- Save initial job tracking to MongoDB immediately (< 50ms) -----

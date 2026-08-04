@@ -33,6 +33,7 @@ import ProfileView from "./ProfileView";
 import AIVideoGenerationView from "./AIVideoGenerationView";
 import AIVideoTemplatesView from "./AIVideoTemplatesView";
 import OfferCreation from "./OfferCreation";
+import Veo3TextVideoView from "./Veo3TextVideoView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ViewKey =
@@ -48,7 +49,8 @@ export type ViewKey =
   | "support"
   | "aiVideoGeneration"
   | "aiVideoTemplates"
-  | "offerCreation";
+  | "offerCreation"
+  | "veo3TextVideo";
 
 interface OfflineDevice {
   id: string;
@@ -165,6 +167,16 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <FaTag className="store-nav-item__icon" />
             <span>Offer Creation</span>
+          </button>
+
+          {/* Google Flow Veo 3.1 Lite */}
+          <button
+            className={`store-nav-item ${isActive("veo3TextVideo") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("veo3TextVideo")}
+            style={{ borderLeft: isActive("veo3TextVideo") ? undefined : "2px solid transparent" }}
+          >
+            <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>🎬</span>
+            <span>Google Flow Veo 3.1</span>
           </button>
 
           <button
@@ -491,7 +503,8 @@ export default function StoreUserPage() {
       view === "viewAllCampaigns" ||
       view === "aiVideoGeneration" ||
       view === "aiVideoTemplates" ||
-      view === "offerCreation"
+      view === "offerCreation" ||
+      view === "veo3TextVideo"
     ) {
       setEditingPlaylist(null);
     }
@@ -583,6 +596,8 @@ export default function StoreUserPage() {
         return <AIVideoTemplatesView />;
       case "offerCreation":
         return <OfferCreation />;
+      case "veo3TextVideo":
+        return <Veo3TextVideoView />;
       default:
         return (
           <div className="store-placeholder">

@@ -84,14 +84,14 @@ const MODELS: ModelInfo[] = [
     supportedDurations: [5, 10, 15, 30],
     badge: "Pro", badgeColor: "#7C3AED",
   },
-  // ── Veo ───────────────────────────────────────────────────────────────────
+  // ── Google Flow Veo ───────────────────────────────────────────────────────
   {
-    name: "Veo 3",
-    slug: "fal-ai/veo3.1",
-    costByRes: { "720p": 0.75, "1080p": 0.75, "4K": 0.75 },
+    name: "Google Flow Veo 3.1 Lite",
+    slug: "google-flow/veo-3.1-lite",
+    costByRes: { "720p": 0.08, "1080p": 0.12, "4K": 0.18 },
     supportedResolutions: ["720p", "1080p", "4K"],
-    supportedDurations: [8],
-    badge: "Google", badgeColor: "#2563EB",
+    supportedDurations: [4, 5, 6, 8],
+    badge: "Google Flow", badgeColor: "#4285F4",
   },
   // ── Seedance ──────────────────────────────────────────────────────────────
   {
@@ -202,79 +202,76 @@ const Select: React.FC<{ id: string; label: string; value: string; onChange: (v:
 );
 
 // ─── Model card grid ──────────────────────────────────────────────────────────
-const ModelGrid: React.FC<{ value: string; onChange: (v: string) => void; resolution: Resolution; duration: number }> = ({ value, onChange, resolution, duration }) => (
-  <div>
-    <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: "#64848D", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 12 }}>
-      AI Model — showing compatibility for <span style={{ color: "#0B2830" }}>{resolution}</span>
-    </label>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: 10 }}>
-      {MODELS.map((m) => {
-        const supported = m.supportedResolutions.includes(resolution);
-        const cps = supported ? m.costByRes[resolution]! : null;
-        const total = cps != null ? fmtTotal(cps, duration) : null;
-        const active = value === m.name && supported;
+const ModelGrid: React.FC<{ value: string; onChange: (v: string) => void; resolution: Resolution; duration: number; engine?: "fal" | "veo" }> = ({ value, onChange, resolution, duration, engine = "fal" }) => {
+  const filteredModels = MODELS.filter((m) => (engine === "veo" ? m.slug.includes("google") : !m.slug.includes("google")));
+  return (
+    <div>
+      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: "#64848D", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 12 }}>
+        AI Model ({engine === "veo" ? "Google Veo Engine" : "Fal.ai Engine"}) — showing compatibility for <span style={{ color: "#0B2830" }}>{resolution}</span>
+      </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: 10 }}>
+        {filteredModels.map((m) => {
+          const supported = m.supportedResolutions.includes(resolution);
+          const cps = supported ? m.costByRes[resolution]! : null;
+          const total = cps != null ? fmtTotal(cps, duration) : null;
+          const active = value === m.name && supported;
 
-        return (
-          <button key={m.name} onClick={() => supported && onChange(m.name)} disabled={!supported}
-            style={{
-              background: active
-                ? "linear-gradient(135deg, #0B3D44, #11B5BB)"
-                : supported ? "#F8FAFB" : "#F0F4F5",
-              border: active ? "2px solid #11B5BB" : `1.5px solid ${supported ? "#EAEFEF" : "#E0E7EA"}`,
-              borderRadius: 12, padding: "12px 14px", cursor: supported ? "pointer" : "not-allowed",
-              textAlign: "left", transition: "all 0.15s", fontFamily: "Inter, sans-serif",
-              position: "relative", overflow: "hidden", opacity: supported ? 1 : 0.55,
-            }}>
-
-            {/* Badge */}
-            {m.badge && (
-              <span style={{ position: "absolute", top: 8, right: 8, background: active ? "rgba(255,255,255,0.22)" : (m.badgeColor || "#64848D"), color: "#fff", fontSize: "0.58rem", fontWeight: 700, padding: "2px 7px", borderRadius: 20, letterSpacing: "0.04em" }}>
-                {m.badge}
-              </span>
-            )}
-
-            {/* Unsupported overlay */}
-            {!supported && (
-              <span style={{ position: "absolute", top: 8, right: m.badge ? 55 : 8, display: "flex", alignItems: "center", gap: 3, background: "#FEE2E2", color: "#DC2626", fontSize: "0.58rem", fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>
-                <FaBan size={8} /> N/A
-              </span>
-            )}
-
-            <p style={{ margin: "0 0 6px", fontSize: "0.82rem", fontWeight: 700, color: active ? "#fff" : supported ? "#0B2830" : "#A4B6B9", paddingRight: 40 }}>
-              {m.name}
-            </p>
-
-            {supported ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <FaBolt size={8} style={{ color: active ? "rgba(255,255,255,0.7)" : "#F05A28", flexShrink: 0 }} />
-                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: active ? "rgba(255,255,255,0.9)" : "#64848D" }}>
-                    {fmtCost(cps!)}/s @ {resolution}
-                  </span>
+          return (
+            <button key={m.name} onClick={() => supported && onChange(m.name)} disabled={!supported}
+              style={{
+                background: active
+                  ? "linear-gradient(135deg, #0B3D44, #11B5BB)"
+                  : supported ? "#F8FAFB" : "#F0F4F5",
+                border: active ? "2px solid #11B5BB" : `1.5px solid ${supported ? "#EAEFEF" : "#E0E7EA"}`,
+                borderRadius: 12, padding: "12px 14px", cursor: supported ? "pointer" : "not-allowed",
+                textAlign: "left", transition: "all 0.15s", fontFamily: "Inter, sans-serif",
+                position: "relative", overflow: "hidden", opacity: supported ? 1 : 0.55,
+              }}>
+              {m.badge && (
+                <span style={{ position: "absolute", top: 8, right: 8, background: active ? "rgba(255,255,255,0.22)" : (m.badgeColor || "#64848D"), color: "#fff", fontSize: "0.58rem", fontWeight: 700, padding: "2px 7px", borderRadius: 20, letterSpacing: "0.04em" }}>
+                  {m.badge}
+                </span>
+              )}
+              {!supported && (
+                <span style={{ position: "absolute", top: 8, right: m.badge ? 55 : 8, display: "flex", alignItems: "center", gap: 3, background: "#FEE2E2", color: "#DC2626", fontSize: "0.58rem", fontWeight: 700, padding: "2px 7px", borderRadius: 20 }}>
+                  <FaBan size={8} /> N/A
+                </span>
+              )}
+              <p style={{ margin: "0 0 6px", fontSize: "0.82rem", fontWeight: 700, color: active ? "#fff" : supported ? "#0B2830" : "#A4B6B9", paddingRight: 40 }}>
+                {m.name}
+              </p>
+              {supported ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <FaBolt size={8} style={{ color: active ? "rgba(255,255,255,0.7)" : "#F05A28", flexShrink: 0 }} />
+                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: active ? "rgba(255,255,255,0.9)" : "#64848D" }}>
+                      {fmtCost(cps!)}/s @ {resolution}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <FaClock size={8} style={{ color: active ? "rgba(255,255,255,0.6)" : "#A4B6B9", flexShrink: 0 }} />
+                    <span style={{ fontSize: "0.72rem", color: active ? "rgba(255,255,255,0.7)" : "#A4B6B9" }}>
+                      {duration}s = <strong style={{ color: active ? "#fff" : "#0B2830" }}>{total}</strong> total
+                    </span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <FaClock size={8} style={{ color: active ? "rgba(255,255,255,0.6)" : "#A4B6B9", flexShrink: 0 }} />
-                  <span style={{ fontSize: "0.72rem", color: active ? "rgba(255,255,255,0.7)" : "#A4B6B9" }}>
-                    {duration}s = <strong style={{ color: active ? "#fff" : "#0B2830" }}>{total}</strong> total
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <p style={{ margin: 0, fontSize: "0.72rem", color: "#A4B6B9" }}>Not supported at {resolution}</p>
-            )}
-          </button>
-        );
-      })}
+              ) : (
+                <p style={{ margin: "0", fontSize: "0.72rem", color: "#A4B6B9" }}>Not supported at {resolution}</p>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const AIVideoGenerationView: React.FC = () => {
   const [resolution, setResolution] = useState<Resolution>("1080p");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
-  const [aiModel, setAiModel] = useState(MODELS[0].name);
-  const [duration, setDuration] = useState(5);
+  const [aiModel, setAiModel] = useState("Google Flow Veo 3.1 Lite");
+  const [duration, setDuration] = useState(4);
   const [numVideos, setNumVideos] = useState(1);
   const [roughPrompt, setRoughPrompt] = useState("");
   const [refinedPrompt, setRefinedPrompt] = useState("");
@@ -283,6 +280,13 @@ const AIVideoGenerationView: React.FC = () => {
   const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([]);
   const [generationProgress, setGenerationProgress] = useState(0);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [engine, setEngine] = useState<"fal" | "veo">("veo");
+  const [offerId, setOfferId] = useState("");
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(["instagram", "facebook", "instore"]);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [pollingJobId, setPollingJobId] = useState("");
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [videoTemplates, setVideoTemplates] = useState<any[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
@@ -308,7 +312,12 @@ const AIVideoGenerationView: React.FC = () => {
     const tmpl = videoTemplates.find((t) => t._id === tId);
     if (tmpl) {
       if (tmpl.aspectRatio) setAspectRatio(tmpl.aspectRatio as AspectRatio);
-      if (tmpl.videoDuration) setDuration(Number(tmpl.videoDuration));
+      if (tmpl.videoDuration && selectedModel.supportedDurations.includes(Number(tmpl.videoDuration))) setDuration(Number(tmpl.videoDuration));
+      if (tmpl.aiModel && MODELS.some((m) => m.name === tmpl.aiModel)) {
+        setAiModel(tmpl.aiModel);
+        if (tmpl.aiModel.includes("Google") || tmpl.aiModel.includes("Veo")) setEngine("veo");
+        else setEngine("fal");
+      }
       if (!roughPrompt && !refinedPrompt) {
         setRefinedPrompt(`Video generation using active template "${tmpl.templateName}"`);
         setStatus("prompt-ready");
@@ -328,10 +337,9 @@ const AIVideoGenerationView: React.FC = () => {
     setResolution(res);
     const currentStillOk = MODELS.find((m) => m.name === aiModel)?.supportedResolutions.includes(res);
     if (!currentStillOk) {
-      const first = MODELS.find((m) => m.supportedResolutions.includes(res));
+      const first = MODELS.find((m) => m.supportedResolutions.includes(res) && (engine === "veo" ? m.slug.includes("google") : !m.slug.includes("google"))) || MODELS.find((m) => m.supportedResolutions.includes(res));
       if (first) setAiModel(first.name);
     }
-    // also clamp duration to what selected model supports at new resolution
   };
 
   // When model changes, clamp duration to supported
@@ -371,12 +379,72 @@ const AIVideoGenerationView: React.FC = () => {
   };
 
   const handleGenerateVideo = async () => {
-    if ((!refinedPrompt.trim() && !selectedTemplateId) || !userId) return;
-    setStatus("generating-video"); setErrorMsg(""); setGeneratedVideos([]); startProgress();
+    if ((!refinedPrompt.trim() && !roughPrompt.trim() && !selectedTemplateId) || !userId) return;
+    setStatus("generating-video"); setErrorMsg(""); setGeneratedVideos([]); startProgress(); setPollingJobId("");
+
+    if (engine === "veo" || aiModel.includes("Veo") || aiModel.includes("Google")) {
+      try {
+        const fd = new FormData();
+        fd.append("userId", userId);
+        fd.append("text", refinedPrompt || roughPrompt || `Video generated via template`);
+        fd.append("model", "Veo 3.1 Lite");
+        fd.append("resolution", resolution);
+        fd.append("aspectRatio", aspectRatio);
+        fd.append("duration", String(duration));
+        fd.append("numberOfVideos", String(numVideos));
+        if (selectedTemplateId) fd.append("templateId", selectedTemplateId);
+        if (offerId) fd.append("offerId", offerId);
+        if (selectedChannels.length > 0) fd.append("channels", JSON.stringify(selectedChannels));
+        uploadFiles.forEach((file) => fd.append("images ", file));
+
+        const res = await fetch("/api/external/create-video", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || "Failed to initiate Google Veo video generation.");
+
+        const jobId = data.jobId;
+        setPollingJobId(jobId);
+
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(async () => {
+          try {
+            const pollRes = await fetch("/api/external/get-video", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jobId }),
+            });
+            const pollData = await pollRes.json();
+            if (pollData.success && (pollData.status === "completed" || pollData.status === "success")) {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              finishProgress();
+              setGeneratedVideos([{ videoUrl: pollData.videoUrl || pollData["video 1"] || "", mediaId: pollData.videoId || jobId }]);
+              setStatus("done");
+              setPollingJobId("");
+            } else if (pollData.status === "failed") {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              finishProgress();
+              setErrorMsg(pollData.message || "Google Veo generation failed during cloud processing.");
+              setStatus("error");
+              setPollingJobId("");
+            }
+          } catch (e) {
+            console.error("Error polling Google Veo status:", e);
+          }
+        }, 5000);
+        return;
+      } catch (err: any) {
+        finishProgress();
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setErrorMsg(err.message || "Google Veo video generation failed.");
+        setStatus("error");
+        setPollingJobId("");
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/ai-video/generate-video", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: refinedPrompt, resolution, aspectRatio, model: aiModel, numVideos, duration, userId, templateId: selectedTemplateId || undefined }),
+        body: JSON.stringify({ prompt: refinedPrompt || roughPrompt, resolution, aspectRatio, model: aiModel, numVideos, duration, userId, templateId: selectedTemplateId || undefined }),
       });
       const data = await res.json();
       finishProgress();
@@ -385,7 +453,17 @@ const AIVideoGenerationView: React.FC = () => {
     } catch (err: any) { finishProgress(); setErrorMsg(err.message || "Video generation failed."); setStatus("error"); }
   };
 
-  const handleReset = () => { setStatus("idle"); setRefinedPrompt(""); setRoughPrompt(""); setGeneratedVideos([]); setGenerationProgress(0); setErrorMsg(""); };
+  const handleReset = () => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setStatus("idle"); setRefinedPrompt(""); setRoughPrompt(""); setGeneratedVideos([]); setGenerationProgress(0); setErrorMsg(""); setPollingJobId("");
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (progressRef.current) clearInterval(progressRef.current);
+    };
+  }, []);
 
   // Styles
   const card: React.CSSProperties = { background: "#fff", borderRadius: 20, padding: "28px 32px", boxShadow: "0 4px 20px rgba(0,0,0,0.04)", border: "1px solid #EAF0F2" };
@@ -470,9 +548,50 @@ const AIVideoGenerationView: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#0B2830" }}>Configuration</h2>
-              <p style={{ margin: "2px 0 0", fontSize: "0.76rem", color: "#64848D" }}>Resolution, aspect ratio, duration and quantity</p>
+              <h2 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#0B2830" }}>Configuration & Engine Selector</h2>
+              <p style={{ margin: "2px 0 0", fontSize: "0.76rem", color: "#64848D" }}>Choose AI engine, resolution, aspect ratio, and campaign details</p>
             </div>
+          </div>
+
+          {/* ── Engine Switcher (Fal vs Google Veo) ───────────────────────── */}
+          <div style={{ background: "#F0F4F5", padding: 6, borderRadius: 16, display: "flex", gap: 8, marginBottom: 26, border: "1px solid #EAEFEF" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setEngine("veo");
+                setAiModel("Google Flow Veo 3.1 Lite");
+                if (![4, 5, 6, 8].includes(duration)) setDuration(4);
+              }}
+              style={{
+                flex: 1, padding: "12px 20px", borderRadius: 12, border: "none",
+                background: engine === "veo" ? "linear-gradient(135deg, #1E3A8A, #3B82F6)" : "transparent",
+                color: engine === "veo" ? "#fff" : "#64848D", fontWeight: 700, fontSize: "0.92rem",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", transition: "all 0.2s",
+                boxShadow: engine === "veo" ? "0 4px 12px rgba(59,130,246,0.3)" : "none",
+              }}
+            >
+              <span style={{ fontSize: "1.1rem" }}>✨</span>
+              <span>Google Veo Engine (Veo 3.1 Lite & Gemini)</span>
+              <span style={{ background: engine === "veo" ? "rgba(255,255,255,0.2)" : "#3B82F6", color: "#fff", fontSize: "0.65rem", padding: "2px 8px", borderRadius: 20, fontWeight: 800 }}>DEFAULT</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEngine("fal");
+                if (aiModel.includes("Veo") || aiModel.includes("Google")) setAiModel("Wan 2.1");
+                if (duration === 4 || duration === 6) setDuration(5);
+              }}
+              style={{
+                flex: 1, padding: "12px 20px", borderRadius: 12, border: "none",
+                background: engine === "fal" ? "linear-gradient(135deg, #0B3D44, #11B5BB)" : "transparent",
+                color: engine === "fal" ? "#fff" : "#64848D", fontWeight: 700, fontSize: "0.92rem",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", transition: "all 0.2s",
+                boxShadow: engine === "fal" ? "0 4px 12px rgba(17,181,187,0.25)" : "none",
+              }}
+            >
+              <FaBolt size={15} style={{ color: engine === "fal" ? "#F05A28" : "#A4B6B9" }} />
+              <span>Fal.ai Engine (Wan 2.1, Kling, Pro)</span>
+            </button>
           </div>
 
           {/* Row 1 — dropdowns */}
@@ -525,8 +644,88 @@ const AIVideoGenerationView: React.FC = () => {
             )}
           </div>
 
+          {/* ── Google Veo Extended Details (Offer, Channels, Image Upload) ──── */}
+          {engine === "veo" && (
+            <div style={{ background: "linear-gradient(135deg, #EFF6FF, #F8FAFC)", border: "1.5px solid #DBEAFE", borderRadius: 16, padding: "20px 22px", marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: "1.1rem" }}>🛠️</span>
+                <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 800, color: "#1E40AF" }}>Google Veo Campaign Details & Reference Assets</h3>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 18, marginBottom: 18 }}>
+                <div>
+                  <label htmlFor="aivg-offer" style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "#3B82F6", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                    Offer ID Binding (Optional)
+                  </label>
+                  <input
+                    id="aivg-offer"
+                    type="text"
+                    placeholder="e.g. OFFER-2026-9988"
+                    value={offerId}
+                    onChange={(e) => setOfferId(e.target.value)}
+                    style={{ width: "100%", background: "#fff", border: "1.5px solid #BFDBFE", borderRadius: 10, padding: "10px 14px", fontSize: "0.88rem", color: "#1E3A8A", fontWeight: 600, outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "#3B82F6", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                    Upload Reference Images (Image-to-Video)
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.webp"
+                    onChange={(e) => {
+                      if (e.target.files) setUploadFiles(Array.from(e.target.files));
+                    }}
+                    style={{ fontSize: "0.82rem", color: "#1E40AF", background: "#fff", padding: "7px 12px", border: "1.5px solid #BFDBFE", borderRadius: 10, width: "100%", boxSizing: "border-box" }}
+                  />
+                  {uploadFiles.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                      {uploadFiles.map((f, i) => (
+                        <span key={i} style={{ background: "#DBEAFE", color: "#1E3A8A", fontSize: "0.72rem", padding: "3px 9px", borderRadius: 6, fontWeight: 600 }}>
+                          📁 {f.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "#3B82F6", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                  Publishing Channels / Social Media Targets
+                </label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {["instagram", "facebook", "instore", "tiktok", "youtube", "twitter"].map((ch) => {
+                    const sel = selectedChannels.includes(ch);
+                    return (
+                      <button
+                        key={ch}
+                        onClick={() => {
+                          setSelectedChannels((prev) =>
+                            prev.includes(ch) ? prev.filter((c) => c !== ch) : [...prev, ch]
+                          );
+                        }}
+                        type="button"
+                        style={{
+                          background: sel ? "#3B82F6" : "#fff",
+                          color: sel ? "#fff" : "#3B82F6",
+                          border: `1.5px solid ${sel ? "#3B82F6" : "#BFDBFE"}`,
+                          borderRadius: 20, padding: "6px 14px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer", transition: "all 0.15s", textTransform: "capitalize"
+                        }}
+                      >
+                        {sel && "✓ "} {ch}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Row 3 — Model grid */}
-          <ModelGrid value={aiModel} onChange={handleModelChange} resolution={resolution} duration={duration} />
+          <ModelGrid value={aiModel} onChange={handleModelChange} resolution={resolution} duration={duration} engine={engine} />
         </div>
 
         {/* ── Section 2: Prompt ─────────────────────────────────────────────── */}
@@ -589,14 +788,19 @@ const AIVideoGenerationView: React.FC = () => {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24, padding: "32px 0" }}>
                 <SpinnerRing />
                 <div style={{ textAlign: "center" }}>
-                  <LoadingDots label="Generating your video" />
+                  <LoadingDots label={pollingJobId ? "Google Veo compositing on Cloud" : "Generating your video"} />
                   <p style={{ margin: "8px 0 0", fontSize: "0.82rem", color: "#64848D" }}>{aiModel} · {resolution} · {duration}s</p>
+                  {pollingJobId && (
+                    <div style={{ background: "#DBEAFE", color: "#1E40AF", padding: "6px 14px", borderRadius: 20, fontSize: "0.78rem", fontWeight: 700, marginTop: 10, display: "inline-block" }}>
+                      📡 Polling Google Cloud (Job ID: {pollingJobId.slice(0, 8)}...) — Checked every 5s
+                    </div>
+                  )}
                 </div>
                 <div style={{ width: "100%", maxWidth: 420, background: "#EAF0F2", borderRadius: 99, height: 8, overflow: "hidden" }}>
                   <div style={{ height: "100%", background: "linear-gradient(90deg, #11B5BB, #0E9C9F)", borderRadius: 99, width: `${Math.min(generationProgress, 100)}%`, transition: "width 1.5s ease" }} />
                 </div>
                 <p style={{ fontSize: "0.75rem", color: "#A4B6B9", margin: 0 }}>
-                  {generationProgress < 30 ? "Initializing model…" : generationProgress < 60 ? "Rendering frames…" : generationProgress < 90 ? "Compositing output…" : "Finalizing…"}
+                  {pollingJobId ? "Google Vertex AI is synthesizing high-definition cinematic frames..." : generationProgress < 30 ? "Initializing model…" : generationProgress < 60 ? "Rendering frames…" : generationProgress < 90 ? "Compositing output…" : "Finalizing…"}
                 </p>
               </div>
             ) : (
