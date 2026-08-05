@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
 import DevicePlaylist from '@/models/ConectPlaylist';
 import Playlist from '@/models/PlaylistConfig';
+import { advancedPlaylistScheduleService } from '@/services/advancedPlaylistSchedule.service';
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,6 +32,13 @@ export async function GET(req: NextRequest) {
     device.lastConnection = new Date();
     device.status = 'active'; // Optionally ensure status is active
     await device.save();
+
+    // Advanced Schedule Lookup (Independent Advanced Scheduler)
+    // If an advanced schedule matches, return it immediately; otherwise proceed untouched with existing scheduler.
+    const advancedPlayback = await advancedPlaylistScheduleService.getPlaybackForDevice(device._id, serialNumber);
+    if (advancedPlayback) {
+      return NextResponse.json(advancedPlayback, { status: 200 });
+    }
 
     // Step 2: Find device's playlist connections
     const devicePlaylists = await DevicePlaylist.findOne(
