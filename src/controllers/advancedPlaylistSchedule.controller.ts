@@ -65,7 +65,7 @@ export async function getAdvancedSchedulesHandler(req: NextRequest): Promise<Nex
  */
 export async function getAdvancedScheduleByIdHandler(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
     await connectToDatabase();
@@ -92,7 +92,7 @@ export async function getAdvancedScheduleByIdHandler(
  */
 export async function updateAdvancedScheduleHandler(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
     await connectToDatabase();
@@ -126,7 +126,7 @@ export async function updateAdvancedScheduleHandler(
  */
 export async function deleteAdvancedScheduleHandler(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
     await connectToDatabase();
