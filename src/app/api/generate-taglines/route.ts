@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     // Accept offer details from common property names for high flexibility
     const offerText = body.text || body.offerText || body.offerDescription || body.prompt;
     const storeName = body.storeName || '';
-    const tone = body.tone || 'catchy, persuasive, and dynamic';
+    const tone = body.tone || ''; // Optional tone; if not provided, relies on system prompt
     const count = Math.min(Math.max(parseInt(body.count || '5', 10), 1), 10); // Default to 5 taglines, bound between 1 and 10
 
     if (!offerText || !String(offerText).trim()) {

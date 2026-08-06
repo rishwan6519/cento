@@ -5,6 +5,7 @@ export interface OfferDocument extends Document {
   offerId?: string;
   offerName: string;
   offerDescription: string;
+  tagline?: string;
   startDate: Date;
   endDate: Date;
   isActive: boolean;
@@ -33,6 +34,11 @@ const OfferSchema: Schema = new Schema(
     offerDescription: {
       type: String,
       required: [true, 'Offer description is required'],
+      trim: true,
+    },
+    tagline: {
+      type: String,
+      required: false,
       trim: true,
     },
     startDate: {

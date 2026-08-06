@@ -33,7 +33,7 @@
 // ];
 
 
-export const DUMMY_TEMPLATES = [
+const RAW_DUMMY_TEMPLATES = [
   {
     _id: "6797a1f8b1a3e9c4d2800001",
     templateName: "Animate Product + Discount + Caption",
@@ -1338,3 +1338,8 @@ Never invent labels, headings or helper text.
       "Crafted for a vertical 9:16 aspect ratio in luxury 720p HD resolution to highlight your top-performing products and customer favorites. Integrates sleek gallery transitions, star rating emblems, value points, and polished reflections to elevate perceived product value. A confident and persuasive voiceover explains why these items are fan favorites, finishing strong with a compelling 'Shop Now' call-to-action.",
   },
 ];
+
+export const DUMMY_TEMPLATES = RAW_DUMMY_TEMPLATES.map((tmpl) => ({
+  ...tmpl,
+  description: tmpl.description ? tmpl.description.replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim() : "",
+}));

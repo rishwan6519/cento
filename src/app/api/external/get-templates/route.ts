@@ -76,7 +76,10 @@ async function getTemplatesForUser(userId: string, templateId?: string, search?:
     };
 
     combinedTemplates.forEach((tmpl, index) => {
-      responsePayload[`template ${index + 1}`] = tmpl;
+      responsePayload[`template ${index + 1}`] = {
+        ...tmpl,
+        description: tmpl.description ? String(tmpl.description).replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim() : "",
+      };
     });
 
     return NextResponse.json(responsePayload);

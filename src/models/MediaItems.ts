@@ -13,6 +13,7 @@ export interface IMediaItem extends Document {
   approvalStatus?: string;
   offerId?: string;
   templateId?: string;
+  tagline?: string;
   metadataId?: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
 }
@@ -30,6 +31,7 @@ const MediaItemSchema = new Schema<IMediaItem>({
   approvalStatus: { type: String, required: false },
   offerId: { type: String, required: false },
   templateId: { type: String, required: false },
+  tagline: { type: String, required: false },
   metadataId: { type: mongoose.Schema.Types.ObjectId, ref: 'MediaMetadata', required: false },
   createdAt: { type: Date, default: Date.now }
 });

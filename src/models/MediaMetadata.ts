@@ -11,6 +11,7 @@ export interface IMediaMetadata extends Document {
   approvalStatus?: string;
   offerId?: string;
   templateId?: string;
+  tagline?: string;
   createdAt: Date;
 }
 
@@ -25,6 +26,7 @@ const MediaMetadataSchema = new Schema<IMediaMetadata>({
   approvalStatus: { type: String, required: false },
   offerId: { type: String, required: false },
   templateId: { type: String, required: false },
+  tagline: { type: String, required: false },
   createdAt: { type: Date, default: Date.now }
 });
 
