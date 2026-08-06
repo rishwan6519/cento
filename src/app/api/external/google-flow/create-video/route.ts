@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     // Combine tagline into the prompt text so it becomes part of the video content
     let finalText = text;
     if (finalTagline) {
-      finalText = text.trim() + `\n\n[MARKETING & PROMOTIONAL TAGLINE: "${finalTagline}" — Make sure this promotional offer tagline (such as buy one get one / special deal) is visually represented in the advertisement, such as bold animated text overlay or promotional signage integrated into the commercial video.]`;
+      finalText = text.trim() + `\n\n[MANDATORY ON-SCREEN PROMOTIONAL TEXT OVERLAY: Render a high-end commercial typographic graphic banner prominently at the VERY TOP of the video frame reading exactly: "${finalTagline}". Ensure this promotional offer text is sharp, bold, elegant, and cleanly overlaid at the top above the video scene alongside the brand logo.]`;
     }
 
     if (imageTypesList.length > 0) {

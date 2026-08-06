@@ -53,7 +53,7 @@ async function enhancePromptAndScript(
 ): Promise<{ enhancedPrompt: string; voiceoverScript: string; socialMediaHeading: string; socialMediaCaption: string; hashTags: string[] }> {
   const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for AI video generation models such as Google Flow, Veo, Higgsfield AI, Seedance, Kling, Runway, Pika, Luma and similar models (${model}).
 
-Your job is NOT to create marketing copy inside the visual prompt.
+When a marketing promotional offer or tagline is provided, you MUST explicitly command the AI video generator to render a crisp, bold, readable typographic graphic banner at the VERY TOP of the video frame displaying the exact promotional wording!
 Your job is to convert a simple offer instruction into an extremely detailed, production-quality video generation prompt, along with an accompanying commercial voiceover script.
 
 The user may provide:
@@ -417,7 +417,7 @@ export async function POST(req: NextRequest) {
 
     // Combine tagline into the prompt text so it becomes part of the video content
     if (finalTagline) {
-      finalText = finalText.trim() + `\n\n[MARKETING & PROMOTIONAL TAGLINE: "${finalTagline}" — Make sure this promotional offer tagline (such as buy one get one / special deal) is visually represented in the advertisement, such as bold animated text overlay or promotional signage integrated into the commercial video.]`;
+      finalText = finalText.trim() + `\n\n[MANDATORY ON-SCREEN PROMOTIONAL TEXT OVERLAY: Render a high-end commercial typographic graphic banner prominently at the VERY TOP of the video frame reading exactly: "${finalTagline}". Ensure this promotional offer text is sharp, bold, elegant, and cleanly overlaid at the top above the video scene alongside the brand logo.]`;
     }
 
     const videoDuration = Math.max(1, Math.min(60, Number(String(finalDuration || 4).replace("s", "")) || 4));
@@ -573,10 +573,15 @@ export async function POST(req: NextRequest) {
           openAiKey
         );
 
+        let finalSubmissionPrompt = enhancedPrompt;
+        if (finalTagline && !finalSubmissionPrompt.includes(finalTagline)) {
+          finalSubmissionPrompt = `${enhancedPrompt}\n\n[CRITICAL VIDEO OVERLAY INSTRUCTION: Render a clean, bold, high-resolution commercial graphic text banner positioned directly at the VERY TOP of the video frame reading exactly: "${finalTagline}". Ensure this promotional offer lettering is cleanly overlaid above the video scene.]`;
+        }
+
         await connectToDatabase();
         const activeJob: any = await VideoJobModel.findOne({ jobId });
         if (activeJob) {
-          activeJob.enhancedPrompt = enhancedPrompt;
+          activeJob.enhancedPrompt = finalSubmissionPrompt;
           activeJob.voiceoverScript = voiceoverScript;
           activeJob.socialMediaHeading = socialMediaHeading;
           activeJob.socialMediaCaption = socialMediaCaption;
@@ -599,7 +604,7 @@ export async function POST(req: NextRequest) {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  prompt: enhancedPrompt,
+                  prompt: finalSubmissionPrompt,
                   image_size: imageSizeKey,
                   aspect_ratio: finalAspectRatio,
                   num_inference_steps: 30,

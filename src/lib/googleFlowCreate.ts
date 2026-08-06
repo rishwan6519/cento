@@ -105,6 +105,7 @@ Always include:
 • Premium reflections and materials
 • Highly detailed textures
 • Professional commercial style
+• ON-SCREEN PROMOTIONAL TEXT OVERLAY: Whenever a marketing tagline or promotional discount offer is provided, explicitly command the AI video model to render a crisp, bold, readable graphic text banner prominently at the VERY TOP of the video frame displaying the exact promotional wording and offer!
 
 Preferred duration: ${duration} seconds.
 Target aspect ratio: ${aspectRatio}.
@@ -317,8 +318,8 @@ export async function startGoogleFlowVideoJob({
 
   // Combine tagline into the prompt text so it becomes part of the video content
   let finalText = text;
-  if (finalTagline && !text.includes("[MARKETING")) {
-    finalText = text.trim() + `\n\n[MARKETING & PROMOTIONAL TAGLINE: "${finalTagline}" — Make sure this promotional offer tagline (such as buy one get one / special deal) is visually represented in the advertisement, such as bold animated text overlay or promotional signage integrated into the commercial video.]`;
+  if (finalTagline && !text.includes("[MARKETING") && !text.includes("[MANDATORY ON-SCREEN")) {
+    finalText = text.trim() + `\n\n[MANDATORY ON-SCREEN PROMOTIONAL TEXT OVERLAY: Render a high-end commercial typographic graphic banner prominently at the VERY TOP of the video frame reading exactly: "${finalTagline}". Ensure this promotional offer text is sharp, bold, elegant, and cleanly overlaid at the top above the video scene alongside the brand logo.]`;
   }
 
   const cleanDuration = Math.max(4, Math.min(8, Number(String(duration || 4).replace("s", "")) || 4));
@@ -371,18 +372,24 @@ export async function startGoogleFlowVideoJob({
       const { enhancedPrompt, voiceoverScript, socialMediaHeading, socialMediaCaption, hashTags } =
         await enhancePrompt(finalText, aspectRatio, cleanDuration, openAiKey, resolvedImage);
 
+      // Forcefully append explicit visual typography instructions directly to the final Google Veo 3.1 Lite prompt to guarantee top text overlay
+      let finalSubmissionPrompt = enhancedPrompt;
+      if (finalTagline) {
+        finalSubmissionPrompt = `${enhancedPrompt}\n\n[CRITICAL VEO RENDER REQUIREMENT - TEXT OVERLAY: Render a clean, bold, high-resolution commercial graphic text banner positioned directly at the VERY TOP of the video frame reading exactly: "${finalTagline}". The promotional offer lettering must remain sharp, prominent, and clearly readable at the top throughout the video advertisement above the hero product.]`;
+      }
+
       await connectToDatabase();
       const activeJob = await GoogleFlowJobModel.findOne({ jobId });
       if (!activeJob) return;
 
-      activeJob.enhancedPrompt = enhancedPrompt;
+      activeJob.enhancedPrompt = finalSubmissionPrompt;
       activeJob.voiceoverScript = voiceoverScript;
       activeJob.socialMediaHeading = socialMediaHeading;
       activeJob.socialMediaCaption = socialMediaCaption;
       activeJob.hashTags = hashTags;
       await activeJob.save().catch(() => {});
 
-      const operationName = await submitToGoogleFlow(enhancedPrompt, aspectRatio, cleanDuration, googleApiKey, resolvedImage);
+      const operationName = await submitToGoogleFlow(finalSubmissionPrompt, aspectRatio, cleanDuration, googleApiKey, resolvedImage);
 
       await connectToDatabase();
       const updatedJob = await GoogleFlowJobModel.findOne({ jobId });
