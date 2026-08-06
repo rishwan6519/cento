@@ -572,20 +572,49 @@ export async function GET(req: NextRequest) {
         }, { status: 404 });
       }
 
-      // Fetch connection mapping in DevicePlaylist
+      // Fetch connection mapping in DevicePlaylist using Storesparc resolution engine
       const connection = await DevicePlaylist.findOne({ deviceId: resolvedDeviceId });
       const activePlaylistIds = connection?.playlistIds || [];
       const activeAnnIds = connection?.announcementPlaylistIds || [];
 
-      // Query both PlaylistConfig and AnnouncementPlaylist
-      // Also include any playlist where selectedDeviceId or deviceIds explicitly references this device!
+      const deviceIdStr = resolvedDeviceId.toString();
+      let associatedIds: any[] = [resolvedDeviceId, deviceIdStr];
+      let storeUserIds: any[] = [];
+      try {
+        const assignments = await AssignedDevice.find({ deviceId: resolvedDeviceId });
+        assignments.forEach((a: any) => {
+          associatedIds.push(a._id, a._id.toString());
+          if (a.userId) storeUserIds.push(a.userId, a.userId.toString());
+        });
+        const onboardings = await OnboardedDevice.find({ deviceId: resolvedDeviceId });
+        onboardings.forEach((o: any) => {
+          associatedIds.push(o._id, o._id.toString());
+          if (o.userId) storeUserIds.push(o.userId, o.userId.toString());
+        });
+      } catch (err) {
+        console.error("Error finding associated assignments in concurrent GET:", err);
+      }
+
+      let storeConnectedPlaylistIds: any[] = [];
+      try {
+        if (storeUserIds.length > 0) {
+          const storePlaylists = await DevicePlaylist.find({ deviceId: { $in: storeUserIds } }, 'playlistIds announcementPlaylistIds');
+          storePlaylists.forEach((curr: any) => {
+            if (curr.playlistIds) curr.playlistIds.forEach((pid: any) => { if (pid) storeConnectedPlaylistIds.push(pid); });
+            if (curr.announcementPlaylistIds) curr.announcementPlaylistIds.forEach((pid: any) => { if (pid) activeAnnIds.push(pid); });
+          });
+        }
+      } catch (err) {}
+
+      const allConnectedIds = [...activePlaylistIds, ...storeConnectedPlaylistIds];
+
       const mediaPlaylists = await PlaylistConfig.find({
         $or: [
-          { _id: { $in: activePlaylistIds } },
-          { selectedDeviceId: resolvedDeviceId },
-          { deviceIds: resolvedDeviceId },
-          { deviceIds: resolvedDeviceId.toString() },
-          { selectedDeviceId: resolvedDeviceId.toString() }
+          { _id: { $in: allConnectedIds } },
+          { selectedDeviceId: { $in: associatedIds } },
+          { deviceIds: { $in: associatedIds } },
+          { selectedDeviceId: { $in: storeUserIds } },
+          { deviceIds: { $in: storeUserIds } }
         ]
       })
       .populate('userId', 'username')

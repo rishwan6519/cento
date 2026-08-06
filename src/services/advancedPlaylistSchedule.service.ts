@@ -3,6 +3,8 @@ import AdvancedPlaylistSchedule, { IAdvancedPlaylistSchedule } from '@/models/Ad
 import PlaylistConfig from '@/models/PlaylistConfig';
 import Device from '@/models/Device';
 import DevicePlaylist from '@/models/ConectPlaylist';
+import AssignedDevice from '@/models/AssignDevice';
+import OnboardedDevice from '@/models/OnboardedDevice';
 import { validateSchedulePayload, ScheduleInput } from '@/validators/advancedPlaylistSchedule.validation';
 
 export class ServiceError extends Error {
@@ -366,32 +368,109 @@ export const advancedPlaylistScheduleService = {
         source: 'advancedSchedule',
       }));
 
-    // 2. Query Old Legacy and Concurrent Playlists connected to this device
+    // 2. Query Old Legacy and Concurrent Playlists connected to this device (Storesparc resolution engine)
     const devicePlaylists = await DevicePlaylist.findOne({ deviceId: device._id }, 'playlistIds');
-    const activeIds = devicePlaylists && Array.isArray(devicePlaylists.playlistIds) ? devicePlaylists.playlistIds : [];
+    const connectedPlaylistIds = devicePlaylists && Array.isArray(devicePlaylists.playlistIds) ? devicePlaylists.playlistIds : [];
+
+    const deviceIdStr = device._id.toString();
+    const deviceIdObj = device._id;
+
+    let associatedIds: any[] = [deviceIdObj, deviceIdStr];
+    let storeUserIds: any[] = [];
+    try {
+      const assignments = await AssignedDevice.find({ deviceId: device._id });
+      assignments.forEach((a: any) => {
+        associatedIds.push(a._id);
+        associatedIds.push(a._id.toString());
+        if (a.userId) {
+          storeUserIds.push(a.userId);
+          storeUserIds.push(a.userId.toString());
+        }
+      });
+      const onboardings = await OnboardedDevice.find({ deviceId: device._id });
+      onboardings.forEach((o: any) => {
+        associatedIds.push(o._id);
+        associatedIds.push(o._id.toString());
+        if (o.userId) {
+          storeUserIds.push(o.userId);
+          storeUserIds.push(o.userId.toString());
+        }
+      });
+    } catch (err) {
+      console.error("Error fetching associated assignment and store user IDs in timeline:", err);
+    }
+
+    let storeConnectedPlaylistIds: any[] = [];
+    try {
+      if (storeUserIds.length > 0) {
+        const storePlaylists = await DevicePlaylist.find({
+          deviceId: { $in: storeUserIds }
+        }, 'playlistIds');
+        storePlaylists.forEach((curr: any) => {
+          if (curr.playlistIds) {
+            curr.playlistIds.forEach((pid: any) => {
+              if (pid) storeConnectedPlaylistIds.push(pid);
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching store-connected playlists in timeline:", err);
+    }
+
+    const allConnectedPlaylistIds = [
+      ...connectedPlaylistIds,
+      ...storeConnectedPlaylistIds
+    ];
 
     const legacyPlaylists = await PlaylistConfig.find({
       $or: [
-        { _id: { $in: activeIds } },
-        { selectedDeviceId: device._id },
-        { deviceIds: device._id },
-        { selectedDeviceId: device._id.toString() },
-        { deviceIds: device._id.toString() },
-      ],
-      status: { $ne: 'inactive' },
-    });
+        { _id: { $in: allConnectedPlaylistIds } },
+        { selectedDeviceId: { $in: associatedIds } },
+        { deviceIds: { $in: associatedIds } },
+        { selectedDeviceId: { $in: storeUserIds } },
+        { deviceIds: { $in: storeUserIds } }
+      ]
+    }).populate('files.fileId').lean();
 
-    const todayStr = queryDate.toISOString().slice(0, 10);
-    const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const todayWeekDay = weekDays[queryDate.getDay()];
+    const todayStr = dateStr;
+    const melbourneWeekdayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Australia/Melbourne', weekday: 'long' });
+    const todayWeekDay = melbourneWeekdayFormatter.format(now).toLowerCase();
+
+    const normalizeDateToYYYYMMDD = (dateVal: any): string | null => {
+      if (!dateVal) return null;
+      let dStr = "";
+      if (dateVal instanceof Date) dStr = dateVal.toISOString().slice(0, 10);
+      else dStr = String(dateVal).trim();
+      if (dStr.includes('T')) dStr = dStr.split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dStr)) return dStr;
+      return dStr;
+    };
+
+    const isDayMatching = (daysOfWeek: any[], tDay: string): boolean => {
+      if (!Array.isArray(daysOfWeek) || daysOfWeek.length === 0) return true;
+      const shortDays: { [key: string]: string } = {
+        'sunday': 'sun', 'monday': 'mon', 'tuesday': 'tue', 'wednesday': 'wed',
+        'thursday': 'thu', 'friday': 'fri', 'saturday': 'sat'
+      };
+      const tLower = tDay.toLowerCase();
+      const tShort = shortDays[tLower] || '';
+      return daysOfWeek.some(day => {
+        if (!day) return false;
+        const dLower = String(day).trim().toLowerCase();
+        return dLower === tLower || dLower === tShort || tLower.startsWith(dLower);
+      });
+    };
 
     for (const p of legacyPlaylists) {
       const lp = p as any;
-      if (lp.startDate && lp.endDate && (todayStr < lp.startDate || todayStr > lp.endDate)) continue;
-      if (Array.isArray(lp.daysOfWeek) && lp.daysOfWeek.length > 0 && !lp.daysOfWeek.includes(todayWeekDay)) continue;
+      const normStart = normalizeDateToYYYYMMDD(lp.startDate);
+      const normEnd = normalizeDateToYYYYMMDD(lp.endDate);
+      if (normStart && normEnd && (todayStr < normStart || todayStr > normEnd)) continue;
+      if (!isDayMatching(lp.daysOfWeek, todayWeekDay)) continue;
 
-      const lStart = lp.startTime ? lp.startTime.slice(0, 5) : '00:00';
-      const lEnd = lp.endTime ? lp.endTime.slice(0, 5) : '23:59';
+      const lStart = lp.startTime ? String(lp.startTime).slice(0, 5) : '00:00';
+      const lEnd = lp.endTime ? String(lp.endTime).slice(0, 5) : '23:59';
 
       validSchedules.push({
         _id: lp._id.toString(),
@@ -437,7 +516,7 @@ export const advancedPlaylistScheduleService = {
         for (const sched of activeSchedules) {
           const playlist = sched.playlistId as any;
           contributingPlaylists.push({
-            playlistId: playlist._id.toString(),
+            playlistId: playlist._id ? playlist._id.toString() : String(playlist.id || sched._id),
             playlistName: playlist.name || 'Unnamed Playlist',
             scheduleId: sched._id.toString(),
             window: `${sched.startTime}-${sched.endTime}`,
@@ -447,14 +526,18 @@ export const advancedPlaylistScheduleService = {
           if (Array.isArray(playlist.files)) {
             for (const file of playlist.files) {
               const fileObj = file.toObject ? file.toObject() : { ...file };
-              if (fileObj.path) {
-                const fullUrl = fileObj.path.startsWith('http')
-                  ? fileObj.path
-                  : `https://iot.centelon.com${fileObj.path.startsWith('/') ? '' : '/'}${fileObj.path}`;
+              let rawPath = fileObj.path || (fileObj.fileId && typeof fileObj.fileId === 'object' ? (fileObj.fileId.url || fileObj.fileId.fileUrl) : '') || '';
+              if (rawPath) {
+                const fullUrl = rawPath.startsWith('http')
+                  ? rawPath
+                  : `https://iot.centelon.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
                 fileObj.path = fullUrl;
                 fileObj.url = fullUrl;
               } else {
                 fileObj.url = null;
+              }
+              if (fileObj.fileId && typeof fileObj.fileId === 'object') {
+                fileObj.fileId = fileObj.fileId._id ? fileObj.fileId._id.toString() : fileObj.fileId;
               }
               combinedMedias.push(fileObj);
             }
