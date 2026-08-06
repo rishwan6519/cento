@@ -8,7 +8,7 @@ import VideoJobModel, { IVideoJob } from "@/models/VideoJob";
 import Offer from "@/models/Offer";
 import MediaMetadataModel from "@/models/MediaMetadata";
 import GoogleFlowJobModel from "@/models/GoogleFlowJob";
-import { checkAndResolveGoogleJob } from "@/app/api/external/google-flow/get-video/route";
+import { checkAndResolveGoogleJob } from "@/lib/googleFlowGet";
 import { v4 as uuidv4 } from "uuid";
 import mongoose from "mongoose";
 
@@ -84,15 +84,21 @@ async function buildCompletedJobResponse(job: any): Promise<NextResponse> {
   responsePayload.videoId = resolvedVideoId;
   if (job.offerId) {
     responsePayload.offerId = job.offerId;
-    if (mongoose.Types.ObjectId.isValid(String(job.offerId).trim())) {
-      const linkedOffer: any = await Offer.findById(String(job.offerId).trim()).lean().catch(() => null);
-      if (linkedOffer) {
-        if (linkedOffer.offerName) responsePayload.offerName = linkedOffer.offerName;
-        if (linkedOffer.offerDescription) responsePayload.offerDescription = linkedOffer.offerDescription;
-        if (linkedOffer.startDate) responsePayload.offerStartDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
-        if (linkedOffer.endDate) responsePayload.offerEndDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
-      }
+    const trimmedId = String(job.offerId).trim();
+    const query = mongoose.Types.ObjectId.isValid(trimmedId)
+      ? { $or: [{ _id: trimmedId }, { offerId: trimmedId }] }
+      : { offerId: trimmedId };
+    const linkedOffer: any = await Offer.findOne(query).lean().catch(() => null);
+    if (linkedOffer) {
+      if (linkedOffer.offerName) responsePayload.offerName = linkedOffer.offerName;
+      if (linkedOffer.offerDescription) responsePayload.offerDescription = linkedOffer.offerDescription;
+      if (linkedOffer.startDate) responsePayload.offerStartDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
+      if (linkedOffer.endDate) responsePayload.offerEndDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
     }
+  }
+  responsePayload.tagline = job.tagline || "";
+  if (job.imageTypes && job.imageTypes.length > 0) {
+    responsePayload.imageTypes = job.imageTypes;
   }
   responsePayload.templateId = job.templateId || "";
 
@@ -140,6 +146,7 @@ async function checkAndResolveJob(jobId: string) {
       success: false,
       status: "failed",
       jobId,
+      ...(job.offerId ? { offerId: job.offerId } : {}),
       message: "One or more video generation tasks failed during processing at fal.ai.",
     });
   }
@@ -327,6 +334,7 @@ async function checkAndResolveJob(jobId: string) {
       success: false,
       status: "failed",
       jobId,
+      ...(job.offerId ? { offerId: job.offerId } : {}),
       details: renderDetails,
       message: "Video generation failed at fal.ai during rendering.",
     });
@@ -344,6 +352,7 @@ async function checkAndResolveJob(jobId: string) {
       renderProgress: renderDetails,
       enhancedPrompt: job.enhancedPrompt || "",
       voiceoverScript: job.voiceoverScript || "",
+      ...(job.imageTypes && job.imageTypes.length > 0 ? { imageTypes: job.imageTypes } : {}),
       ...((job.channels || job.socialMedia || []).length > 0
         ? {
           socialMediaHeading: job.socialMediaHeading || "",

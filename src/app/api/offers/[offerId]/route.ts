@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { connectToDatabase } from '@/lib/db';
 import Offer from '@/models/Offer';
+import mongoose from 'mongoose';
 
 // ─── Helper: Extract & verify JWT ────────────────────────────────────────────
 function getAuthenticatedUser(req: NextRequest): {
@@ -97,7 +98,10 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     }
 
     // ── Ownership check ───────────────────────────────────────────────────
-    const offer = await Offer.findById(offerId);
+    const query = mongoose.Types.ObjectId.isValid(offerId)
+      ? { $or: [{ _id: offerId }, { offerId: offerId }] }
+      : { offerId: offerId };
+    const offer = await Offer.findOne(query);
     if (!offer) {
       return NextResponse.json(
         { success: false, message: 'Offer not found' },
@@ -182,7 +186,10 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     }
 
     // ── Ownership check ───────────────────────────────────────────────────
-    const offer = await Offer.findById(offerId);
+    const query = mongoose.Types.ObjectId.isValid(offerId)
+      ? { $or: [{ _id: offerId }, { offerId: offerId }] }
+      : { offerId: offerId };
+    const offer = await Offer.findOne(query);
     if (!offer) {
       return NextResponse.json(
         { success: false, message: 'Offer not found' },
@@ -196,7 +203,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       );
     }
 
-    await Offer.findByIdAndDelete(offerId);
+    await Offer.deleteOne({ _id: offer._id });
 
     return NextResponse.json({
       success: true,

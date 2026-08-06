@@ -6,6 +6,7 @@ import Offer from '@/models/Offer';
 import User from '@/models/User';
 import Notification from '@/models/Notification';
 import { sendPushNotification } from '@/lib/firebase-admin';
+import { generateUniqueOfferId } from '@/lib/generateOfferId';
 
 // ─── Helper: Extract & verify JWT, return decoded payload ───────────────────
 function getAuthenticatedUser(req: NextRequest): {
@@ -124,8 +125,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Create offer ───────────────────────────────────────────────────────
+    const uniqueOfferId = await generateUniqueOfferId();
     const offer = await Offer.create({
       storeUserId: targetUserId,
+      offerId: uniqueOfferId,
       offerName: offerName.trim(),
       offerDescription: offerDescription.trim(),
       startDate: start,
@@ -202,6 +205,7 @@ export async function POST(req: NextRequest) {
       { 
         success: true, 
         message: 'Offer created successfully',
+        offerId: uniqueOfferId,
         notificationDetails,
       },
       { status: 201 }

@@ -7,7 +7,8 @@ import { v4 as uuidv4 } from "uuid";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
-import { startGoogleFlowVideoJob } from "@/app/api/external/google-flow/create-video/route";
+import { generateUniqueOfferId } from "@/lib/generateOfferId";
+import { startGoogleFlowVideoJob } from "@/lib/googleFlowCreate";
 
 export const maxDuration = 300; // Allow sufficient execution duration for background tasks
 export const dynamic = "force-dynamic";
@@ -239,7 +240,7 @@ export async function POST(req: NextRequest) {
             body[key] = value.name;
           }
         } else if (typeof value === "string") {
-          if (["images", "imageUrls", "channels", "socialMedia", "share", "shareTo"].includes(key)) {
+          if (["images", "imageUrls", "channels", "socialMedia", "share", "shareTo", "imageType", "imageTypes", "image_type", "image_types"].includes(key)) {
             if (body[key]) {
               if (Array.isArray(body[key])) body[key].push(value);
               else body[key] = [body[key], value];
@@ -280,9 +281,13 @@ export async function POST(req: NextRequest) {
       shareTo,    // fallback alias for channels
       images,     // optional — array of image URLs
       imageUrls,  // fallback alias for images
+      imageTypes, // optional — array clarifying image purposes (e.g. ["product", "logo"])
+      imageType,  // fallback alias for imageTypes
+      image_types,// fallback alias for imageTypes
+      image_type, // fallback alias for imageTypes
       templateId, // optional (not mandatory) — AI Video Template ID from video_templates collection
-      offerId,    // optional (not mandatory) — Offer ID to associate with the video
-      offer_id,   // fallback alias for offerId
+      // NOTE: Manual offerId / offer_id entry removed. We always automatically generate unique offerId creation below.
+      tagline: rawTagline, // optional — marketing promotional offer tagline text (e.g. "Buy 1 Get 1 Free")
     } = body;
 
     // Automatically trim inputs to strip hidden tabs (\t), spaces, or newlines from Postman/form copy-pasting
@@ -291,7 +296,8 @@ export async function POST(req: NextRequest) {
     const resolution = typeof rawResolution === "string" ? rawResolution.trim() : "";
     const text = typeof rawText === "string" ? rawText.trim() : "";
     const aspectRatio = typeof rawAspectRatio === "string" ? rawAspectRatio.trim() : "";
-    const cleanOfferId = (offerId || offer_id) ? String(offerId || offer_id).trim() : "";
+    // Always generate a unique 6-digit random number for offerId (manual entry removed)
+    const cleanOfferId = await generateUniqueOfferId();
 
     // ----- Validate required userId first -----
     if (!userId) {
@@ -406,7 +412,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const videoDuration = Math.max(1, Math.min(60, Number(String(finalDuration || 5).replace("s", "")) || 5));
+    // --- Use tagline only if user explicitly provides it (no auto-generation) ---
+    const finalTagline = typeof rawTagline === "string" ? rawTagline.trim() : "";
+
+    // Combine tagline into the prompt text so it becomes part of the video content
+    if (finalTagline) {
+      finalText = finalText.trim() + `\n\n[MARKETING & PROMOTIONAL TAGLINE: "${finalTagline}" — Make sure this promotional offer tagline (such as buy one get one / special deal) is visually represented in the advertisement, such as bold animated text overlay or promotional signage integrated into the commercial video.]`;
+    }
+
+    const videoDuration = Math.max(1, Math.min(60, Number(String(finalDuration || 4).replace("s", "")) || 4));
     const videoCount = Math.max(1, Math.min(10, Number(numVideos || numberOfVideos || number_of_videos || count) || 1));
 
     const rawChannels = channels || socialMedia || share || shareTo || [];
@@ -423,6 +437,22 @@ export async function POST(req: NextRequest) {
       imagesList = rawImages.map((item: any) => String(item).trim()).filter(Boolean);
     } else if (typeof rawImages === "string") {
       imagesList = rawImages.split(",").map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    const rawImageTypes = imageTypes || imageType || image_types || image_type || [];
+    let imageTypesList: string[] = [];
+    if (Array.isArray(rawImageTypes)) {
+      imageTypesList = rawImageTypes.map((item: any) => String(item).trim()).filter(Boolean);
+    } else if (typeof rawImageTypes === "string") {
+      try {
+        if (rawImageTypes.startsWith("[") && rawImageTypes.endsWith("]")) {
+          imageTypesList = JSON.parse(rawImageTypes).map((item: any) => String(item).trim()).filter(Boolean);
+        } else {
+          imageTypesList = rawImageTypes.split(",").map((s: string) => s.trim()).filter(Boolean);
+        }
+      } catch {
+        imageTypesList = rawImageTypes.split(",").map((s: string) => s.trim()).filter(Boolean);
+      }
     }
 
     // Save uploaded multipart image files into local uploads/userId/image folder
@@ -444,6 +474,21 @@ export async function POST(req: NextRequest) {
           console.warn("[external/create-video] Failed to save uploaded image file:", err);
         }
       }
+    }
+
+    // Apply image type explanations (e.g. "logo", "product image") to clarify the purpose of each uploaded image for AI generation
+    if (imageTypesList.length > 0 && imagesList.length > 0) {
+      const typeInstructions = imageTypesList.map((type, i) => {
+        const lowerType = type.toLowerCase();
+        if (lowerType.includes("logo") || lowerType.includes("brand")) {
+          return `• Image ${i + 1} is a BRAND LOGO: Do NOT render or animate this logo as a generic physical 3D object in the world scene. Display this logo cleanly as a high-end branding graphic, watermark, or animated logo overlay in the corner or end-screen of the commercial video advertisement.`;
+        } else if (lowerType.includes("product") || lowerType.includes("item")) {
+          return `• Image ${i + 1} is the HERO PRODUCT IMAGE: This is the exact actual physical product to be featured and animated in the commercial. Keep its shape, branding, packaging, and colors exactly as shown in the reference image, featuring it with luxury lighting and cinematic camera movements.`;
+        } else {
+          return `• Image ${i + 1} serves as '${type}': Incorporate this visual asset into the video specifically as a ${type}.`;
+        }
+      }).join("\n");
+      finalText = finalText.trim() + `\n\n[UPLOADED IMAGE ROLES & PURPOSES:\n${typeInstructions}]`;
     }
 
     if (isGoogleModel) {
@@ -475,9 +520,11 @@ export async function POST(req: NextRequest) {
         aspectRatio: finalAspectRatio || "16:9",
         duration: Math.max(4, Math.min(8, Number(String(finalDuration || "4").replace("s", "")) || 4)),
         offerId: cleanOfferId || "",
+        tagline: finalTagline || "",
         templateId: templateId ? String(templateId).trim() : "",
         channels: channelsList,
         images: imagesList,
+        imageTypes: imageTypesList,
         numberOfVideos: videoCount,
         imageBase64: refImageBase64,
         imageMimeType: refMimeType,
@@ -503,7 +550,9 @@ export async function POST(req: NextRequest) {
       approvalStatus: "pending",
       templateId: templateId ? String(templateId).trim() : "",
       offerId: cleanOfferId,
+      tagline: finalTagline || "",
       images: imagesList,
+      imageTypes: imageTypesList,
       channels: channelsList,
       socialMedia: channelsList,
       videoCount,
@@ -620,7 +669,9 @@ export async function POST(req: NextRequest) {
       model: finalModel,
       duration: typeof finalDuration === "string" && finalDuration ? finalDuration : `${videoDuration}s`,
       numberOfVideos: videoCount,
-      ...(cleanOfferId ? { offerId: cleanOfferId } : {}),
+      offerId: cleanOfferId,
+      ...(finalTagline ? { tagline: finalTagline } : {}),
+      ...(imageTypesList.length > 0 ? { imageTypes: imageTypesList } : {}),
       ...(templateId ? { templateId: String(templateId).trim() } : {}),
       message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });

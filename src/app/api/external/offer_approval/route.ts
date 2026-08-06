@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import MediaItemModel from "@/models/MediaItems";
 import VideoJobModel from "@/models/VideoJob";
+import GoogleFlowJobModel from "@/models/GoogleFlowJob";
 import Offer from "@/models/Offer";
 import User from "@/models/User";
 import Notification from "@/models/Notification";
@@ -38,11 +39,16 @@ export async function POST(req: NextRequest) {
       mediaItem = await MediaItemModel.findOne({ url: String(videoUrlParam).trim() });
     }
 
-    // 2. Locate associated VideoJob by videoId, jobId, or video URL
+    // 2. Locate associated VideoJob or GoogleFlowJob by videoId, jobId, or video URL
     if (rawId && typeof rawId === "string") {
       videoJob = await VideoJobModel.findOne({
         $or: [{ videoId: rawId.trim() }, { jobId: rawId.trim() }],
       });
+      if (!videoJob) {
+        videoJob = await GoogleFlowJobModel.findOne({
+          $or: [{ jobId: rawId.trim() }, ...(mongoose.Types.ObjectId.isValid(rawId.trim()) ? [{ _id: rawId.trim() }] : [])],
+        });
+      }
     }
     if (!videoJob && mediaItem) {
       videoJob = await VideoJobModel.findOne({
@@ -51,9 +57,15 @@ export async function POST(req: NextRequest) {
           { "falRequests.videoUrl": mediaItem.url },
         ],
       });
+      if (!videoJob) {
+        videoJob = await GoogleFlowJobModel.findOne({ videoUrl: mediaItem.url });
+      }
     }
     if (!videoJob && videoUrlParam) {
       videoJob = await VideoJobModel.findOne({ "falRequests.videoUrl": String(videoUrlParam).trim() });
+      if (!videoJob) {
+        videoJob = await GoogleFlowJobModel.findOne({ videoUrl: String(videoUrlParam).trim() });
+      }
     }
 
     // STRICT VALIDATION: Check if video exists first! If videoId is invalid or non-existent, stop immediately and return error.
@@ -85,7 +97,25 @@ export async function POST(req: NextRequest) {
       storeUserId,
     } = body;
 
+    const assignedOfferId = String(mediaItem?.offerId || videoJob?.offerId || "").trim();
     let newOfferId = (offerId !== undefined || offer_id !== undefined) ? String(offerId || offer_id).trim() : undefined;
+
+    // STRICT VALIDATION: If an offerId is passed in request body and video already has an assigned offerId, verify they match!
+    if (newOfferId && assignedOfferId && newOfferId !== assignedOfferId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid offerId: The provided offerId '${newOfferId}' does not match the generated offerId '${assignedOfferId}' for this video.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // If caller did not provide an offerId in body, default to the video's assigned offerId
+    if (!newOfferId && assignedOfferId) {
+      newOfferId = assignedOfferId;
+    }
+
     const newTemplateId = (templateId !== undefined || template_id !== undefined) ? String(templateId || template_id).trim() : undefined;
     const targetUserId = userId || user_id || storeUserId || mediaItem?.userId?.toString() || videoJob?.userId || "";
 
@@ -97,15 +127,20 @@ export async function POST(req: NextRequest) {
 
       if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
         try {
-          if (newOfferId && mongoose.Types.ObjectId.isValid(newOfferId)) {
-            createdOffer = await Offer.findByIdAndUpdate(
-              newOfferId,
+          if (newOfferId) {
+            const query = mongoose.Types.ObjectId.isValid(newOfferId)
+              ? { $or: [{ _id: newOfferId }, { offerId: newOfferId }] }
+              : { offerId: newOfferId };
+            createdOffer = await Offer.findOneAndUpdate(
+              query,
               {
+                storeUserId: targetUserId,
                 offerName: String(offerName).trim(),
                 offerDescription: String(offerDescription).trim(),
                 startDate: start,
                 endDate: end,
                 isActive: true,
+                offerId: newOfferId,
               },
               { new: true }
             );
@@ -113,13 +148,16 @@ export async function POST(req: NextRequest) {
           if (!createdOffer) {
             createdOffer = await Offer.create({
               storeUserId: targetUserId,
+              offerId: newOfferId,
               offerName: String(offerName).trim(),
               offerDescription: String(offerDescription).trim(),
               startDate: start,
               endDate: end,
               isActive: true,
             });
-            newOfferId = createdOffer._id.toString();
+            if (!newOfferId) {
+              newOfferId = createdOffer._id.toString();
+            }
           }
         } catch (offerErr) {
           console.warn("[offer_approval] Offer creation or update error:", offerErr);
@@ -200,11 +238,11 @@ export async function POST(req: NextRequest) {
       await mediaItem.save();
     }
 
-    // Apply updates to VideoJob
+    // Apply updates to VideoJob or GoogleFlowJob
     if (videoJob) {
       if (newChannels !== undefined) {
         videoJob.channels = newChannels;
-        videoJob.socialMedia = newChannels;
+        if (videoJob.socialMedia !== undefined) videoJob.socialMedia = newChannels;
       }
       if (voiceoverScript !== undefined) videoJob.voiceoverScript = String(voiceoverScript).trim();
       if (socialMediaHeading !== undefined) videoJob.socialMediaHeading = String(socialMediaHeading).trim();
@@ -212,13 +250,13 @@ export async function POST(req: NextRequest) {
       if (newHashTags !== undefined) videoJob.hashTags = newHashTags;
       if (newOfferId !== undefined) videoJob.offerId = newOfferId;
       if (newTemplateId !== undefined) videoJob.templateId = newTemplateId;
-      if (mediaItem) videoJob.videoId = mediaItem._id.toString();
+      if (mediaItem && videoJob.videoId !== undefined) videoJob.videoId = mediaItem._id.toString();
       videoJob.approvalStatus = "success";
-      await videoJob.save();
+      await videoJob.save().catch(() => {});
     }
 
     // 4. Return updated approved metadata in clean, logical ordering
-    const finalVideoUrl = mediaItem?.url || videoJob?.falRequests?.find((r: any) => r.videoUrl)?.videoUrl || "";
+    const finalVideoUrl = mediaItem?.url || videoJob?.falRequests?.find((r: any) => r.videoUrl)?.videoUrl || videoJob?.videoUrl || "";
     const finalScript = voiceoverScript !== undefined ? String(voiceoverScript).trim() : (mediaItem?.voiceoverScript || videoJob?.voiceoverScript || "");
     const finalHeading = socialMediaHeading !== undefined ? String(socialMediaHeading).trim() : (mediaItem?.socialMediaHeading || videoJob?.socialMediaHeading || "");
     const finalCaption = socialMediaCaption !== undefined ? String(socialMediaCaption).trim() : (mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
@@ -259,8 +297,12 @@ export async function POST(req: NextRequest) {
     }
 
     let linkedOfferData: any = createdOffer;
-    if (!linkedOfferData && finalOfferId && mongoose.Types.ObjectId.isValid(String(finalOfferId).trim())) {
-      linkedOfferData = await Offer.findById(String(finalOfferId).trim()).lean().catch(() => null);
+    if (!linkedOfferData && finalOfferId) {
+      const trimmedId = String(finalOfferId).trim();
+      const query = mongoose.Types.ObjectId.isValid(trimmedId)
+        ? { $or: [{ _id: trimmedId }, { offerId: trimmedId }] }
+        : { offerId: trimmedId };
+      linkedOfferData = await Offer.findOne(query).lean().catch(() => null);
     }
 
     const response: Record<string, any> = {

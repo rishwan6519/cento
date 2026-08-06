@@ -69,7 +69,7 @@ export async function sendPushNotification(
     );
 
     // Log any failures for debugging
-    response.responses.forEach((resp, idx) => {
+    response.responses.forEach((resp: any, idx: number) => {
       if (!resp.success) {
         console.error(`FCM token[${idx}] failed:`, resp.error?.message);
       }

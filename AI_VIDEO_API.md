@@ -24,10 +24,17 @@ POST /api/external/create-video
 |-------|------|----------|-------------|
 | `text` | `string` | ✅ Yes | Your plain-language video description (rough text is fine — we enhance it automatically) |
 | `userId` | `string` | ✅ Yes | Your user account ID |
-| `model` | `string` | ✅ Yes | AI video model to use — see the [Supported Models](#supported-models) table |
-| `resolution` | `string` | ✅ Yes | Video resolution: `"480p"` \| `"720p"` \| `"1080p"` \| `"4K"` |
-| `aspectRatio` | `string` | ✅ Yes | Video aspect ratio: `"16:9"` \| `"9:16"` \| `"1:1"` \| `"4:3"` |
-| `duration` | `number` | ❌ No | Video length in seconds (default: `5`, max: `60`) |
+| `model` | `string` | ❌ No | AI video model to use (default: `"Veo 3.1 Lite"`) |
+| `resolution` | `string` | ❌ No | Video resolution: `"480p"` \| `"720p"` \| `"1080p"` \| `"4K"` (default: `"720p"`) |
+| `aspectRatio` | `string` | ❌ No | Video aspect ratio: `"16:9"` \| `"9:16"` \| `"1:1"` \| `"4:3"` (default: `"9:16"`) |
+| `duration` | `number` | ❌ No | Video length in seconds (default: `4`, max: `60`) |
+| `tagline` | `string` | ❌ No | Marketing promotional offer tagline (e.g. `"Buy 1 Get 1 Free"`) to feature prominently in the advertisement |
+| `images` | `string[]` \| `File[]` | ❌ No | Reference image URLs or uploaded image files |
+| `imageType` \| `imageTypes` | `string` \| `string[]` | ❌ No | Plain text clarifying the role of your uploaded image(s), e.g. `"product"` or `"logo"` (or `"product, logo"` for multiple images), so the AI renders brand logos as overlays and products as animated 3D hero objects |
+| `templateId` | `string` | ❌ No | AI Video Template ID from saved templates |
+| `channels` | `string[]` | ❌ No | Target social media channels (e.g. `["instagram", "facebook", "instore"]`) |
+
+> ℹ️ **Note on Offer ID:** You do **not** need to manually send an `offerId`. The server automatically generates a unique 6-digit random offer ID for every video generation request.
 
 ---
 

@@ -15,9 +15,11 @@ export interface IGoogleFlowJob extends Document {
   resolution: string;
   duration: number;
   offerId: string;
+  tagline?: string;
   templateId?: string;
   channels: string[];
   images: string[];
+  imageTypes?: string[];
   numberOfVideos: number;
   referenceImageUrl?: string; // stored local URL of uploaded reference image
   hasReferenceImage?: boolean;
@@ -43,9 +45,11 @@ const GoogleFlowJobSchema = new Schema<IGoogleFlowJob>({
   resolution:         { type: String, default: "720p" },
   duration:           { type: Number, default: 8 },
   offerId:            { type: String, default: "" },
+  tagline:            { type: String, default: "" },
   templateId:         { type: String, default: "" },
   channels:           { type: [String], default: [] },
   images:             { type: [String], default: [] },
+  imageTypes:         { type: [String], default: [] },
   numberOfVideos:     { type: Number, default: 1 },
   referenceImageUrl:  { type: String, default: "" },
   hasReferenceImage:  { type: Boolean, default: false },

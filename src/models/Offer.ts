@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface OfferDocument extends Document {
   storeUserId: mongoose.Types.ObjectId;
+  offerId?: string;
   offerName: string;
   offerDescription: string;
   startDate: Date;
@@ -17,6 +18,12 @@ const OfferSchema: Schema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: [true, 'Store user ID is required'],
+    },
+    offerId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
     },
     offerName: {
       type: String,
