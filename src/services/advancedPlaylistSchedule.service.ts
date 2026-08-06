@@ -435,7 +435,7 @@ export const advancedPlaylistScheduleService = {
 
     const todayStr = dateStr;
     const melbourneWeekdayFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Australia/Melbourne', weekday: 'long' });
-    const todayWeekDay = melbourneWeekdayFormatter.format(now).toLowerCase();
+    const todayWeekDay = melbourneWeekdayFormatter.format(queryDate).toLowerCase();
 
     const normalizeDateToYYYYMMDD = (dateVal: any): string | null => {
       if (!dateVal) return null;
