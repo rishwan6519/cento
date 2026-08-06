@@ -546,32 +546,94 @@ export async function PUT(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    await connectToDatabase();
+
+    const serialNumber = req.nextUrl.searchParams.get('serialNumber') || req.nextUrl.searchParams.get('deviceSerialNumber');
+    const deviceId = req.nextUrl.searchParams.get('deviceId');
     const userId = req.nextUrl.searchParams.get('userId');
 
+    // 1. Search by Device Serial Number or Device ID
+    if (serialNumber || deviceId) {
+      let dev: any = null;
+      if (serialNumber) {
+        dev = await Device.findOne({ serialNumber: String(serialNumber).trim() });
+      }
+      if (!dev && deviceId && mongoose.Types.ObjectId.isValid(deviceId)) {
+        dev = await Device.findById(deviceId);
+      }
+
+      const resolvedDeviceId = dev ? dev._id : (deviceId && mongoose.Types.ObjectId.isValid(deviceId) ? new mongoose.Types.ObjectId(deviceId) : null);
+
+      if (!resolvedDeviceId) {
+        return NextResponse.json({
+          success: false,
+          error: 'Device not found for the provided serial number or ID',
+          data: []
+        }, { status: 404 });
+      }
+
+      // Fetch connection mapping in DevicePlaylist
+      const connection = await DevicePlaylist.findOne({ deviceId: resolvedDeviceId });
+      const activePlaylistIds = connection?.playlistIds || [];
+      const activeAnnIds = connection?.announcementPlaylistIds || [];
+
+      // Query both PlaylistConfig and AnnouncementPlaylist
+      // Also include any playlist where selectedDeviceId or deviceIds explicitly references this device!
+      const mediaPlaylists = await PlaylistConfig.find({
+        $or: [
+          { _id: { $in: activePlaylistIds } },
+          { selectedDeviceId: resolvedDeviceId },
+          { deviceIds: resolvedDeviceId },
+          { deviceIds: resolvedDeviceId.toString() },
+          { selectedDeviceId: resolvedDeviceId.toString() }
+        ]
+      })
+      .populate('userId', 'username')
+      .populate('files.fileId')
+      .lean();
+
+      const announcementPlaylists = await AnnouncementPlaylist.find({
+        _id: { $in: activeAnnIds }
+      }).lean();
+
+      const allDevicePlaylists = [...mediaPlaylists, ...announcementPlaylists]
+        .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+      return NextResponse.json({
+        success: true,
+        serialNumber: dev?.serialNumber || serialNumber || null,
+        deviceId: resolvedDeviceId.toString(),
+        deviceStatus: dev?.status || 'unknown',
+        totalCount: allDevicePlaylists.length,
+        data: allDevicePlaylists
+      }, { status: 200 });
+    }
+
+    // 2. Fallback: Search by User ID
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return NextResponse.json(
-        { error: 'Invalid or missing userId' },
+        { error: 'Please provide either serialNumber, deviceId, or userId as a query parameter' },
         { status: 400 }
       );
     }
 
-    await connectToDatabase();
     const userObjectId = new mongoose.Types.ObjectId(userId);
     const ownPlaylists = await PlaylistConfig.find({ userId: userObjectId })
       .populate('userId', 'username')
-      .populate('files.fileId');
+      .populate('files.fileId')
+      .lean();
 
     const onboarded = await OnboardedDevice.find({ userId: userObjectId }).select('deviceId');
     const assigned = await AssignedDevice.find({ userId: userObjectId }).select('deviceId');
 
-    const deviceIds = [
+    const devIds = [
       ...onboarded.map(d => d.deviceId),
       ...assigned.map(d => d.deviceId)
     ];
 
     let connectedOtherPlaylists: any[] = [];
-    if (deviceIds.length > 0) {
-      const connections = await DevicePlaylist.find({ deviceId: { $in: deviceIds } }).select('playlistIds');
+    if (devIds.length > 0) {
+      const connections = await DevicePlaylist.find({ deviceId: { $in: devIds } }).select('playlistIds');
       const activePlaylistIds = connections.reduce((acc: mongoose.Types.ObjectId[], curr) => {
         if (curr.playlistIds) acc.push(...curr.playlistIds);
         return acc;
@@ -583,14 +645,19 @@ export async function GET(req: NextRequest) {
           userId: { $ne: userObjectId }
         })
         .populate('userId', 'username')
-        .populate('files.fileId');
+        .populate('files.fileId')
+        .lean();
       }
     }
 
     const allPlaylists = [...ownPlaylists, ...connectedOtherPlaylists]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
-    return NextResponse.json(allPlaylists);
+    return NextResponse.json({
+      success: true,
+      count: allPlaylists.length,
+      data: allPlaylists
+    });
   } catch (error) {
     console.error('Error fetching concurrent playlists:', error);
     return NextResponse.json({ error: 'Failed to fetch playlists' }, { status: 500 });

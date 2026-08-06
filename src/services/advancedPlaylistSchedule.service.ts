@@ -366,35 +366,40 @@ export const advancedPlaylistScheduleService = {
         source: 'advancedSchedule',
       }));
 
-    // 2. Query Old Legacy Playlists connected via ConectPlaylist / DevicePlaylist
+    // 2. Query Old Legacy and Concurrent Playlists connected to this device
     const devicePlaylists = await DevicePlaylist.findOne({ deviceId: device._id }, 'playlistIds');
-    if (devicePlaylists && Array.isArray(devicePlaylists.playlistIds) && devicePlaylists.playlistIds.length > 0) {
-      const legacyPlaylists = await PlaylistConfig.find({
-        _id: { $in: devicePlaylists.playlistIds },
-        status: 'active',
+    const activeIds = devicePlaylists && Array.isArray(devicePlaylists.playlistIds) ? devicePlaylists.playlistIds : [];
+
+    const legacyPlaylists = await PlaylistConfig.find({
+      $or: [
+        { _id: { $in: activeIds } },
+        { selectedDeviceId: device._id },
+        { deviceIds: device._id },
+        { selectedDeviceId: device._id.toString() },
+        { deviceIds: device._id.toString() },
+      ],
+      status: { $ne: 'inactive' },
+    });
+
+    const todayStr = queryDate.toISOString().slice(0, 10);
+    const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const todayWeekDay = weekDays[queryDate.getDay()];
+
+    for (const p of legacyPlaylists) {
+      const lp = p as any;
+      if (lp.startDate && lp.endDate && (todayStr < lp.startDate || todayStr > lp.endDate)) continue;
+      if (Array.isArray(lp.daysOfWeek) && lp.daysOfWeek.length > 0 && !lp.daysOfWeek.includes(todayWeekDay)) continue;
+
+      const lStart = lp.startTime ? lp.startTime.slice(0, 5) : '00:00';
+      const lEnd = lp.endTime ? lp.endTime.slice(0, 5) : '23:59';
+
+      validSchedules.push({
+        _id: lp._id.toString(),
+        startTime: lStart,
+        endTime: lEnd,
+        playlistId: lp,
+        source: 'legacyPlaylist',
       });
-
-      const todayStr = queryDate.toISOString().slice(0, 10);
-      const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const todayWeekDay = weekDays[queryDate.getDay()];
-
-      for (const p of legacyPlaylists) {
-        const lp = p as any;
-        if (lp.contentType === 'announcement') continue; // keep timeline exclusively for media playlists
-        if (lp.startDate && lp.endDate && (todayStr < lp.startDate || todayStr > lp.endDate)) continue;
-        if (Array.isArray(lp.daysOfWeek) && lp.daysOfWeek.length > 0 && !lp.daysOfWeek.includes(todayWeekDay)) continue;
-
-        const lStart = lp.startTime ? lp.startTime.slice(0, 5) : '00:00';
-        const lEnd = lp.endTime ? lp.endTime.slice(0, 5) : '23:59';
-
-        validSchedules.push({
-          _id: lp._id.toString(),
-          startTime: lStart,
-          endTime: lEnd,
-          playlistId: lp,
-          source: 'legacyPlaylist',
-        });
-      }
     }
 
     if (validSchedules.length === 0) {
@@ -423,10 +428,8 @@ export const advancedPlaylistScheduleService = {
       );
 
       if (allActive.length > 0) {
-        // Priority check: If any Advanced Schedule is active, it takes priority over old legacy playlists.
-        // If NO Advanced Schedule is active, seamlessly use the matching Old Legacy Playlists!
-        const advancedActive = allActive.filter((s) => s.source === 'advancedSchedule');
-        const activeSchedules = advancedActive.length > 0 ? advancedActive : allActive;
+        // Include all active playlists (advanced schedules, concurrent playlists, and legacy platform playlists)
+        const activeSchedules = allActive;
 
         const combinedMedias: any[] = [];
         const contributingPlaylists: any[] = [];
