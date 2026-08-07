@@ -94,23 +94,6 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     await connectToDatabase();
     const { templateId } = await context.params;
-    const template: any = await VideoTemplate.findById(templateId);
-
-    if (!template) {
-      return NextResponse.json(
-        { success: false, message: 'Template not found' },
-        { status: 404 }
-      );
-    }
-
-    // Only the owner can update
-    if (String(template.storeUserId) !== String(auth.userId)) {
-      return NextResponse.json(
-        { success: false, message: 'Forbidden: You do not own this template' },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
 
     // Prevent overriding sensitive immutable properties
@@ -123,13 +106,21 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       );
     }
 
-    Object.assign(template, updateData);
-    await template.save();
+    // Upsert: if the template doesn't exist in DB (dummy first edit), create it with this _id
+    const updatedTemplate = await VideoTemplate.findOneAndUpdate(
+      { _id: templateId },
+      {
+        ...updateData,
+        storeUserId: auth.userId,
+        isDummyOverride: true,
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Template updated successfully',
-      data: template,
+      data: updatedTemplate,
     });
   } catch (error) {
     console.error('[PUT /api/video-template/:templateId] Error:', error);

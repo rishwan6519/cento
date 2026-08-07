@@ -185,7 +185,7 @@ export async function checkAndResolveGoogleJob(jobId: string, formatAsLegacy = f
         status: "failed",
         jobId,
         ...(job.offerId ? { offerId: job.offerId } : {}),
-        message: job.errorMessage || "Google Flow Veo 3.1 Lite video generation failed.",
+        message: job.errorMessage || "Veo 3.1 video generation failed.",
       });
     }
   }
@@ -220,7 +220,7 @@ export async function checkAndResolveGoogleJob(jobId: string, formatAsLegacy = f
       model: "Veo 3.1 Lite",
       provider: "Google Flow",
       operationName: job.operationName,
-      message: "Google Flow Veo 3.1 Lite is rendering your video. Please check again in 2–3 minutes.",
+      message: "Veo 3.1 is rendering your video. Please check again in 2–3 minutes.",
     });
   }
 
@@ -278,7 +278,7 @@ export async function checkAndResolveGoogleJob(jobId: string, formatAsLegacy = f
 
     const mediaItem = new MediaItemModel({
       userId: targetUserObj,
-      name: `Google Flow Veo 3.1 Lite – ${new Date().toLocaleString()}`,
+      name: `Veo 3.1 – ${new Date().toLocaleString()}`,
       type: "video",
       url: localVideoUrl,
       voiceoverScript: job.voiceoverScript || "",

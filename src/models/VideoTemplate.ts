@@ -29,6 +29,8 @@ export interface VideoTemplateDocument extends Document {
   aspectRatio: string;
   language: string;
   aiModel?: string;
+  isDummyOverride?: boolean;
+  description?: string;
   status: TemplateStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -160,7 +162,16 @@ const VideoTemplateSchema: Schema = new Schema(
     },
     aiModel: {
       type: String,
-      default: 'Google Flow Veo 3.1 Lite',
+      default: 'Veo 3.1',
+      trim: true,
+    },
+    isDummyOverride: {
+      type: Boolean,
+      default: false,
+    },
+    description: {
+      type: String,
+      default: '',
       trim: true,
     },
     status: {

@@ -124,7 +124,7 @@ const Veo3TextVideoView: React.FC = () => {
           setStatus("done");
         } else if (data.status === "failed") {
           stopPolling();
-          setErrorMsg(data.message || "Google Flow Veo 3.1 Lite generation failed.");
+          setErrorMsg(data.message || "Veo 3.1 generation failed.");
           setStatus("error");
         }
         // else still processing — continue polling
@@ -389,7 +389,7 @@ const Veo3TextVideoView: React.FC = () => {
                   <img src={imageBase64} alt="Preview" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, border: "1px solid #DADCE0", flexShrink: 0 }} />
                   <div style={{ flex: 1, overflow: "hidden" }}>
                     <p style={{ margin: 0, fontWeight: 700, color: "#1A73E8", fontSize: "0.9rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{imageName || "Reference Image"}</p>
-                    <p style={{ margin: "2px 0 0", color: "#174EA6", fontSize: "0.76rem" }}>✨ Image will be submitted to Google Flow Veo 3.1 Lite as visual reference</p>
+                    <p style={{ margin: "2px 0 0", color: "#174EA6", fontSize: "0.76rem" }}>✨ Image will be submitted to Veo 3.1 as visual reference</p>
                   </div>
                   <button
                     type="button"
@@ -448,7 +448,7 @@ const Veo3TextVideoView: React.FC = () => {
               <div>
                 <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 700, color: "#1A73E8" }}>How it works</p>
                 <p style={{ margin: "4px 0 0", fontSize: "0.78rem", color: "#174EA6", lineHeight: 1.6 }}>
-                  Your text is first enhanced by OpenAI into a cinematic prompt, then submitted to Google Flow Veo 3.1 Lite.
+                  Your text is first enhanced by OpenAI into a cinematic prompt, then submitted to Veo 3.1.
                   Generation takes <strong>2–5 minutes</strong>. The page will automatically poll every 20 seconds.
                 </p>
               </div>
@@ -461,7 +461,7 @@ const Veo3TextVideoView: React.FC = () => {
               style={{ width: "100%", justifyContent: "center", fontSize: "1.05rem", padding: "16px 32px" }}
             >
               <FaPlay />
-              Generate with Google Flow Veo 3.1 Lite
+              Generate with Veo 3.1
             </button>
 
             {isError && (
@@ -483,7 +483,7 @@ const Veo3TextVideoView: React.FC = () => {
               <Spin />
             </div>
             <h2 style={{ margin: "0 0 8px", fontSize: "1.25rem", fontWeight: 800, color: "#202124" }}>
-              {isSubmitting ? "Submitting to Google Flow..." : "Google Flow Veo 3.1 Lite is Generating"}
+              {isSubmitting ? "Submitting to Google Flow..." : "Veo 3.1 is Generating"}
             </h2>
             <p style={{ margin: "0 0 24px", fontSize: "0.88rem", color: "#5F6368", lineHeight: 1.6 }}>
               {isSubmitting
@@ -543,7 +543,7 @@ const Veo3TextVideoView: React.FC = () => {
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontWeight: 800, color: "#fff", fontSize: "1.1rem" }}>Video Generated Successfully!</p>
                 <p style={{ margin: "3px 0 0", fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>
-                  Google Flow Veo 3.1 Lite · Saved to Media Library
+                  Veo 3.1 · Saved to Media Library
                 </p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>

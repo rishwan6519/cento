@@ -515,11 +515,21 @@ export const advancedPlaylistScheduleService = {
 
         for (const sched of activeSchedules) {
           const playlist = sched.playlistId as any;
+          const shortDayDisplay: Record<string, string> = {
+            'sunday': 'Sun', 'monday': 'Mon', 'tuesday': 'Tue',
+            'wednesday': 'Wed', 'thursday': 'Thu', 'friday': 'Fri', 'saturday': 'Sat',
+          };
+          const rawDays: string[] = Array.isArray(playlist.daysOfWeek) ? playlist.daysOfWeek : [];
+          const displayDays = rawDays.length > 0
+            ? rawDays.map((d: string) => shortDayDisplay[String(d).trim().toLowerCase()] || String(d).trim())
+            : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
           contributingPlaylists.push({
             playlistId: playlist._id ? playlist._id.toString() : String(playlist.id || sched._id),
             playlistName: playlist.name || 'Unnamed Playlist',
             scheduleId: sched._id.toString(),
             window: `${sched.startTime}-${sched.endTime}`,
+            daysOfWeek: displayDays,
             source: sched.source,
           });
 

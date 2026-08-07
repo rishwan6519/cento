@@ -86,7 +86,7 @@ const MODELS: ModelInfo[] = [
   },
   // ── Google Flow Veo ───────────────────────────────────────────────────────
   {
-    name: "Google Flow Veo 3.1 Lite",
+    name: "Veo 3.1",
     slug: "google-flow/veo-3.1-lite",
     costByRes: { "720p": 0.08, "1080p": 0.12, "4K": 0.18 },
     supportedResolutions: ["720p", "1080p", "4K"],
@@ -270,7 +270,7 @@ const ModelGrid: React.FC<{ value: string; onChange: (v: string) => void; resolu
 const AIVideoGenerationView: React.FC = () => {
   const [resolution, setResolution] = useState<Resolution>("1080p");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
-  const [aiModel, setAiModel] = useState("Google Flow Veo 3.1 Lite");
+  const [aiModel, setAiModel] = useState("Veo 3.1");
   const [duration, setDuration] = useState(4);
   const [numVideos, setNumVideos] = useState(1);
   const [roughPrompt, setRoughPrompt] = useState("");
@@ -559,7 +559,7 @@ const AIVideoGenerationView: React.FC = () => {
               type="button"
               onClick={() => {
                 setEngine("veo");
-                setAiModel("Google Flow Veo 3.1 Lite");
+                setAiModel("Veo 3.1");
                 if (![4, 5, 6, 8].includes(duration)) setDuration(4);
               }}
               style={{

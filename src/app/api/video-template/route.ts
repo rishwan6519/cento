@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import type { SortOrder } from 'mongoose';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import VideoTemplate from '@/models/VideoTemplate';
+import { DUMMY_TEMPLATES } from '@/lib/dummyTemplates';
 
 // ─── Helper: Extract & verify JWT, return decoded payload ───────────────────
 function getAuthenticatedUser(req: NextRequest): {
@@ -48,10 +50,10 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     const body = await req.json();
 
-    // Remove any client-supplied storeUserId or _id for security
+    // Allow a custom _id when saving a dummy template override
     const {
       storeUserId: _ignoredStoreUser,
-      _id: _ignoredId,
+      _id: clientId,
       templateName,
       ...templateFields
     } = body;
@@ -63,17 +65,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newTemplate = await VideoTemplate.create({
-      ...templateFields,
-      templateName: String(templateName).trim(),
-      storeUserId: auth.userId,
-    });
+    let savedTemplate: any;
+
+    // If a valid _id is supplied (dummy override), use findOneAndUpdate with upsert
+    if (clientId && mongoose.Types.ObjectId.isValid(String(clientId))) {
+      savedTemplate = await VideoTemplate.findOneAndUpdate(
+        { _id: String(clientId) },
+        {
+          ...templateFields,
+          templateName: String(templateName).trim(),
+          storeUserId: auth.userId,
+          isDummyOverride: true,
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+    } else {
+      savedTemplate = await VideoTemplate.create({
+        ...templateFields,
+        templateName: String(templateName).trim(),
+        storeUserId: auth.userId,
+      });
+    }
 
     return NextResponse.json(
       {
         success: true,
-        message: 'Template created successfully',
-        templateId: String(newTemplate._id),
+        message: 'Template saved successfully',
+        templateId: String(savedTemplate._id),
       },
       { status: 201 }
     );
@@ -118,11 +136,38 @@ export async function GET(req: NextRequest) {
     }
 
     const sortField: { [key: string]: SortOrder } = { [sort]: order };
-    const templates = await VideoTemplate.find(query).sort(sortField).lean();
+    const dbTemplates: any[] = await VideoTemplate.find(query).sort(sortField).lean();
+
+    // Build a set of DB _ids for fast lookup (DB records override dummies with same _id)
+    const dbIdSet = new Set(dbTemplates.map((t: any) => String(t._id)));
+
+    // Merge: include dummies that have NOT been overridden in DB
+    const dummyEntries = DUMMY_TEMPLATES
+      .filter((d) => !dbIdSet.has(String(d._id)))
+      .map((d) => ({
+        _id: d._id,
+        templateName: d.templateName,
+        templateDescription: d.description,
+        description: d.description,
+        status: 'Active',
+        isDummy: true,
+        createdAt: new Date('2026-01-01').toISOString(),
+        updatedAt: new Date('2026-01-01').toISOString(),
+      }));
+
+    // Search filter for dummies too
+    const filteredDummies = search.trim()
+      ? dummyEntries.filter((d) =>
+          d.templateName.toLowerCase().includes(search.toLowerCase()) ||
+          (d.description || '').toLowerCase().includes(search.toLowerCase())
+        )
+      : dummyEntries;
+
+    const combined = [...dbTemplates, ...filteredDummies];
 
     return NextResponse.json({
       success: true,
-      data: templates,
+      data: combined,
     });
   } catch (error) {
     console.error('[GET /api/video-template] Error:', error);

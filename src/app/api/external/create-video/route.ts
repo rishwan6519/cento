@@ -332,7 +332,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (template) {
-        const descText = String(template.templateDescription || template.offerTitle || "");
+        const descText = String(template.description || template.templateDescription || template.offerTitle || "");
         if (!finalAspectRatio && template.aspectRatio) finalAspectRatio = String(template.aspectRatio).trim();
         if (!finalResolution && template.resolution) finalResolution = String(template.resolution).trim();
         if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
@@ -352,7 +352,9 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const tmplDetails = `[Selected Template Name: ${template.templateName}]\n[Template Specifications & Visual Guidelines: Theme: ${template.templateDescription || template.offerTitle}. Headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}', discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}.]`;
+        const tmplDetails = template.description?.trim() 
+          ? `[Selected Template Name: ${template.templateName}]\n[Template Architecture & Design Instructions:\n${template.description.trim()}]`
+          : `[Selected Template Name: ${template.templateName}]\n[Template Specifications & Visual Guidelines: Theme: ${template.templateDescription || template.offerTitle}. Headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}', discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}.]`;
 
         finalText = finalText.trim() ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these AI Video Template structural requirements:\n${tmplDetails}` : `Generate video following these exact AI Video Template specifications:\n${tmplDetails}`;
       } else if (dummyTemplate) {
@@ -381,7 +383,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Apply intelligent defaults if omitted by user and not available on template
-    if (!finalModel?.trim()) finalModel = "Veo 3.1 Lite";
+    if (!finalModel?.trim()) finalModel = "Veo 3.1";
     if (!finalResolution?.trim()) finalResolution = "720p";
     if (!finalAspectRatio?.trim()) finalAspectRatio = "9:16";
 

@@ -238,7 +238,18 @@ export async function POST(req: NextRequest) {
           frequency: frequencyInMinutes ? Number(frequencyInMinutes) : undefined,
           startDate: startDate || null,
           endDate: endDate || null,
-          daysOfWeek: daysOfWeek || [],
+          daysOfWeek: (() => {
+            const dayMap: Record<string, string> = {
+              'sun': 'sunday', 'sunday': 'sunday',
+              'mon': 'monday', 'monday': 'monday',
+              'tue': 'tuesday', 'tuesday': 'tuesday',
+              'wed': 'wednesday', 'wednesday': 'wednesday',
+              'thu': 'thursday', 'thursday': 'thursday',
+              'fri': 'friday', 'friday': 'friday',
+              'sat': 'saturday', 'saturday': 'saturday',
+            };
+            return (daysOfWeek || []).map((d: any) => dayMap[String(d).trim().toLowerCase()] || String(d).trim().toLowerCase());
+          })(),
           startTime: startTime || null,
           endTime: endTime || null,
         },
@@ -252,7 +263,19 @@ export async function POST(req: NextRequest) {
         endTime: endTime || null,
         startDate: startDate || null,
         endDate: endDate || null,
-        daysOfWeek: daysOfWeek || [],
+        daysOfWeek: (() => {
+          // Normalize all day variants to full lowercase names for consistent matching
+          const dayMap: Record<string, string> = {
+            'sun': 'sunday', 'sunday': 'sunday',
+            'mon': 'monday', 'monday': 'monday',
+            'tue': 'tuesday', 'tuesday': 'tuesday',
+            'wed': 'wednesday', 'wednesday': 'wednesday',
+            'thu': 'thursday', 'thursday': 'thursday',
+            'fri': 'friday', 'friday': 'friday',
+            'sat': 'saturday', 'saturday': 'saturday',
+          };
+          return (daysOfWeek || []).map((d: any) => dayMap[String(d).trim().toLowerCase()] || String(d).trim().toLowerCase());
+        })(),
         globalMinVolume: globalMinVolume ?? 30,
         globalMaxVolume: globalMaxVolume ?? 80,
         frequencyInMinutes: frequencyInMinutes ? Number(frequencyInMinutes) : null,

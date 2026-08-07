@@ -93,7 +93,7 @@ async function enhancePrompt(
   socialMediaCaption: string;
   hashTags: string[];
 }> {
-  const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for Google Flow Veo 3.1 Lite — Google's state-of-the-art text-to-video AI model.
+  const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for Veo 3.1 — Google's state-of-the-art text-to-video AI model.
 
 Your job is to convert a simple idea or product description into an extremely detailed, production-quality video generation prompt.
 
@@ -114,7 +114,7 @@ Tone: Premium, Modern, Luxury, Highly engaging, Commercial quality
 
 You MUST respond ONLY with a valid JSON object matching this schema:
 {
-  "enhancedPrompt": "The final Veo 3.1 Lite video generation prompt. No explanations. No markdown. No headings.",
+  "enhancedPrompt": "The final Veo 3.1 video generation prompt. No explanations. No markdown. No headings.",
   "voiceoverScript": "An emotionally compelling TV advertisement narration (${duration} seconds, ~15-30 words).",
   "socialMediaHeading": "An attention-grabbing promotional heading (approx 5-10 words).",
   "socialMediaCaption": "A highly engaging, interaction-driven social media caption (approx 15-30 words).",
@@ -141,14 +141,14 @@ You MUST respond ONLY with a valid JSON object matching this schema:
                 ? [
                     {
                       type: "text",
-                      text: `Create a Veo 3.1 Lite product commercial advertisement video prompt for:\n"${rawText}"\n\nAspect ratio: ${aspectRatio}, Duration: ${duration}s.\nCRITICAL PRODUCT VISION INSTRUCTION: An actual image of the product has been attached. Inspect the product image carefully — identify its exact features, colors, packaging, logo, labels, materials, and design. Your video generation prompt MUST explicitly instruct the AI video model to animate this exact reference product image into a high-end commercial advertisement video. Emphasize preserving the exact visual identity, branding, packaging, and shape of the product shown in the image, while bringing it to life with studio luxury lighting, dynamic reflections, cinematic camera movements (orbit shot, macro closeup push-in, smooth tracking), and cinematic atmosphere (such as glowing particles, water splashes, or sleek pedestal display).`,
+                      text: `Create a Veo 3.1 product commercial advertisement video prompt for:\n"${rawText}"\n\nAspect ratio: ${aspectRatio}, Duration: ${duration}s.\nCRITICAL PRODUCT VISION INSTRUCTION: An actual image of the product has been attached. Inspect the product image carefully — identify its exact features, colors, packaging, logo, labels, materials, and design. Your video generation prompt MUST explicitly instruct the AI video model to animate this exact reference product image into a high-end commercial advertisement video. Emphasize preserving the exact visual identity, branding, packaging, and shape of the product shown in the image, while bringing it to life with studio luxury lighting, dynamic reflections, cinematic camera movements (orbit shot, macro closeup push-in, smooth tracking), and cinematic atmosphere (such as glowing particles, water splashes, or sleek pedestal display).`,
                     },
                     {
                       type: "image_url",
                       image_url: { url: `data:${imageData.mimeType || "image/jpeg"};base64,${imageData.base64}` },
                     },
                   ]
-                : `Create a Veo 3.1 Lite video generation prompt for:\n"${rawText}"\n\nAspect ratio: ${aspectRatio}, Duration: ${duration}s`,
+                : `Create a Veo 3.1 video generation prompt for:\n"${rawText}"\n\nAspect ratio: ${aspectRatio}, Duration: ${duration}s`,
             },
           ],
           max_tokens: 600,
@@ -193,7 +193,7 @@ You MUST respond ONLY with a valid JSON object matching this schema:
 }
 
 // ---------------------------------------------------------------------------
-// Submit to Google Gemini API — Veo 3.1 Lite (async long-running operation)
+// Submit to Google Gemini API — Veo 3.1 (async long-running operation)
 // ---------------------------------------------------------------------------
 async function submitToGoogleFlow(
   prompt: string,
@@ -372,7 +372,7 @@ export async function startGoogleFlowVideoJob({
       const { enhancedPrompt, voiceoverScript, socialMediaHeading, socialMediaCaption, hashTags } =
         await enhancePrompt(finalText, aspectRatio, cleanDuration, openAiKey, resolvedImage);
 
-      // Forcefully append explicit visual typography instructions directly to the final Google Veo 3.1 Lite prompt to guarantee top text overlay
+      // Forcefully append explicit visual typography instructions directly to the final Google Veo 3.1 prompt to guarantee top text overlay
       let finalSubmissionPrompt = enhancedPrompt;
       if (finalTagline) {
         finalSubmissionPrompt = `${enhancedPrompt}\n\n[CRITICAL VEO RENDER REQUIREMENT - TEXT OVERLAY: Render a clean, bold, high-resolution commercial graphic text banner positioned directly at the VERY TOP of the video frame reading exactly: "${finalTagline}". The promotional offer lettering must remain sharp, prominent, and clearly readable at the top throughout the video advertisement above the hero product.]`;
@@ -410,7 +410,7 @@ export async function startGoogleFlowVideoJob({
     success: true,
     status: "processing",
     jobId,
-    model: fromUnifiedEndpoint ? "Veo 3.1 Lite (Google Flow)" : "Veo 3.1 Lite",
+    model: fromUnifiedEndpoint ? "Veo 3.1 (Google Flow)" : "Veo 3.1",
     provider: "Google Flow",
     aspectRatio,
     duration: `${duration}s`,
@@ -424,7 +424,7 @@ export async function startGoogleFlowVideoJob({
     ...(referenceImageUrl ? { referenceImageUrl } : {}),
     hasReferenceImage: !!imageBase64,
     message: fromUnifiedEndpoint
-      ? `AI Video generation via Google Flow Veo 3.1 Lite started. Please check after a few minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`
-      : `Google Flow Veo 3.1 Lite video generation started. Poll for results at /api/external/google-flow/get-video with {"jobId": "${jobId}"}`,
+      ? `AI Video generation via Veo 3.1 started. Please check after a few minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`
+      : `Veo 3.1 video generation started. Poll for results at /api/external/google-flow/get-video with {"jobId": "${jobId}"}`,
   });
 }

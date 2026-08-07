@@ -54,7 +54,19 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       setEndDate(formatDate(editingPlaylist.endDate));
       setStartTime(editingPlaylist.startTime || "");
       setEndTime(editingPlaylist.endTime || "");
-      setSelectedDays(editingPlaylist.daysOfWeek || []);
+      const dayNormalizeMap: Record<string, string> = {
+        'sun': 'Sun', 'sunday': 'Sun',
+        'mon': 'Mon', 'monday': 'Mon',
+        'tue': 'Tue', 'tuesday': 'Tue',
+        'wed': 'Wed', 'wednesday': 'Wed',
+        'thu': 'Thu', 'thursday': 'Thu',
+        'fri': 'Fri', 'friday': 'Fri',
+        'sat': 'Sat', 'saturday': 'Sat',
+      };
+      const normalizedDays = (editingPlaylist.daysOfWeek || []).map((d: string) =>
+        dayNormalizeMap[String(d).trim().toLowerCase()] || String(d).trim()
+      );
+      setSelectedDays(normalizedDays);
       setVolume(editingPlaylist.globalMaxVolume || 30);
       setSelectedDeviceIds(editingPlaylist.deviceIds || []);
 
