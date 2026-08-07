@@ -37,31 +37,7 @@ const RAW_DUMMY_TEMPLATES = [
   {
     _id: "6797a1f8b1a3e9c4d2800001",
     templateName: "Animate Product + Discount + Caption",
-    description: `Use these assets and values:
- 
-Logo:
-(the supplied pentagon-shaped logo image)
- 
-Product Image:
-(the supplied robot head image)
- 
-Brand Theme Colours:
-Orange and Purple
- 
-Promotional Caption:
-GET YOUR CENTO ROBOT NOW!
- 
-Discount Text:
-50% OFF
- 
-Offer Validity:
-Valid till Aug 31, 2026
- 
-Terms & Conditions:
-If none are supplied, display exactly:
-TERMS & CONDITIONS APPLY
- 
-Think like Adobe After Effects creating a reusable motion graphics template (MOGRT), not like a filmmaker creating a commercial.
+    description: `Think like Adobe After Effects creating a reusable motion graphics template (MOGRT), not like a filmmaker creating a commercial.
 Create a 6-second looping digital signage advertisement for a restaurant or retail store.
  
 This is NOT a cinematic commercial. It is a clean promotional motion graphic similar to the animated advertisements displayed on restaurant menu boards, food court displays, supermarket digital signages, and mall LED displays.
@@ -81,6 +57,18 @@ One continuous composition
 Seamless loop
  
 The entire animation must remain on one canvas throughout the whole video.
+ 
+Input Fidelity Rule (HIGHEST PRIORITY)
+ 
+Supplied inputs take precedence over creative interpretation.
+ 
+Provided content must be used exactly as supplied.
+ 
+Missing content must remain missing.
+ 
+The AI must NEVER fill an empty space simply because the template normally contains an element there.
+ 
+Do not treat missing information as permission to be creative.
  
 Canvas Layout
  
@@ -383,23 +371,98 @@ never animate
 never disappear
 always remain visible throughout the video
  
+The only permitted automatic fallback is:
+ 
+TERMS & CONDITIONS APPLY
+ 
+when {{terms_and_conditions}} is missing.
+ 
+No other variable has an automatic fallback.
+ 
+ 
+Missing Input Rules (CRITICAL)
+ 
+Every supplied asset, value and text field is optional unless explicitly provided.
+ 
+ONLY use elements that are actually supplied.
+ 
+If an input is missing, empty, null, unavailable or not provided, completely omit that element from the composition.
+ 
+A missing input MUST NOT be replaced with an AI-generated substitute.
+ 
+NEVER guess, infer, invent or fabricate a missing asset, value, image, logo, text, price, percentage, date, promotion or design element.
+ 
+Do not create a generic replacement.
+ 
+Do not create a placeholder.
+ 
+Do not create fake content.
+ 
+Do not use random text.
+ 
+Do not use visually similar generated artwork.
+ 
+Do not assume that a missing input exists.
+ 
+The absence of an input is intentional and must be respected.
+ 
+OPTIONAL ELEMENTS:
+ 
+If {{logo}} is not provided:
+Do not generate or display any logo.
+ 
+If {{product_image}} is not provided:
+Do not generate or substitute a product image. Leave the product-image area empty and adapt the surrounding composition naturally.
+ 
+If {{offer_percentage}} is not provided:
+Do not create the promotional discount shape.
+Do not display any percentage.
+Do not display any offer-related text.
+Do not create a substitute promotion.
+ 
+If {{marketing_caption}} is not provided:
+Do not create a headline.
+Do not invent promotional copy.
+Leave the corresponding area clean.
+ 
+If {{offer_validity}} is not provided:
+Do not create the rounded date/validity element.
+Do not invent a date.
+Do not display a validity message.
+ 
+If {{terms_and_conditions}} is not provided:
+Display exactly:
+TERMS & CONDITIONS APPLY
+ 
+Do not add any other terms or legal text.
+ 
+If {{brand_colors}} are not provided:
+Do not invent a brand colour palette. Use a clean neutral design that preserves the intended layout.
+ 
+IMPORTANT:
+ 
+Never compensate for missing inputs by adding more decorative elements, text or promotional content.
+ 
+The final composition must contain ONLY the elements that have been explicitly supplied or explicitly authorized by these instructions.
+ 
 Dynamic Variables
  
-The following elements will be provided externally and must replace placeholders exactly:
+The following inputs may be provided externally:
  
 {{logo}}
- 
 {{product_image}}
- 
 {{brand_colors}}
- 
 {{marketing_caption}}
- 
 {{offer_percentage}}
- 
 {{offer_validity}}
- 
 {{terms_and_conditions}}
+ 
+Each variable is independent.
+ 
+A missing variable means that the corresponding element must be completely omitted.
+ 
+Never assume that all variables will be provided.
+Never generate content for missing variables.
  
 Strict Rules
  
@@ -436,7 +499,8 @@ Do not replace the supplied image.
 Treat the supplied assets as locked design elements.
  
 The result should resemble a professionally animated restaurant digital menu board rather than a traditional commercial.
-
+ 
+ 
 Terminology Rules (VERY IMPORTANT)
  
 The headings and section names in this prompt are instructions for understanding the layout only.

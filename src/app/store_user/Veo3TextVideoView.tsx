@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import { FaPlay, FaCheckCircle, FaExternalLinkAlt, FaRedo, FaSpinner, FaCopy, FaHashtag } from "react-icons/fa";
@@ -307,14 +307,14 @@ const Veo3TextVideoView: React.FC = () => {
                   Google Flow
                 </span>
                 <span style={{ fontSize: "0.72rem", fontWeight: 700, background: "rgba(15,157,88,0.25)", color: "#81C995", padding: "3px 10px", borderRadius: 20, letterSpacing: "0.05em" }}>
-                  Veo 3.1 Lite
+                  Veo 3.1
                 </span>
               </div>
               <h1 style={{ margin: 0, fontSize: "1.8rem", fontWeight: 800, color: "#fff", lineHeight: 1.2, letterSpacing: "-0.01em" }}>
                 Text to Video Generation
               </h1>
               <p style={{ margin: "10px 0 0", fontSize: "0.9rem", color: "rgba(255,255,255,0.65)", lineHeight: 1.6 }}>
-                Powered by Google's Veo 3.1 Lite model · cinematic quality · native audio · premium commercial output
+                Powered by Google's Veo 3.1 model · cinematic quality · native audio · premium commercial output
               </p>
             </div>
           </div>
@@ -338,7 +338,7 @@ const Veo3TextVideoView: React.FC = () => {
               </div>
               <div>
                 <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "#202124" }}>Describe Your Video</h2>
-                <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "#5F6368" }}>AI enhances your idea into a cinematic Veo 3.1 Lite prompt automatically</p>
+                <p style={{ margin: "2px 0 0", fontSize: "0.78rem", color: "#5F6368" }}>AI enhances your idea into a cinematic Veo 3.1 prompt automatically</p>
               </div>
             </div>
 
@@ -382,7 +382,7 @@ const Veo3TextVideoView: React.FC = () => {
                 >
                   <div style={{ fontSize: "1.6rem", marginBottom: 6 }}>🌅</div>
                   <p style={{ margin: 0, fontWeight: 700, color: "#202124", fontSize: "0.9rem" }}>Click to select a reference image or initial frame</p>
-                  <p style={{ margin: "4px 0 0", color: "#5F6368", fontSize: "0.78rem" }}>Supports JPG, PNG, WEBP — Veo 3.1 Lite will use this image to animate your video!</p>
+                  <p style={{ margin: "4px 0 0", color: "#5F6368", fontSize: "0.78rem" }}>Supports JPG, PNG, WEBP — Veo 3.1 will use this image to animate your video!</p>
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#E8F0FE", border: "1.5px solid #4285F4", borderRadius: 14, padding: "12px 16px" }}>
@@ -487,7 +487,7 @@ const Veo3TextVideoView: React.FC = () => {
             </h2>
             <p style={{ margin: "0 0 24px", fontSize: "0.88rem", color: "#5F6368", lineHeight: 1.6 }}>
               {isSubmitting
-                ? "Enhancing your prompt with AI and submitting to Google Veo 3.1 Lite..."
+                ? "Enhancing your prompt with AI and submitting to Google Veo 3.1..."
                 : <>Your video is being rendered. This typically takes <strong>2–5 minutes</strong>.<br />The page polls automatically every 20 seconds.</>
               }
             </p>
@@ -502,7 +502,7 @@ const Veo3TextVideoView: React.FC = () => {
                     </div>
                     <div>
                       <p className="gf-stat-label">Model</p>
-                      <p className="gf-stat-value">Veo 3.1 Lite</p>
+                      <p className="gf-stat-value">Veo 3.1</p>
                     </div>
                     <div>
                       <p className="gf-stat-label">Provider</p>
@@ -518,7 +518,7 @@ const Veo3TextVideoView: React.FC = () => {
                   <div className="gf-progress-fill" style={{ width: "100%" }} />
                 </div>
                 <p style={{ margin: "10px 0 0", fontSize: "0.76rem", color: "#9AA0A6" }}>
-                  {pollCount < 3 ? "Initializing Google Cloud GPU cluster..." : pollCount < 8 ? "Veo 3.1 Lite is rendering your video..." : "Finalizing and encoding your video..."}
+                  {pollCount < 3 ? "Initializing Google Cloud GPU cluster..." : pollCount < 8 ? "Veo 3.1 is rendering your video..." : "Finalizing and encoding your video..."}
                 </p>
               </>
             )}

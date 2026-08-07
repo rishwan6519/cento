@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -169,7 +169,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span>Offer Creation</span>
           </button>
 
-          {/* Google Flow Veo 3.1 Lite */}
+          {/* Google Flow Veo 3.1 */}
           <button
             className={`store-nav-item ${isActive("veo3TextVideo") ? "store-nav-item--active" : ""}`}
             onClick={() => onNavigate("veo3TextVideo")}

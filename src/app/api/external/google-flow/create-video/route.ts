@@ -7,7 +7,7 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
-// POST Handler — Initiate Google Flow Veo 3.1 Lite video generation
+// POST Handler — Initiate Google Flow Veo 3.1 video generation
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {

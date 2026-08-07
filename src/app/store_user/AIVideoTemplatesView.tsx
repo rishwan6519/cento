@@ -495,7 +495,7 @@ export default function AIVideoTemplatesView() {
               <select id="v-model" className="aivt-form-select" value={aiModel} onChange={(e) => setAiModel(e.target.value)}
                 style={{ fontWeight: 700, color: aiModel.includes("Google") ? "#1A73E8" : "#202124", border: aiModel.includes("Google") ? "2px solid #4285F4" : undefined }}>
                 <option value="Veo 3.1">🎬 Google Flow Veo 3.1</option>
-                <option value="Veo 3.1 Lite">🎬 Google Flow Veo 3.1 Lite</option>
+                <option value="Veo 3.1">🎬 Google Flow Veo 3.1</option>
                 <option value="Wan 2.1">⚡ Wan 2.1 (Fal AI)</option>
                 <option value="Wan Pro">🔥 Wan Pro (Fal AI)</option>
                 <option value="Kling 2.0 Pro">✨ Kling 2.0 Pro (Fal AI)</option>

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { writeFile, readFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -93,7 +93,7 @@ async function enhancePrompt(
   socialMediaCaption: string;
   hashTags: string[];
 }> {
-  const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for Veo 3.1 — Google's state-of-the-art text-to-video AI model.
+  const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for Google Flow Veo 3.1 — Google's state-of-the-art text-to-video AI model.
 
 Your job is to convert a simple idea or product description into an extremely detailed, production-quality video generation prompt.
 
@@ -203,7 +203,7 @@ async function submitToGoogleFlow(
   imageData?: { base64: string; mimeType: string } | null
 ): Promise<string> {
   // Google Gemini API generate_videos endpoint
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-lite-generate-preview:predictLongRunning?key=${googleApiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning?key=${googleApiKey}`;
 
   const instancePayload: Record<string, any> = { prompt };
   if (imageData && imageData.base64) {
@@ -424,7 +424,7 @@ export async function startGoogleFlowVideoJob({
     ...(referenceImageUrl ? { referenceImageUrl } : {}),
     hasReferenceImage: !!imageBase64,
     message: fromUnifiedEndpoint
-      ? `AI Video generation via Veo 3.1 started. Please check after a few minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`
-      : `Veo 3.1 video generation started. Poll for results at /api/external/google-flow/get-video with {"jobId": "${jobId}"}`,
+      ? `AI Video generation via Google Flow Veo 3.1 started. Please check after a few minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`
+      : `Google Flow Veo 3.1 video generation started. Poll for results at /api/external/google-flow/get-video with {"jobId": "${jobId}"}`,
   });
 }

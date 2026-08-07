@@ -387,7 +387,7 @@ const AIVideoGenerationView: React.FC = () => {
         const fd = new FormData();
         fd.append("userId", userId);
         fd.append("text", refinedPrompt || roughPrompt || `Video generated via template`);
-        fd.append("model", "Veo 3.1 Lite");
+        fd.append("model", "Veo 3.1");
         fd.append("resolution", resolution);
         fd.append("aspectRatio", aspectRatio);
         fd.append("duration", String(duration));
@@ -571,7 +571,7 @@ const AIVideoGenerationView: React.FC = () => {
               }}
             >
               <span style={{ fontSize: "1.1rem" }}>✨</span>
-              <span>Google Veo Engine (Veo 3.1 Lite & Gemini)</span>
+              <span>Google Veo Engine (Veo 3.1 & Gemini)</span>
               <span style={{ background: engine === "veo" ? "rgba(255,255,255,0.2)" : "#3B82F6", color: "#fff", fontSize: "0.65rem", padding: "2px 8px", borderRadius: 20, fontWeight: 800 }}>DEFAULT</span>
             </button>
             <button

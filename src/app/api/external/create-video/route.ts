@@ -497,7 +497,7 @@ export async function POST(req: NextRequest) {
       const googleApiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
       if (!googleApiKey) {
         return NextResponse.json(
-          { success: false, message: "Server configuration error: GOOGLE_API_KEY not set for Google Flow Veo 3.1 Lite generation" },
+          { success: false, message: "Server configuration error: GOOGLE_API_KEY not set for Google Flow Veo 3.1 generation" },
           { status: 500 }
         );
       }
