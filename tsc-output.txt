@@ -1,0 +1,1 @@
+src/app/api/external/create-video/route.ts(356,72): error TS2304: Cannot find name 'HTTP'.

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoJobModel from "@/models/VideoJob";
 import VideoTemplate from "@/models/VideoTemplate";
@@ -310,11 +310,11 @@ export async function POST(req: NextRequest) {
         f.name && (f.type.startsWith('image/') || /\\.(webp|png|jpe?g|jpg|bmp|gif)$/i.test(f.name))
       ) || null;
 
-      // Convert uploaded file to buffer now (before background execution)
-      let uploadedFileBuffer: Buffer | null = null;
+      // Convert uploaded file to ArrayBuffer now (before background execution)
+      let uploadedFileBuffer: ArrayBuffer | null = null;
       let uploadedFileName = '';
       if (uploadedProductFile) {
-        uploadedFileBuffer = Buffer.from(await uploadedProductFile.arrayBuffer());
+        uploadedFileBuffer = await uploadedProductFile.arrayBuffer();
         uploadedFileName   = uploadedProductFile.name;
       }
 
@@ -353,7 +353,7 @@ export async function POST(req: NextRequest) {
           } else {
             await CloudbasesJobModel.findOneAndUpdate(
               { jobId: cloudJobId },
-              { status: 'failed', errorMessage: resultData?.message || HTTP  }
+              { status: 'failed', errorMessage: resultData?.message || `HTTP ${externalResponse.status}` }
             );
           }
         } catch (err: any) {
@@ -375,7 +375,7 @@ export async function POST(req: NextRequest) {
         jobId: cloudJobId,
         provider: 'cloudbases',
         templateId: String(cloudbases_template_id),
-        message: `Video generation started. Poll for result at POST /api/external/get-video with { jobId: '' }`,
+        message: `Video generation started. Poll for result at POST /api/external/get-video with { jobId: '${cloudJobId}' }`,
       });
     }
     // -- END NEW --
