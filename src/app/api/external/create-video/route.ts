@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoJobModel from "@/models/VideoJob";
 import VideoTemplate from "@/models/VideoTemplate";
@@ -10,7 +10,7 @@ import { join } from "path";
 import { generateUniqueOfferId } from "@/lib/generateOfferId";
 import { startGoogleFlowVideoJob } from "@/lib/googleFlowCreate";
 
-export const maxDuration = 300; // Allow sufficient execution duration for background tasks
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ You MUST respond ONLY with a valid JSON object matching this schema:
 }
 
 // ---------------------------------------------------------------------------
-// Main POST handler — strictly initiates AI video generation jobs (< 2s)
+// Main POST handler
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {
@@ -264,42 +264,115 @@ export async function POST(req: NextRequest) {
       body = await req.json().catch(() => ({}));
     }
 
+    // -- NEW: Proxy to cloudbases.in video API --
+    // Accepted fields:
+    //   templateId/template_id -> template_id (REQUIRED, triggers this flow)
+    //   text                   -> description (old field mapped to new)
+    //   tagline                -> headline    (old field mapped to new)
+    //   discount               -> discount
+    //   validity               -> validity
+    //   product_url/productImageUrl -> product_url (URL string)
+    //   product_image (file upload) -> product_url (file, takes priority over URL)
+    // NOT forwarded: userId, channels, imageType, numberOfVideos, duration
+
+    const cloudbases_template_id = body.template_id || body.templateId;
+
+    if (cloudbases_template_id) {
+      const apiKey = process.env.CLOUDBASES_API_KEY;
+      if (!apiKey) {
+        return NextResponse.json(
+          { success: false, message: 'Server configuration error: CLOUDBASES_API_KEY not set in .env.local' },
+          { status: 500 }
+        );
+      }
+
+      // Field mapping: old fields -> new cloudbases fields
+      const mapped_description = body.description || body.text    || '';
+      const mapped_headline    = body.headline    || body.tagline || '';
+      const mapped_discount    = body.discount    || '';
+      const mapped_validity    = body.validity    || '';
+
+      // Product image: file upload takes priority over URL string
+      const product_url_string = body.product_url || body.productImageUrl || '';
+      const uploadedProductFile = uploadedFiles.find((f) =>
+        f.name && (f.type.startsWith('image/') || /\.(webp|png|jpe?g|jpg|bmp|gif)$/i.test(f.name))
+      ) || null;
+
+      const externalFormData = new FormData();
+      externalFormData.append('template_id', String(cloudbases_template_id));
+
+      if (uploadedProductFile) {
+        externalFormData.append('product_url', uploadedProductFile, uploadedProductFile.name);
+      } else if (product_url_string) {
+        externalFormData.append('product_url', String(product_url_string));
+      }
+
+      if (mapped_headline)    externalFormData.append('headline',    String(mapped_headline));
+      if (mapped_discount)    externalFormData.append('discount',    String(mapped_discount));
+      if (mapped_description) externalFormData.append('description', String(mapped_description));
+      if (mapped_validity)    externalFormData.append('validity',    String(mapped_validity));
+      externalFormData.append('footer', '*T&C apply');
+
+      const externalResponse = await fetch(
+        'https://cloudbases.in/storesparc_video/index.php/api/external/video',
+        {
+          method: 'POST',
+          headers: { 'X-API-Key': apiKey },
+          body: externalFormData,
+        }
+      );
+
+      const data = await externalResponse.json().catch(() => null);
+
+      if (!externalResponse.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: data?.message || `External video API error ()`,
+            externalStatus: externalResponse.status,
+          },
+          { status: externalResponse.status }
+        );
+      }
+
+      return NextResponse.json(data);
+    }
+    // -- END NEW --
+
+    /*
+    // ── OLD CODE (preserved for reference) ────────────────────────────────
     const {
-      text: rawText,       // rough description — third party provides this plain text
-      userId: rawUserId,     // third party user/account ID
-      model: rawModel,      // AI video model name
-      resolution: rawResolution, // "480p" | "720p" | "1080p" | "4K"
-      aspectRatio: rawAspectRatio,// "16:9" | "9:16" | "1:1" | "4:3"
-      duration,   // optional — video length in seconds (default: 5)
-      numVideos,  // optional — number of videos to generate (default: 1, max: 10)
-      numberOfVideos, // fallback alias for numVideos
-      number_of_videos, // fallback alias for numVideos
-      count,      // fallback property in case caller sends 'count' instead of 'numVideos'
-      channels,   // optional — platforms/channels to publish to e.g. ["insta", "facebook", "twitter"]
-      socialMedia,// optional — fallback alias for channels
-      share,      // fallback alias for channels
-      shareTo,    // fallback alias for channels
-      images,     // optional — array of image URLs
-      imageUrls,  // fallback alias for images
-      imageTypes, // optional — array clarifying image purposes (e.g. ["product", "logo"])
-      imageType,  // fallback alias for imageTypes
-      image_types,// fallback alias for imageTypes
-      image_type, // fallback alias for imageTypes
-      templateId, // optional (not mandatory) — AI Video Template ID from video_templates collection
-      // NOTE: Manual offerId / offer_id entry removed. We always automatically generate unique offerId creation below.
-      tagline: rawTagline, // optional — marketing promotional offer tagline text (e.g. "Buy 1 Get 1 Free")
+      text: rawText,
+      userId: rawUserId,
+      model: rawModel,
+      resolution: rawResolution,
+      aspectRatio: rawAspectRatio,
+      duration,
+      numVideos,
+      numberOfVideos,
+      number_of_videos,
+      count,
+      channels,
+      socialMedia,
+      share,
+      shareTo,
+      images,
+      imageUrls,
+      imageTypes,
+      imageType,
+      image_types,
+      image_type,
+      templateId,
+      tagline: rawTagline,
     } = body;
 
-    // Automatically trim inputs to strip hidden tabs (\t), spaces, or newlines from Postman/form copy-pasting
     const userId = typeof rawUserId === "string" ? rawUserId.trim() : "";
     const model = typeof rawModel === "string" ? rawModel.trim() : "";
     const resolution = typeof rawResolution === "string" ? rawResolution.trim() : "";
     const text = typeof rawText === "string" ? rawText.trim() : "";
     const aspectRatio = typeof rawAspectRatio === "string" ? rawAspectRatio.trim() : "";
-    // Always generate a unique 6-digit random number for offerId (manual entry removed)
     const cleanOfferId = await generateUniqueOfferId();
 
-    // ----- Validate required userId first -----
     if (!userId) {
       return NextResponse.json(
         { success: false, message: "Field 'userId' is required" },
@@ -313,7 +386,6 @@ export async function POST(req: NextRequest) {
     let finalModel = model;
     let finalDuration = duration;
 
-    // Retrieve template from database automatically if templateId is provided
     if (templateId?.trim()) {
       await connectToDatabase();
       const targetTmplId = templateId.trim();
@@ -338,38 +410,36 @@ export async function POST(req: NextRequest) {
         if (!finalDuration && template.videoDuration) finalDuration = template.videoDuration;
         if (!finalModel && template.aiModel) finalModel = String(template.aiModel).trim();
 
-        // Automatically extract aspect ratio from template description if not otherwise provided
         if (!finalAspectRatio) {
           const ratioMatch = descText.match(/\b(9:16|16:9|1:1|4:3|3:4|21:9)\b/);
           if (ratioMatch) finalAspectRatio = ratioMatch[1];
         }
-        // Automatically extract resolution from template description if not otherwise provided
         if (!finalResolution) {
-          const resMatch = descText.match(/\b(720p|1080p|480p|4k|2k|720×1280|1080×1920)\b/i);
+          const resMatch = descText.match(/\b(720p|1080p|480p|4k|2k|720x1280|1080x1920)\b/i);
           if (resMatch) {
             const m = resMatch[1].toLowerCase();
             finalResolution = m.includes("1080") ? "1080p" : m.includes("4k") ? "4K" : "720p";
           }
         }
 
-        const tmplDetails = template.description?.trim() 
+        const tmplDetails = template.description?.trim()
           ? `[Selected Template Name: ${template.templateName}]\n[Template Architecture & Design Instructions:\n${template.description.trim()}]`
           : `[Selected Template Name: ${template.templateName}]\n[Template Specifications & Visual Guidelines: Theme: ${template.templateDescription || template.offerTitle}. Headline: '${template.offerTitle}', description: '${template.offerDescription}', badge label: '${template.offerLabel}', discount '${template.discountLabel}' from '${template.priceLabel}'. Animation style: ${template.animationStyle}. Colors: ${template.backgroundColor} background with ${template.primaryTextColor} text. Product placement at ${template.productImagePosition}, store branding at ${template.storeImagePosition}, logo placed at ${template.logoPosition}.]`;
 
-        finalText = finalText.trim() ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these AI Video Template structural requirements:\n${tmplDetails}` : `Generate video following these exact AI Video Template specifications:\n${tmplDetails}`;
+        finalText = finalText.trim()
+          ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these AI Video Template structural requirements:\n${tmplDetails}`
+          : `Generate video following these exact AI Video Template specifications:\n${tmplDetails}`;
       } else if (dummyTemplate) {
         const descText = String(dummyTemplate.description || "");
         if (!finalAspectRatio && (dummyTemplate as any).aspectRatio) finalAspectRatio = String((dummyTemplate as any).aspectRatio).trim();
         if (!finalResolution && (dummyTemplate as any).resolution) finalResolution = String((dummyTemplate as any).resolution).trim();
 
-        // Automatically extract aspect ratio from template description if not otherwise provided
         if (!finalAspectRatio) {
           const ratioMatch = descText.match(/\b(9:16|16:9|1:1|4:3|3:4|21:9)\b/);
           if (ratioMatch) finalAspectRatio = ratioMatch[1];
         }
-        // Automatically extract resolution from template description if not otherwise provided
         if (!finalResolution) {
-          const resMatch = descText.match(/\b(720p|1080p|480p|4k|2k|720×1280|1080×1920)\b/i);
+          const resMatch = descText.match(/\b(720p|1080p|480p|4k|2k|720x1280|1080x1920)\b/i);
           if (resMatch) {
             const m = resMatch[1].toLowerCase();
             finalResolution = m.includes("1080") ? "1080p" : m.includes("4k") ? "4K" : "720p";
@@ -378,18 +448,18 @@ export async function POST(req: NextRequest) {
 
         const tmplDetails = `[Selected Template Name: ${dummyTemplate.templateName}]\n[Template Architecture & Design Instructions:\n${dummyTemplate.description.trim()}]`;
 
-        finalText = finalText.trim() ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these exact AI Video Template architectural requirements and visual layout:\n${tmplDetails}` : `Generate commercial advertisement strictly following these AI Video Template instructions:\n${tmplDetails}`;
+        finalText = finalText.trim()
+          ? `User Advertising Instructions: "${finalText.trim()}"\n\nMust follow these exact AI Video Template architectural requirements and visual layout:\n${tmplDetails}`
+          : `Generate commercial advertisement strictly following these AI Video Template instructions:\n${tmplDetails}`;
       }
     }
 
-    // Apply intelligent defaults if omitted by user and not available on template
     if (!finalModel?.trim()) finalModel = "Veo 3.1";
     if (!finalResolution?.trim()) finalResolution = "720p";
     if (!finalAspectRatio?.trim()) finalAspectRatio = "9:16";
 
     const isGoogleModel = String(finalModel).toLowerCase().includes("veo") || String(finalModel).toLowerCase().includes("google") || String(finalModel).toLowerCase().includes("flow") || String(body.provider || "").toLowerCase().includes("google");
 
-    // ----- Validate required fields -----
     if (!finalText?.trim()) {
       return NextResponse.json(
         { success: false, message: "Field 'text' (or a valid 'templateId') is required — provide your video description" },
@@ -397,7 +467,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ----- Validate API keys -----
     const openAiKey = process.env.OPENAI_API_KEY;
     const falKey = process.env.FAL_KEY;
 
@@ -414,10 +483,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Use tagline only if user explicitly provides it (no auto-generation) ---
     const finalTagline = typeof rawTagline === "string" ? rawTagline.trim() : "";
 
-    // Combine tagline into the prompt text so it becomes part of the video content
     if (finalTagline) {
       finalText = finalText.trim() + `\n\n[MANDATORY ON-SCREEN PROMOTIONAL TEXT OVERLAY: Render a high-end commercial typographic graphic banner prominently at the VERY TOP of the video frame reading exactly: "${finalTagline}". Ensure this promotional offer text is sharp, bold, elegant, and cleanly overlaid at the top above the video scene alongside the brand logo.]`;
     }
@@ -457,7 +524,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Save uploaded multipart image files into local uploads/userId/image folder
     if (uploadedFiles.length > 0 && userId?.trim()) {
       const imgUploadDir = join(process.cwd(), "uploads", userId.trim(), "image");
       if (!existsSync(imgUploadDir)) {
@@ -478,7 +544,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Apply image type explanations (e.g. "logo", "product image") to clarify the purpose of each uploaded image for AI generation
     if (imageTypesList.length > 0 && imagesList.length > 0) {
       const typeInstructions = imageTypesList.map((type, i) => {
         const lowerType = type.toLowerCase();
@@ -536,7 +601,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ----- Save initial job tracking to MongoDB immediately (< 50ms) -----
     await connectToDatabase();
     const jobId = uuidv4();
     const videoJob = new VideoJobModel({
@@ -563,7 +627,6 @@ export async function POST(req: NextRequest) {
     });
     await videoJob.save();
 
-    // ----- Step 1 & 2 Background Execution: Enhance prompt with OpenAI and submit to fal.ai queue -----
     (async () => {
       try {
         const { enhancedPrompt, voiceoverScript, socialMediaHeading, socialMediaCaption, hashTags } = await enhancePromptAndScript(
@@ -668,7 +731,6 @@ export async function POST(req: NextRequest) {
       }
     })();
 
-    // Immediately return processing status without waiting for OpenAI prompt creation or queue rendering!
     return NextResponse.json({
       success: true,
       status: "processing",
@@ -682,6 +744,9 @@ export async function POST(req: NextRequest) {
       ...(templateId ? { templateId: String(templateId).trim() } : {}),
       message: `AI Video generation takes time depending on model complexity. Please check after 10 minutes by sending a POST request with {"jobId": "${jobId}"} to /api/external/get-video`,
     });
+    // ── END OLD CODE ───────────────────────────────────────────────────────
+    */
+
   } catch (error) {
     console.error("[external/create-video] Error:", error);
     return NextResponse.json(

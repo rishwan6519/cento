@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
 // ─── GET /api/video-template ────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
+    /*
     const auth = getAuthenticatedUser(req);
     // Never accept storeUserId from frontend. Always use logged-in Store User ID.
     if (!auth || !auth.userId) {
@@ -169,6 +170,18 @@ export async function GET(req: NextRequest) {
       success: true,
       data: combined,
     });
+    */
+
+    const fetchOptions: RequestInit = {};
+    const authHeader = req.headers.get('authorization');
+    if (authHeader) {
+      fetchOptions.headers = { 'Authorization': authHeader };
+    }
+    const response = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1", fetchOptions);
+    const data = await response.json();
+    
+    // Pass the response directly as requested
+    return NextResponse.json(data);
   } catch (error) {
     console.error('[GET /api/video-template] Error:', error);
     return NextResponse.json(

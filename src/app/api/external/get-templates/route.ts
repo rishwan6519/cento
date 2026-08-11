@@ -1,11 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoTemplate from "@/models/VideoTemplate";
 import { DUMMY_TEMPLATES } from "@/lib/dummyTemplates";
 
 export const dynamic = "force-dynamic";
 
-// ─── Shared helper to fetch templates using userId ────────────────────────────
+// ─── NEW: Fetch templates from external API ────────────────────────────────
+// OLD code is preserved below in comments for reference
+async function getTemplatesFromExternalAPI(authHeader?: string | null) {
+  const EXTERNAL_API_URL = "https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1";
+  const fetchOptions: RequestInit = {};
+  if (authHeader) {
+    fetchOptions.headers = { "Authorization": authHeader };
+  }
+  const response = await fetch(EXTERNAL_API_URL, fetchOptions);
+  const data = await response.json();
+  return NextResponse.json(data);
+}
+
+/*
+// ─── OLD: Shared helper to fetch templates using userId ────────────────────────────
 async function getTemplatesForUser(userId: string, templateId?: string, search?: string) {
   try {
     await connectToDatabase();
@@ -91,23 +105,13 @@ async function getTemplatesForUser(userId: string, templateId?: string, search?:
     );
   }
 }
+*/
 
-// ─── GET Handler: e.g. /api/external/get-templates?userId=123 ────────────────
+// ─── GET Handler ──────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") || searchParams.get("storeUserId") || searchParams.get("account");
-    const templateId = searchParams.get("templateId") || searchParams.get("id") || undefined;
-    const search = searchParams.get("search") || undefined;
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: "Missing required query parameter 'userId' (e.g., ?userId=YOUR_ID)" },
-        { status: 400 }
-      );
-    }
-
-    return await getTemplatesForUser(userId, templateId, search);
+    const authHeader = req.headers.get("authorization");
+    return await getTemplatesFromExternalAPI(authHeader);
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server Error" },
@@ -116,22 +120,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ─── POST Handler: e.g. {"userId": "123", "templateId": "..."} ────────────────
+// ─── POST Handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const userId = body.userId || body.storeUserId || body.account;
-    const templateId = body.templateId || body.id || undefined;
-    const search = body.search || undefined;
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: "Missing required property 'userId' in JSON request body" },
-        { status: 400 }
-      );
-    }
-
-    return await getTemplatesForUser(String(userId), templateId ? String(templateId) : undefined, search ? String(search) : undefined);
+    const authHeader = req.headers.get("authorization");
+    return await getTemplatesFromExternalAPI(authHeader);
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server Error" },
