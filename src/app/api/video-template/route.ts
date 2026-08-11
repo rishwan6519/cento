@@ -172,11 +172,13 @@ export async function GET(req: NextRequest) {
     });
     */
 
-    const fetchOptions: RequestInit = {};
     const authHeader = req.headers.get('authorization');
-    if (authHeader) {
-      fetchOptions.headers = { 'Authorization': authHeader };
-    }
+    const apiKey = process.env.CLOUDBASES_API_KEY;
+    const headers: Record<string, string> = {};
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (apiKey) headers['X-API-Key'] = apiKey;
+    const fetchOptions: RequestInit = { headers };
+
     const response = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1", fetchOptions);
     const data = await response.json();
     

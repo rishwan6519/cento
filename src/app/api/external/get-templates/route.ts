@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoTemplate from "@/models/VideoTemplate";
 import { DUMMY_TEMPLATES } from "@/lib/dummyTemplates";
@@ -9,10 +9,12 @@ export const dynamic = "force-dynamic";
 // OLD code is preserved below in comments for reference
 async function getTemplatesFromExternalAPI(authHeader?: string | null) {
   const EXTERNAL_API_URL = "https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1";
-  const fetchOptions: RequestInit = {};
-  if (authHeader) {
-    fetchOptions.headers = { "Authorization": authHeader };
-  }
+  const apiKey = process.env.CLOUDBASES_API_KEY;
+  const headers: Record<string, string> = {};
+  if (authHeader) headers["Authorization"] = authHeader;
+  if (apiKey) headers["X-API-Key"] = apiKey;
+
+  const fetchOptions: RequestInit = { headers };
   const response = await fetch(EXTERNAL_API_URL, fetchOptions);
   const data = await response.json();
   return NextResponse.json(data);
