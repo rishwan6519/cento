@@ -154,13 +154,92 @@ async function checkAndResolveJob(jobId: string) {
         });
       }
       // completed
+      let finalResultData = { ...cloudJob.resultData };
+      const videoUrl = finalResultData.video_url || finalResultData.videoUrl || finalResultData.url || finalResultData.file;
+      const jobUserId = cloudJob.userId;
+      
+      if (videoUrl && jobUserId) {
+        let localVideoUrl = finalResultData.local_video_url;
+        let downloadedNow = false;
+
+        if (!localVideoUrl) {
+          try {
+            const videoRes = await fetch(videoUrl);
+            if (videoRes.ok) {
+              const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+              const uploadDir = join(process.cwd(), "uploads", jobUserId, "video");
+              if (!existsSync(uploadDir)) {
+                await mkdir(uploadDir, { recursive: true });
+              }
+              const fileName = `${uuidv4()}-cloudbases-generated.mp4`;
+              await writeFile(join(uploadDir, fileName), videoBuffer);
+              
+              localVideoUrl = `/uploads/${jobUserId}/video/${fileName}`;
+              finalResultData.local_video_url = localVideoUrl;
+              downloadedNow = true;
+            }
+          } catch (e) {
+            console.error("[get-video cloudbases download error]:", e);
+          }
+        }
+
+        if (localVideoUrl) {
+          try {
+            const targetUserObj = mongoose.Types.ObjectId.isValid(jobUserId)
+              ? new mongoose.Types.ObjectId(jobUserId)
+              : jobUserId;
+              
+            // Check if media item already exists for this exact localVideoUrl
+            let mediaItem = await MediaItemModel.findOne({ url: localVideoUrl });
+            
+            if (!mediaItem) {
+              mediaItem = new MediaItemModel({
+                userId: targetUserObj,
+                name: `Cloudbases AI Video – ${new Date().toLocaleString()}`,
+                type: "video",
+                url: localVideoUrl,
+                approvalStatus: "pending",
+                templateId: String(cloudJob.templateId),
+                createdAt: new Date(),
+              });
+              await mediaItem.save();
+            }
+
+            // Ensure metadata exists
+            if (!mediaItem.metadataId) {
+              const metadataDoc = await MediaMetadataModel.create({
+                mediaId: mediaItem._id,
+                userId: targetUserObj,
+                channels: [],
+                voiceoverScript: cloudJob.description || "",
+                socialMediaHeading: cloudJob.headline || "",
+                socialMediaCaption: "",
+                hashTags: [],
+                approvalStatus: "pending",
+                templateId: String(cloudJob.templateId),
+              });
+              mediaItem.metadataId = metadataDoc._id;
+              await mediaItem.save();
+            }
+
+            if (downloadedNow) {
+              cloudJob.resultData = finalResultData;
+              cloudJob.markModified("resultData");
+              await cloudJob.save();
+            }
+          } catch (e) {
+            console.error("[get-video] media save error:", e);
+          }
+        }
+      }
+
       return NextResponse.json({
         success: true,
         status: 'completed',
         jobId,
         provider: 'cloudbases',
         templateId: cloudJob.templateId,
-        ...cloudJob.resultData,
+        ...finalResultData,
       });
     }
     return NextResponse.json(
