@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
 import VideoJobModel from "@/models/VideoJob";
 import VideoTemplate from "@/models/VideoTemplate";
@@ -293,9 +294,10 @@ export async function POST(req: NextRequest) {
 
       // Save initial job to DB immediately
       const CloudbasesJobModel = (await import('@/models/CloudbasesJob')).default;
+      const jobUserId = body.userId || body.userid || body.storeUserId || '';
       await CloudbasesJobModel.create({
         jobId:       cloudJobId,
-        userId:      body.userId || body.storeUserId || '',
+        userId:      jobUserId,
         templateId:  String(cloudbases_template_id),
         status:      'processing',
         description: mapped_description,
@@ -346,9 +348,48 @@ export async function POST(req: NextRequest) {
 
           await connectToDatabase();
           if (externalResponse.ok && resultData) {
+            let finalResultData = { ...resultData };
+            const videoUrl = resultData.video_url || resultData.videoUrl || resultData.url || resultData.file;
+            
+            if (videoUrl && jobUserId) {
+              try {
+                const videoRes = await fetch(videoUrl);
+                if (videoRes.ok) {
+                  const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+                  const uploadDir = join(process.cwd(), "uploads", jobUserId, "video");
+                  if (!existsSync(uploadDir)) {
+                    await mkdir(uploadDir, { recursive: true });
+                  }
+                  const fileName = `${uuidv4()}-cloudbases-generated.mp4`;
+                  await writeFile(join(uploadDir, fileName), videoBuffer);
+                  
+                  const localVideoUrl = `/uploads/${jobUserId}/video/${fileName}`;
+                  finalResultData.local_video_url = localVideoUrl;
+                  
+                  const targetUserObj = mongoose.Types.ObjectId.isValid(jobUserId)
+                    ? new mongoose.Types.ObjectId(jobUserId)
+                    : jobUserId;
+                  
+                  const MediaItemModel = (await import('@/models/MediaItems')).default;
+                  const mediaItem = new MediaItemModel({
+                    userId: targetUserObj,
+                    name: `Cloudbases AI Video – ${new Date().toLocaleString()}`,
+                    type: "video",
+                    url: localVideoUrl,
+                    approvalStatus: "pending",
+                    templateId: String(cloudbases_template_id),
+                    createdAt: new Date(),
+                  });
+                  await mediaItem.save();
+                }
+              } catch (e) {
+                console.error("[cloudbases video download error]:", e);
+              }
+            }
+
             await CloudbasesJobModel.findOneAndUpdate(
               { jobId: cloudJobId },
-              { status: 'completed', resultData, completedAt: new Date() }
+              { status: 'completed', resultData: finalResultData, completedAt: new Date() }
             );
           } else {
             await CloudbasesJobModel.findOneAndUpdate(
