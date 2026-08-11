@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -130,10 +130,44 @@ async function checkAndResolveJob(jobId: string) {
     if (googleJob) {
       return await checkAndResolveGoogleJob(jobId, true);
     }
+    // Check CloudbasesJob (new async video generation via cloudbases.in)
+    const CloudbasesJobModel = (await import('@/models/CloudbasesJob')).default;
+    const cloudJob = await CloudbasesJobModel.findOne({ jobId });
+    if (cloudJob) {
+      if (cloudJob.status === 'processing') {
+        return NextResponse.json({
+          success: true,
+          status: 'processing',
+          jobId,
+          provider: 'cloudbases',
+          templateId: cloudJob.templateId,
+          message: 'Video generation is in progress. Please check again in a minute.',
+        });
+      }
+      if (cloudJob.status === 'failed') {
+        return NextResponse.json({
+          success: false,
+          status: 'failed',
+          jobId,
+          provider: 'cloudbases',
+          message: cloudJob.errorMessage || 'Video generation failed.',
+        });
+      }
+      // completed
+      return NextResponse.json({
+        success: true,
+        status: 'completed',
+        jobId,
+        provider: 'cloudbases',
+        templateId: cloudJob.templateId,
+        ...cloudJob.resultData,
+      });
+    }
     return NextResponse.json(
-      { success: false, message: `No video generation job found with jobId '${jobId}'` },
+      { success: false, message: `No video generation job found with jobId ''` },
       { status: 404 }
     );
+  }
   }
 
   // If job is already completed, instantly return the standardized complete processed data!
