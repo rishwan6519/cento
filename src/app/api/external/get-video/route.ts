@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
@@ -164,10 +164,9 @@ async function checkAndResolveJob(jobId: string) {
       });
     }
     return NextResponse.json(
-      { success: false, message: `No video generation job found with jobId ''` },
+      { success: false, message: `No video generation job found with jobId '${jobId}'` },
       { status: 404 }
     );
-  }
   }
 
   // If job is already completed, instantly return the standardized complete processed data!
