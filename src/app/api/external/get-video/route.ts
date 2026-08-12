@@ -135,6 +135,33 @@ async function checkAndResolveJob(jobId: string) {
     const cloudJob = await CloudbasesJobModel.findOne({ jobId });
     if (cloudJob) {
       if (cloudJob.status === 'processing') {
+        try {
+          const apiKey = process.env.CLOUDBASES_API_KEY || "";
+          const extRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api//external/video/${jobId}`, {
+            headers: {
+              ...(apiKey ? { 'X-API-Key': apiKey } : {})
+            }
+          });
+          if (extRes.ok) {
+            const extJson = await extRes.json();
+            if (extJson && extJson.success && extJson.data) {
+              if (extJson.data.status === 'completed') {
+                cloudJob.status = 'completed';
+                cloudJob.resultData = extJson; // Contains full completed JSON
+                await cloudJob.save();
+              } else if (extJson.data.status === 'failed') {
+                cloudJob.status = 'failed';
+                cloudJob.errorMessage = extJson.data.message || 'Video generation failed at cloudbases';
+                await cloudJob.save();
+              }
+            }
+          }
+        } catch (e) {
+          console.error("[get-video] Error fetching status from cloudbases:", e);
+        }
+      }
+
+      if (cloudJob.status === 'processing') {
         return NextResponse.json({
           success: true,
           status: 'processing',
@@ -144,6 +171,7 @@ async function checkAndResolveJob(jobId: string) {
           message: 'Video generation is in progress. Please check again in a minute.',
         });
       }
+
       if (cloudJob.status === 'failed') {
         return NextResponse.json({
           success: false,
@@ -155,16 +183,45 @@ async function checkAndResolveJob(jobId: string) {
       }
       // completed
       let finalResultData = { ...cloudJob.resultData };
-      const videoUrl = finalResultData.video_url || finalResultData.videoUrl || finalResultData.url || finalResultData.file;
       const jobUserId = cloudJob.userId;
       
-      if (videoUrl && jobUserId) {
-        let localVideoUrl = finalResultData.local_video_url;
-        let downloadedNow = false;
-
-        if (!localVideoUrl) {
+      if (!finalResultData.saved_videos) {
+        finalResultData.saved_videos = [];
+        // Migrate old saved video if present
+        if (finalResultData.local_video_url) {
           try {
-            const videoRes = await fetch(videoUrl);
+            let mediaItem = await MediaItemModel.findOne({ url: finalResultData.local_video_url });
+            if (mediaItem) {
+              finalResultData.saved_videos.push({
+                mediaId: mediaItem._id.toString(),
+                url: finalResultData.local_video_url,
+                name: mediaItem.name,
+                ratio: "16:9"
+              });
+            }
+          } catch(e) {}
+        }
+      }
+
+      let videosToProcess: { originalUrl: string, ratio: string }[] = [];
+      if (finalResultData.data && Array.isArray(finalResultData.data.videos) && finalResultData.data.videos.length > 0) {
+        videosToProcess = finalResultData.data.videos.map((v: any) => ({
+           originalUrl: v.url || v.file,
+           ratio: v.ratio || "16:9"
+        })).filter((v: any) => !!v.originalUrl);
+      } else {
+        const fallbackUrl = finalResultData.video_url || finalResultData.videoUrl || finalResultData.url || finalResultData.file;
+        if (fallbackUrl) {
+           videosToProcess.push({ originalUrl: fallbackUrl, ratio: "16:9" });
+        }
+      }
+
+      let downloadedNow = false;
+
+      for (const [index, videoInfo] of videosToProcess.entries()) {
+        if (!finalResultData.saved_videos[index]) {
+          try {
+            const videoRes = await fetch(videoInfo.originalUrl);
             if (videoRes.ok) {
               const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
               const uploadDir = join(process.cwd(), "uploads", jobUserId, "video");
@@ -174,28 +231,15 @@ async function checkAndResolveJob(jobId: string) {
               const fileName = `${uuidv4()}-cloudbases-generated.mp4`;
               await writeFile(join(uploadDir, fileName), videoBuffer);
               
-              localVideoUrl = `/uploads/${jobUserId}/video/${fileName}`;
-              finalResultData.local_video_url = localVideoUrl;
-              downloadedNow = true;
-            }
-          } catch (e) {
-            console.error("[get-video cloudbases download error]:", e);
-          }
-        }
-
-        if (localVideoUrl) {
-          try {
-            const targetUserObj = mongoose.Types.ObjectId.isValid(jobUserId)
-              ? new mongoose.Types.ObjectId(jobUserId)
-              : jobUserId;
+              const localVideoUrl = `/uploads/${jobUserId}/video/${fileName}`;
               
-            // Check if media item already exists for this exact localVideoUrl
-            let mediaItem = await MediaItemModel.findOne({ url: localVideoUrl });
-            
-            if (!mediaItem) {
-              mediaItem = new MediaItemModel({
+              const targetUserObj = mongoose.Types.ObjectId.isValid(jobUserId)
+                ? new mongoose.Types.ObjectId(jobUserId)
+                : jobUserId;
+                
+              let mediaItem = new MediaItemModel({
                 userId: targetUserObj,
-                name: `Cloudbases AI Video – ${new Date().toLocaleString()}`,
+                name: `Cloudbases AI Video ${index + 1} – ${new Date().toLocaleString()}`,
                 type: "video",
                 url: localVideoUrl,
                 approvalStatus: "pending",
@@ -203,10 +247,7 @@ async function checkAndResolveJob(jobId: string) {
                 createdAt: new Date(),
               });
               await mediaItem.save();
-            }
 
-            // Ensure metadata exists
-            if (!mediaItem.metadataId) {
               const metadataDoc = await MediaMetadataModel.create({
                 mediaId: mediaItem._id,
                 userId: targetUserObj,
@@ -220,17 +261,25 @@ async function checkAndResolveJob(jobId: string) {
               });
               mediaItem.metadataId = metadataDoc._id;
               await mediaItem.save();
-            }
 
-            if (downloadedNow) {
-              cloudJob.resultData = finalResultData;
-              cloudJob.markModified("resultData");
-              await cloudJob.save();
+              finalResultData.saved_videos.push({
+                mediaId: mediaItem._id.toString(),
+                url: localVideoUrl,
+                name: mediaItem.name,
+                ratio: videoInfo.ratio
+              });
+              downloadedNow = true;
             }
           } catch (e) {
-            console.error("[get-video] media save error:", e);
+            console.error(`[get-video] failed to download video at index ${index}:`, e);
           }
         }
+      }
+
+      if (downloadedNow) {
+        cloudJob.resultData = finalResultData;
+        cloudJob.markModified("resultData");
+        await cloudJob.save();
       }
 
       return NextResponse.json({
@@ -239,9 +288,34 @@ async function checkAndResolveJob(jobId: string) {
         jobId,
         provider: 'cloudbases',
         templateId: cloudJob.templateId,
-        ...finalResultData,
+        message: finalResultData.message || 'Video created successfully',
+        videos: finalResultData.saved_videos
       });
     }
+    
+    // Fallback: If not found in any local DB, try directly fetching from cloudbases API
+    try {
+      const apiKey = process.env.CLOUDBASES_API_KEY || "";
+      const extRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api//external/video/${jobId}`, {
+        headers: { ...(apiKey ? { 'X-API-Key': apiKey } : {}) }
+      });
+      if (extRes.ok) {
+        const extJson = await extRes.json();
+        if (extJson && extJson.success && extJson.data) {
+           return NextResponse.json({
+             success: true,
+             status: extJson.data.status || 'completed',
+             jobId,
+             provider: 'cloudbases',
+             message: extJson.message || 'Video generation found externally',
+             data: extJson.data
+           });
+        }
+      }
+    } catch (e) {
+      console.error("[get-video] Fallback external fetch error:", e);
+    }
+
     return NextResponse.json(
       { success: false, message: `No video generation job found with jobId '${jobId}'` },
       { status: 404 }

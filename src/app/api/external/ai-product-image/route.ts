@@ -11,7 +11,7 @@ const EXTERNAL_API_URL = "https://cloudbases.in/storesparc_video/index.php/api/e
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { template_id, product_name, description, jobId } = body;
+    const { template_id, product_name, description, jobId, userId } = body;
 
     // 1. If checking job status via POST
     if (jobId) {
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     // Save initial job state
     await CloudbasesJobModel.create({
       jobId: cloudJobId,
+      userId: userId ? String(userId) : "",
       templateId: String(template_id),
       status: 'processing',
       description: String(description),
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
             template_id: String(template_id),
             product_name: String(product_name),
             description: String(description),
+            ...(userId && { userId: String(userId) })
           }),
         });
 

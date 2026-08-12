@@ -282,19 +282,63 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      await connectToDatabase();
-      const cloudJobId = uuidv4();
-
-      // Field mapping: old fields -> cloudbases fields
       const mapped_description = body.description || body.text    || '';
       const mapped_headline    = body.headline    || body.tagline || '';
       const mapped_discount    = body.discount    || '';
       const mapped_validity    = body.validity    || '';
       const product_url_string = body.product_url || body.productImageUrl || '';
 
-      // Save initial job to DB immediately
-      const CloudbasesJobModel = (await import('@/models/CloudbasesJob')).default;
+      const uploadedProductFile = uploadedFiles.find((f) =>
+        f.name && (f.type.startsWith('image/') || /\.(webp|png|jpe?g|jpg|bmp|gif)$/i.test(f.name))
+      ) || null;
+
+      let uploadedFileBuffer: ArrayBuffer | null = null;
+      let uploadedFileName = '';
+      if (uploadedProductFile) {
+        uploadedFileBuffer = await uploadedProductFile.arrayBuffer();
+        uploadedFileName   = uploadedProductFile.name;
+      }
+
+      const externalFormData = new FormData();
+      externalFormData.append('template_id', String(cloudbases_template_id));
+
+      if (uploadedFileBuffer) {
+        const blob = new Blob([uploadedFileBuffer]);
+        externalFormData.append('product_url', blob, uploadedFileName);
+      } else if (product_url_string) {
+        externalFormData.append('product_url', String(product_url_string));
+      }
+
+      if (mapped_headline)    externalFormData.append('headline',    String(mapped_headline));
+      if (mapped_discount)    externalFormData.append('discount',    String(mapped_discount));
+      if (mapped_description) externalFormData.append('description', String(mapped_description));
+      if (mapped_validity)    externalFormData.append('validity',    String(mapped_validity));
+      externalFormData.append('footer', '*T&C apply');
+
+      let externalResponse;
+      try {
+        externalResponse = await fetch(
+          'https://cloudbases.in/storesparc_video/index.php/api/external/video',
+          { method: 'POST', headers: { 'X-API-Key': apiKey }, body: externalFormData }
+        );
+      } catch (err: any) {
+        return NextResponse.json({ success: false, message: `Failed to connect to Cloudbases API: ${err.message}` }, { status: 502 });
+      }
+
+      const resultData = await externalResponse.json().catch(() => null);
+      if (!externalResponse.ok || !resultData || !resultData.success) {
+         return NextResponse.json({ 
+           success: false, 
+           message: resultData?.message || 'Failed to queue video on Cloudbases' 
+         }, { status: externalResponse.status || 500 });
+      }
+
       const jobUserId = body.userId || body.userid || body.storeUserId || '';
+      const externalJobId = resultData.data?.job_id;
+      const cloudJobId = externalJobId || uuidv4();
+
+      await connectToDatabase();
+      const CloudbasesJobModel = (await import('@/models/CloudbasesJob')).default;
       await CloudbasesJobModel.create({
         jobId:       cloudJobId,
         userId:      jobUserId,
@@ -305,118 +349,16 @@ export async function POST(req: NextRequest) {
         discount:    mapped_discount,
         validity:    mapped_validity,
         productUrl:  product_url_string,
+        resultData:  resultData
       });
 
-      // Handle uploaded product image file
-      const uploadedProductFile = uploadedFiles.find((f) =>
-        f.name && (f.type.startsWith('image/') || /\\.(webp|png|jpe?g|jpg|bmp|gif)$/i.test(f.name))
-      ) || null;
-
-      // Convert uploaded file to ArrayBuffer now (before background execution)
-      let uploadedFileBuffer: ArrayBuffer | null = null;
-      let uploadedFileName = '';
-      if (uploadedProductFile) {
-        uploadedFileBuffer = await uploadedProductFile.arrayBuffer();
-        uploadedFileName   = uploadedProductFile.name;
-      }
-
-      // Background async call - does NOT block the response
-      (async () => {
-        try {
-          const externalFormData = new FormData();
-          externalFormData.append('template_id', String(cloudbases_template_id));
-
-          if (uploadedFileBuffer) {
-            const blob = new Blob([uploadedFileBuffer]);
-            externalFormData.append('product_url', blob, uploadedFileName);
-          } else if (product_url_string) {
-            externalFormData.append('product_url', String(product_url_string));
-          }
-
-          if (mapped_headline)    externalFormData.append('headline',    String(mapped_headline));
-          if (mapped_discount)    externalFormData.append('discount',    String(mapped_discount));
-          if (mapped_description) externalFormData.append('description', String(mapped_description));
-          if (mapped_validity)    externalFormData.append('validity',    String(mapped_validity));
-          externalFormData.append('footer', '*T&C apply');
-
-          const externalResponse = await fetch(
-            'https://cloudbases.in/storesparc_video/index.php/api/external/video',
-            { method: 'POST', headers: { 'X-API-Key': apiKey }, body: externalFormData }
-          );
-
-          const resultData = await externalResponse.json().catch(() => null);
-
-          await connectToDatabase();
-          if (externalResponse.ok && resultData) {
-            let finalResultData = { ...resultData };
-            const videoUrl = resultData.video_url || resultData.videoUrl || resultData.url || resultData.file;
-            
-            if (videoUrl && jobUserId) {
-              try {
-                const videoRes = await fetch(videoUrl);
-                if (videoRes.ok) {
-                  const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-                  const uploadDir = join(process.cwd(), "uploads", jobUserId, "video");
-                  if (!existsSync(uploadDir)) {
-                    await mkdir(uploadDir, { recursive: true });
-                  }
-                  const fileName = `${uuidv4()}-cloudbases-generated.mp4`;
-                  await writeFile(join(uploadDir, fileName), videoBuffer);
-                  
-                  const localVideoUrl = `/uploads/${jobUserId}/video/${fileName}`;
-                  finalResultData.local_video_url = localVideoUrl;
-                  
-                  const targetUserObj = mongoose.Types.ObjectId.isValid(jobUserId)
-                    ? new mongoose.Types.ObjectId(jobUserId)
-                    : jobUserId;
-                  
-                  const MediaItemModel = (await import('@/models/MediaItems')).default;
-                  const mediaItem = new MediaItemModel({
-                    userId: targetUserObj,
-                    name: `Cloudbases AI Video – ${new Date().toLocaleString()}`,
-                    type: "video",
-                    url: localVideoUrl,
-                    approvalStatus: "pending",
-                    templateId: String(cloudbases_template_id),
-                    createdAt: new Date(),
-                  });
-                  await mediaItem.save();
-                }
-              } catch (e) {
-                console.error("[cloudbases video download error]:", e);
-              }
-            }
-
-            await CloudbasesJobModel.findOneAndUpdate(
-              { jobId: cloudJobId },
-              { status: 'completed', resultData: finalResultData, completedAt: new Date() }
-            );
-          } else {
-            await CloudbasesJobModel.findOneAndUpdate(
-              { jobId: cloudJobId },
-              { status: 'failed', errorMessage: resultData?.message || `HTTP ${externalResponse.status}` }
-            );
-          }
-        } catch (err: any) {
-          console.error('[cloudbases background job error]:', err);
-          try {
-            await connectToDatabase();
-            await CloudbasesJobModel.findOneAndUpdate(
-              { jobId: cloudJobId },
-              { status: 'failed', errorMessage: err?.message || 'Unknown error' }
-            );
-          } catch (_) {}
-        }
-      })();
-
-      // Return immediately — client polls with jobId
       return NextResponse.json({
         success: true,
         status: 'processing',
         jobId: cloudJobId,
         provider: 'cloudbases',
         templateId: String(cloudbases_template_id),
-        message: `Video generation started. Poll for result at POST /api/external/get-video with { jobId: '${cloudJobId}' }`,
+        message: `Video queued. Poll for result at POST /api/external/get-video with { jobId: '${cloudJobId}' }`,
       });
     }
     // -- END NEW --
