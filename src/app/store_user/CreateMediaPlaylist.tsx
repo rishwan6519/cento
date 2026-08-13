@@ -72,11 +72,47 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
 
       if (editingPlaylist.files && editingPlaylist.files.length > 0) {
         setSelectionMode("existing");
-        setSelectedMediaIds(editingPlaylist.files.map((f: any) => f.fileId || f._id));
+        // Extract media IDs from playlist files
+        // fileId can be: a populated object {_id, name, url...}, a string ObjectId, or missing
+        // mediaId can also hold the reference
+        // f._id is the SUBDOCUMENT id, NOT the MediaItem id
+        const ids: string[] = [];
+        editingPlaylist.files.forEach((f: any) => {
+          const fid = f.fileId;
+          // Case 1: fileId is a populated object from .populate('files.fileId')
+          if (fid && typeof fid === 'object' && fid._id) {
+            ids.push(String(fid._id));
+            return;
+          }
+          // Case 2: fileId is a plain string/ObjectId
+          if (fid && typeof fid === 'string') {
+            ids.push(String(fid));
+            return;
+          }
+          // Case 3: mediaId field holds the reference
+          if (f.mediaId) {
+            const mid = typeof f.mediaId === 'object' && f.mediaId._id ? f.mediaId._id : f.mediaId;
+            ids.push(String(mid));
+            return;
+          }
+        });
+        setSelectedMediaIds(ids);
+        // Store file paths for fallback matching when media loads
+        const paths = editingPlaylist.files.map((f: any) => {
+          const fid = f.fileId;
+          if (fid && typeof fid === 'object') return fid.url || fid.fileUrl || '';
+          return f.path || '';
+        }).filter(Boolean);
+        (window as any).__editingPlaylistPaths = paths;
 
         const newBgSettings: Record<string, any> = {};
         editingPlaylist.files.forEach((f: any) => {
-          const id = f.fileId || f._id;
+          const fid = f.fileId;
+          let id: string;
+          if (fid && typeof fid === 'object' && fid._id) id = String(fid._id);
+          else if (fid && typeof fid === 'string') id = String(fid);
+          else if (f.mediaId) id = String(typeof f.mediaId === 'object' && f.mediaId._id ? f.mediaId._id : f.mediaId);
+          else return;
           if (f.backgroundImageEnabled) {
             newBgSettings[id] = { enabled: true, imageId: f.backgroundImage || null };
           }
@@ -119,7 +155,48 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
     if (selectionMode !== "existing" || !userId) return;
     setLoadingMedia(true);
     fetch(`/api/media?userId=${userId}`).then(r => r.json())
-      .then(d => setExistingMediaData(d.media || d.mediaFiles || d.data || []))
+      .then(d => {
+        const allMedia = d.media || d.mediaFiles || d.data || [];
+        setExistingMediaData(allMedia);
+        
+        // Fallback: if we're in edit mode and selectedMediaIds don't match any loaded media,
+        // try matching by file path/URL instead
+        if (editingPlaylist && editingPlaylist.files && editingPlaylist.files.length > 0) {
+          setSelectedMediaIds(prev => {
+            // Check if any current IDs match the loaded media
+            const mediaIds = new Set(allMedia.map((m: any) => String(m._id || m.id)));
+            const anyMatch = prev.some(id => mediaIds.has(id));
+            
+            if (anyMatch) return prev; // IDs matched, no fallback needed
+            
+            // No match — try path-based matching
+            const matchedIds: string[] = [];
+            editingPlaylist.files.forEach((f: any) => {
+              const fid = f.fileId;
+              // Get the URL from the playlist file
+              const fileUrl = (fid && typeof fid === 'object') 
+                ? (fid.url || fid.fileUrl || '') 
+                : (f.path || f.url || '');
+              const fileName = (fid && typeof fid === 'object') 
+                ? (fid.name || '') 
+                : (f.name || '');
+              
+              if (fileUrl || fileName) {
+                const match = allMedia.find((m: any) => {
+                  if (fileUrl && (m.url === fileUrl || m.fileUrl === fileUrl)) return true;
+                  if (fileName && m.name === fileName) return true;
+                  return false;
+                });
+                if (match) {
+                  matchedIds.push(String(match._id || match.id));
+                }
+              }
+            });
+            
+            return matchedIds.length > 0 ? matchedIds : prev;
+          });
+        }
+      })
       .catch(() => setExistingMediaData([]))
       .finally(() => setLoadingMedia(false));
   }, [selectionMode, userId]);
@@ -128,7 +205,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   const toggleDevice = (id: string) => {
     setSelectedDeviceIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   };
-  const toggleMedia = (id: string) => setSelectedMediaIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const toggleMedia = (id: string) => setSelectedMediaIds(p => p.includes(String(id)) ? p.filter(x => x !== String(id)) : [...p, String(id)]);
 
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -437,10 +514,10 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                     const badge = t.includes('video') ? 'video' : t.includes('audio') ? 'audio' : 'image';
                     return (
                       <tr key={id}>
-                        <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(id)} onChange={() => toggleMedia(id)} /></td>
+                        <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(String(id))} onChange={() => toggleMedia(id)} /></td>
                         <td style={{ fontWeight: 500, color: '#445459' }}>
                           {media.name}
-                          {badge === 'audio' && selectedMediaIds.includes(id) && (
+                          {badge === 'audio' && selectedMediaIds.includes(String(id)) && (
                             <div style={{ marginTop: 8, padding: '8px 10px', background: '#F8FAFB', borderRadius: 6, border: '1px dashed #D6E6E9', maxWidth: 220 }}>
                               <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#162B30' }}>
                                 <input type="checkbox"

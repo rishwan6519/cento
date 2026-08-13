@@ -48,7 +48,20 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
       setStartTime(editingPlaylist.startTime || schedule.startTime || "");
       setEndTime(editingPlaylist.endTime || schedule.endTime || "");
       setFrequencyInMinutes(editingPlaylist.frequencyInMinutes || schedule.frequency || "");
-      setSelectedDays(editingPlaylist.daysOfWeek || schedule.daysOfWeek || []);
+      const dayNormalizeMap: Record<string, string> = {
+        'sun': 'Sun', 'sunday': 'Sun',
+        'mon': 'Mon', 'monday': 'Mon',
+        'tue': 'Tue', 'tuesday': 'Tue',
+        'wed': 'Wed', 'wednesday': 'Wed',
+        'thu': 'Thu', 'thursday': 'Thu',
+        'fri': 'Fri', 'friday': 'Fri',
+        'sat': 'Sat', 'saturday': 'Sat',
+      };
+      const rawDays = editingPlaylist.daysOfWeek || schedule.daysOfWeek || [];
+      const normalizedDays = rawDays.map((d: string) =>
+        dayNormalizeMap[String(d).trim().toLowerCase()] || String(d).trim()
+      );
+      setSelectedDays(normalizedDays);
       
       // Device IDs mapping (depends on how we fetch connections in ViewAllCampaigns)
       setSelectedDeviceIds(editingPlaylist.deviceIds || []);

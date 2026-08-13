@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -20,6 +20,7 @@ import {
   FaFilm,
   FaTag,
   FaLayerGroup,
+  FaFolderOpen,
 } from "react-icons/fa";
 import { MdCampaign, MdComputer } from "react-icons/md";
 import { BsMusicNoteList } from "react-icons/bs";
@@ -34,6 +35,8 @@ import AIVideoGenerationView from "./AIVideoGenerationView";
 import AIVideoTemplatesView from "./AIVideoTemplatesView";
 import OfferCreation from "./OfferCreation";
 import Veo3TextVideoView from "./Veo3TextVideoView";
+import MediaLibraryView from "./MediaLibraryView";
+import DeviceDetailsModal from "./DeviceDetailsModal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ViewKey =
@@ -50,7 +53,8 @@ export type ViewKey =
   | "aiVideoGeneration"
   | "aiVideoTemplates"
   | "offerCreation"
-  | "veo3TextVideo";
+  | "veo3TextVideo"
+  | "mediaLibrary";
 
 interface OfflineDevice {
   id: string;
@@ -143,6 +147,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <MdCampaign className="store-nav-item__icon" />
             <span>View all active campaigns</span>
+          </button>
+
+          <button
+            className={`store-nav-item ${isActive("mediaLibrary") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("mediaLibrary")}
+          >
+            <FaFolderOpen className="store-nav-item__icon" />
+            <span>Media Library</span>
           </button>
 
           <button
@@ -271,6 +283,12 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
   const [stats, setStats] = useState({ playlists: 0, announcements: 0 });
   const [loadingStats, setLoadingStats] = useState(true);
 
+  const [selectedDeviceForModal, setSelectedDeviceForModal] = useState<OfflineDevice | null>(null);
+
+  const handleDeviceClick = (device: OfflineDevice) => {
+    setSelectedDeviceForModal(device);
+  };
+
   useEffect(() => {
     const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
     if (!userId) { setLoadingStats(false); return; }
@@ -351,7 +369,7 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
                 const statusStr = (device.status || "").toLowerCase();
                 const isOnline = statusStr === 'online';
                 return (
-                  <div key={device.id} className="store-device-card" style={{ borderLeftColor: isOnline ? '#16A34A' : '#F05A28' }}>
+                  <div key={device.id} className="store-device-card" style={{ borderLeftColor: isOnline ? '#16A34A' : '#F05A28', cursor: 'pointer' }} onClick={() => handleDeviceClick(device)}>
                     <div className="store-device-card__content">
                       <div className="store-device-card__icon-wrap">
                         <MdComputer size={24} className="store-device-card__device-icon" style={{ color: isOnline ? '#16A34A' : '#F05A28' }} />
@@ -365,7 +383,7 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
                         <button 
                           className="store-device-card__raise-btn" 
                           style={{ color: isOnline ? '#16A34A' : '#F05A28' }}
-                          onClick={() => { window.location.href = "mailto:contact@centelonrobotics.tech"; }}
+                          onClick={(e) => { e.stopPropagation(); window.location.href = "mailto:contact@centelonrobotics.tech"; }}
                         >
                           {isOnline ? 'View Details' : 'Raise issue'} <FaArrowRight size={10} />
                         </button>
@@ -418,6 +436,11 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
           </button>
         </div>
       </div>
+      <DeviceDetailsModal 
+        isOpen={!!selectedDeviceForModal} 
+        onClose={() => setSelectedDeviceForModal(null)} 
+        device={selectedDeviceForModal} 
+      />
     </div>
   );
 };
@@ -596,6 +619,8 @@ export default function StoreUserPage() {
         return <AIVideoTemplatesView />;
       case "offerCreation":
         return <OfferCreation />;
+      case "mediaLibrary":
+        return <MediaLibraryView />;
       case "veo3TextVideo":
         return <Veo3TextVideoView />;
       default:

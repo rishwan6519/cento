@@ -308,6 +308,7 @@ export const advancedPlaylistScheduleService = {
     timeline: any[];
     serverDate: string;
     serverTime: { australian: string; timeZone: string; utcOffset: string };
+    versionId: string;
   }> {
     if (!serialNumber) {
       throw new ServiceError('Serial number is required', 400);
@@ -525,6 +526,7 @@ export const advancedPlaylistScheduleService = {
             : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
           contributingPlaylists.push({
+            id: playlist._id ? playlist._id.toString() : String(playlist.id || sched._id),
             playlistId: playlist._id ? playlist._id.toString() : String(playlist.id || sched._id),
             playlistName: playlist.name || 'Unnamed Playlist',
             scheduleId: sched._id.toString(),
@@ -582,10 +584,23 @@ export const advancedPlaylistScheduleService = {
       }
     }
 
+    let maxUpdatedAt = 0;
+    for (const sched of validSchedules) {
+      const playlist = sched.playlistId as any;
+      if (playlist && playlist.updatedAt) {
+        const time = new Date(playlist.updatedAt).getTime();
+        if (time > maxUpdatedAt) {
+          maxUpdatedAt = time;
+        }
+      }
+    }
+    const globalVersionId = maxUpdatedAt > 0 ? maxUpdatedAt.toString() : Date.now().toString();
+
     return {
       timeline: mergedSlots,
       serverDate: dateStr,
       serverTime: serverTimeMeta,
+      versionId: globalVersionId,
     };
   },
 };

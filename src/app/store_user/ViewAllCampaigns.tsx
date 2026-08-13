@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { FaEdit, FaTrash, FaPlus, FaSearch, FaArrowLeft } from "react-icons/fa";
+import { FaEdit, FaTrash, FaPlus, FaSearch, FaArrowLeft, FaEye } from "react-icons/fa";
 import { ViewKey } from "./page";
 
 interface Props {
@@ -16,6 +16,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
   const [search, setSearch] = useState("");
   const [previewFiles, setPreviewFiles] = useState<any[] | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [viewingPlaylist, setViewingPlaylist] = useState<any>(null);
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
 
   useEffect(() => {
@@ -87,6 +88,18 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
     } catch { }
   };
 
+  const getFileIcon = (type: string) => {
+    const t = (type || '').toLowerCase();
+    if (t.includes('video') || t.includes('mp4')) return '🎬';
+    if (t.includes('audio') || t.includes('mp3') || t.includes('wav')) return '🎵';
+    if (t.includes('image') || t.includes('jpg') || t.includes('png')) return '🖼️';
+    return '📄';
+  };
+
+  const getPreviewUrl = (f: any) => {
+    return f?.url || f?.fileUrl || f?.path || f?.file || (typeof f === 'string' ? f : '');
+  };
+
   const showTypeColumn = filter === "all" || filter === "announcement";
 
   return (
@@ -140,15 +153,14 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                 {filtered.map(p => {
                   const id = p._id || p.id;
                   const status = getStatus(p);
-                  const days = Array.isArray(p.daysOfWeek) ? p.daysOfWeek.join(",") : "";
-                  const time = p.startTime && p.endTime ? `${p.startTime} to ${p.endTime}` : "";
-                  const schedule = [days, time].filter(Boolean).join(" | ") || "—";
-                  const hasMedia = p.mediaIds?.length || p.announcements?.length;
-                  const preview = hasMedia ? `Display file link - uploaded by ${p.userId?.username || "user"}` : "—";
+                  const daysArr = Array.isArray(p.daysOfWeek) ? p.daysOfWeek : [];
+                  const time = p.startTime && p.endTime ? `${p.startTime} - ${p.endTime}` : "";
+                  const filesArr = p.files || p.announcements || [];
+                  const fileCount = filesArr.length;
                   const isAnn = !!p.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
 
                   return (
-                    <tr key={id}>
+                    <tr key={id} style={{ cursor: 'pointer' }} onClick={() => setViewingPlaylist(p)}>
                       {showTypeColumn && (
                         <td>
                           <span className={`su-vc-type-badge ${isAnn ? 'su-vc-type--ann' : 'su-vc-type--media'}`}>
@@ -157,25 +169,28 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                         </td>
                       )}
                       <td style={{ fontWeight: 600, color: "#162B30" }}>{p.name || "Playlist name"}</td>
-                      <td>{schedule}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {daysArr.length > 0 ? daysArr.map((d: string) => (
+                              <span key={d} style={{ background: '#EAF6F8', color: '#11B5BB', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                                {d.substring(0,3)}
+                              </span>
+                            )) : <span style={{ color: "#A4B6B9", fontSize: '0.75rem' }}>No days selected</span>}
+                          </div>
+                          {time && <span style={{ fontSize: '0.75rem', color: '#64848D', fontWeight: 600 }}>{time}</span>}
+                        </div>
+                      </td>
                       <td style={{ fontSize: ".8rem", color: "#64848D" }}>
-                        {hasMedia ? (
-                          <button 
-                            onClick={() => {
-                              setPreviewFiles(p.files || p.announcements || []);
-                              setPreviewIndex(0);
-                            }}
-                            style={{ background: "none", border: "none", color: "#11B5BB", cursor: "pointer", padding: 0, textDecoration: "underline", textAlign: "left" }}
-                          >
-                            {preview}
-                          </button>
+                        {fileCount > 0 ? (
+                          <span style={{ color: '#11B5BB', fontWeight: 600 }}>{fileCount} file{fileCount !== 1 ? 's' : ''}</span>
                         ) : "—"}
                       </td>
                       <td><span className="su-vc-status" style={{ color: getStatusColor(status), background: status === "Assigned" ? "#F0FDF4" : "transparent" }}>{status}</span></td>
                       <td>
                         <div className="su-vc-actions">
-                          <button className="su-vc-action-btn su-vc-action-btn--edit" onClick={() => onEdit && onEdit(p)}><FaEdit size={12} /></button>
-                          <button className="su-vc-action-btn su-vc-action-btn--del" onClick={() => handleDelete(p)}><FaTrash size={11} /></button>
+                          <button className="su-vc-action-btn su-vc-action-btn--edit" onClick={(e) => { e.stopPropagation(); onEdit && onEdit(p); }}><FaEdit size={12} /></button>
+                          <button className="su-vc-action-btn su-vc-action-btn--del" onClick={(e) => { e.stopPropagation(); handleDelete(p); }}><FaTrash size={11} /></button>
                         </div>
                       </td>
                     </tr>
@@ -190,6 +205,101 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
         )}
       </div>
 
+      {/* ── Playlist Detail Modal (Read-Only) ── */}
+      {viewingPlaylist && (
+        <div className="su-vc-modal-overlay" onClick={() => setViewingPlaylist(null)}>
+          <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 640, maxHeight: '88vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 60px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg, #0B3D44, #155E68)', padding: '20px 24px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>{viewingPlaylist.name}</h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)' }}>
+                  {(() => {
+                    const isAnn = !!viewingPlaylist.announcements || ["announcement"].some(t => (viewingPlaylist.type || "").toLowerCase().includes(t));
+                    return isAnn ? 'Announcement Playlist' : 'Media Playlist';
+                  })()}
+                </p>
+              </div>
+              <button onClick={() => setViewingPlaylist(null)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: 36, height: 36, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+
+            {/* Schedule info */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 24px', background: '#F8FAFB', borderBottom: '1px solid #EAEFEF' }}>
+              <div style={{ background: '#fff', padding: '12px 14px', borderRadius: 10, border: '1px solid #E8ECEE' }}>
+                <p style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8CA3AB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>📅 Date Range</p>
+                <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', margin: 0 }}>
+                  {viewingPlaylist.startDate ? new Date(viewingPlaylist.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                  {' → '}
+                  {viewingPlaylist.endDate ? new Date(viewingPlaylist.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                </p>
+              </div>
+              <div style={{ background: '#fff', padding: '12px 14px', borderRadius: 10, border: '1px solid #E8ECEE' }}>
+                <p style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8CA3AB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>⏰ Active Hours</p>
+                <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', margin: 0 }}>
+                  {viewingPlaylist.startTime || '00:00'} – {viewingPlaylist.endTime || '23:59'}
+                </p>
+              </div>
+              <div style={{ gridColumn: '1 / -1', background: '#fff', padding: '12px 14px', borderRadius: 10, border: '1px solid #E8ECEE' }}>
+                <p style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8CA3AB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>🗓️ Active Days</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {(viewingPlaylist.daysOfWeek || []).length > 0 ? (viewingPlaylist.daysOfWeek || []).map((d: string) => (
+                    <span key={d} style={{ background: '#EAF6F8', color: '#11B5BB', padding: '3px 10px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 700, textTransform: 'capitalize' }}>{d}</span>
+                  )) : <span style={{ fontSize: '0.78rem', color: '#8CA3AB' }}>Everyday</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Files list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+              <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#8CA3AB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
+                Files ({(viewingPlaylist.files || viewingPlaylist.announcements || []).length})
+              </p>
+              {(viewingPlaylist.files || viewingPlaylist.announcements || []).length === 0 ? (
+                <div style={{ padding: 32, textAlign: 'center', color: '#A4B6B9', background: '#F8FAFB', borderRadius: 12, border: '1.5px dashed #D6E6E9' }}>No files in this playlist.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(viewingPlaylist.files || viewingPlaylist.announcements || []).map((f: any, idx: number) => {
+                    const file = f.file || f;
+                    const name = file.name || (file.path || '').split('/').pop() || 'Unknown';
+                    const type = file.type || '';
+                    const path = getPreviewUrl(file);
+                    return (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#fff', border: '1.5px solid #E8ECEE', borderRadius: 12, transition: 'border-color 0.2s' }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#F5F7F8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
+                          {getFileIcon(type || name)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: 600, fontSize: '0.82rem', color: '#162B30', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</p>
+                          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '2px 0 0', textTransform: 'uppercase', fontWeight: 600 }}>{type || 'file'}{f.delay ? ` • Delay: ${f.delay}s` : ''}</p>
+                        </div>
+                        {path && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewFiles([file]);
+                              setPreviewIndex(0);
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #F05A28, #E04818)', color: '#fff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 2px 8px rgba(240,90,40,0.25)' }}
+                          >
+                            <FaEye size={11} /> Preview
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #EAEFEF', display: 'flex', justifyContent: 'flex-end', gap: 12, background: '#fff' }}>
+              <button onClick={() => setViewingPlaylist(null)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #EAEFEF', background: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', color: '#445459' }}>Close</button>
+              <button onClick={() => { setViewingPlaylist(null); onEdit && onEdit(viewingPlaylist); }} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#F05A28', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Edit Playlist</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Preview Modal */}
       {previewFiles && previewFiles.length > 0 && (
         <div className="su-vc-modal-overlay">
@@ -202,9 +312,15 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
               {(() => {
                 const current = previewFiles[previewIndex];
                 const file = current?.fileId || current;
-                const type = (file?.type || '').toLowerCase();
-                const path = file?.url || file?.fileUrl || file?.path;
+                let type = (file?.type || '').toLowerCase();
+                const path = file?.url || file?.fileUrl || file?.path || file?.file || (typeof file === 'string' ? file : '');
                 const name = file?.name || "Unknown file";
+
+                if (!type && path) {
+                  if (path.match(/\.(mp4|webm|ogg)(\?.*)?$/i) || path.includes('video')) type = 'video';
+                  else if (path.match(/\.(mp3|wav|ogg|m4a)(\?.*)?$/i) || path.includes('audio')) type = 'audio';
+                  else type = 'image';
+                }
 
                 if (type.includes('image')) {
                   return <img src={path} alt="Preview" className="su-vc-modal-media" />;

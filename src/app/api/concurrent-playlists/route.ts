@@ -649,7 +649,12 @@ export async function GET(req: NextRequest) {
       }).lean();
 
       const allDevicePlaylists = [...mediaPlaylists, ...announcementPlaylists]
-        .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .map((p: any) => ({
+          ...p,
+          id: p._id.toString(),
+          versionId: p.updatedAt ? new Date(p.updatedAt).getTime().toString() : p._id.toString()
+        }));
 
       return NextResponse.json({
         success: true,
@@ -703,7 +708,12 @@ export async function GET(req: NextRequest) {
     }
 
     const allPlaylists = [...ownPlaylists, ...connectedOtherPlaylists]
-      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .map((p: any) => ({
+        ...p,
+        id: p._id.toString(),
+        versionId: p.updatedAt ? new Date(p.updatedAt).getTime().toString() : p._id.toString()
+      }));
 
     return NextResponse.json({
       success: true,

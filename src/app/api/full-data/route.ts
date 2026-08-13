@@ -71,6 +71,7 @@ export async function GET(req: NextRequest) {
       const playlists = await Playlist.find({ _id: { $in: devicePlaylist.playlistIds } });
       playlistDetails = playlists.map((p: any) => {
         const payload = {
+          name: p.name,
           contentType: p.contentType,
           startDate: p.startDate,
           endDate: p.endDate,
@@ -122,6 +123,7 @@ export async function GET(req: NextRequest) {
 
       announcementDetails = announcementPlaylists.map((ap: any) => {
         const payload = {
+          name: ap.name,
           schedule: ap.schedule,
           announcements: ap.announcements
             .map((a: any) => {

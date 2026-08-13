@@ -260,6 +260,7 @@ export async function getDailyTimelineHandler(req: NextRequest): Promise<NextRes
         success: true,
         serverDate: result.serverDate,
         serverTime: result.serverTime,
+        versionId: result.versionId,
         count: result.timeline.length,
         data: result.timeline,
       },
