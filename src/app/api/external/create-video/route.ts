@@ -336,7 +336,8 @@ export async function POST(req: NextRequest) {
       const jobUserId = body.userId || body.userid || body.storeUserId || '';
       const externalJobId = resultData.data?.job_id;
       const cloudJobId = externalJobId || uuidv4();
-      const cleanOfferId = await generateUniqueOfferId();
+      const passedOfferId = body.offerId || body.offerid || body.offer_id;
+      const cleanOfferId = passedOfferId ? String(passedOfferId).trim() : await generateUniqueOfferId();
 
       const rawChannels = body.channels || body.socialMedia || body.share || body.shareTo || [];
       let channelsList: string[] = [];

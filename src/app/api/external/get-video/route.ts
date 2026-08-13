@@ -301,7 +301,7 @@ async function checkAndResolveJob(jobId: string) {
         await cloudJob.save();
       }
 
-      return NextResponse.json({
+      const responsePayload: any = {
         success: true,
         status: 'completed',
         jobId,
@@ -315,7 +315,23 @@ async function checkAndResolveJob(jobId: string) {
         socialMediaCaption: cloudJob.socialMediaCaption || "",
         hashTags: cloudJob.hashTags || [],
         channels: cloudJob.channels || [],
-      });
+      };
+
+      if (cloudJob.offerId) {
+        const trimmedId = String(cloudJob.offerId).trim();
+        const query = mongoose.Types.ObjectId.isValid(trimmedId)
+          ? { $or: [{ _id: trimmedId }, { offerId: trimmedId }] }
+          : { offerId: trimmedId };
+        const linkedOffer: any = await Offer.findOne(query).lean().catch(() => null);
+        if (linkedOffer) {
+          if (linkedOffer.offerName) responsePayload.offerName = linkedOffer.offerName;
+          if (linkedOffer.offerDescription) responsePayload.offerDescription = linkedOffer.offerDescription;
+          if (linkedOffer.startDate) responsePayload.offerStartDate = new Date(linkedOffer.startDate).toISOString().split("T")[0];
+          if (linkedOffer.endDate) responsePayload.offerEndDate = new Date(linkedOffer.endDate).toISOString().split("T")[0];
+        }
+      }
+
+      return NextResponse.json(responsePayload);
     }
     
     // Fallback: If not found in any local DB, try directly fetching from cloudbases API
