@@ -483,7 +483,7 @@ export const advancedPlaylistScheduleService = {
     }
 
     if (validSchedules.length === 0) {
-      return { timeline: [], serverDate: dateStr, serverTime: serverTimeMeta };
+      return { timeline: [], serverDate: dateStr, serverTime: serverTimeMeta, versionId: Date.now().toString() };
     }
 
     // Collect all unique start and end boundaries from both advanced and legacy schedules
