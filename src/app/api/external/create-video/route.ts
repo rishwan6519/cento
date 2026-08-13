@@ -336,6 +336,40 @@ export async function POST(req: NextRequest) {
       const jobUserId = body.userId || body.userid || body.storeUserId || '';
       const externalJobId = resultData.data?.job_id;
       const cloudJobId = externalJobId || uuidv4();
+      const cleanOfferId = await generateUniqueOfferId();
+
+      const rawChannels = body.channels || body.socialMedia || body.share || body.shareTo || [];
+      let channelsList: string[] = [];
+      if (Array.isArray(rawChannels)) {
+        channelsList = rawChannels.map((item: any) => String(item).trim()).filter(Boolean);
+      } else if (typeof rawChannels === "string") {
+        channelsList = rawChannels.split(",").map((s: string) => s.trim()).filter(Boolean);
+      }
+
+      const openAiKey = process.env.OPENAI_API_KEY || "";
+      let voiceoverScript = "";
+      let socialMediaHeading = "";
+      let socialMediaCaption = "";
+      let hashTags: string[] = [];
+
+      if (openAiKey && mapped_description) {
+        try {
+          const enhancedData = await enhancePromptAndScript(
+            mapped_description,
+            "Cloudbases",
+            "720p",
+            "9:16",
+            4,
+            openAiKey
+          );
+          voiceoverScript = enhancedData.voiceoverScript;
+          socialMediaHeading = enhancedData.socialMediaHeading;
+          socialMediaCaption = enhancedData.socialMediaCaption;
+          hashTags = enhancedData.hashTags;
+        } catch (e) {
+          console.warn("[create-video] Failed to generate enhanced script for cloudbases job:", e);
+        }
+      }
 
       await connectToDatabase();
       const CloudbasesJobModel = (await import('@/models/CloudbasesJob')).default;
@@ -343,12 +377,18 @@ export async function POST(req: NextRequest) {
         jobId:       cloudJobId,
         userId:      jobUserId,
         templateId:  String(cloudbases_template_id),
+        offerId:     cleanOfferId,
         status:      'processing',
         description: mapped_description,
         headline:    mapped_headline,
         discount:    mapped_discount,
         validity:    mapped_validity,
         productUrl:  product_url_string,
+        channels:    channelsList,
+        voiceoverScript,
+        socialMediaHeading,
+        socialMediaCaption,
+        hashTags,
         resultData:  resultData
       });
 
@@ -356,9 +396,15 @@ export async function POST(req: NextRequest) {
         success: true,
         status: 'processing',
         jobId: cloudJobId,
+        offerId: cleanOfferId,
         provider: 'cloudbases',
         templateId: String(cloudbases_template_id),
         message: `Video queued. Poll for result at POST /api/external/get-video with { jobId: '${cloudJobId}' }`,
+        voiceoverScript,
+        socialMediaHeading,
+        socialMediaCaption,
+        hashTags,
+        channels: channelsList,
       });
     }
     // -- END NEW --

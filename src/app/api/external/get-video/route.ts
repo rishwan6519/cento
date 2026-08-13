@@ -166,9 +166,15 @@ async function checkAndResolveJob(jobId: string) {
           success: true,
           status: 'processing',
           jobId,
+          ...(cloudJob.offerId ? { offerId: cloudJob.offerId } : {}),
           provider: 'cloudbases',
           templateId: cloudJob.templateId,
           message: 'Video generation is in progress. Please check again in a minute.',
+          voiceoverScript: cloudJob.voiceoverScript || "",
+          socialMediaHeading: cloudJob.socialMediaHeading || "",
+          socialMediaCaption: cloudJob.socialMediaCaption || "",
+          hashTags: cloudJob.hashTags || [],
+          channels: cloudJob.channels || [],
         });
       }
 
@@ -177,8 +183,14 @@ async function checkAndResolveJob(jobId: string) {
           success: false,
           status: 'failed',
           jobId,
+          ...(cloudJob.offerId ? { offerId: cloudJob.offerId } : {}),
           provider: 'cloudbases',
           message: cloudJob.errorMessage || 'Video generation failed.',
+          voiceoverScript: cloudJob.voiceoverScript || "",
+          socialMediaHeading: cloudJob.socialMediaHeading || "",
+          socialMediaCaption: cloudJob.socialMediaCaption || "",
+          hashTags: cloudJob.hashTags || [],
+          channels: cloudJob.channels || [],
         });
       }
       // completed
@@ -244,6 +256,12 @@ async function checkAndResolveJob(jobId: string) {
                 url: localVideoUrl,
                 approvalStatus: "pending",
                 templateId: String(cloudJob.templateId),
+                ...(cloudJob.offerId ? { offerId: cloudJob.offerId } : {}),
+                channels: cloudJob.channels || [],
+                voiceoverScript: cloudJob.voiceoverScript || "",
+                socialMediaHeading: cloudJob.socialMediaHeading || "",
+                socialMediaCaption: cloudJob.socialMediaCaption || "",
+                hashTags: cloudJob.hashTags || [],
                 createdAt: new Date(),
               });
               await mediaItem.save();
@@ -251,13 +269,14 @@ async function checkAndResolveJob(jobId: string) {
               const metadataDoc = await MediaMetadataModel.create({
                 mediaId: mediaItem._id,
                 userId: targetUserObj,
-                channels: [],
-                voiceoverScript: cloudJob.description || "",
-                socialMediaHeading: cloudJob.headline || "",
-                socialMediaCaption: "",
-                hashTags: [],
+                channels: cloudJob.channels || [],
+                voiceoverScript: cloudJob.voiceoverScript || "",
+                socialMediaHeading: cloudJob.socialMediaHeading || "",
+                socialMediaCaption: cloudJob.socialMediaCaption || "",
+                hashTags: cloudJob.hashTags || [],
                 approvalStatus: "pending",
                 templateId: String(cloudJob.templateId),
+                ...(cloudJob.offerId ? { offerId: cloudJob.offerId } : {}),
               });
               mediaItem.metadataId = metadataDoc._id;
               await mediaItem.save();
@@ -286,10 +305,16 @@ async function checkAndResolveJob(jobId: string) {
         success: true,
         status: 'completed',
         jobId,
+        ...(cloudJob.offerId ? { offerId: cloudJob.offerId } : {}),
         provider: 'cloudbases',
         templateId: cloudJob.templateId,
         message: finalResultData.message || 'Video created successfully',
-        videos: finalResultData.saved_videos
+        videos: finalResultData.saved_videos,
+        voiceoverScript: cloudJob.voiceoverScript || "",
+        socialMediaHeading: cloudJob.socialMediaHeading || "",
+        socialMediaCaption: cloudJob.socialMediaCaption || "",
+        hashTags: cloudJob.hashTags || [],
+        channels: cloudJob.channels || [],
       });
     }
     

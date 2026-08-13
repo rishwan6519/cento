@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db";
 import MediaItemModel from "@/models/MediaItems";
 import VideoJobModel from "@/models/VideoJob";
 import GoogleFlowJobModel from "@/models/GoogleFlowJob";
+import CloudbasesJobModel from "@/models/CloudbasesJob";
 import Offer from "@/models/Offer";
 import User from "@/models/User";
 import Notification from "@/models/Notification";
@@ -49,6 +50,11 @@ export async function POST(req: NextRequest) {
           $or: [{ jobId: rawId.trim() }, ...(mongoose.Types.ObjectId.isValid(rawId.trim()) ? [{ _id: rawId.trim() }] : [])],
         });
       }
+      if (!videoJob) {
+        videoJob = await CloudbasesJobModel.findOne({
+          $or: [{ jobId: rawId.trim() }, ...(mongoose.Types.ObjectId.isValid(rawId.trim()) ? [{ _id: rawId.trim() }] : [])],
+        });
+      }
     }
     if (!videoJob && mediaItem) {
       videoJob = await VideoJobModel.findOne({
@@ -60,11 +66,17 @@ export async function POST(req: NextRequest) {
       if (!videoJob) {
         videoJob = await GoogleFlowJobModel.findOne({ videoUrl: mediaItem.url });
       }
+      if (!videoJob) {
+        videoJob = await CloudbasesJobModel.findOne({ "resultData.saved_videos.url": mediaItem.url });
+      }
     }
     if (!videoJob && videoUrlParam) {
       videoJob = await VideoJobModel.findOne({ "falRequests.videoUrl": String(videoUrlParam).trim() });
       if (!videoJob) {
         videoJob = await GoogleFlowJobModel.findOne({ videoUrl: String(videoUrlParam).trim() });
+      }
+      if (!videoJob) {
+        videoJob = await CloudbasesJobModel.findOne({ "resultData.saved_videos.url": String(videoUrlParam).trim() });
       }
     }
 

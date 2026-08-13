@@ -1,9 +1,10 @@
-﻿import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface ICloudbasesJob extends Document {
   jobId: string;
   userId: string;
   templateId: string;
+  offerId?: string;
   status: "processing" | "completed" | "failed";
   // Input fields
   description: string;
@@ -11,6 +12,12 @@ export interface ICloudbasesJob extends Document {
   discount: string;
   validity: string;
   productUrl: string;
+  // Social & metadata
+  channels?: string[];
+  voiceoverScript?: string;
+  socialMediaHeading?: string;
+  socialMediaCaption?: string;
+  hashTags?: string[];
   // Output
   resultData: Record<string, any>;
   errorMessage: string;
@@ -22,12 +29,18 @@ const CloudbasesJobSchema = new Schema<ICloudbasesJob>({
   jobId:         { type: String, required: true, unique: true },
   userId:        { type: String, default: "" },
   templateId:    { type: String, default: "" },
+  offerId:       { type: String, default: "" },
   status:        { type: String, enum: ["processing", "completed", "failed"], default: "processing" },
   description:   { type: String, default: "" },
   headline:      { type: String, default: "" },
   discount:      { type: String, default: "" },
   validity:      { type: String, default: "" },
   productUrl:    { type: String, default: "" },
+  channels:      { type: [String], default: [] },
+  voiceoverScript: { type: String, default: "" },
+  socialMediaHeading: { type: String, default: "" },
+  socialMediaCaption: { type: String, default: "" },
+  hashTags:      { type: [String], default: [] },
   resultData:    { type: Schema.Types.Mixed, default: {} },
   errorMessage:  { type: String, default: "" },
   createdAt:     { type: Date, default: Date.now },
