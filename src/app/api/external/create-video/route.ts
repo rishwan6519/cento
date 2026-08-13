@@ -282,10 +282,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const mapped_description = body.description || body.text    || '';
-      const mapped_headline    = body.headline    || body.tagline || '';
-      const mapped_discount    = body.discount    || '';
-      const mapped_validity    = body.validity    || '';
+      const mapped_description = body.description || body.text || '';
+      const mapped_headline = body.headline || body.tagline || '';
+      const mapped_discount = body.discount || '';
+      const mapped_validity = body.validity || '';
       const product_url_string = body.product_url || body.productImageUrl || '';
 
       const uploadedProductFile = uploadedFiles.find((f) =>
@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
       let uploadedFileName = '';
       if (uploadedProductFile) {
         uploadedFileBuffer = await uploadedProductFile.arrayBuffer();
-        uploadedFileName   = uploadedProductFile.name;
+        uploadedFileName = uploadedProductFile.name;
       }
 
       const externalFormData = new FormData();
@@ -309,10 +309,10 @@ export async function POST(req: NextRequest) {
         externalFormData.append('product_url', String(product_url_string));
       }
 
-      if (mapped_headline)    externalFormData.append('headline',    String(mapped_headline));
-      if (mapped_discount)    externalFormData.append('discount',    String(mapped_discount));
+      if (mapped_headline) externalFormData.append('headline', String(mapped_headline));
+      if (mapped_discount) externalFormData.append('discount', String(mapped_discount));
       if (mapped_description) externalFormData.append('description', String(mapped_description));
-      if (mapped_validity)    externalFormData.append('validity',    String(mapped_validity));
+      if (mapped_validity) externalFormData.append('validity', String(mapped_validity));
       externalFormData.append('footer', '*T&C apply');
 
       let externalResponse;
@@ -327,11 +327,13 @@ export async function POST(req: NextRequest) {
 
       const resultData = await externalResponse.json().catch(() => null);
       if (!externalResponse.ok || !resultData || !resultData.success) {
-         return NextResponse.json({ 
-           success: false, 
-           message: resultData?.message || 'Failed to queue video on Cloudbases' 
-         }, { status: externalResponse.status || 500 });
+        return NextResponse.json({
+          success: false,
+          message: resultData?.message || 'Failed to queue video on Cloudbases'
+        }, { status: externalResponse.status || 500 });
       }
+
+
 
       const jobUserId = body.userId || body.userid || body.storeUserId || '';
       const externalJobId = resultData.data?.job_id;
@@ -375,22 +377,22 @@ export async function POST(req: NextRequest) {
       await connectToDatabase();
       const CloudbasesJobModel = (await import('@/models/CloudbasesJob')).default;
       await CloudbasesJobModel.create({
-        jobId:       cloudJobId,
-        userId:      jobUserId,
-        templateId:  String(cloudbases_template_id),
-        offerId:     cleanOfferId,
-        status:      'processing',
+        jobId: cloudJobId,
+        userId: jobUserId,
+        templateId: String(cloudbases_template_id),
+        offerId: cleanOfferId,
+        status: 'processing',
         description: mapped_description,
-        headline:    mapped_headline,
-        discount:    mapped_discount,
-        validity:    mapped_validity,
-        productUrl:  product_url_string,
-        channels:    channelsList,
+        headline: mapped_headline,
+        discount: mapped_discount,
+        validity: mapped_validity,
+        productUrl: product_url_string,
+        channels: channelsList,
         voiceoverScript,
         socialMediaHeading,
         socialMediaCaption,
         hashTags,
-        resultData:  resultData
+        resultData: resultData
       });
 
       return NextResponse.json({
