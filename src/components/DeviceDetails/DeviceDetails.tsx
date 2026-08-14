@@ -186,6 +186,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
   };
 
   const handlePlayPause = (file: any) => {
+    if (!file?.path) return;
     const fullPath = file.path.startsWith("http") ? file.path : `https://iot.centelon.com${file.path}`;
     
     if (playingId === file._id) {
@@ -208,7 +209,8 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
     }
   };
 
-  const downloadFile = (url: string, filename: string) => {
+  const downloadFile = (url: string | undefined, filename: string) => {
+    if (!url) return;
     const fullPath = url.startsWith("http") ? url : `https://iot.centelon.com${url}`;
     const link = document.createElement('a');
     link.href = fullPath;
@@ -708,7 +710,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                   <div className="bg-gray-100 rounded-xl w-full h-96 flex items-center justify-center mb-6 overflow-hidden">
                     {previewFile.file.type.includes('image') ? (
                       <img 
-                        src={previewFile.file.path.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file.path}`} 
+                        src={previewFile.file?.path?.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file?.path || ''}`} 
                         alt={previewFile.file.name} 
                         className="max-h-96 object-contain"
                         onError={(e) => {
@@ -718,7 +720,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                       />
                     ) : previewFile.file.type.includes('video') ? (
                       <video 
-                        src={previewFile.file.path.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file.path}`} 
+                        src={previewFile.file?.path?.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file?.path || ''}`} 
                         controls 
                         className="max-h-96 w-full"
                         onError={(e) => {
@@ -733,7 +735,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                         </div>
                         <div className="w-full max-w-md">
                           <audio 
-                            src={previewFile.file.path.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file.path}`} 
+                            src={previewFile.file?.path?.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file?.path || ''}`} 
                             controls 
                             className="w-full"
                             onError={(e) => {
@@ -788,7 +790,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                     </div>
                     <div className="w-full max-w-md mt-6">
                       <audio 
-                        src={previewFile.file.path.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file.path}`} 
+                        src={previewFile.file?.path?.startsWith("http") ? previewFile.file.path : `https://iot.centelon.com${previewFile.file?.path || ''}`} 
                         controls 
                         className="w-full"
                         onError={(e) => {
