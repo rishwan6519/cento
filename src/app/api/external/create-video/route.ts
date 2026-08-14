@@ -313,7 +313,7 @@ export async function POST(req: NextRequest) {
       if (mapped_discount) externalFormData.append('discount', String(mapped_discount));
       if (mapped_description) externalFormData.append('description', String(mapped_description));
       if (mapped_validity) externalFormData.append('validity', String(mapped_validity));
-      externalFormData.append('footer', '*T&C apply');
+      externalFormData.append('footer', '*T&C Apply.Product images may differ from actual products and are for illustration only.');
 
       let externalResponse;
       try {
