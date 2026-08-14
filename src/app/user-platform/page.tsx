@@ -681,10 +681,10 @@ const [slides, setSlides] = useState<Slide[]>([]);
       if (!response.ok) throw new Error("Failed to fetch slider data");
       const data = await response.json();
       if (data.success && data.data?.length > 0) {
-        const sliders = data.data[0].sliderId.sliders.map((slide: any) => ({
+        const sliders = data.data[0].sliderId?.sliders?.map((slide: any) => ({
           url: slide.url,
           description: slide.description,
-        }));
+        })) || [];
         setSliderData(sliders);
       }
     } catch (err) {

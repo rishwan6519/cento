@@ -273,6 +273,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
   };
 
   const getFileIcon = (type: string) => {
+    if (!type) return <Database className="text-gray-500" size={20} />;
     if (type.includes("image")) return <ImageIcon className="text-green-500" size={20} />;
     if (type.includes("video")) return <Video className="text-blue-500" size={20} />;
     if (type.includes("audio")) return <Volume2 className="text-purple-500" size={20} />;
@@ -280,6 +281,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
   };
 
   const getFileTypeLabel = (type: string) => {
+    if (!type) return "File";
     if (type.includes("image")) return "Image";
     if (type.includes("video")) return "Video";
     if (type.includes("audio")) return "Audio";
