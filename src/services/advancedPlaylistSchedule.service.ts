@@ -549,10 +549,20 @@ export const advancedPlaylistScheduleService = {
                 fileObj.url = null;
               }
               if (fileObj.fileId && typeof fileObj.fileId === 'object') {
+                if (fileObj.fileId.fileCategory) {
+                  fileObj.fileCategory = fileObj.fileId.fileCategory;
+                }
+                // If type was overwritten to offer in DB, maybe we restore it, but let's just pass fileCategory
+                if (fileObj.fileId.type) {
+                  fileObj.type = fileObj.fileId.type;
+                }
                 fileObj.fileId = fileObj.fileId._id ? fileObj.fileId._id.toString() : fileObj.fileId;
               }
               fileObj.duration = 12;
-              fileObj.type = 'offer';
+              // If fileCategory is not present, optionally hardcode it based on previous instruction
+              if (!fileObj.fileCategory) {
+                fileObj.fileCategory = 'offer';
+              }
               combinedMedias.push(fileObj);
             }
           }
