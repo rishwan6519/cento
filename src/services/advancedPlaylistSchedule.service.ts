@@ -609,7 +609,10 @@ export const advancedPlaylistScheduleService = {
     const globalVersionId = maxUpdatedAt > 0 ? maxUpdatedAt.toString() : Date.now().toString();
 
     return {
-      timeline: mergedSlots,
+      timeline: mergedSlots.map((slot: any) => {
+        const { activePlaylists, ...rest } = slot;
+        return rest;
+      }),
       serverDate: dateStr,
       serverTime: serverTimeMeta,
       versionId: globalVersionId,
