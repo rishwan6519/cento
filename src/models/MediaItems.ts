@@ -5,6 +5,7 @@ export interface IMediaItem extends Document {
   name: string;
   type: string;
   url: string;
+  fileCategory?: string;
   channels?: string[];
   voiceoverScript?: string;
   socialMediaHeading?: string;
@@ -23,6 +24,7 @@ const MediaItemSchema = new Schema<IMediaItem>({
   name: { type: String, required: true },
   type: { type: String, required: true },
   url: { type: String, required: true },
+  fileCategory: { type: String, required: false },
   channels: { type: [String], default: [] },
   voiceoverScript: { type: String, required: false },
   socialMediaHeading: { type: String, required: false },
