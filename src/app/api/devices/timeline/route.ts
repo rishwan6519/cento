@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { advancedPlaylistScheduleService } from '@/services/advancedPlaylistSchedule.service';
-import { getMediaDuration } from '@/lib/mediaHelper';
 import { connectToDatabase } from '@/lib/db';
 import PlaylistDistribution from '@/models/PlaylistDistribution';
 import mongoose from 'mongoose';
@@ -39,7 +38,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Device not found or no schedule' }, { status: 404 });
     }
 
-    const DURATION_CACHE = new Map<string, number>();
     const transformedTimeline = [];
 
     // 2. Iterate through each time slot and process distribution
@@ -62,17 +60,7 @@ export async function GET(req: NextRequest) {
       // Pre-calculate true durations for all medias in this slot
       for (const media of slot.medias) {
         if (!media.duration || media.duration <= 0) {
-          if (media.url) {
-            if (DURATION_CACHE.has(media.url)) {
-              media.duration = DURATION_CACHE.get(media.url);
-            } else {
-              const dur = await getMediaDuration(media.url);
-              media.duration = dur;
-              DURATION_CACHE.set(media.url, dur);
-            }
-          } else {
-            media.duration = 12; // fallback
-          }
+           media.duration = 12; // fallback to 12s if missing
         }
       }
 
