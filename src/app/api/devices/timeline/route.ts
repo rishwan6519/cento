@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
     const serialNumber = req.nextUrl.searchParams.get('serialNumber');
     const targetDate = req.nextUrl.searchParams.get('date') || undefined;
+    const maxItemsParam = req.nextUrl.searchParams.get('maxItems');
+    const MAX_ITEMS = maxItemsParam ? parseInt(maxItemsParam, 10) : Infinity;
 
     if (!serialNumber) {
       return NextResponse.json({ error: 'Serial number is required' }, { status: 400 });
@@ -163,6 +165,9 @@ export async function GET(req: NextRequest) {
               generatedItems.push(cleanM);
               catElapsed += dur;
 
+              if (generatedItems.length >= MAX_ITEMS) {
+                 break;
+              }
               if (generatedItems.length > 5000) {
                 console.warn('[devices/timeline] Hard cap of 5000 items reached for category', type);
                 break;
@@ -214,6 +219,9 @@ export async function GET(req: NextRequest) {
             index++;
 
             // Safety breaks
+            if (unrolledMedias.length >= MAX_ITEMS) {
+               break;
+            }
             if (unrolledMedias.length > 5000) {
               console.warn('[devices/timeline] Hard cap of 5000 items reached in fallback loop');
               break;
