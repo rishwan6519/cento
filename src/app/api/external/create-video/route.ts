@@ -402,6 +402,7 @@ export async function POST(req: NextRequest) {
         offerId: cleanOfferId,
         provider: 'cloudbases',
         templateId: String(cloudbases_template_id),
+        videoCategory: 'offer',
         message: `Video queued. Poll for result at POST /api/external/get-video with { jobId: '${cloudJobId}' }`,
         voiceoverScript,
         socialMediaHeading,
