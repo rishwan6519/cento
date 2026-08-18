@@ -28,11 +28,11 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       const res = await fetch(`/api/media?id=${mediaId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: newType }),
+        body: JSON.stringify({ fileCategory: newType }),
       });
       const data = await res.json();
       if (data.success) {
-        setExistingMediaData(prev => prev.map(item => (item._id === mediaId || item.id === mediaId) ? { ...item, type: newType } : item));
+        setExistingMediaData(prev => prev.map(item => (item._id === mediaId || item.id === mediaId) ? { ...item, fileCategory: newType } : item));
       } else {
         alert(data.error || "Failed to update media type");
       }
@@ -177,43 +177,74 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         const allMedia = d.media || d.mediaFiles || d.data || [];
         setExistingMediaData(allMedia);
         
+        let combinedMedia = [...allMedia];
+        
         // Fallback: if we're in edit mode and selectedMediaIds don't match any loaded media,
-        // try matching by file path/URL instead
+        // try matching by file path/URL instead, or inject them into combinedMedia if entirely missing
         if (editingPlaylist && editingPlaylist.files && editingPlaylist.files.length > 0) {
-          setSelectedMediaIds(prev => {
-            // Check if any current IDs match the loaded media
-            const mediaIds = new Set(allMedia.map((m: any) => String(m._id || m.id)));
-            const anyMatch = prev.some(id => mediaIds.has(id));
-            
-            if (anyMatch) return prev; // IDs matched, no fallback needed
-            
-            // No match — try path-based matching
+            const mediaIds = new Set(combinedMedia.map((m: any) => String(m._id || m.id)));
             const matchedIds: string[] = [];
+            
             editingPlaylist.files.forEach((f: any) => {
               const fid = f.fileId;
-              // Get the URL from the playlist file
-              const fileUrl = (fid && typeof fid === 'object') 
-                ? (fid.url || fid.fileUrl || '') 
-                : (f.path || f.url || '');
-              const fileName = (fid && typeof fid === 'object') 
-                ? (fid.name || '') 
-                : (f.name || '');
+              const mid = f.mediaId;
               
-              if (fileUrl || fileName) {
-                const match = allMedia.find((m: any) => {
-                  if (fileUrl && (m.url === fileUrl || m.fileUrl === fileUrl)) return true;
-                  if (fileName && m.name === fileName) return true;
-                  return false;
-                });
-                if (match) {
-                  matchedIds.push(String(match._id || match.id));
-                }
+              let id = '';
+              let fileUrl = '';
+              let fileName = '';
+              let fileType = '';
+
+              if (fid && typeof fid === 'object') {
+                 id = String(fid._id || fid.id || '');
+                 fileUrl = fid.url || fid.fileUrl || '';
+                 fileName = fid.name || '';
+                 fileType = fid.type || fid.videoCategory || '';
+              } else if (mid && typeof mid === 'object') {
+                 id = String(mid._id || mid.id || '');
+                 fileUrl = mid.url || mid.fileUrl || '';
+                 fileName = mid.name || '';
+                 fileType = mid.type || mid.videoCategory || '';
+              } else {
+                 id = String(fid || mid || f._id || '');
+                 fileUrl = f.path || f.url || '';
+                 fileName = f.name || '';
+                 fileType = f.type || f.videoCategory || '';
+              }
+              
+              if (!id) return; // Need an ID to select it
+              
+              if (mediaIds.has(id)) {
+                 matchedIds.push(id);
+              } else {
+                 // Try to match by url or name if it's in combinedMedia but id mismatched
+                 const match = combinedMedia.find((m: any) => {
+                   if (fileUrl && (m.url === fileUrl || m.fileUrl === fileUrl)) return true;
+                   if (fileName && m.name === fileName) return true;
+                   return false;
+                 });
+                 if (match) {
+                    matchedIds.push(String(match._id || match.id));
+                 } else {
+                    // Inject it into combinedMedia so it shows up in the table!
+                    matchedIds.push(id);
+                    combinedMedia.push({
+                       _id: id,
+                       name: fileName || 'Unknown File',
+                       url: fileUrl,
+                       type: fileType || 'video',
+                       createdAt: new Date().toISOString() // dummy date
+                    });
+                    mediaIds.add(id);
+                 }
               }
             });
             
-            return matchedIds.length > 0 ? matchedIds : prev;
-          });
+            if (matchedIds.length > 0) {
+               setSelectedMediaIds(matchedIds);
+            }
         }
+        
+        setExistingMediaData(combinedMedia);
       })
       .catch(() => setExistingMediaData([]))
       .finally(() => setLoadingMedia(false));
@@ -454,6 +485,8 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                             <option value="video">Video</option>
                             <option value="audio">Audio</option>
                             <option value="image">Image</option>
+                            <option value="generic">Generic</option>
+                            <option value="featured">Featured</option>
                           </select>
                         </div>
                         <div className="store-file-actions">
@@ -566,8 +599,14 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                 <tbody>
                   {existingMediaData.map((media: any) => {
                     const id = media._id || media.id;
-                    const t = (media.type || "").toLowerCase();
-                    const badge = t.includes('video') ? 'video' : t.includes('audio') ? 'audio' : t.includes('offer') ? 'offer' : 'image';
+                    const typeStr = (media.fileCategory || media.videoCategory || media.type || "unknown").toLowerCase();
+                    let badge = "unknown";
+                    if (["video", "mp4"].includes(typeStr)) badge = "video";
+                    else if (["audio", "mp3"].includes(typeStr)) badge = "audio";
+                    else if (["image", "png", "jpg", "jpeg"].includes(typeStr)) badge = "image";
+                    else if (typeStr === "offer") badge = "offer";
+                    else if (typeStr === "generic") badge = "generic";
+                    else if (typeStr === "featured") badge = "featured";
                     return (
                       <tr key={id}>
                         <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(String(id))} onChange={() => toggleMedia(id)} /></td>
@@ -616,7 +655,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                         </td>
                         <td>
                           <select
-                            value={media.type || ""}
+                            value={media.fileCategory || media.videoCategory || media.type || ""}
                             onChange={e => handleUpdateMediaType(id, e.target.value)}
                             className={`store-type-badge store-type-badge--${badge}`}
                             style={{ border: "1px solid #D6E6E9", outline: "none", cursor: "pointer" }}
@@ -625,6 +664,8 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                             <option value="audio" style={{ background: "#fff", color: "#162B30" }}>audio</option>
                             <option value="image" style={{ background: "#fff", color: "#162B30" }}>image</option>
                             <option value="offer" style={{ background: "#fff", color: "#162B30" }}>offer</option>
+                            <option value="generic" style={{ background: "#fff", color: "#162B30" }}>generic</option>
+                            <option value="featured" style={{ background: "#fff", color: "#162B30" }}>featured</option>
                           </select>
                         </td>
                         <td style={{ color: '#445459' }}>{media.createdAt ? new Date(media.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—'}</td>

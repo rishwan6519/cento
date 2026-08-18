@@ -255,14 +255,22 @@ export async function getDailyTimelineHandler(req: NextRequest): Promise<NextRes
 
     const result = await advancedPlaylistScheduleService.getDailyTimelineForDevice(serialNumber, date);
 
+    const strippedResult = {
+      ...result,
+      data: result.timeline.map((slot: any) => {
+        const { activePlaylists, ...rest } = slot;
+        return rest;
+      })
+    };
+
     return NextResponse.json(
       {
         success: true,
-        serverDate: result.serverDate,
-        serverTime: result.serverTime,
-        versionId: result.versionId,
-        count: result.timeline.length,
-        data: result.timeline,
+        serverDate: strippedResult.serverDate,
+        serverTime: strippedResult.serverTime,
+        versionId: strippedResult.versionId,
+        count: strippedResult.data.length,
+        data: strippedResult.data,
       },
       { status: 200 }
     );

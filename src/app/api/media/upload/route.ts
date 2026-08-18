@@ -107,7 +107,8 @@ export async function POST(req: NextRequest) {
         const mediaItem = new MediaItemModel({
           userId: new mongoose.Types.ObjectId(userId),
           name: originalFileName,
-          type: (formData.get(`mediaTypes[${index}]`) as string) || customMediaType || fileType,
+          type: fileType,
+          fileCategory: (formData.get(`mediaTypes[${index}]`) as string) || customMediaType || 'offer',
           url: `/uploads/${userId}/${fileType}/${uniqueFileName}`,
           createdAt: new Date(),
         });

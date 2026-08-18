@@ -94,11 +94,15 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { type } = body;
+    const { type, fileCategory } = body;
 
-    if (!type) {
+    const updateData: any = {};
+    if (type !== undefined) updateData.type = type;
+    if (fileCategory !== undefined) updateData.fileCategory = fileCategory;
+
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
-        { error: 'Field "type" is required' },
+        { error: 'No valid fields provided for update' },
         { status: 400 }
       );
     }
@@ -107,7 +111,7 @@ export async function PUT(request: NextRequest) {
 
     const mediaItem = await MediaItemModel.findByIdAndUpdate(
       mediaId,
-      { type },
+      updateData,
       { new: true }
     );
 

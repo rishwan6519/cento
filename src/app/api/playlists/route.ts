@@ -51,13 +51,14 @@ export async function POST(req: NextRequest) {
     let resolvedFiles: any[] = [];
     if (Array.isArray(files) && files.length > 0) {
       resolvedFiles = await Promise.all(files.map(async (file: any, index: number) => {
-        let mediaDetails = { name: file.name, path: file.path, type: file.type };
+        let mediaDetails = { name: file.name, path: file.path, type: file.type, videoCategory: file.videoCategory };
         if (!file.path && (file.fileId || file._id || file.id)) {
           const media = await MediaItem.findById(file.fileId || file._id || file.id);
           if (media) {
             mediaDetails.name = media.name;
             mediaDetails.path = media.url || media.fileUrl;
             mediaDetails.type = media.type;
+            mediaDetails.videoCategory = media.fileCategory || media.videoCategory;
           }
         }
         let bgImage = file.backgroundImage || null;
@@ -77,13 +78,14 @@ export async function POST(req: NextRequest) {
       }));
     } else if (Array.isArray(mediaIds) && mediaIds.length > 0) {
       resolvedFiles = await Promise.all(mediaIds.map(async (id: any, index: number) => {
-        let mediaDetails = { name: undefined, path: undefined, type: undefined };
+        let mediaDetails = { name: undefined, path: undefined, type: undefined, videoCategory: undefined };
         if (id) {
           const media = await MediaItem.findById(id);
           if (media) {
             mediaDetails.name = media.name;
             mediaDetails.path = media.url || media.fileUrl;
             mediaDetails.type = media.type;
+            mediaDetails.videoCategory = media.fileCategory || media.videoCategory;
           }
         }
         return {
@@ -405,13 +407,14 @@ export async function PUT(req: NextRequest) {
 
     if (Array.isArray(files) && files.length > 0) {
       updateFields.files = await Promise.all(files.map(async (file: any, index: number) => {
-        let mediaDetails = { name: file.name, path: file.path, type: file.type };
+        let mediaDetails = { name: file.name, path: file.path, type: file.type, videoCategory: file.videoCategory };
         if (!file.path && (file.fileId || file._id || file.id)) {
           const media = await MediaItem.findById(file.fileId || file._id || file.id);
           if (media) {
             mediaDetails.name = media.name;
             mediaDetails.path = media.url || media.fileUrl;
             mediaDetails.type = media.type;
+            mediaDetails.videoCategory = media.fileCategory || media.videoCategory;
           }
         }
         let bgImage = file.backgroundImage || null;
@@ -431,13 +434,14 @@ export async function PUT(req: NextRequest) {
       }));
     } else if (Array.isArray(mediaIds) && mediaIds.length > 0) {
       updateFields.files = await Promise.all(mediaIds.map(async (mediaId: any, index: number) => {
-        let mediaDetails = { name: undefined, path: undefined, type: undefined };
+        let mediaDetails = { name: undefined, path: undefined, type: undefined, videoCategory: undefined };
         if (mediaId) {
           const media = await MediaItem.findById(mediaId);
           if (media) {
             mediaDetails.name = media.name;
             mediaDetails.path = media.url || media.fileUrl;
             mediaDetails.type = media.type;
+            mediaDetails.videoCategory = media.fileCategory || media.videoCategory;
           }
         }
         return {

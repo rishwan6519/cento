@@ -6,6 +6,10 @@ import DevicePlaylist from '@/models/ConectPlaylist';
 import AssignedDevice from '@/models/AssignDevice';
 import OnboardedDevice from '@/models/OnboardedDevice';
 import { validateSchedulePayload, ScheduleInput } from '@/validators/advancedPlaylistSchedule.validation';
+import { getMediaDuration } from '@/lib/mediaHelper';
+import MediaItemModel from '@/models/MediaItems';
+
+const DURATION_CACHE = new Map<string, number>();
 
 export class ServiceError extends Error {
   statusCode: number;
@@ -357,7 +361,10 @@ export const advancedPlaylistScheduleService = {
       isActive: true,
       startDate: { $lte: endOfDay },
       endDate: { $gte: startOfDay },
-    }).populate('playlistId');
+    }).populate({
+      path: 'playlistId',
+      populate: { path: 'files.fileId' }
+    });
 
     const validSchedules: any[] = matchingSchedules
       .filter((s) => s.playlistId && (s.playlistId as any)._id)
@@ -486,6 +493,32 @@ export const advancedPlaylistScheduleService = {
       return { timeline: [], serverDate: dateStr, serverTime: serverTimeMeta, versionId: Date.now().toString() };
     }
 
+    // Collect all unique fileIds to fetch their actual MediaItem properties (like fileCategory)
+    const mediaIdsToFetch = new Set<string>();
+    for (const sched of validSchedules) {
+      const playlist = sched.playlistId as any;
+      if (Array.isArray(playlist.files)) {
+        for (const file of playlist.files) {
+          const fid = file.fileId || file.mediaId;
+          if (fid) {
+            const idStr = typeof fid === 'object' ? fid._id?.toString() || fid.toString() : String(fid);
+            if (mongoose.Types.ObjectId.isValid(idStr)) {
+              mediaIdsToFetch.add(idStr);
+            }
+          }
+        }
+      }
+    }
+
+    // Fetch the MediaItems
+    let mediaItemMap: Record<string, any> = {};
+    if (mediaIdsToFetch.size > 0) {
+       const items = await MediaItemModel.find({ _id: { $in: Array.from(mediaIdsToFetch) } }).lean();
+       items.forEach((item: any) => {
+         mediaItemMap[item._id.toString()] = item;
+       });
+    }
+
     // Collect all unique start and end boundaries from both advanced and legacy schedules
     const boundaries = new Set<string>();
     for (const sched of validSchedules) {
@@ -548,17 +581,23 @@ export const advancedPlaylistScheduleService = {
               } else {
                 fileObj.url = null;
               }
-              if (fileObj.fileId && typeof fileObj.fileId === 'object') {
-                if (fileObj.fileId.videoCategory) {
-                  fileObj.videoCategory = fileObj.fileId.videoCategory;
-                }
-                // If type was overwritten to offer in DB, maybe we restore it, but let's just pass videoCategory
-                if (fileObj.fileId.type) {
-                  fileObj.type = fileObj.fileId.type;
-                }
-                fileObj.fileId = fileObj.fileId._id ? fileObj.fileId._id.toString() : fileObj.fileId;
+              const rawFid = fileObj.fileId || fileObj.mediaId;
+              if (rawFid) {
+                 const idStr = typeof rawFid === 'object' ? rawFid._id?.toString() || rawFid.toString() : String(rawFid);
+                 const dbMedia = mediaItemMap[idStr];
+                 if (dbMedia) {
+                    if (dbMedia.fileCategory) {
+                       fileObj.videoCategory = dbMedia.fileCategory;
+                    } else if (dbMedia.videoCategory) {
+                       fileObj.videoCategory = dbMedia.videoCategory;
+                    }
+                    if (dbMedia.type) {
+                       fileObj.type = dbMedia.type;
+                    }
+                 }
+                 fileObj.fileId = idStr;
               }
-              fileObj.duration = 12;
+              
               // Ensure videoCategory is used, default to 'offer'
               if (!fileObj.videoCategory) {
                 fileObj.videoCategory = 'offer';
@@ -567,6 +606,18 @@ export const advancedPlaylistScheduleService = {
               if (fileObj.fileCategory) {
                 delete fileObj.fileCategory;
               }
+              let mediaDuration = 12; // default fallback
+              if (fileObj.duration && fileObj.duration > 0) {
+                mediaDuration = fileObj.duration;
+              } else if (fileObj.url) {
+                if (DURATION_CACHE.has(fileObj.url)) {
+                  mediaDuration = DURATION_CACHE.get(fileObj.url)!;
+                } else {
+                  mediaDuration = await getMediaDuration(fileObj.url);
+                  DURATION_CACHE.set(fileObj.url, mediaDuration);
+                }
+              }
+              fileObj.duration = mediaDuration;
               combinedMedias.push(fileObj);
             }
           }
@@ -614,8 +665,7 @@ export const advancedPlaylistScheduleService = {
 
     return {
       timeline: mergedSlots.map((slot: any) => {
-        const { activePlaylists, ...rest } = slot;
-        return rest;
+        return slot;
       }),
       serverDate: dateStr,
       serverTime: serverTimeMeta,

@@ -1,14 +1,14 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IPlaylistDistribution extends Document {
-  playlistId: mongoose.Schema.Types.ObjectId;
+  serialNumber: string;
   distribution: Map<string, number>;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const PlaylistDistributionSchema = new Schema<IPlaylistDistribution>({
-  playlistId: { type: mongoose.Schema.Types.ObjectId, ref: 'PlaylistConfig', required: true, unique: true },
+  serialNumber: { type: String, required: true, unique: true },
   distribution: { type: Map, of: Number, required: true },
 }, {
   timestamps: true
