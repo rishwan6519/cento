@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
                  currentBag = shuffleArray(catFiles);
               }
               const m = currentBag.pop();
-              let dur = m.duration || 12;
+              let dur = Number(m.duration) || 12;
               
               // Adjust duration if it exceeds remaining allocated time
               const remaining = allocatedSeconds - catElapsed;
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
             const mediaItem = slot.medias[index % slot.medias.length];
             unrolledMedias.push({ ...mediaItem });
             
-            const dur = mediaItem.duration || 12;
+            const dur = Number(mediaItem.duration) || 12;
             accumulatedSec += dur;
             index++;
             
@@ -207,7 +207,7 @@ export async function GET(req: NextRequest) {
       let currentStartTime = slot.start.length === 5 ? `${slot.start}:00` : slot.start;
       for (const item of unrolledMedias) {
           item.startTime = currentStartTime;
-          currentStartTime = addSecondsToTime(currentStartTime, item.duration || 12);
+          currentStartTime = addSecondsToTime(currentStartTime, Number(item.duration) || 12);
           item.endTime = currentStartTime;
       }
 
