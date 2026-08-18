@@ -37,6 +37,7 @@ import OfferCreation from "./OfferCreation";
 import Veo3TextVideoView from "./Veo3TextVideoView";
 import MediaLibraryView from "./MediaLibraryView";
 import DeviceDetailsModal from "./DeviceDetailsModal";
+import TimelineSchedulesView from "./TimelineSchedulesView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ViewKey =
@@ -54,7 +55,8 @@ export type ViewKey =
   | "aiVideoTemplates"
   | "offerCreation"
   | "veo3TextVideo"
-  | "mediaLibrary";
+  | "mediaLibrary"
+  | "timelineSchedules";
 
 interface OfflineDevice {
   id: string;
@@ -189,6 +191,15 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>🎬</span>
             <span>Google Flow Veo 3.1</span>
+          </button>
+
+          {/* Timelines / Schedules */}
+          <button
+            className={`store-nav-item ${isActive("timelineSchedules") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("timelineSchedules")}
+          >
+            <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>📅</span>
+            <span>Timelines / Schedules</span>
           </button>
 
           <button
@@ -527,7 +538,8 @@ export default function StoreUserPage() {
       view === "aiVideoGeneration" ||
       view === "aiVideoTemplates" ||
       view === "offerCreation" ||
-      view === "veo3TextVideo"
+      view === "veo3TextVideo" ||
+      view === "timelineSchedules"
     ) {
       setEditingPlaylist(null);
     }
@@ -623,6 +635,8 @@ export default function StoreUserPage() {
         return <MediaLibraryView />;
       case "veo3TextVideo":
         return <Veo3TextVideoView />;
+      case "timelineSchedules":
+        return <TimelineSchedulesView />;
       default:
         return (
           <div className="store-placeholder">

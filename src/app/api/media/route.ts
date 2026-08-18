@@ -80,3 +80,50 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Failed to delete media' }, { status: 500 });
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const mediaId = searchParams.get('mediaId') || searchParams.get('id');
+
+    if (!mediaId || !mongoose.Types.ObjectId.isValid(mediaId)) {
+      return NextResponse.json(
+        { error: 'Invalid or missing mediaId' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { type } = body;
+
+    if (!type) {
+      return NextResponse.json(
+        { error: 'Field "type" is required' },
+        { status: 400 }
+      );
+    }
+
+    await connectToDatabase();
+
+    const mediaItem = await MediaItemModel.findByIdAndUpdate(
+      mediaId,
+      { type },
+      { new: true }
+    );
+
+    if (!mediaItem) {
+      return NextResponse.json(
+        { error: 'Media item not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, media: mediaItem });
+  } catch (error) {
+    console.error('Error updating media:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Failed to update media' },
+      { status: 500 }
+    );
+  }
+}

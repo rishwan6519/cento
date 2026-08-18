@@ -40,6 +40,7 @@ function typeColor(type: string) {
   if (t.includes("video")) return { bg: "#e0f2fe", color: "#0369a1" };
   if (t.includes("audio")) return { bg: "#dcfce7", color: "#16a34a" };
   if (t.includes("image")) return { bg: "#fef9c3", color: "#ca8a04" };
+  if (t.includes("offer")) return { bg: "#ffe4e6", color: "#e11d48" };
   return { bg: "#f1f5f9", color: "#475569" };
 }
 
@@ -112,6 +113,7 @@ interface CreatePlaylistViewProps {
 const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) => {
   const [sourceMode, setSourceMode] = useState<"none" | "upload" | "existing">("none");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [fileTypes, setFileTypes] = useState<Record<string, string>>({});
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -134,6 +136,25 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
+
+  const handleUpdateMediaType = async (mediaId: string, newType: string) => {
+    try {
+      const res = await fetch(`/api/media?id=${mediaId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: newType }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Media type updated successfully");
+        setMediaItems(prev => prev.map(item => item._id === mediaId ? { ...item, type: newType } : item));
+      } else {
+        toast.error(data.error || "Failed to update media type");
+      }
+    } catch {
+      toast.error("Network error updating media type");
+    }
+  };
 
   // Fetch existing media from library
   useEffect(() => {
@@ -178,6 +199,13 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setUploadedFiles(files);
+    const newTypes = { ...fileTypes };
+    files.forEach(f => {
+      if (!newTypes[f.name]) {
+        newTypes[f.name] = "offer";
+      }
+    });
+    setFileTypes(newTypes);
   };
 
   const handleConfirmExisting = () => {
@@ -204,6 +232,8 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
         uploadedFiles.forEach((file, index) => {
           formData.append(`files[${index}]`, file);
           formData.append(`fileNames[${index}]`, file.name);
+          const type = fileTypes[file.name] || "offer";
+          formData.append(`mediaTypes[${index}]`, type);
         });
 
         const uploadRes = await fetch("/api/media/upload", { method: "POST", body: formData });
@@ -296,11 +326,56 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
               <label style={labelStyle}>Upload files</label>
               <div
                 onClick={() => fileInputRef.current?.click()}
-                style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "12px 14px", cursor: "pointer", background: "#f8fafc", color: uploadedFiles.length > 0 ? "#334155" : "#94a3b8", fontSize: "0.85rem", minHeight: 44, display: "flex", alignItems: "center" }}
+                style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "12px 14px", cursor: "pointer", background: "#f8fafc", color: uploadedFiles.length > 0 ? "#334155" : "#94a3b8", fontSize: "0.85rem", minHeight: 44, display: "flex", alignItems: "center", marginBottom: "16px" }}
               >
-                {uploadedFiles.length > 0 ? uploadedFiles.map(f => f.name).join(", ") : "Click to select files from your device…"}
+                Click to browse or select files from your device…
               </div>
               <input ref={fileInputRef} type="file" multiple hidden accept="audio/*,video/*,image/*" onChange={handleFileChange} />
+
+              {uploadedFiles.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
+                  {uploadedFiles.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px 14px" }}>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: "16px" }}>
+                        {file.name}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <select
+                          value={fileTypes[file.name] || "offer"}
+                          onChange={e => {
+                            const newTypes = { ...fileTypes };
+                            newTypes[file.name] = e.target.value;
+                            setFileTypes(newTypes);
+                          }}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            border: "1px solid #e2e8f0",
+                            backgroundColor: "#fff",
+                            color: "#334155",
+                            fontSize: "0.8rem",
+                            outline: "none",
+                          }}
+                        >
+                          <option value="offer">Offer</option>
+                          <option value="video">Video</option>
+                          <option value="audio">Audio</option>
+                          <option value="image">Image</option>
+                        </select>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUploadedFiles(prev => prev.filter((_, i) => i !== idx));
+                          }}
+                          style={{ border: "none", background: "none", color: "#ef4444", cursor: "pointer", padding: "4px", display: "flex", alignItems: "center" }}
+                        >
+                          <FaTrash size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {uploadedFiles.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "12px" }}>
@@ -330,6 +405,7 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
                     <option value="video">Video</option>
                     <option value="audio">Audio</option>
                     <option value="image">Image</option>
+                    <option value="offer">Offer</option>
                   </select>
                 </div>
                 <div style={{ position: "relative", flex: 1 }}>
@@ -375,7 +451,26 @@ const CreatePlaylistView: React.FC<CreatePlaylistViewProps> = ({ onNavigate }) =
                         </td>
                         <td style={{ padding: "12px 14px", fontWeight: 600, color: "#1e293b" }}>{m.name}</td>
                         <td style={{ padding: "12px 14px" }}>
-                          <span style={{ background: tc.bg, color: tc.color, padding: "3px 10px", borderRadius: "20px", fontSize: "0.72rem", fontWeight: 700 }}>{m.type}</span>
+                          <select
+                            value={m.type || ""}
+                            onChange={e => handleUpdateMediaType(m._id, e.target.value)}
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: "20px",
+                              border: "1px solid #e2e8f0",
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              background: tc.bg,
+                              color: tc.color,
+                              cursor: "pointer",
+                              outline: "none"
+                            }}
+                          >
+                            <option value="video" style={{ background: "#fff", color: "#334155" }}>video</option>
+                            <option value="audio" style={{ background: "#fff", color: "#334155" }}>audio</option>
+                            <option value="image" style={{ background: "#fff", color: "#334155" }}>image</option>
+                            <option value="offer" style={{ background: "#fff", color: "#334155" }}>offer</option>
+                          </select>
                         </td>
                         <td style={{ padding: "12px 14px", color: "#64748B" }}>{m.uploadMonth || "—"}</td>
                         <td style={{ padding: "12px 14px" }}>

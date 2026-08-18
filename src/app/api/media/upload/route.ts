@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     const userId = formData.get('userId') as string;
     // Role sent by the client; used to gate what file types are permitted.
     const userRole = (formData.get('userRole') as string) || null;
+    const customMediaType = (formData.get('mediaType') as string) || null;
 
     if (!userId) {
       return NextResponse.json(
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
         const mediaItem = new MediaItemModel({
           userId: new mongoose.Types.ObjectId(userId),
           name: originalFileName,
-          type: fileType,
+          type: (formData.get(`mediaTypes[${index}]`) as string) || customMediaType || fileType,
           url: `/uploads/${userId}/${fileType}/${uniqueFileName}`,
           createdAt: new Date(),
         });

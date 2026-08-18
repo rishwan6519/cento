@@ -4,6 +4,7 @@ import Device from '@/models/Device';
 import DevicePlaylist from '@/models/ConectPlaylist';
 import Playlist from '@/models/PlaylistConfig';
 import { advancedPlaylistScheduleService } from '@/services/advancedPlaylistSchedule.service';
+import { generateDailyTimeline } from '@/lib/timelineHelper';
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,11 +34,45 @@ export async function GET(req: NextRequest) {
     device.status = 'active'; // Optionally ensure status is active
     await device.save();
 
-    // Advanced Schedule Lookup (Independent Advanced Scheduler)
-    // If an advanced schedule matches, return it immediately; otherwise proceed untouched with existing scheduler.
-    const advancedPlayback = await advancedPlaylistScheduleService.getPlaybackForDevice(device._id, serialNumber);
-    if (advancedPlayback) {
-      return NextResponse.json(advancedPlayback, { status: 200 });
+    // Advanced Schedule Lookup (Independent Advanced Scheduler) using the Daily Timeline Engine
+    const dailyTimeline = await generateDailyTimeline(serialNumber);
+    if (dailyTimeline && dailyTimeline.windows.length > 0) {
+      // Get current time in Melbourne timezone in "HH:mm" format
+      const melbourneTimeFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Australia/Melbourne',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const currentTimeHHmm = melbourneTimeFormatter.format(new Date());
+
+      // Find the window active at this exact moment
+      const activeWindow = dailyTimeline.windows.find(
+        (w) => w.start <= currentTimeHHmm && w.end > currentTimeHHmm
+      );
+
+      // Return the timeline playback response
+      return NextResponse.json({
+        success: true,
+        deviceSerialNumber: serialNumber,
+        playlistId: activeWindow ? activeWindow.playlistId : null,
+        playlistName: activeWindow ? activeWindow.playlistName : 'Gap / No Playlist',
+        scheduleId: activeWindow ? activeWindow.scheduleId : null,
+        startDate: dailyTimeline.date,
+        endDate: dailyTimeline.date,
+        startTime: activeWindow ? activeWindow.start : null,
+        endTime: activeWindow ? activeWindow.end : null,
+        versionId: dailyTimeline.versionId,
+        source: 'advancedSchedule',
+        currentPlaylist: activeWindow ? {
+          playlistId: activeWindow.playlistId,
+          versionId: dailyTimeline.versionId
+        } : null,
+        currentTime: {
+          australian: currentTimeHHmm + ":00",
+          utcOffset: '+10:00'
+        }
+      }, { status: 200 });
     }
 
     // Step 2: Find device's playlist connections

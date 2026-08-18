@@ -10,6 +10,7 @@ interface Props {
 export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Props) {
   const [selectionMode, setSelectionMode] = useState<"upload" | "existing" | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [fileTypes, setFileTypes] = useState<Record<string, string>>({});
   const [selectedDays, setSelectedDays] = useState<string[]>(["Tue", "Fri"]);
   const [volume, setVolume] = useState(30);
   const [playlistName, setPlaylistName] = useState("");
@@ -22,6 +23,23 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
 
   // Real media from API
   const [existingMediaData, setExistingMediaData] = useState<any[]>([]);
+  const handleUpdateMediaType = async (mediaId: string, newType: string) => {
+    try {
+      const res = await fetch(`/api/media?id=${mediaId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: newType }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setExistingMediaData(prev => prev.map(item => (item._id === mediaId || item.id === mediaId) ? { ...item, type: newType } : item));
+      } else {
+        alert(data.error || "Failed to update media type");
+      }
+    } catch {
+      alert("Network error updating media type");
+    }
+  };
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
   const [availableBgImages, setAvailableBgImages] = useState<any[]>([]);
@@ -251,6 +269,8 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       selectedFiles.forEach((f, i) => {
         fd.append(`files[${i}]`, f);
         fd.append(`fileNames[${i}]`, f.name);
+        const type = fileTypes[f.name] || "offer";
+        fd.append(`mediaTypes[${i}]`, type);
       });
       const r = await fetch("/api/media/upload", { method: "POST", body: fd });
       const d = await r.json();
@@ -287,7 +307,12 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       let filesPayload: any[] = [];
       if (selectionMode === "upload" && selectedFiles.length > 0) {
         const fd = new FormData(); fd.append("userId", userId); fd.append("userRole", "store");
-        selectedFiles.forEach((f, i) => { fd.append(`files[${i}]`, f); fd.append(`fileNames[${i}]`, f.name); });
+        selectedFiles.forEach((f, i) => { 
+          fd.append(`files[${i}]`, f); 
+          fd.append(`fileNames[${i}]`, f.name);
+          const type = fileTypes[f.name] || "offer";
+          fd.append(`mediaTypes[${i}]`, type);
+        });
         const r = await fetch("/api/media/upload", { method: "POST", body: fd }); const d = await r.json();
         if (d.success) {
           filesPayload = d.files.map((f: any, idx: number) => {
@@ -390,6 +415,11 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                   const newFiles = Array.from(e.target.files || []);
                   setSelectedFiles(prev => [...prev, ...newFiles]);
                   setSelectionConfirmed(false);
+                  const newTypes = { ...fileTypes };
+                  newFiles.forEach(f => {
+                    if (!newTypes[f.name]) newTypes[f.name] = "offer";
+                  });
+                  setFileTypes(newTypes);
                 }} />
               </div>
 
@@ -398,11 +428,33 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                   {selectedFiles.map((file, idx) => (
                     <div key={`${file.name}-${idx}`} className="store-selected-file-item" style={{ display: 'block', padding: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
-                        <div className="store-file-info">
+                        <div className="store-file-info" style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
                           <div className="store-file-icon-sm">
                             {file.type.startsWith('image/') ? <FaDesktop /> : <FaPlay size={10} />}
                           </div>
-                          <span className="store-file-name">{file.name}</span>
+                          <span className="store-file-name" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                          <select
+                            value={fileTypes[file.name] || "offer"}
+                            onChange={e => {
+                              const newTypes = { ...fileTypes };
+                              newTypes[file.name] = e.target.value;
+                              setFileTypes(newTypes);
+                            }}
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: "6px",
+                              border: "1px solid #D6E6E9",
+                              backgroundColor: "#fff",
+                              color: "#162B30",
+                              fontSize: "0.75rem",
+                              outline: "none"
+                            }}
+                          >
+                            <option value="offer">Offer</option>
+                            <option value="video">Video</option>
+                            <option value="audio">Audio</option>
+                            <option value="image">Image</option>
+                          </select>
                         </div>
                         <div className="store-file-actions">
                           <button className="store-file-action-btn" title="Preview" onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}>
@@ -492,6 +544,10 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                   <span className="store-select-prefix">Filter by:</span>
                   <select>
                     <option>All type</option>
+                    <option>video</option>
+                    <option>audio</option>
+                    <option>image</option>
+                    <option>offer</option>
                   </select>
                 </div>
               </div>
@@ -511,7 +567,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                   {existingMediaData.map((media: any) => {
                     const id = media._id || media.id;
                     const t = (media.type || "").toLowerCase();
-                    const badge = t.includes('video') ? 'video' : t.includes('audio') ? 'audio' : 'image';
+                    const badge = t.includes('video') ? 'video' : t.includes('audio') ? 'audio' : t.includes('offer') ? 'offer' : 'image';
                     return (
                       <tr key={id}>
                         <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(String(id))} onChange={() => toggleMedia(id)} /></td>
@@ -558,7 +614,19 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                             </div>
                           )}
                         </td>
-                        <td><span className={`store-type-badge store-type-badge--${badge}`}>{media.type || 'Media'}</span></td>
+                        <td>
+                          <select
+                            value={media.type || ""}
+                            onChange={e => handleUpdateMediaType(id, e.target.value)}
+                            className={`store-type-badge store-type-badge--${badge}`}
+                            style={{ border: "1px solid #D6E6E9", outline: "none", cursor: "pointer" }}
+                          >
+                            <option value="video" style={{ background: "#fff", color: "#162B30" }}>video</option>
+                            <option value="audio" style={{ background: "#fff", color: "#162B30" }}>audio</option>
+                            <option value="image" style={{ background: "#fff", color: "#162B30" }}>image</option>
+                            <option value="offer" style={{ background: "#fff", color: "#162B30" }}>offer</option>
+                          </select>
+                        </td>
                         <td style={{ color: '#445459' }}>{media.createdAt ? new Date(media.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—'}</td>
                         <td><button className="store-preview-btn" onClick={() => { setPreviewMediaUrl(media.url || media.fileUrl); setPreviewMediaName(media.name); }}><FaPlay size={10} /> Preview</button></td>
                         <td><button className="store-table-action-btn store-table-action-btn--delete"><FaTrash /></button></td>
@@ -865,6 +933,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         .store-type-badge--video { background: #F3E8FF; color: #9333EA; }
         .store-type-badge--audio { background: #DCFCE7; color: #16A34A; }
         .store-type-badge--image { background: #E0E7FF; color: #4F46E5; }
+        .store-type-badge--offer { background: #FFE4E6; color: #E11D48; }
 
         .store-preview-btn {
           background: none; border: none; color: #F05A28; font-weight: 600; font-size: 0.8rem;

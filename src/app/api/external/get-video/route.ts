@@ -252,7 +252,7 @@ async function checkAndResolveJob(jobId: string) {
               let mediaItem = new MediaItemModel({
                 userId: targetUserObj,
                 name: `Cloudbases AI Video ${index + 1} – ${new Date().toLocaleString()}`,
-                type: "video",
+                type: fileName.endsWith("cloudbases-generated.mp4") ? "offer" : "video",
                 url: localVideoUrl,
                 approvalStatus: "pending",
                 templateId: String(cloudJob.templateId),
