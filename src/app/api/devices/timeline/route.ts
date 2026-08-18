@@ -145,6 +145,7 @@ export async function GET(req: NextRequest) {
               }
               const m = currentBag.pop();
               let dur = Number(m.duration) || 12;
+              if (dur < 1) dur = 1; // Enforce minimum 1s duration
               
               // Adjust duration if it exceeds remaining allocated time
               const remaining = allocatedSeconds - catElapsed;
@@ -154,6 +155,11 @@ export async function GET(req: NextRequest) {
               
               generatedItems.push({ ...m, duration: dur });
               catElapsed += dur;
+              
+              if (generatedItems.length > 5000) {
+                 console.warn('[devices/timeline] Hard cap of 5000 items reached for category', type);
+                 break;
+              }
             }
             
             allGeneratedItems.push(...generatedItems);
@@ -174,11 +180,16 @@ export async function GET(req: NextRequest) {
             const mediaItem = slot.medias[index % slot.medias.length];
             unrolledMedias.push({ ...mediaItem });
             
-            const dur = Number(mediaItem.duration) || 12;
+            let dur = Number(mediaItem.duration) || 12;
+            if (dur < 1) dur = 1; // Enforce minimum 1s duration
             accumulatedSec += dur;
             index++;
             
-            // Safety break
+            // Safety breaks
+            if (unrolledMedias.length > 5000) {
+               console.warn('[devices/timeline] Hard cap of 5000 items reached in fallback loop');
+               break;
+            }
             if (dur <= 0 && index > slot.medias.length * 2) {
                console.warn('[devices/timeline] Infinite loop protection hit.');
                break;
