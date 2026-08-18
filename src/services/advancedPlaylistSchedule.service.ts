@@ -551,6 +551,8 @@ export const advancedPlaylistScheduleService = {
               if (fileObj.fileId && typeof fileObj.fileId === 'object') {
                 fileObj.fileId = fileObj.fileId._id ? fileObj.fileId._id.toString() : fileObj.fileId;
               }
+              fileObj.duration = 12;
+              fileObj.type = 'offer';
               combinedMedias.push(fileObj);
             }
           }
