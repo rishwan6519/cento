@@ -109,10 +109,11 @@ export async function GET(req: NextRequest) {
         if (validCategories.length > 0) {
           let missingPct = 0;
           for (const [cat, pct] of Object.entries(distConfig)) {
+            const numPct = Number(pct);
             if (!validCategories.includes(cat)) {
-               missingPct += pct;
+               missingPct += numPct;
             } else {
-               activeDistConfig[cat] = pct;
+               activeDistConfig[cat] = numPct;
             }
           }
           if (missingPct > 0) {
