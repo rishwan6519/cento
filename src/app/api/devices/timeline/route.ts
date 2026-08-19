@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { advancedPlaylistScheduleService } from '@/services/advancedPlaylistSchedule.service';
 import { connectToDatabase } from '@/lib/db';
 import PlaylistDistribution from '@/models/PlaylistDistribution';
+import TimeSlotDistribution from '@/models/TimeSlotDistribution';
+import ManualTimelineOverride from '@/models/ManualTimelineOverride';
 import mongoose from 'mongoose';
 
 // Helper: Fisher-Yates shuffle
@@ -27,10 +29,44 @@ export async function GET(req: NextRequest) {
     const serialNumber = req.nextUrl.searchParams.get('serialNumber');
     const targetDate = req.nextUrl.searchParams.get('date') || undefined;
     const maxItemsParam = req.nextUrl.searchParams.get('maxItems');
+    const isAppFormat = req.nextUrl.searchParams.get('format') === 'app';
     const MAX_ITEMS = maxItemsParam ? parseInt(maxItemsParam, 10) : Infinity;
 
     if (!serialNumber) {
       return NextResponse.json({ error: 'Serial number is required' }, { status: 400 });
+    }
+
+    const filterForApp = (timelineData: any[]) => {
+      if (!isAppFormat) return timelineData;
+      return timelineData.map(block => ({
+        start: block.start,
+        end: block.end,
+        medias: (block.medias || block.media || []).map((m: any) => ({
+          path: m.path,
+          startTime: m.startTime,
+          endTime: m.endTime
+        }))
+      }));
+    };
+
+    // CHECK FOR MANUAL OVERRIDE FIRST
+    const overrideDateStr = targetDate || new Date().toLocaleString("en-US", { timeZone: "Australia/Melbourne" }).slice(0, 10);
+    const existingOverride = await ManualTimelineOverride.findOne({ serialNumber, date: overrideDateStr });
+
+    if (existingOverride) {
+      console.log(`[devices/timeline] Serving MANUAL OVERRIDE for ${serialNumber} on ${overrideDateStr}`);
+      return NextResponse.json({
+        success: true,
+        serverDate: overrideDateStr,
+        serverTime: {
+          australian: new Date().toLocaleTimeString('en-US', { timeZone: 'Australia/Melbourne', hour12: false }),
+          timeZone: 'Australia/Melbourne',
+          utcOffset: '+10:00'
+        },
+        versionId: existingOverride.versionId,
+        count: existingOverride.data.length,
+        data: filterForApp(existingOverride.data)
+      }, { status: 200 });
     }
 
     // 1. Fetch the base timeline data from the original service
@@ -43,7 +79,10 @@ export async function GET(req: NextRequest) {
     const transformedTimeline = [];
 
     // 2. Iterate through each time slot and process distribution
+    let blockIdx = 0;
     for (const slot of baseData.timeline) {
+      // Increment at the end or use it directly
+      const currentBlockIdx = blockIdx++;
       const startMins = parseTimeToMinutes(slot.start);
       let endMins = parseTimeToMinutes(slot.end);
 
@@ -66,31 +105,42 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Check for distribution config for this device
+      // Check for distribution config for this specific time slot
       let distConfig: Record<string, number> | null = null;
       try {
-        const distDoc = await PlaylistDistribution.findOne({ serialNumber: serialNumber }).lean() as any;
-        if (distDoc && distDoc.distribution) {
-          const distObj = distDoc.distribution instanceof Map
-            ? Object.fromEntries(distDoc.distribution)
-            : distDoc.distribution;
+        const slotDistDoc = await TimeSlotDistribution.findOne({ serialNumber, start: slot.start, end: slot.end }).lean() as any;
+        
+        let distDocToUse = slotDistDoc;
+        
+        if (!distDocToUse) {
+           // Fallback to global distribution
+           distDocToUse = await PlaylistDistribution.findOne({ serialNumber }).lean() as any;
+        }
+        
+        if (distDocToUse && distDocToUse.distribution) {
+          const distObj = distDocToUse.distribution instanceof Map
+            ? Object.fromEntries(distDocToUse.distribution)
+            : distDocToUse.distribution;
           if (Object.keys(distObj).length > 0) {
             distConfig = distObj;
           }
         }
-      } catch { /* ignore */ }
-
-      let unrolledMedias: any[] = [];
+      } catch (e) {
+        console.error('[devices/timeline] error fetching distribution', e);
+      }
+      
       let finalAllocatedPercentages: Record<string, number> = {};
+      let unrolledMedias: any[] = [];
+      const filesByCategory: Record<string, any[]> = {};
+      
+      for (const m of slot.medias) {
+        const cat = (m.videoCategory || 'uncategorized').toLowerCase();
+        if (!filesByCategory[cat]) filesByCategory[cat] = [];
+        filesByCategory[cat].push(m);
+      }
 
       if (distConfig && slot.medias.length > 0 && slotDurationSec > 0) {
-        // Group files by videoCategory
-        const filesByCategory: Record<string, any[]> = {};
-        for (const m of slot.medias) {
-          const cat = (m.videoCategory || m.type || 'unknown').toLowerCase();
-          if (!filesByCategory[cat]) filesByCategory[cat] = [];
-          filesByCategory[cat].push(m);
-        }
+        // --- REQUIREMENT 1: Handle Missing Categories ---
 
         // --- REQUIREMENT 1: Handle Missing Categories ---
         const validCategories = Object.keys(distConfig).filter(cat => filesByCategory[cat] && filesByCategory[cat].length > 0);
@@ -259,10 +309,15 @@ export async function GET(req: NextRequest) {
       }
 
       transformedTimeline.push({
+        originalIndex: currentBlockIdx,
         start: slot.start,
         end: slot.end,
+        durationSeconds: slotDurationSec,
+        playlistName: slot.playlist?.name,
+        isGap: false,
         allocatedPercentages: Object.keys(finalAllocatedPercentages).length > 0 ? finalAllocatedPercentages : undefined,
-        medias: unrolledMedias
+        medias: unrolledMedias,
+        availableCategories: Object.keys(filesByCategory || {})
       });
     }
 
@@ -273,7 +328,7 @@ export async function GET(req: NextRequest) {
       serverTime: baseData.serverTime,
       versionId: baseData.versionId,
       count: transformedTimeline.length,
-      data: transformedTimeline
+      data: filterForApp(transformedTimeline)
     }, { status: 200 });
 
   } catch (error) {
