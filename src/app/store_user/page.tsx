@@ -159,39 +159,44 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span>Media Library</span>
           </button>
 
-          <button
-            className={`store-nav-item ${isActive("aiVideoGeneration") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("aiVideoGeneration")}
-          >
-            <FaFilm className="store-nav-item__icon" />
-            <span>AI Video Generation</span>
-          </button>
+          {/* Hiding AI features and Offer creation temporarily as requested */}
+          {false && (
+            <>
+              <button
+                className={`store-nav-item ${isActive("aiVideoGeneration") ? "store-nav-item--active" : ""}`}
+                onClick={() => onNavigate("aiVideoGeneration")}
+              >
+                <FaFilm className="store-nav-item__icon" />
+                <span>AI Video Generation</span>
+              </button>
 
-          <button
-            className={`store-nav-item ${isActive("aiVideoTemplates") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("aiVideoTemplates")}
-          >
-            <FaLayerGroup className="store-nav-item__icon" />
-            <span>AI Video Templates</span>
-          </button>
+              <button
+                className={`store-nav-item ${isActive("aiVideoTemplates") ? "store-nav-item--active" : ""}`}
+                onClick={() => onNavigate("aiVideoTemplates")}
+              >
+                <FaLayerGroup className="store-nav-item__icon" />
+                <span>AI Video Templates</span>
+              </button>
 
-          <button
-            className={`store-nav-item ${isActive("offerCreation") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("offerCreation")}
-          >
-            <FaTag className="store-nav-item__icon" />
-            <span>Offer Creation</span>
-          </button>
+              <button
+                className={`store-nav-item ${isActive("offerCreation") ? "store-nav-item--active" : ""}`}
+                onClick={() => onNavigate("offerCreation")}
+              >
+                <FaTag className="store-nav-item__icon" />
+                <span>Offer Creation</span>
+              </button>
 
-          {/* Google Flow Veo 3.1 */}
-          <button
-            className={`store-nav-item ${isActive("veo3TextVideo") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("veo3TextVideo")}
-            style={{ borderLeft: isActive("veo3TextVideo") ? undefined : "2px solid transparent" }}
-          >
-            <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>🎬</span>
-            <span>Google Flow Veo 3.1</span>
-          </button>
+              {/* Google Flow Veo 3.1 */}
+              <button
+                className={`store-nav-item ${isActive("veo3TextVideo") ? "store-nav-item--active" : ""}`}
+                onClick={() => onNavigate("veo3TextVideo")}
+                style={{ borderLeft: isActive("veo3TextVideo") ? undefined : "2px solid transparent" }}
+              >
+                <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>🎬</span>
+                <span>Google Flow Veo 3.1</span>
+              </button>
+            </>
+          )}
 
           {/* Timelines / Schedules */}
           <button
