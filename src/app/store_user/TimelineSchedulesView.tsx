@@ -26,7 +26,7 @@ interface TimelineWindow {
 interface TimelineData {
   date: string;
   versionId: string;
-  windows: TimelineWindow[];
+  data: TimelineWindow[]; // Backend uses "data", not "windows"
 }
 
 interface DeviceOption {
@@ -43,6 +43,9 @@ export default function TimelineSchedulesView() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [selectedMedia, setSelectedMedia] = useState<MediaInstance | null>(null);
+  const [expandedSlots, setExpandedSlots] = useState<Record<number, boolean>>({});
+  const [editedQueues, setEditedQueues] = useState<Record<number, MediaInstance[]>>({});
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
   // Initialize date to today (Melbourne time)
   useEffect(() => {
@@ -94,6 +97,23 @@ export default function TimelineSchedulesView() {
         const data = await res.json();
         if (res.ok) {
           setTimeline(data);
+          // Initialize empty edited queues for each slot
+          const initialQueues: Record<number, MediaInstance[]> = {};
+          if (data.data) {
+             data.data.forEach((slot: any, idx: number) => {
+                initialQueues[idx] = (slot.medias || slot.media || []).map((m: any) => ({
+                   id: m._id || m.fileId,
+                   name: m.name,
+                   url: m.url || m.path,
+                   type: m.type || m.videoCategory || 'unknown',
+                   durationSeconds: m.duration || 12,
+                   startTime: m.startTime,
+                   endTime: m.endTime
+                }));
+             });
+          }
+          setEditedQueues(initialQueues);
+          setExpandedSlots({ 0: true }); // Expand first slot by default
         } else {
           setError(data.error || "Failed to load timeline");
         }
@@ -115,18 +135,19 @@ export default function TimelineSchedulesView() {
 
   // Helper to construct timeline blocks including gaps
   const getTimelineBlocks = () => {
-    if (!timeline || !timeline.windows) return [];
+    if (!timeline || !timeline.data) return [];
     
     const blocks: any[] = [];
     let currentSeconds = 0; // Starts at 00:00 midnight
 
-    timeline.windows.forEach((win) => {
+    timeline.data.forEach((win: any, idx: number) => {
       const winStartSeconds = parseTimeToSeconds(win.start);
       
       // If there is a gap before the window starts
       if (winStartSeconds > currentSeconds) {
         blocks.push({
           isGap: true,
+          originalIndex: -1,
           start: formatSecondsToTime(currentSeconds),
           end: win.start,
           durationSeconds: winStartSeconds - currentSeconds
@@ -136,7 +157,8 @@ export default function TimelineSchedulesView() {
       // Add the schedule window
       blocks.push({
         ...win,
-        isGap: false
+        isGap: false,
+        originalIndex: idx
       });
 
       currentSeconds = parseTimeToSeconds(win.end);
@@ -147,6 +169,7 @@ export default function TimelineSchedulesView() {
     if (currentSeconds < midnightSeconds) {
       blocks.push({
         isGap: true,
+        originalIndex: -1,
         start: formatSecondsToTime(currentSeconds),
         end: "24:00",
         durationSeconds: midnightSeconds - currentSeconds
@@ -154,6 +177,30 @@ export default function TimelineSchedulesView() {
     }
 
     return blocks;
+  };
+
+  // HTML5 Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, slotIdx: number, itemIdx: number) => {
+    setDraggedItemIndex(itemIdx);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent, slotIdx: number, dropIdx: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemIndex === dropIdx) return;
+    
+    const newQueue = [...(editedQueues[slotIdx] || [])];
+    const draggedItem = newQueue[draggedItemIndex];
+    newQueue.splice(draggedItemIndex, 1);
+    newQueue.splice(dropIdx, 0, draggedItem);
+    
+    setEditedQueues({ ...editedQueues, [slotIdx]: newQueue });
+    setDraggedItemIndex(null);
   };
 
   // Helper to convert seconds back to "HH:mm"
@@ -351,56 +398,71 @@ export default function TimelineSchedulesView() {
           margin-top: 2px;
         }
 
-        /* Scrollable Media Track */
-        .tsv-media-track-container {
-          overflow-x: auto;
-          padding: 4px 0 10px;
+        /* Vertical List Media Track (Accordion) */
+        .tsv-accordion-content {
+          margin-top: 16px;
+          border-top: 1px dashed #e2e8f0;
+          padding-top: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .tsv-media-list-item {
           display: flex;
           align-items: center;
-          gap: 12px;
-          scrollbar-width: thin;
-        }
-
-        .tsv-media-track-container::-webkit-scrollbar {
-          height: 6px;
-        }
-        .tsv-media-track-container::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 3px;
-        }
-
-        .tsv-media-card {
+          gap: 16px;
           background: #f8fafb;
           border: 1px solid #eaeef0;
           border-radius: 12px;
           padding: 12px 16px;
-          min-width: 180px;
-          max-width: 220px;
-          flex-shrink: 0;
-          cursor: pointer;
+          cursor: grab;
           transition: all 0.2s ease;
         }
 
-        .tsv-media-card:hover {
-          transform: translateY(-2px);
+        .tsv-media-list-item:active {
+          cursor: grabbing;
+        }
+
+        .tsv-media-list-item:hover {
           background: #ffffff;
           border-color: #11b5bb;
           box-shadow: 0 4px 12px rgba(17, 181, 187, 0.08);
         }
-
-        .tsv-media-card__header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 0.7rem;
-          font-weight: 700;
-          color: #8cabb3;
-          text-transform: uppercase;
-          margin-bottom: 8px;
+        
+        .tsv-media-list-item--dragging {
+          opacity: 0.5;
+          background: #e6f7f8;
         }
 
-        .tsv-media-card__name {
-          font-size: 0.88rem;
+        .tsv-media-drag-handle {
+          color: #94a3b8;
+          cursor: grab;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .tsv-media-list-item__icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 8px;
+          background: #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+          font-size: 1.2rem;
+          flex-shrink: 0;
+        }
+
+        .tsv-media-list-item__details {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .tsv-media-list-item__name {
+          font-size: 0.95rem;
           font-weight: 700;
           color: #162b30;
           white-space: nowrap;
@@ -408,27 +470,41 @@ export default function TimelineSchedulesView() {
           text-overflow: ellipsis;
         }
 
-        .tsv-media-card__time {
-          font-size: 0.72rem;
+        .tsv-media-list-item__time {
+          font-size: 0.75rem;
           color: #64848d;
           font-weight: 500;
-          margin-top: 6px;
+          margin-top: 4px;
         }
 
-        .tsv-media-card__duration {
-          display: inline-block;
+        .tsv-media-list-item__duration {
           background: #e2e8f0;
           color: #475569;
-          font-size: 0.65rem;
+          font-size: 0.75rem;
           font-weight: 700;
-          padding: 2px 6px;
-          border-radius: 4px;
-          margin-top: 8px;
+          padding: 4px 8px;
+          border-radius: 6px;
+          flex-shrink: 0;
         }
 
-        .tsv-track-arrow {
-          color: #94a3b8;
-          flex-shrink: 0;
+        .tsv-accordion-toggle {
+          background: none;
+          border: none;
+          color: #11b5bb;
+          font-size: 0.85rem;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          border-radius: 8px;
+          background: rgba(17, 181, 187, 0.1);
+          transition: all 0.2s ease;
+        }
+
+        .tsv-accordion-toggle:hover {
+          background: rgba(17, 181, 187, 0.15);
         }
 
         /* Gap Card Styles */
@@ -700,41 +776,61 @@ export default function TimelineSchedulesView() {
                             <span>{block.start} ─── {block.end}</span>
                           </div>
                           <div className="tsv-block-info">
-                            <div className="tsv-playlist-name">{block.playlistName}</div>
-                            <span className="tsv-block-duration">
+                            <div className="tsv-playlist-name">{block.playlistName || 'Scheduled Timeline Slot'}</div>
+                            <span className="tsv-block-duration block mb-3">
                               Total duration: {formatDuration(block.durationSeconds)}
                             </span>
+                            <button 
+                               className="tsv-accordion-toggle"
+                               onClick={() => setExpandedSlots({...expandedSlots, [block.originalIndex]: !expandedSlots[block.originalIndex]})}
+                            >
+                               {expandedSlots[block.originalIndex] ? 'Collapse Queue ▲' : 'Edit Timeline Queue ▼'}
+                            </button>
                           </div>
                         </div>
 
-                        {/* Media track scroll queue */}
-                        <div className="tsv-media-track-container">
-                          {block.media.map((med: MediaInstance, mIdx: number) => (
-                            <React.Fragment key={`${med.id}-${mIdx}`}>
+                        {/* Accordion Vertical Media List with Drag and Drop */}
+                        {expandedSlots[block.originalIndex] && (
+                          <div className="tsv-accordion-content">
+                            <div className="text-xs font-bold text-slate-400 uppercase mb-2">Drag to reorder playlist queue</div>
+                            {(editedQueues[block.originalIndex] || []).map((med: MediaInstance, mIdx: number) => (
                               <div
-                                className="tsv-media-card"
+                                key={`${med.id}-${mIdx}`}
+                                className={`tsv-media-list-item ${draggedItemIndex === mIdx ? 'tsv-media-list-item--dragging' : ''}`}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, block.originalIndex, mIdx)}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, block.originalIndex, mIdx)}
                                 onClick={() => setSelectedMedia(med)}
                               >
-                                <div className="tsv-media-card__header">
+                                <div className="tsv-media-drag-handle">
+                                   <div style={{display: 'flex', flexDirection: 'column', gap: '3px'}}>
+                                      <div style={{width: '20px', height: '2px', background: '#cbd5e1'}}/>
+                                      <div style={{width: '20px', height: '2px', background: '#cbd5e1'}}/>
+                                      <div style={{width: '20px', height: '2px', background: '#cbd5e1'}}/>
+                                   </div>
+                                </div>
+                                <div className="tsv-media-list-item__icon">
                                   {med.type.startsWith("image") ? <FaImage /> : <FaPlay />}
-                                  <span>{med.type.split("/")[0] || "media"}</span>
                                 </div>
-                                <div className="tsv-media-card__name" title={med.name}>
-                                  {med.name}
+                                <div className="tsv-media-list-item__details">
+                                  <div className="tsv-media-list-item__name" title={med.name}>
+                                    {med.name}
+                                  </div>
+                                  <div className="tsv-media-list-item__time">
+                                    Queue Position: #{mIdx + 1}
+                                  </div>
                                 </div>
-                                <div className="tsv-media-card__time">
-                                  {med.startTime} - {med.endTime}
-                                </div>
-                                <span className="tsv-media-card__duration">
+                                <div className="tsv-media-list-item__duration">
                                   {med.durationSeconds}s
-                                </span>
+                                </div>
                               </div>
-                              {mIdx < block.media.length - 1 && (
-                                <FaChevronRight className="tsv-track-arrow" />
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </div>
+                            ))}
+                            {editedQueues[block.originalIndex]?.length === 0 && (
+                                <div className="text-slate-400 text-sm">No media items in this slot.</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
