@@ -15,6 +15,32 @@ export default function DeviceDetailsModal({ isOpen, onClose, device }: DeviceDe
   const [loading, setLoading] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<any>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [currentPlaying, setCurrentPlaying] = useState<any>(null);
+
+  // Poll for Currently Playing
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isOpen && device) {
+      const fetchCurrent = async () => {
+        try {
+          const res = await fetch(`/api/devices/current-playing?serialNumber=${device.sn}`);
+          const resData = await res.json();
+          if (resData.success && resData.data) {
+            setCurrentPlaying(resData.data);
+          } else {
+            setCurrentPlaying(null);
+          }
+        } catch (e) {}
+      };
+      fetchCurrent();
+      interval = setInterval(fetchCurrent, 3000);
+    } else {
+      setCurrentPlaying(null);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isOpen, device]);
 
   useEffect(() => {
     if (isOpen && device) {
@@ -293,6 +319,64 @@ export default function DeviceDetailsModal({ isOpen, onClose, device }: DeviceDe
         .ddm-empty-text { font-size: 0.82rem; }
 
         /* Responsive */
+        /* Now Playing Premium Banner */
+        .ddm-now-playing {
+          position: relative;
+          padding: 16px 24px;
+          display: flex; align-items: center; gap: 16px;
+          background: linear-gradient(90deg, #1e293b, #0f172a);
+          color: #fff;
+          overflow: hidden;
+        }
+        .ddm-now-playing--empty {
+          background: #F8FAFB;
+          border-bottom: 1px solid #EAEFEF;
+        }
+        .ddm-now-playing-bg-blur {
+          position: absolute; inset: 0;
+          background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(139, 92, 246, 0.15));
+          z-index: 0; pointer-events: none;
+        }
+        .ddm-now-playing-icon-box {
+          position: relative; z-index: 1;
+          width: 44px; height: 44px; border-radius: 12px;
+          background: linear-gradient(135deg, #38BDF8, #6366F1);
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.35);
+          color: #fff;
+        }
+        .ddm-now-playing--empty .ddm-now-playing-icon-box {
+          background: #E2E8F0; box-shadow: none; color: #94A3B8;
+        }
+        .ddm-now-playing-details {
+          position: relative; z-index: 1; flex: 1; overflow: hidden;
+        }
+        .ddm-now-playing-label {
+          font-size: 0.68rem; font-weight: 700; color: #94A3B8;
+          text-transform: uppercase; letter-spacing: 0.12em;
+          display: flex; align-items: center; gap: 8px; margin-bottom: 3px;
+        }
+        .ddm-now-playing-label span.live-dot {
+          width: 6px; height: 6px; border-radius: 50%; background: #22C55E;
+          box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+          animation: pulse-live 2s infinite;
+        }
+        @keyframes pulse-live {
+          0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+          70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .ddm-now-playing-title {
+          font-size: 0.95rem; font-weight: 600; color: #fff;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ddm-now-playing--empty .ddm-now-playing-title {
+          color: #64748B; font-weight: 500; font-style: italic;
+        }
+        .ddm-now-playing-action {
+          position: relative; z-index: 1;
+        }
+        
         @media (max-width: 640px) {
           .ddm-modal { max-width: 100%; border-radius: 16px; }
           .ddm-schedule-grid { grid-template-columns: 1fr; }
@@ -329,6 +413,43 @@ export default function DeviceDetailsModal({ isOpen, onClose, device }: DeviceDe
                 </div>
               </div>
               <button className="ddm-close-btn" onClick={onClose}><FaTimes size={14} /></button>
+            </div>
+
+            {/* Currently Playing Section */}
+            <div className={`ddm-now-playing ${!currentPlaying ? 'ddm-now-playing--empty' : ''}`}>
+              {currentPlaying && <div className="ddm-now-playing-bg-blur" />}
+              <div className="ddm-now-playing-icon-box">
+                 <FaPlay size={14} style={{ marginLeft: '2px' }} />
+              </div>
+              <div className="ddm-now-playing-details">
+                <div className="ddm-now-playing-label">
+                  {currentPlaying && <span className="live-dot" />}
+                  Currently Playing
+                </div>
+                <div className="ddm-now-playing-title">
+                  {currentPlaying ? getFileName(currentPlaying.path) : "No active media currently playing"}
+                </div>
+              </div>
+              <div className="ddm-now-playing-action">
+                {currentPlaying && (
+                   <button 
+                      className="ddm-preview-btn"
+                      style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'none' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+                      onClick={() => {
+                          const pathLower = currentPlaying.path.toLowerCase();
+                          let type = 'file';
+                          if (pathLower.endsWith('.mp4') || pathLower.endsWith('.webm') || pathLower.endsWith('.ogg')) type = 'video';
+                          else if (pathLower.endsWith('.mp3') || pathLower.endsWith('.wav')) type = 'audio';
+                          else if (pathLower.endsWith('.jpg') || pathLower.endsWith('.jpeg') || pathLower.endsWith('.png')) type = 'image';
+                          setPreviewMedia({ path: currentPlaying.path, name: getFileName(currentPlaying.path), type });
+                      }}
+                   >
+                     <FaEye size={12} /> Preview
+                   </button>
+                )}
+              </div>
             </div>
 
             {/* Summary counts */}

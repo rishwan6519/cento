@@ -347,14 +347,48 @@ export default function TimelineSchedulesView() {
     const destinationIndex = result.destination.index;
     if (sourceIndex === destinationIndex) return;
     
+    const block = getTimelineBlocks().find(b => b.originalIndex === slotIdx);
     const queue = editedQueues[slotIdx] || [];
-    const pastCount = queue.filter(med => getItemStatus(med) === "PAST").length;
+    
+    // Protect the currently playing item from being dragged or displaced
+    const upcomingItems = queue.filter(med => getItemStatus(med) !== "PAST");
+    if (upcomingItems.length > 0 && getItemStatus(upcomingItems[0]) === "CURRENT") {
+      if (sourceIndex === 0 || destinationIndex === 0) {
+         // Reject drag if trying to drag the CURRENT item or drop above it
+         return;
+      }
+    }
+
+    const pastCount = queue.length - upcomingItems.length;
     const actualSourceIndex = sourceIndex + pastCount;
     const actualDestIndex = destinationIndex + pastCount;
     
     const newQueue = Array.from(queue);
     const [reorderedItem] = newQueue.splice(actualSourceIndex, 1);
     newQueue.splice(actualDestIndex, 0, reorderedItem);
+
+    // Recalculate start and end times for the entire queue
+    const addSeconds = (timeStr: string, secondsToAdd: number): string => {
+      const parts = timeStr.split(':');
+      let h = parseInt(parts[0] || '0', 10);
+      let m = parseInt(parts[1] || '0', 10);
+      let s = parseInt(parts[2] || '0', 10);
+      s += secondsToAdd;
+      m += Math.floor(s / 60);
+      s = s % 60;
+      h += Math.floor(m / 60);
+      m = m % 60;
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    };
+
+    let currentStartTime = block?.start.length === 5 ? `${block.start}:00` : (block?.start || '00:00:00');
+    for (const item of newQueue) {
+      item.startTime = currentStartTime;
+      currentStartTime = addSeconds(currentStartTime, item.durationSeconds || 12);
+      item.endTime = currentStartTime;
+    }
+
     setEditedQueues({ ...editedQueues, [slotIdx]: newQueue });
   };
 
