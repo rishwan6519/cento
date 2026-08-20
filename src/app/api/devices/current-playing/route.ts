@@ -8,8 +8,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { serialNumber, path } = body;
 
-    if (!serialNumber || !path) {
+    if (!serialNumber || path === undefined) {
       return NextResponse.json({ error: 'serialNumber and path are required' }, { status: 400 });
+    }
+
+    if (path === '') {
+      await DeviceCurrentPlaying.findOneAndDelete({ serialNumber });
+      return NextResponse.json({ success: true, message: 'Currently playing cleared successfully' }, { status: 200 });
     }
 
     await DeviceCurrentPlaying.findOneAndUpdate(

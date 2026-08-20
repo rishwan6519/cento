@@ -64,6 +64,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
   const [expandedAnnouncementId, setExpandedAnnouncementId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{type: 'playlist' | 'announcement', file: any} | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [currentPlaying, setCurrentPlaying] = useState<any>(null);
   const [disconnectingPlaylistId, setDisconnectingPlaylistId] = useState<string | null>(null);
   const [disconnectingAnnouncementId, setDisconnectingAnnouncementId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -76,6 +77,31 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
       setUserId(storedUserId);
     }
   }, []);
+
+  // Poll for Currently Playing
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (device?.deviceId?.serialNumber) {
+      const fetchCurrent = async () => {
+        try {
+          const res = await fetch(`/api/devices/current-playing?serialNumber=${device.deviceId.serialNumber}`);
+          const resData = await res.json();
+          if (resData.success && resData.data) {
+            setCurrentPlaying(resData.data);
+          } else {
+            setCurrentPlaying(null);
+          }
+        } catch (e) {}
+      };
+      fetchCurrent();
+      interval = setInterval(fetchCurrent, 3000);
+    } else {
+      setCurrentPlaying(null);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [device?.deviceId?.serialNumber]);
 
   useEffect(() => {
     if (userId && device?.deviceId?._id) {
@@ -293,6 +319,11 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  const getFileName = (path: string) => {
+    const name = (path || '').split('/').pop() || 'Unknown File';
+    try { return decodeURIComponent(name); } catch { return name; }
+  };
+
   return (
     <div className="bg-[#f0f9fb] min-h-screen p-4 md:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
@@ -357,7 +388,6 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                 <span className="text-gray-500 w-32">Assigned:</span>
                 <span className="font-medium">User Account</span>
               </div>
-                {storeLocation && ( 
                 <div className="flex items-center">
                   <span className="text-gray-500 w-32">Store Location:</span>
                   <span className="font-medium">{storeLocation}</span>
@@ -365,6 +395,131 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      <style>{`
+        /* Now Playing Premium Banner */
+        .ddm-now-playing {
+          position: relative;
+          padding: 16px 24px;
+          display: flex; align-items: center; gap: 16px;
+          background: linear-gradient(90deg, #1e293b, #0f172a);
+          color: #fff;
+          border-radius: 12px;
+          overflow: hidden;
+          margin-bottom: 24px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .ddm-now-playing--empty {
+          background: #fff;
+          border: 1px solid #e5e7eb;
+          color: #374151;
+          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .ddm-now-playing-bg-blur {
+          position: absolute; inset: 0;
+          background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(139, 92, 246, 0.15));
+          z-index: 0; pointer-events: none;
+        }
+        .ddm-now-playing-icon-box {
+          position: relative; z-index: 1;
+          width: 44px; height: 44px; border-radius: 12px;
+          background: linear-gradient(135deg, #38BDF8, #6366F1);
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.35);
+          color: #fff;
+        }
+        .ddm-now-playing--empty .ddm-now-playing-icon-box {
+          background: #f3f4f6; box-shadow: none; color: #9ca3af;
+        }
+        .ddm-now-playing-details {
+          position: relative; z-index: 1; flex: 1; overflow: hidden;
+        }
+        .ddm-now-playing-label {
+          font-size: 0.68rem; font-weight: 700; color: #94A3B8;
+          text-transform: uppercase; letter-spacing: 0.12em;
+          display: flex; align-items: center; gap: 8px; margin-bottom: 3px;
+        }
+        .ddm-now-playing--empty .ddm-now-playing-label {
+          color: #6b7280;
+        }
+        .ddm-now-playing-label span.live-dot {
+          width: 6px; height: 6px; border-radius: 50%; background: #22C55E;
+          box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+          animation: pulse-live 2s infinite;
+        }
+        @keyframes pulse-live {
+          0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+          70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .ddm-now-playing-title {
+          font-size: 0.95rem; font-weight: 600; color: #fff;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ddm-now-playing--empty .ddm-now-playing-title {
+          color: #9ca3af; font-weight: 500; font-style: italic;
+        }
+        .ddm-now-playing-action {
+          position: relative; z-index: 1;
+        }
+        .ddm-preview-btn {
+          display: flex; align-items: center; gap: 6px;
+          padding: 7px 14px; border-radius: 8px; border: none;
+          background: linear-gradient(135deg, #F05A28, #E04818);
+          color: #fff; font-size: 0.72rem; font-weight: 700;
+          cursor: pointer; white-space: nowrap; flex-shrink: 0;
+          transition: transform 0.15s, box-shadow 0.15s;
+          box-shadow: 0 2px 8px rgba(240, 90, 40, 0.25);
+        }
+        .ddm-preview-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(240, 90, 40, 0.35);
+        }
+      `}</style>
+
+      {/* Currently Playing Section */}
+      <div className={`ddm-now-playing ${!currentPlaying ? 'ddm-now-playing--empty' : ''}`}>
+        {currentPlaying && <div className="ddm-now-playing-bg-blur" />}
+        <div className="ddm-now-playing-icon-box">
+           <Play size={16} className="ml-1" />
+        </div>
+        <div className="ddm-now-playing-details">
+          <div className="ddm-now-playing-label">
+            {currentPlaying && <span className="live-dot" />}
+            Currently Playing
+          </div>
+          <div className="ddm-now-playing-title">
+            {currentPlaying ? getFileName(currentPlaying.path) : "No active media currently playing"}
+          </div>
+        </div>
+        <div className="ddm-now-playing-action">
+          {currentPlaying && (
+             <button 
+                className="ddm-preview-btn"
+                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'none' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+                onClick={() => {
+                    const pathLower = currentPlaying.path.toLowerCase();
+                    let type: 'video' | 'audio' | 'image' | 'playlist' | 'announcement' = 'playlist';
+                    if (pathLower.endsWith('.mp4') || pathLower.endsWith('.webm') || pathLower.endsWith('.ogg')) type = 'video';
+                    else if (pathLower.endsWith('.mp3') || pathLower.endsWith('.wav')) type = 'audio';
+                    else if (pathLower.endsWith('.jpg') || pathLower.endsWith('.jpeg') || pathLower.endsWith('.png')) type = 'image';
+                    setPreviewFile({ 
+                      type: 'playlist', 
+                      file: { 
+                        name: getFileName(currentPlaying.path), 
+                        path: currentPlaying.path,
+                        type 
+                      } 
+                    });
+                }}
+             >
+               <Maximize2 size={12} /> Preview
+             </button>
+          )}
         </div>
       </div>
 
