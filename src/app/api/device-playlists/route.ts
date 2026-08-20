@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
 
-    // 2. Schedule Conflict Check (New Feature)
+    // 2. Schedule Conflict Check (REMOVED as per user request to allow multiple playlists at same time)
+    // The timeline logic already merges medias from multiple playlists overlapping the same slot.
+    /*
     const newPlaylists = await PlaylistConfig.find({ _id: { $in: playlistIds } });
     
     // Check against existing regular playlists for THIS device
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
           if (newP._id.toString() === existingP._id.toString()) continue;
           if (isTimeOverlapping(newP as any, existingP as any)) {
              return NextResponse.json({
-                error: `Conflict: Time Slot overlap with existing playlist "${existingP.name}"`,
+                error: \`Conflict: Time Slot overlap with existing playlist "\${existingP.name}"\`,
                 conflict: true,
                 conflictType: 'regular'
               }, { status: 409 });
@@ -62,10 +64,10 @@ export async function POST(req: NextRequest) {
        for (const newP of newPlaylists) {
          for (const existingAnn of (announcementConnections.announcementPlaylistIds || []) as any[]) {
             const schedule = existingAnn.schedule || {};
-            if (schedule.scheduleType === 'hourly') continue; // Simple overlap skip for hourly for now or treat as always overlap?
+            if (schedule.scheduleType === 'hourly') continue;
             if (isTimeOverlapping(newP as any, schedule as any)) {
                return NextResponse.json({
-                  error: `Conflict: Time Slot overlap with existing announcement "${existingAnn.name}"`,
+                  error: \`Conflict: Time Slot overlap with existing announcement "\${existingAnn.name}"\`,
                   conflict: true,
                   conflictType: 'announcement'
                 }, { status: 409 });
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
          }
        }
     }
+    */
 
     // 3. Check for existing regular playlist record (Previous logic)
     const existing = await DevicePlaylist.findOne({ deviceId });

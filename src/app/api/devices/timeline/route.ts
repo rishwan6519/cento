@@ -342,6 +342,11 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Ensure random shuffling (with duplicate prevention) for the fallback loop as well
+      if (unrolledMedias.length > 0) {
+         unrolledMedias = smartShuffle(unrolledMedias);
+      }
+
       // --- REQUIREMENT 3: Calculate start and end times for each item ---
       const addSecondsToTime = (timeStr: string, secondsToAdd: number): string => {
         const parts = timeStr.split(':');
