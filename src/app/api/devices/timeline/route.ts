@@ -16,6 +16,51 @@ function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
+// Helper: Smart shuffle that prevents consecutive duplicates if possible
+function smartShuffle(array: any[]): any[] {
+  if (array.length <= 1) return array;
+  const shuffled = shuffleArray(array);
+  
+  const getId = (item: any) => item.fileId || item.path || Math.random().toString();
+
+  for (let i = 0; i < shuffled.length - 1; i++) {
+    const currentId = getId(shuffled[i]);
+    const nextId = getId(shuffled[i + 1]);
+    
+    if (currentId === nextId) {
+       let swapIdx = -1;
+       
+       for (let j = i + 2; j < shuffled.length; j++) {
+          const candidateId = getId(shuffled[j]);
+          if (candidateId !== currentId) {
+             const leftSafe = j === 0 || getId(shuffled[j - 1]) !== nextId;
+             const rightSafe = j === shuffled.length - 1 || getId(shuffled[j + 1]) !== nextId;
+             if (leftSafe && rightSafe) {
+                swapIdx = j;
+                break;
+             }
+          }
+       }
+       
+       if (swapIdx === -1) {
+         for (let j = i + 2; j < shuffled.length; j++) {
+            if (getId(shuffled[j]) !== currentId) {
+               swapIdx = j;
+               break;
+            }
+         }
+       }
+       
+       if (swapIdx !== -1) {
+          const temp = shuffled[i + 1];
+          shuffled[i + 1] = shuffled[swapIdx];
+          shuffled[swapIdx] = temp;
+       }
+    }
+  }
+  return shuffled;
+}
+
 export const dynamic = 'force-dynamic';
 
 const parseTimeToMinutes = (timeStr: string) => {
@@ -105,6 +150,14 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Normalize category names
+      const normalizeCat = (catStr: string) => {
+        const lower = (catStr || 'Uncategorized').toLowerCase();
+        if (lower.includes('generic')) return 'Generic';
+        if (lower.includes('offer')) return 'Offer';
+        return catStr.charAt(0).toUpperCase() + catStr.slice(1).toLowerCase();
+      };
+
       // Check for distribution config for this specific time slot
       let distConfig: Record<string, number> | null = null;
       try {
@@ -122,7 +175,11 @@ export async function GET(req: NextRequest) {
             ? Object.fromEntries(distDocToUse.distribution)
             : distDocToUse.distribution;
           if (Object.keys(distObj).length > 0) {
-            distConfig = distObj;
+            distConfig = {};
+            for (const [k, v] of Object.entries(distObj)) {
+               const normK = normalizeCat(k);
+               distConfig[normK] = (distConfig[normK] || 0) + Number(v);
+            }
           }
         }
       } catch (e) {
@@ -134,7 +191,7 @@ export async function GET(req: NextRequest) {
       const filesByCategory: Record<string, any[]> = {};
       
       for (const m of slot.medias) {
-        const cat = (m.videoCategory || 'uncategorized').toLowerCase();
+        const cat = normalizeCat(m.videoCategory);
         if (!filesByCategory[cat]) filesByCategory[cat] = [];
         filesByCategory[cat].push(m);
       }
@@ -228,7 +285,8 @@ export async function GET(req: NextRequest) {
           }
 
           // True random shuffle of the entire generated timeline (Professional Random Mix)
-          unrolledMedias = shuffleArray(allGeneratedItems);
+          // Uses smartShuffle to ensure the same video doesn't play consecutively
+          unrolledMedias = smartShuffle(allGeneratedItems);
         }
       }
 
