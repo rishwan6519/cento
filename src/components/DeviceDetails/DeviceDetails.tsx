@@ -388,6 +388,7 @@ const DeviceDetails: React.FC<DeviceDetailsProps> = ({ device, onBack }) => {
                 <span className="text-gray-500 w-32">Assigned:</span>
                 <span className="font-medium">User Account</span>
               </div>
+              {storeLocation && (
                 <div className="flex items-center">
                   <span className="text-gray-500 w-32">Store Location:</span>
                   <span className="font-medium">{storeLocation}</span>
