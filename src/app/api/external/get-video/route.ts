@@ -222,9 +222,10 @@ async function checkAndResolveJob(jobId: string) {
            ratio: v.ratio || "16:9"
         })).filter((v: any) => !!v.originalUrl);
       } else {
-        const fallbackUrl = finalResultData.video_url || finalResultData.videoUrl || finalResultData.url || finalResultData.file;
+        const fallbackUrl = finalResultData.data?.url || finalResultData.data?.file || finalResultData.video_url || finalResultData.videoUrl || finalResultData.url || finalResultData.file;
+        const fallbackRatio = finalResultData.data?.ratio || "16:9";
         if (fallbackUrl) {
-           videosToProcess.push({ originalUrl: fallbackUrl, ratio: "16:9" });
+           videosToProcess.push({ originalUrl: fallbackUrl, ratio: fallbackRatio });
         }
       }
 
