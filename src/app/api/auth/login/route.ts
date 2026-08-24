@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/lib/db";
 import User from "@/models/User";
+import ActivityLog from "@/models/ActivityLog";
 
 export async function POST(request: Request) {
   try {
@@ -25,6 +26,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Reject paused or deleted accounts
+    if (user.accountStatus === 'paused' || user.accountStatus === 'deleted') {
+      return NextResponse.json(
+        { message: `Your account is ${user.accountStatus}. Please contact support.` },
+        { status: 403 }
+      );
+    }
+
     // Reject demo_store users from main login — they must use /demo/login
     if (user.role === "demo_store") {
       return NextResponse.json(
@@ -42,6 +51,19 @@ export async function POST(request: Request) {
       );
     }
     
+    // Log login activity
+    try {
+      await ActivityLog.create({
+        userId: user._id,
+        action: 'LOGIN',
+        entityType: 'User',
+        entityId: user._id,
+        details: { message: 'User logged in' }
+      });
+    } catch (logError) {
+      console.error('Failed to log login activity:', logError);
+    }
+
     // Create JWT token with admin role
     const token = jwt.sign(
       { 

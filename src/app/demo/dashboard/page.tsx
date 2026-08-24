@@ -793,7 +793,7 @@ export default function DemoDashboardPage() {
     <>
       <style>{`
         /* ── Reset & Base ── */
-        .store-root *, .store-root *::before, .store-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        .store-root *, .store-root *::before, .store-root *::after { box-sizing: border-box; }
         .store-root { display: flex; height: 100vh; overflow: hidden; font-family: 'Inter', 'Geist', sans-serif; background: #eaf6f8; }
 
         /* ── Sidebar ── */

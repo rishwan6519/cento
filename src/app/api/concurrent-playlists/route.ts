@@ -170,18 +170,52 @@ export async function POST(req: NextRequest) {
     const finalSelectedDeviceId = resolvedDevicesToConnect.length > 0 ? resolvedDevicesToConnect[0].id : (selectedDeviceId || null);
     const finalDeviceIds = resolvedDevicesToConnect.map(d => d.id);
 
+    // 2.5 Determine target device ratio to align media automatically
+    let targetRatio: string | null = null;
+    if (resolvedDevicesToConnect.length > 0) {
+      const dev = await Device.findById(resolvedDevicesToConnect[0].id).populate('typeId');
+      if (dev?.typeId?.screenSize) {
+        const { width, height } = dev.typeId.screenSize;
+        if (width && height) {
+          const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+          const div = gcd(width, height);
+          targetRatio = `${width / div}:${height / div}`;
+          if (width > height && targetRatio !== "16:9") {
+            if (Math.abs(width/height - 16/9) < 0.1) targetRatio = "16:9";
+          } else if (height > width && targetRatio !== "9:16") {
+            if (Math.abs(height/width - 16/9) < 0.1) targetRatio = "9:16";
+            else if (Math.abs(height/width - 5/4) < 0.1) targetRatio = "4:5";
+          }
+        }
+      }
+    }
+
     // 3. Resolve files — accept either 'files' array or 'mediaIds' array
     let resolvedFiles: any[] = [];
     if (Array.isArray(files) && files.length > 0) {
       resolvedFiles = await Promise.all(files.map(async (file: any, index: number) => {
         let mediaDetails = { name: file.name, path: file.path, type: file.type };
-        if (!file.path && (file.fileId || file._id || file.id)) {
-          const media = await MediaItem.findById(file.fileId || file._id || file.id);
-          if (media) {
-            mediaDetails.name = media.name;
-            mediaDetails.path = media.url || media.fileUrl;
-            mediaDetails.type = media.type;
+        const fileIdToFind = file.mediaId || file.fileId || file._id || file.id;
+        let media = null;
+        if (fileIdToFind) {
+          media = await MediaItem.findById(fileIdToFind);
+        } else if (file.path) {
+          media = await MediaItem.findOne({ url: file.path });
+        }
+        
+        if (media) {
+          if (targetRatio && media.jobId) {
+             const alignedMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: targetRatio });
+             if (alignedMedia) {
+                media = alignedMedia;
+             } else {
+                const mainMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: "16:9" });
+                if (mainMedia) media = mainMedia;
+             }
           }
+          mediaDetails.name = media.name;
+          mediaDetails.path = media.url || media.fileUrl;
+          mediaDetails.type = media.type;
         }
         let bgImage = file.backgroundImage || null;
         if (bgImage && mongoose.Types.ObjectId.isValid(bgImage)) {
@@ -202,8 +236,17 @@ export async function POST(req: NextRequest) {
       resolvedFiles = await Promise.all(mediaIds.map(async (id: any, index: number) => {
         let mediaDetails = { name: undefined, path: undefined, type: undefined };
         if (id) {
-          const media = await MediaItem.findById(id);
+          let media = await MediaItem.findById(id);
           if (media) {
+            if (targetRatio && media.jobId) {
+               const alignedMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: targetRatio });
+               if (alignedMedia) {
+                  media = alignedMedia;
+               } else {
+                  const mainMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: "16:9" });
+                  if (mainMedia) media = mainMedia;
+               }
+            }
             mediaDetails.name = media.name;
             mediaDetails.path = media.url || media.fileUrl;
             mediaDetails.type = media.type;
@@ -451,16 +494,50 @@ export async function PUT(req: NextRequest) {
       };
     }
 
+    // Determine target device ratio to align media automatically
+    let targetRatio: string | null = null;
+    if (resolvedDevicesToConnect.length > 0) {
+      const dev = await Device.findById(resolvedDevicesToConnect[0]).populate('typeId');
+      if (dev?.typeId?.screenSize) {
+        const { width, height } = dev.typeId.screenSize;
+        if (width && height) {
+          const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+          const div = gcd(width, height);
+          targetRatio = `${width / div}:${height / div}`;
+          if (width > height && targetRatio !== "16:9") {
+            if (Math.abs(width/height - 16/9) < 0.1) targetRatio = "16:9";
+          } else if (height > width && targetRatio !== "9:16") {
+            if (Math.abs(height/width - 16/9) < 0.1) targetRatio = "9:16";
+            else if (Math.abs(height/width - 5/4) < 0.1) targetRatio = "4:5";
+          }
+        }
+      }
+    }
+
     if (Array.isArray(files) && files.length > 0) {
       updateFields.files = await Promise.all(files.map(async (file: any, index: number) => {
         let mediaDetails = { name: file.name, path: file.path, type: file.type };
-        if (!file.path && (file.fileId || file._id || file.id)) {
-          const media = await MediaItem.findById(file.fileId || file._id || file.id);
-          if (media) {
-            mediaDetails.name = media.name;
-            mediaDetails.path = media.url || media.fileUrl;
-            mediaDetails.type = media.type;
+        const fileIdToFind = file.mediaId || file.fileId || file._id || file.id;
+        let media = null;
+        if (fileIdToFind) {
+          media = await MediaItem.findById(fileIdToFind);
+        } else if (file.path) {
+          media = await MediaItem.findOne({ url: file.path });
+        }
+        
+        if (media) {
+          if (targetRatio && media.jobId) {
+             const alignedMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: targetRatio });
+             if (alignedMedia) {
+                media = alignedMedia;
+             } else {
+                const mainMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: "16:9" });
+                if (mainMedia) media = mainMedia;
+             }
           }
+          mediaDetails.name = media.name;
+          mediaDetails.path = media.url || media.fileUrl;
+          mediaDetails.type = media.type;
         }
         let bgImage = file.backgroundImage || null;
         if (bgImage && mongoose.Types.ObjectId.isValid(bgImage)) {
@@ -481,8 +558,17 @@ export async function PUT(req: NextRequest) {
       updateFields.files = await Promise.all(mediaIds.map(async (mediaId: any, index: number) => {
         let mediaDetails = { name: undefined, path: undefined, type: undefined };
         if (mediaId) {
-          const media = await MediaItem.findById(mediaId);
+          let media = await MediaItem.findById(mediaId);
           if (media) {
+            if (targetRatio && media.jobId) {
+               const alignedMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: targetRatio });
+               if (alignedMedia) {
+                  media = alignedMedia;
+               } else {
+                  const mainMedia = await MediaItem.findOne({ jobId: media.jobId, ratio: "16:9" });
+                  if (mainMedia) media = mainMedia;
+               }
+            }
             mediaDetails.name = media.name;
             mediaDetails.path = media.url || media.fileUrl;
             mediaDetails.type = media.type;

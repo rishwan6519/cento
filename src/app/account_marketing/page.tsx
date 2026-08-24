@@ -40,6 +40,8 @@ import {
   Clock
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import SubUsersView from "../components/SubUsersView";
+import AuditLogsView from "../components/AuditLogsView";
 
 // --- Sub-components for different views ---
 
@@ -2569,6 +2571,8 @@ export default function AccountMarketingDashboard() {
   const userName = userData?.operatorName || userData?.username || "Bastien Morel";
   const initials = userName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
 
+  const isSubUser = !!userData?.createdBy;
+
   const sidebarLinks = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { 
@@ -2589,6 +2593,15 @@ export default function AccountMarketingDashboard() {
       ]
     },
     { id: "media_provisioning", label: "Media provisioning", icon: ImageIcon },
+    ...(isSubUser ? [] : [{ 
+      id: "marketing_users", 
+      label: "User Management", 
+      icon: Users,
+      subItems: [
+        { id: "sub_users", label: "Sub-Users", icon: Users }
+      ]
+    }]),
+    { id: "audit_logs", label: "Audit Logs", icon: ListIcon },
     { id: "profile", label: "Profile", icon: User },
     { id: "support", label: "Support", icon: HeadphonesIcon },
   ];
@@ -2623,6 +2636,8 @@ export default function AccountMarketingDashboard() {
       case "create_instant_playlist": return <CreateInstantPlaylistView userData={userData} />;
       case "create_announcement": return <CreateAnnouncementWizard userRole="account_marketing" userId={userData?._id || (typeof window !== "undefined" ? localStorage.getItem("userId") : "")} customerId={userData?.customerId} onNavigate={setActiveView} />;
       case "media_provisioning": return <MediaProvisioningView />;
+      case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'account_marketing'} />;
+      case "audit_logs": return <AuditLogsView userId={userData?._id} />;
       case "profile": return <ProfileView userData={userData} />;
       default: return <div className="text-gray-500 font-medium">This module is under development.</div>;
     }

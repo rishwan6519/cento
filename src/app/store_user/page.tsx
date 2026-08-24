@@ -38,6 +38,8 @@ import Veo3TextVideoView from "./Veo3TextVideoView";
 import MediaLibraryView from "./MediaLibraryView";
 import DeviceDetailsModal from "./DeviceDetailsModal";
 import TimelineSchedulesView from "./TimelineSchedulesView";
+import SubUsersView from "../components/SubUsersView";
+import AuditLogsView from "../components/AuditLogsView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ViewKey =
@@ -56,6 +58,8 @@ export type ViewKey =
   | "offerCreation"
   | "veo3TextVideo"
   | "mediaLibrary"
+  | "subUsers"
+  | "auditLogs"
   | "timelineSchedules";
 
 interface OfflineDevice {
@@ -77,6 +81,7 @@ interface SidebarProps {
   setSupportOpen: (v: boolean) => void;
   mobileOpen: boolean;
   setMobileOpen: (v: boolean) => void;
+  isSubUser?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -88,6 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   setSupportOpen,
   mobileOpen,
   setMobileOpen,
+  isSubUser,
 }) => {
   const isActive = (view: ViewKey) => activeView === view;
   const isMediaActive =
@@ -205,6 +211,24 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>📅</span>
             <span>Timelines / Schedules</span>
+          </button>
+
+          {!isSubUser && (
+            <button
+              className={`store-nav-item ${isActive("subUsers") ? "store-nav-item--active" : ""}`}
+              onClick={() => onNavigate("subUsers")}
+            >
+              <FaUser className="store-nav-item__icon" />
+              <span>Sub-Users</span>
+            </button>
+          )}
+
+          <button
+            className={`store-nav-item ${isActive("auditLogs") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("auditLogs")}
+          >
+            <BsMusicNoteList className="store-nav-item__icon" />
+            <span>Audit Logs</span>
           </button>
 
           <button
@@ -642,6 +666,10 @@ export default function StoreUserPage() {
         return <Veo3TextVideoView />;
       case "timelineSchedules":
         return <TimelineSchedulesView />;
+      case "subUsers":
+        return <SubUsersView creatorId={localStorage.getItem("userId") || ''} role="store" />;
+      case "auditLogs":
+        return <AuditLogsView userId={localStorage.getItem("userId") || ''} />;
       default:
         return (
           <div className="store-placeholder">
@@ -655,7 +683,7 @@ export default function StoreUserPage() {
     <>
       <style>{`
         /* ── Reset & Base ── */
-        .store-root *, .store-root *::before, .store-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        .store-root *, .store-root *::before, .store-root *::after { box-sizing: border-box; }
         .store-root { display: flex; height: 100vh; overflow: hidden; font-family: 'Inter', 'Geist', sans-serif; background: #eaf6f8; }
 
         /* ── Sidebar ── */
@@ -854,6 +882,7 @@ export default function StoreUserPage() {
           setSupportOpen={setSupportOpen}
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
+          isSubUser={!!userData?.createdBy}
         />
         <div className="store-layout-right">
           <Header userName={userName} onMobileMenuOpen={() => setMobileOpen(true)} />

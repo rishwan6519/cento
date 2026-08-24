@@ -14,6 +14,8 @@ import { isTimeOverlapping } from '@/lib/conflictCheck';
 
 
 
+import ActivityLog from '@/models/ActivityLog';
+
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -35,47 +37,6 @@ export async function POST(req: NextRequest) {
         conflictType: 'quick'
       }, { status: 409 });
     }
-
-    // 2. Schedule Conflict Check (REMOVED as per user request to allow multiple playlists at same time)
-    // The timeline logic already merges medias from multiple playlists overlapping the same slot.
-    /*
-    const newPlaylists = await PlaylistConfig.find({ _id: { $in: playlistIds } });
-    
-    // Check against existing regular playlists for THIS device
-    const existingConnections = await DevicePlaylist.findOne({ deviceId }).populate('playlistIds');
-    if (existingConnections) {
-      for (const newP of newPlaylists) {
-        for (const existingP of (existingConnections.playlistIds || []) as any[]) {
-          if (newP._id.toString() === existingP._id.toString()) continue;
-          if (isTimeOverlapping(newP as any, existingP as any)) {
-             return NextResponse.json({
-                error: \`Conflict: Time Slot overlap with existing playlist "\${existingP.name}"\`,
-                conflict: true,
-                conflictType: 'regular'
-              }, { status: 409 });
-          }
-        }
-      }
-    }
-
-    // Check against existing announcements for THIS device
-    const announcementConnections = await DeviceAnnouncementConnection.findOne({ deviceId }).populate('announcementPlaylistIds');
-    if (announcementConnections) {
-       for (const newP of newPlaylists) {
-         for (const existingAnn of (announcementConnections.announcementPlaylistIds || []) as any[]) {
-            const schedule = existingAnn.schedule || {};
-            if (schedule.scheduleType === 'hourly') continue;
-            if (isTimeOverlapping(newP as any, schedule as any)) {
-               return NextResponse.json({
-                  error: \`Conflict: Time Slot overlap with existing announcement "\${existingAnn.name}"\`,
-                  conflict: true,
-                  conflictType: 'announcement'
-                }, { status: 409 });
-            }
-         }
-       }
-    }
-    */
 
     // 3. Check for existing regular playlist record (Previous logic)
     const existing = await DevicePlaylist.findOne({ deviceId });
@@ -106,6 +67,17 @@ export async function POST(req: NextRequest) {
         await PlaylistConfig.findByIdAndUpdate(pid, { priority: prio as number }, { new: true });
       }
 
+      // Log activity
+      if (userId) {
+        await ActivityLog.create({
+          userId,
+          action: 'ASSIGN_PLAYLIST',
+          entityType: 'Device',
+          entityId: deviceId,
+          details: { playlistIds }
+        });
+      }
+
       return NextResponse.json(existing);
     } else {
       // No record, create new
@@ -120,6 +92,17 @@ export async function POST(req: NextRequest) {
       // Update PlaylistConfig
       for (const [pid, prio] of Object.entries(priorities)) {
         await PlaylistConfig.findByIdAndUpdate(pid, { priority: prio as number }, { new: true });
+      }
+
+      // Log activity
+      if (userId) {
+        await ActivityLog.create({
+          userId,
+          action: 'ASSIGN_PLAYLIST',
+          entityType: 'Device',
+          entityId: deviceId,
+          details: { playlistIds }
+        });
       }
 
       return NextResponse.json(newDevicePlaylist);

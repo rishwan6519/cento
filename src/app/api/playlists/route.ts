@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import MediaItem from '@/models/MediaItems';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 import User from '@/models/User';
+import ActivityLog from '@/models/ActivityLog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -148,6 +149,18 @@ export async function POST(req: NextRequest) {
       });
     }
     console.log('Playlist created successfully:', playlist);
+
+    try {
+      await ActivityLog.create({
+        userId: userId || playlist.userId,
+        action: 'CREATE_PLAYLIST',
+        entityType: 'Playlist',
+        entityId: playlist._id,
+        details: { name: playlist.name, type: playlist.type }
+      });
+    } catch (logError) {
+      console.error('Failed to log create playlist activity:', logError);
+    }
 
     // Connect playlist to selected device(s) in DevicePlaylist collection
     const rawDevices: string[] = [];
@@ -463,6 +476,18 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
     }
 
+    try {
+      await ActivityLog.create({
+        userId: userId || playlist.userId,
+        action: 'UPDATE_PLAYLIST',
+        entityType: 'Playlist',
+        entityId: playlist._id,
+        details: { name: playlist.name, type: playlist.type }
+      });
+    } catch (logError) {
+      console.error('Failed to log update playlist activity:', logError);
+    }
+
     // Sync DevicePlaylist connections
     const rawDevices: string[] = [];
     if (selectedDeviceId && mongoose.Types.ObjectId.isValid(selectedDeviceId)) {
@@ -720,6 +745,18 @@ export async function DELETE(req: NextRequest) {
         { error: 'Playlist not found' },
         { status: 404 }
       );
+    }
+
+    try {
+      await ActivityLog.create({
+        userId: playlist.userId || new mongoose.Types.ObjectId(), // Best effort
+        action: 'DELETE_PLAYLIST',
+        entityType: 'Playlist',
+        entityId: playlist._id,
+        details: { name: playlist.name }
+      });
+    } catch (logError) {
+      console.error('Failed to log delete playlist activity:', logError);
     }
 
     return NextResponse.json({ success: true });

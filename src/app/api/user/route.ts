@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
 import User, { UserRole } from '@/models/User';
 import { connectToDatabase } from '@/lib/db';
+import ActivityLog from '@/models/ActivityLog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -68,6 +69,19 @@ export async function POST(req: NextRequest) {
 
     try {
       await newUser.save();
+      
+      // Log activity
+      try {
+        await ActivityLog.create({
+          userId: controllerId || customerId || newUser._id,
+          action: 'CREATE_USER',
+          entityType: 'User',
+          entityId: newUser._id,
+          details: { username: newUser.username, role: newUser.role, storeName: newUser.storeName }
+        });
+      } catch (logError) {
+        console.error('Failed to log create user activity:', logError);
+      }
     } catch (saveError: any) {
       if (saveError.code === 11000) {
         const field = Object.keys(saveError.keyPattern)[0];
@@ -211,6 +225,20 @@ export async function PUT(req: NextRequest) {
 
     await user.save();
 
+    // Log activity
+    try {
+      // In a real app we'd get the acting user from auth/token. For now we use the target user ID if acting user isn't passed
+      await ActivityLog.create({
+        userId: user._id, 
+        action: 'UPDATE_USER',
+        entityType: 'User',
+        entityId: user._id,
+        details: { username: user.username, fieldsUpdated: Object.keys(await req.json()) }
+      });
+    } catch (logError) {
+      console.error('Failed to log update user activity:', logError);
+    }
+
     const { password: _, ...userWithoutPassword } = user.toObject();
     return NextResponse.json({ success: true, data: userWithoutPassword });
   } catch (error) {
@@ -241,6 +269,19 @@ export async function DELETE(req: NextRequest) {
         { success: false, message: "User not found" },
         { status: 404 }
       );
+    }
+
+    // Log activity
+    try {
+      await ActivityLog.create({
+        userId: user.controllerId || user.customerId || user._id, // Best effort to guess who deleted it, or self-deleted
+        action: 'DELETE_USER',
+        entityType: 'User',
+        entityId: user._id,
+        details: { username: user.username, role: user.role }
+      });
+    } catch (logError) {
+      console.error('Failed to log delete user activity:', logError);
     }
 
     return NextResponse.json({ success: true });

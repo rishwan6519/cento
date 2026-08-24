@@ -42,6 +42,8 @@ import {
   Lock,
   X
 } from "lucide-react";
+import SubUsersView from "../components/SubUsersView";
+import AuditLogsView from "../components/AuditLogsView";
 import { useRouter } from "next/navigation";
 
 // --- Sub-components for different views ---
@@ -2586,6 +2588,8 @@ export default function ResellerDashboard() {
     fetchUser();
   }, [router]);
 
+  const isSubUser = !!userData?.createdBy;
+
   const sidebarLinks = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { 
@@ -2616,6 +2620,15 @@ export default function ResellerDashboard() {
       ]
     },
     { id: "media", label: "Media provisioning", icon: ImageIcon },
+    ...(isSubUser ? [] : [{ 
+      id: "reseller_users", 
+      label: "Reseller Users", 
+      icon: Users,
+      subItems: [
+        { id: "sub_users", label: "Sub-Users", icon: Users }
+      ]
+    }]),
+    { id: "audit_logs", label: "Audit Logs", icon: ListIcon },
     { id: "support", label: "Support", icon: HeadphonesIcon },
   ];
 
@@ -2643,6 +2656,8 @@ export default function ResellerDashboard() {
       case "view_devices": return <AllDevicesView />;
       case "media": return <MediaProvisioningView onCreateCampaign={(u) => { setActiveUserForCampaign(u); setActiveView("create_campaign"); }} />;
       case "create_campaign": return <ResellerCreateCampaignFormView actingUser={activeUserForCampaign} onBack={() => { setActiveView("media"); setActiveUserForCampaign(null); }} />;
+      case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'reseller'} />;
+      case "audit_logs": return <AuditLogsView userId={userData?._id} />;
       case "profile": return <ProfileView />;
       default: return <div className="text-gray-500 font-medium">This module is under development.</div>;
     }

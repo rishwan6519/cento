@@ -71,6 +71,19 @@ export async function POST(req: NextRequest) {
       status: "active",
     });
 
+    try {
+      const ActivityLog = (await import('@/models/ActivityLog')).default;
+      await ActivityLog.create({
+        userId,
+        action: 'CREATE_PLAYLIST',
+        entityType: 'Playlist',
+        entityId: playlistConfig._id,
+        details: { name: playlistConfig.name }
+      });
+    } catch (e) {
+      console.error('Failed to log activity', e);
+    }
+
     return NextResponse.json(playlistConfig, { status: 201 });
   } catch (error) {
     console.error("Error creating configuration:", error);

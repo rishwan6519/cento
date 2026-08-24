@@ -39,6 +39,8 @@ import {
   MonitorPlay
 } from "lucide-react";
 import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
+import SubUsersView from "../components/SubUsersView";
+import AuditLogsView from "../components/AuditLogsView";
 import { useRouter } from "next/navigation";
 
 // --- Sub-components for different views ---
@@ -1833,6 +1835,8 @@ export default function AccountAdminDashboard() {
     router.push("/login");
   };
 
+  const isSubUser = !!userData?.createdBy;
+
   const sidebarLinks = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   
@@ -1853,9 +1857,11 @@ export default function AccountAdminDashboard() {
       icon: Users,
       subItems: [
         { id: "onboard_user", label: "Onboard Central marketing user", icon: Plus },
-        { id: "all_users", label: "View Central marketing user", icon: ListIcon }
+        { id: "all_users", label: "View Central marketing user", icon: ListIcon },
+        ...(isSubUser ? [] : [{ id: "sub_users", label: "Sub-Users", icon: Users }])
       ]
     },
+    { id: "audit_logs", label: "Audit Logs", icon: ListIcon },
     { id: "profile", label: "Profile", icon: User },
     { id: "support", label: "Support", icon: HeadphonesIcon },
   ];
@@ -1897,6 +1903,8 @@ export default function AccountAdminDashboard() {
           />
         </div>
       );
+      case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'account_admin'} />;
+      case "audit_logs": return <AuditLogsView userId={userData?._id} />;
       case "profile": return <ProfileView userData={userData} />;
       default: return <div className="text-gray-500 font-medium">This module is under development.</div>;
     }

@@ -272,6 +272,50 @@ export async function POST(req: NextRequest) {
       await videoJob.save().catch(() => {});
     }
 
+    // 3.5 Fetch additional videos from Cloudbases if we have a job_id
+    const targetJobId = videoJob?.jobId || (typeof rawId === "string" ? rawId.trim() : "");
+    if (targetJobId) {
+      try {
+        const cloudRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api/external/videos?job_id=${targetJobId}`);
+        if (cloudRes.ok) {
+          const cloudData = await cloudRes.json();
+          if (cloudData?.success && cloudData?.data?.videos) {
+            for (const vid of cloudData.data.videos) {
+              if (vid.url) {
+                const existingMedia = await MediaItemModel.findOne({ url: vid.url });
+                if (!existingMedia) {
+                  await MediaItemModel.create({
+                    userId: targetUserId,
+                    name: vid.file || 'Generated Video',
+                    type: 'video/mp4',
+                    url: vid.url,
+                    ratio: vid.ratio,
+                    suffix: vid.suffix,
+                    width: vid.width,
+                    height: vid.height,
+                    duration: vid.duration,
+                    templateId: vid.template_id ? String(vid.template_id) : undefined,
+                    offerId: newOfferId || undefined,
+                    jobId: targetJobId,
+                  });
+                } else {
+                  existingMedia.ratio = vid.ratio;
+                  existingMedia.suffix = vid.suffix;
+                  existingMedia.width = vid.width;
+                  existingMedia.height = vid.height;
+                  existingMedia.duration = vid.duration;
+                  existingMedia.jobId = targetJobId;
+                  await existingMedia.save();
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[offer_approval] Error fetching external videos:", err);
+      }
+    }
+
     // 4. Return updated approved metadata in clean, logical ordering
     const finalVideoUrl = mediaItem?.url || videoJob?.falRequests?.find((r: any) => r.videoUrl)?.videoUrl || videoJob?.videoUrl || "";
     const finalScript = voiceoverScript !== undefined ? String(voiceoverScript).trim() : (mediaItem?.voiceoverScript || videoJob?.voiceoverScript || "");

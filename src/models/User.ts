@@ -98,6 +98,8 @@ export interface UserDocument extends Document {
   fcmTokens?: string[];
   notificationFrequency?: number;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  accountStatus?: 'active' | 'paused' | 'deleted';
+  createdBy?: mongoose.Types.ObjectId;
   activeAlerts?: any[];
 }
 
@@ -155,6 +157,16 @@ const UserSchema: Schema = new Schema({
     type: String,
     enum: ['pending', 'approved', 'rejected'],
     default: 'approved'
+  },
+  accountStatus: {
+    type: String,
+    enum: ['active', 'paused', 'deleted'],
+    default: 'active'
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
   },
   hasAllStoreAccess: {
     type: Boolean,

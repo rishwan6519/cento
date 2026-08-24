@@ -6,6 +6,7 @@ import User from "@/models/User";
 import Device from "@/models/Device";
 import { DeviceType } from "@/models/DeviceTypes";
 import AssignedDevice from "@/models/AssignDevice";
+import ActivityLog from "@/models/ActivityLog";
 
 function generateSerialNumber(): string {
   const digits = Math.floor(10000 + Math.random() * 90000);
@@ -100,6 +101,19 @@ export async function POST(request: Request) {
         model: Device,
         select: "name serialNumber status typeId",
       });
+    }
+
+    // Log login activity
+    try {
+      await ActivityLog.create({
+        userId: user._id,
+        action: 'LOGIN',
+        entityType: 'User',
+        entityId: user._id,
+        details: { message: 'Demo store user logged in' }
+      });
+    } catch (logError) {
+      console.error('Failed to log demo login activity:', logError);
     }
 
     // Create JWT token
