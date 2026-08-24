@@ -121,10 +121,11 @@ const AddDevice: React.FC<AddDeviceProps> = ({
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {deviceTypes.map((type: any) => (
               <button
-                key={type.id || (type as any)._id}
+                key={type.id || type._id}
                 onClick={() =>
-                  setNewDevice({ ...newDevice, typeId: type.id || (type as any)._id })
+                  setNewDevice({ ...newDevice, typeId: type.id || type._id })
                 }
                 className="group relative flex flex-col bg-white rounded-[2rem] p-6 border-2 border-slate-50 hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 text-left overflow-hidden translate-z-0"
               >

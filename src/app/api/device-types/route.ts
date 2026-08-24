@@ -30,6 +30,7 @@ export async function POST(request: Request) {
         width: data.screenSize?.width || 0,
         height: data.screenSize?.height || 0
       },
+      type: data.type || 'audio',
       blockCodingEnabled: !!data.blockCodingEnabled,
     });
     
@@ -69,6 +70,7 @@ export async function PUT(request: Request) {
           width: data.screenSize?.width,
           height: data.screenSize?.height
         },
+        type: data.type,
         blockCodingEnabled: data.blockCodingEnabled,
       },
       { new: true }
@@ -141,6 +143,7 @@ export async function GET() {
       screenSize: type.screenSize,
       createdAt: type.createdAt,
       updatedAt: type.updatedAt,
+      type: type.type,
       blockCodingEnabled: type?.blockCodingEnabled,
     }));
     console.log(transformedDeviceTypes,"................")

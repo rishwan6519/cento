@@ -24,6 +24,7 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
   const [bodyMovements, setBodyMovements] = useState<string>(initialData?.bodyMovements?.join(", ") || "");
   const [screenWidth, setScreenWidth] = useState<string>(initialData?.screenSize?.width?.toString() || "");
   const [screenHeight, setScreenHeight] = useState<string>(initialData?.screenSize?.height?.toString() || "");
+  const [deviceTypeCategory, setDeviceTypeCategory] = useState<string>(initialData?.type || "audio");
   const [blockCodingEnabled, setBlockCodingEnabled] = useState<boolean>(initialData?.blockCodingEnabled || false);
 
   // Skip rendering if not the active section
@@ -70,6 +71,7 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
           width: screenWidth ? parseInt(screenWidth) : 0,
           height: screenHeight ? parseInt(screenHeight) : 0,
         },
+        type: deviceTypeCategory,
         blockCodingEnabled: blockCodingEnabled,
       };
 
@@ -107,6 +109,7 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
     setBodyMovements("");
     setScreenWidth("");
     setScreenHeight("");
+    setDeviceTypeCategory("audio");
   };
 
   return (
@@ -133,6 +136,25 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
               placeholder="e.g. Sentinel-7 Series"
               className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all text-xl shadow-sm hover:shadow-md"
             />
+          </div>
+
+          <div className="pt-2">
+            <label className="flex items-center gap-4 cursor-pointer group">
+              <div className="relative">
+                 <input
+                  type="checkbox"
+                  checked={deviceTypeCategory === "video"}
+                  onChange={(e) => setDeviceTypeCategory(e.target.checked ? "video" : "audio")}
+                  className="sr-only"
+                />
+                <div className={`w-14 h-8 rounded-full transition-colors duration-300 ${deviceTypeCategory === "video" ? 'bg-blue-600' : 'bg-slate-200'}`} />
+                <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${deviceTypeCategory === "video" ? 'translate-x-6' : 'translate-x-0'}`} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-black text-slate-900 tracking-tight">Video Display Capability</span>
+                <span className="text-xs text-slate-400 font-medium tracking-tight">Enable if this architecture has a screen.</span>
+              </div>
+            </label>
           </div>
           
           {/* Movements Container */}
@@ -169,36 +191,7 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
         </div>
 
         <div className="space-y-8">
-           {/* Screen Geometry */}
-           <div className="bg-white/40 rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-8">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-50 pb-4">Display Geometry</h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
-                    Horizontal (px) <span className="text-slate-400/50 normal-case">(Optional)</span>
-                  </label>
-                <input
-                  type="number"
-                  value={screenWidth}
-                  onChange={(e) => setScreenWidth(e.target.value)}
-                  placeholder="1080"
-                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-3 font-bold text-slate-900 outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
-                    Vertical (px) <span className="text-slate-400/50 normal-case">(Optional)</span>
-                  </label>
-                <input
-                  type="number"
-                  value={screenHeight}
-                  onChange={(e) => setScreenHeight(e.target.value)}
-                  placeholder="1920"
-                  className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-3 font-bold text-slate-900 outline-none transition-all"
-                />
-              </div>
-            </div>
-          </div>
+
 
           {/* Media & Configuration */}
           <div className="bg-white/40 rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-8">
@@ -264,25 +257,7 @@ const AddDeviceType: React.FC<AddDeviceTypeProps> = ({
               </div>
             </div>
 
-            {/* Block Coding */}
-            <div className="pt-4">
-              <label className="flex items-center gap-4 cursor-pointer group">
-                <div className="relative">
-                   <input
-                    type="checkbox"
-                    checked={blockCodingEnabled}
-                    onChange={(e) => setBlockCodingEnabled(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={`w-14 h-8 rounded-full transition-colors duration-300 ${blockCodingEnabled ? 'bg-blue-600' : 'bg-slate-200'}`} />
-                  <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-300 ${blockCodingEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-black text-slate-900 tracking-tight">Logic Engine Support</span>
-                  <span className="text-xs text-slate-400 font-medium tracking-tight">Enables Drag-and-Drop Block Coding for this model.</span>
-                </div>
-              </label>
-            </div>
+
           </div>
         </div>
       </div>
