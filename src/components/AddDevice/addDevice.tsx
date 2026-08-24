@@ -31,11 +31,13 @@ const AddDevice: React.FC<AddDeviceProps> = ({
     typeId: string;
     color: string;
     serialNumber: string;
+    screenRatio: string;
   }>({
     name: "",
     typeId: "",
     color: "",
     serialNumber: "",
+    screenRatio: "16:9",
   });
 
   // Skip rendering if not the active section
@@ -65,6 +67,7 @@ const AddDevice: React.FC<AddDeviceProps> = ({
           color: newDevice.color,
           typeId: newDevice.typeId,
           serialNumber: newDevice.serialNumber,
+          screenRatio: newDevice.screenRatio,
           imageUrl: deviceType?.imageUrl || "", // Allow empty image if not provided
         }),
       });
@@ -78,7 +81,7 @@ const AddDevice: React.FC<AddDeviceProps> = ({
       toast.success("Device added successfully!");
       
       // Reset form
-      setNewDevice({ name: "", typeId: "", serialNumber: "", color: "" });
+      setNewDevice({ name: "", typeId: "", serialNumber: "", color: "", screenRatio: "16:9" });
       
       // Notify parent component
       onSuccess();
@@ -98,6 +101,7 @@ const AddDevice: React.FC<AddDeviceProps> = ({
       typeId: "",
       serialNumber: "",
       color: "",
+      screenRatio: "16:9",
     });
   };
 
@@ -117,11 +121,10 @@ const AddDevice: React.FC<AddDeviceProps> = ({
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {deviceTypes.map((type) => (
               <button
-                key={type.id}
+                key={type.id || (type as any)._id}
                 onClick={() =>
-                  setNewDevice({ ...newDevice, typeId: type.id })
+                  setNewDevice({ ...newDevice, typeId: type.id || (type as any)._id })
                 }
                 className="group relative flex flex-col bg-white rounded-[2rem] p-6 border-2 border-slate-50 hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 text-left overflow-hidden translate-z-0"
               >
@@ -176,9 +179,9 @@ const AddDevice: React.FC<AddDeviceProps> = ({
             {/* Selected Type Preview */}
             <div className="w-full lg:w-2/5 flex flex-col items-center">
               <div className="w-full aspect-square rounded-[2rem] overflow-hidden bg-slate-50 border border-slate-100 p-8 shadow-inner group">
-                {deviceTypes.find((t) => t.id === newDevice.typeId)?.imageUrl && (
+                {deviceTypes.find((t) => (t.id || (t as any)._id) === newDevice.typeId)?.imageUrl && (
                   <img
-                    src={deviceTypes.find((t) => t.id === newDevice.typeId)?.imageUrl}
+                    src={deviceTypes.find((t) => (t.id || (t as any)._id) === newDevice.typeId)?.imageUrl}
                     alt="Selected type"
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700"
                   />
@@ -186,7 +189,7 @@ const AddDevice: React.FC<AddDeviceProps> = ({
               </div>
               <div className="mt-6 text-center">
                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 block">Architecture</span>
-                 <h4 className="text-xl font-black text-slate-900">{deviceTypes.find((t) => t.id === newDevice.typeId)?.name}</h4>
+                 <h4 className="text-xl font-black text-slate-900">{deviceTypes.find((t) => (t.id || (t as any)._id) === newDevice.typeId)?.name}</h4>
               </div>
             </div>
             
@@ -253,6 +256,27 @@ const AddDevice: React.FC<AddDeviceProps> = ({
                   className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all text-xl"
                 />
               </div>
+
+              {/* Screen Ratio Dropdown for Video Devices */}
+              {deviceTypes.find((t) => (t.id || (t as any)._id) === newDevice.typeId)?.type === "video" && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">
+                    Screen Ratio / Orientation
+                  </label>
+                  <select
+                    value={newDevice.screenRatio}
+                    onChange={(e) =>
+                      setNewDevice({ ...newDevice, screenRatio: e.target.value })
+                    }
+                    className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-2xl px-6 py-4 font-bold text-slate-900 outline-none transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="16:9">16:9 (Landscape)</option>
+                    <option value="9:16">9:16 (Portrait)</option>
+                    <option value="1:1">1:1 (Square)</option>
+                    <option value="4:5">4:5 (Vertical)</option>
+                  </select>
+                </div>
+              )}
               
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row justify-end gap-4 pt-8">

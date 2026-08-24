@@ -12,7 +12,9 @@ interface Device {
   typeId: {
     name: string;
     imageUrl: string;
+    type?: string;
   };
+  screenRatio?: string;
 }
 
 interface EditFormData {
@@ -20,6 +22,7 @@ interface EditFormData {
   imageUrl: string;
   color: string;
   status: string;
+  screenRatio: string;
 }
 
 interface ShowDevicesProps {
@@ -35,6 +38,7 @@ export default function ShowDevices({ onBack }: ShowDevicesProps) {
     imageUrl: '',
     color: '',
     status: 'active',
+    screenRatio: '16:9',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [imageMode, setImageMode] = useState<'url' | 'upload'>('url');
@@ -85,6 +89,7 @@ export default function ShowDevices({ onBack }: ShowDevicesProps) {
       imageUrl: device.imageUrl || '',
       color: device.color || '',
       status: device.status || 'active',
+      screenRatio: device.screenRatio || '16:9',
     });
     setImageMode('url');
   };
@@ -132,7 +137,7 @@ export default function ShowDevices({ onBack }: ShowDevicesProps) {
 
   const closeEditModal = () => {
     setEditingDevice(null);
-    setEditForm({ name: '', imageUrl: '', color: '', status: 'active' });
+    setEditForm({ name: '', imageUrl: '', color: '', status: 'active', screenRatio: '16:9' });
   };
 
   const handleSaveEdit = async () => {
@@ -153,6 +158,7 @@ export default function ShowDevices({ onBack }: ShowDevicesProps) {
           imageUrl: editForm.imageUrl.trim(),
           color: editForm.color.trim(),
           status: editForm.status,
+          screenRatio: editForm.screenRatio,
         }),
       });
 
@@ -429,6 +435,25 @@ export default function ShowDevices({ onBack }: ShowDevicesProps) {
                   />
                 </div>
               </div>
+
+              {/* Screen Ratio Dropdown for Video Devices */}
+              {editingDevice.typeId?.type === "video" && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Screen Ratio / Orientation
+                  </label>
+                  <select
+                    value={editForm.screenRatio}
+                    onChange={(e) => setEditForm({ ...editForm, screenRatio: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
+                  >
+                    <option value="16:9">16:9 (Landscape)</option>
+                    <option value="9:16">9:16 (Portrait)</option>
+                    <option value="1:1">1:1 (Square)</option>
+                    <option value="4:5">4:5 (Vertical)</option>
+                  </select>
+                </div>
+              )}
 
               {/* Status */}
               <div>

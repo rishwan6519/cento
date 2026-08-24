@@ -174,7 +174,9 @@ export async function POST(req: NextRequest) {
     let targetRatio: string | null = null;
     if (resolvedDevicesToConnect.length > 0) {
       const dev = await Device.findById(resolvedDevicesToConnect[0].id).populate('typeId');
-      if (dev?.typeId?.screenSize) {
+      if (dev?.screenRatio) {
+        targetRatio = dev.screenRatio;
+      } else if (dev?.typeId?.screenSize) {
         const { width, height } = dev.typeId.screenSize;
         if (width && height) {
           const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
@@ -498,7 +500,9 @@ export async function PUT(req: NextRequest) {
     let targetRatio: string | null = null;
     if (resolvedDevicesToConnect.length > 0) {
       const dev = await Device.findById(resolvedDevicesToConnect[0]).populate('typeId');
-      if (dev?.typeId?.screenSize) {
+      if (dev?.screenRatio) {
+        targetRatio = dev.screenRatio;
+      } else if (dev?.typeId?.screenSize) {
         const { width, height } = dev.typeId.screenSize;
         if (width && height) {
           const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);

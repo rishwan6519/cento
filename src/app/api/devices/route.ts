@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { name, typeId, serialNumber, imageUrl,color } = body;
+    const { name, typeId, serialNumber, imageUrl,color, screenRatio } = body;
 
     // Validate required fields
     if (!name || !typeId || !serialNumber) {
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       serialNumber,
       imageUrl,
       color,
+      screenRatio: screenRatio || null,
       status: 'active'
     });
 
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
 
     if (customerId && customerId !== 'undefined' && customerId !== 'null') {
       const devices = await Device.find({ customerId: customerId })
-        .populate('typeId', 'name imageUrl')
+        .populate('typeId', 'name imageUrl type')
         .sort({ createdAt: -1 });
       return NextResponse.json(devices);
     }
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
     if (!resellerId) {
       // No filter — return all devices (admin use)
       const devices = await Device.find({})
-        .populate('typeId', 'name imageUrl')
+        .populate('typeId', 'name imageUrl type')
         .sort({ createdAt: -1 });
       return NextResponse.json(devices);
     }
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
     }
 
     const devices = await Device.find({ $or: orConditions })
-      .populate('typeId', 'name imageUrl')
+      .populate('typeId', 'name imageUrl type')
       .sort({ createdAt: -1 });
 
     console.log(`GET /api/devices: resellerId=${resellerId}, customers=${customerIds.length}, found=${devices.length}`);
@@ -150,7 +151,7 @@ export async function PATCH(request: NextRequest) {
   try {
     await connectToDatabase();
     const mongoose = (await import('mongoose')).default;
-    const { id, name, imageUrl, color, status, customerId, resellerId } = await request.json();
+    const { id, name, imageUrl, color, status, customerId, resellerId, screenRatio } = await request.json();
 
     if (!id) {
       return NextResponse.json({ success: false, message: "Device ID is required" }, { status: 400 });
@@ -161,6 +162,7 @@ export async function PATCH(request: NextRequest) {
     if (name !== undefined) updateData.name = name;
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
     if (color !== undefined) updateData.color = color;
+    if (screenRatio !== undefined) updateData.screenRatio = screenRatio;
     if (status !== undefined) updateData.status = status;
     // Explicitly cast to ObjectId or allow null (for disconnect)
     if (customerId !== undefined) {

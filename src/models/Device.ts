@@ -25,6 +25,11 @@ const deviceSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    screenRatio: {
+        type: String,
+        required: false,
+        default: null
+    },
     lastConnection: {
     type: Date,
     required: false,
