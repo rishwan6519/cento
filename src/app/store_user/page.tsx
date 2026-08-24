@@ -492,6 +492,7 @@ export default function StoreUserPage() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userName, setUserName] = useState("Loren Wilson");
+  const [userData, setUserData] = useState<any>(null);
   const [devices, setDevices] = useState<OfflineDevice[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<any>(null);
@@ -515,6 +516,7 @@ export default function StoreUserPage() {
         if (data.success && data.data && data.data.length > 0) {
           const user = data.data[0];
           setUserName(user.storeName || user.username || "Loren Wilson");
+          setUserData(user);
         }
       } catch (err) {
         console.error("Failed to fetch user", err);
