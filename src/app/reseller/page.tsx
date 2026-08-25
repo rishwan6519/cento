@@ -2566,23 +2566,34 @@ export default function ResellerDashboard() {
   };
 
   useEffect(() => {
-    const role = localStorage.getItem("userRole");
-    if (role !== "reseller") {
+    const token = localStorage.getItem("token");
+    const id = localStorage.getItem("userId");
+    
+    if (!token || !id) {
       router.push("/login");
       return;
     }
 
     const fetchUser = async () => {
-      const id = localStorage.getItem("userId");
-      if (!id) return;
       try {
         const res = await fetch(`/api/user?userId=${id}`);
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
-          setUserData(data.data[0]);
+          const user = data.data[0];
+          if (user.role !== "reseller") {
+            toast.error("Unauthorized access.");
+            localStorage.clear();
+            router.push("/login");
+            return;
+          }
+          setUserData(user);
+        } else {
+          localStorage.clear();
+          router.push("/login");
         }
       } catch (err) {
         console.error("Failed to fetch profile", err);
+        router.push("/login");
       }
     };
     fetchUser();

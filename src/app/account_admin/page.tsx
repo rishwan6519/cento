@@ -36,7 +36,8 @@ import {
   Mail,
   Wifi,
   WifiOff,
-  MonitorPlay
+  MonitorPlay,
+  Film
 } from "lucide-react";
 import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
 import SubUsersView from "../components/SubUsersView";
@@ -1803,25 +1804,37 @@ export default function AccountAdminDashboard() {
   const [selectedStore, setSelectedStore] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [loadingSSO, setLoadingSSO] = useState(false);
 
   useEffect(() => {
-    const role = localStorage.getItem("userRole");
-    if (role !== "account_admin") {
+    const token = localStorage.getItem("token");
+    const id = localStorage.getItem("userId");
+    
+    if (!token || !id) {
       router.push("/login");
       return;
     }
 
     const fetchUser = async () => {
-      const id = localStorage.getItem("userId");
-      if (!id) return;
       try {
         const res = await fetch(`/api/user?userId=${id}`);
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
-          setUserData(data.data[0]);
+          const user = data.data[0];
+          if (user.role !== "account_admin") {
+            toast.error("Unauthorized access.");
+            localStorage.clear();
+            router.push("/login");
+            return;
+          }
+          setUserData(user);
+        } else {
+          localStorage.clear();
+          router.push("/login");
         }
       } catch (err) {
         console.error("Failed to fetch profile", err);
+        router.push("/login");
       }
     };
     fetchUser();
@@ -1839,6 +1852,7 @@ export default function AccountAdminDashboard() {
 
   const sidebarLinks = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "video_template", label: loadingSSO ? "Loading..." : "Video Template", icon: Film },
   
     { 
       id: "stores", 
@@ -1866,7 +1880,25 @@ export default function AccountAdminDashboard() {
     { id: "support", label: "Support", icon: HeadphonesIcon },
   ];
 
-  const handleMenuClick = (linkId: string, hasSubItems: boolean) => {
+  const handleMenuClick = async (linkId: string, hasSubItems: boolean) => {
+    if (linkId === "video_template") {
+      try {
+        setLoadingSSO(true);
+        const res = await fetch("/api/sso/video-template");
+        const data = await res.json();
+        if (data.success && data.data?.redirect_url) {
+          window.open(data.data.redirect_url, "_blank");
+        } else {
+          alert("Failed to generate SSO link: " + (data.message || "Unknown error"));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error generating SSO link");
+      } finally {
+        setLoadingSSO(false);
+      }
+      return;
+    }
     if (linkId === "support") {
       window.location.href = "mailto:contact@centelonrobotics.tech";
       return;

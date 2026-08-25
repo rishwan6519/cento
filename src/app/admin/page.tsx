@@ -61,13 +61,34 @@ export default function RobotAdminDashboard() {
   useEffect(() => {
     // Authentication Check
     const token = localStorage.getItem("token");
-    const role = localStorage.getItem("userRole");
+    const userId = localStorage.getItem("userId");
     
-    if (!token || role !== "admin") {
+    if (!token || !userId) {
       toast.error("Unauthorized access. Please login first.");
       router.push("/admin/login");
       return;
     }
+
+    // Verify role securely
+    fetch(`/api/user?userId=${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data && data.data.length > 0) {
+          const user = data.data[0];
+          if (user.role !== "admin") {
+            toast.error("Unauthorized access.");
+            localStorage.clear();
+            router.push("/admin/login");
+          }
+        } else {
+          localStorage.clear();
+          router.push("/admin/login");
+        }
+      })
+      .catch(() => {
+        toast.error("Verification failed");
+        router.push("/admin/login");
+      });
   }, [router]);
 
   useEffect(() => {

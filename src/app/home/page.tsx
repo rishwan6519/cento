@@ -64,35 +64,43 @@ const CustomerEngagementPlatform = () => {
     const checkUserAccess = async () => {
       try {
         const id = localStorage.getItem("userId");
-        const role = localStorage.getItem("userRole");
+        const token = localStorage.getItem("token");
 
-        if (!id || !role) {
+        if (!id || !token) {
           toast.error("Authentication required. Please log in.");
           router.push("/login");
           return;
         }
 
-        if (role !== "user") {
-          toast.error("You are unauthorized to access this page", {
-            duration: 4000,
-            position: "top-right",
-            style: {
-              background: "#ef4444",
-              color: "#ffffff",
-              fontWeight: "bold",
-            },
-            icon: "🚫",
-          });
+        const res = await fetch(`/api/user?userId=${id}`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          const user = data.data[0];
+          if (user.role !== "user") {
+            toast.error("You are unauthorized to access this page", {
+              duration: 4000,
+              position: "top-right",
+              style: {
+                background: "#ef4444",
+                color: "#ffffff",
+                fontWeight: "bold",
+              },
+              icon: "🚫",
+            });
+            localStorage.clear();
+            router.push("/login");
+            return;
+          }
+          setUserId(id);
+          setUserRole(user.role);
+        } else {
+          localStorage.clear();
           router.push("/login");
-          return;
         }
-
-        setUserId(id);
-        setUserRole(role);
       } catch (error) {
         console.error("Error checking user access:", error);
         toast.error("An error occurred while verifying access");
-        router.push("/");
+        router.push("/login");
       } finally {
         setIsLoading(false);
       }

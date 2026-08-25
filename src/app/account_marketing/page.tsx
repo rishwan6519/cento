@@ -2538,23 +2538,34 @@ export default function AccountMarketingDashboard() {
 
   useEffect(() => {
     toast.dismiss(); // Clear any persistent login toasts on mount
-    const role = typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
-    if (role && role !== "account_marketing" && role !== "account_admin") {
+    const token = localStorage.getItem("token");
+    const id = localStorage.getItem("userId");
+    
+    if (!token || !id) {
       router.push("/login");
       return;
     }
 
     const fetchUser = async () => {
-      const id = localStorage.getItem("userId");
-      if (!id) return;
       try {
         const res = await fetch(`/api/user?userId=${id}`);
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
-          setUserData(data.data[0]);
+          const user = data.data[0];
+          if (user.role !== "account_marketing" && user.role !== "account_admin") {
+            toast.error("Unauthorized access.");
+            localStorage.clear();
+            router.push("/login");
+            return;
+          }
+          setUserData(user);
+        } else {
+          localStorage.clear();
+          router.push("/login");
         }
       } catch (err) {
         console.error("Failed to fetch user", err);
+        router.push("/login");
       }
     };
     fetchUser();

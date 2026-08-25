@@ -74,27 +74,35 @@ const BlockCodingGate: React.FC = () => {
 
   useEffect(() => {
     const checkAccess = async () => {
-    const userRole = localStorage.getItem("userRole");
+    const token = localStorage.getItem("token");
     const userId = localStorage.getItem("userId");
 
-    if (!userId) {
-      toast.error("User ID not found.");
+    if (!token || !userId) {
+      toast.error("Authentication required.");
       return window.location.href = "/login";
     }
 
     try {
-      const response = await fetch(`/api/user/users?userId=${userId}`);
-      const data = await response.json();
-
-      if (userRole === "developer" && data.blockCoding === true) {
-        toast.success("Welcome Developer!");
+      const response = await fetch(`/api/user?userId=${userId}`);
+      const resData = await response.json();
+      if (resData.success && resData.data && resData.data.length > 0) {
+        const user = resData.data[0];
+        if (user.role === "developer" && user.blockCoding === true) {
+          toast.success("Welcome Developer!");
+        } else {
+          toast.error("You are not authorized to access this page.");
+          localStorage.clear();
+          window.location.href = "/login";
+        }
       } else {
-        toast.error("You are not authorized to access this page.");
-             window.location.href = "/login";    }
+        localStorage.clear();
+        window.location.href = "/login";
+      }
     } catch (error) {
       console.error("Access check failed:", error);
       toast.error("Something went wrong.");
-            window.location.href = "/login";  }
+      window.location.href = "/login";
+    }
   };
 
     // Connect to ROS and setup periodic checking

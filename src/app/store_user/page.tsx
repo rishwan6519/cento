@@ -531,25 +531,33 @@ export default function StoreUserPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const userId = localStorage.getItem("userId");
-    if (!token || !userId) {
+    const id = localStorage.getItem("userId");
+    if (!token || !id) {
       router.push("/login");
       return;
     }
 
     const fetchUser = async () => {
-      const id = localStorage.getItem("userId");
-      if (!id) return;
       try {
         const res = await fetch(`/api/user?userId=${id}`);
         const data = await res.json();
         if (data.success && data.data && data.data.length > 0) {
           const user = data.data[0];
+          if (user.role !== "store") {
+            console.error("Unauthorized access.");
+            localStorage.clear();
+            router.push("/login");
+            return;
+          }
           setUserName(user.storeName || user.username || "Loren Wilson");
           setUserData(user);
+        } else {
+          localStorage.clear();
+          router.push("/login");
         }
       } catch (err) {
         console.error("Failed to fetch user", err);
+        router.push("/login");
       }
     };
     fetchUser();

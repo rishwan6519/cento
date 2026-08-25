@@ -258,27 +258,51 @@ export default function RoboticPlatform(): React.ReactElement {
 
   // --- Auth & Initial Fetch (Fully Restored) ---
   useEffect(() => {
-    const userRole = localStorage.getItem("userRole");
-    setCurrentUserRole(userRole);
-    if (userRole === "superUser" || userRole === "reseller") {
-      toast.success(`Welcome ${userRole === "reseller" ? "Reseller" : "Super User"}!`, {
-        style: { background: "#1e293b", color: "#fff" },
-        duration: 2000,
-      });
-    } else {
-      toast.error("You are not authorized to access this page.");
+    const token = localStorage.getItem("token");
+    const userId = localStorage.getItem("userId");
+    
+    if (!token || !userId) {
       window.location.href = "/login";
+      return;
     }
 
-    fetchDevices();
-    fetchPlaylists();
-    fetchAnnouncements();
-
-    (window as any).refreshPlatformData = () => {
-      fetchDevices();
-      fetchPlaylists();
-      fetchAnnouncements();
+    const verifyUser = async () => {
+      try {
+        const res = await fetch(`/api/user?userId=${userId}`);
+        const data = await res.json();
+        if (data.success && data.data && data.data.length > 0) {
+          const user = data.data[0];
+          setCurrentUserRole(user.role);
+          if (user.role === "superUser" || user.role === "reseller") {
+            toast.success(`Welcome ${user.role === "reseller" ? "Reseller" : "Super User"}!`, {
+              style: { background: "#1e293b", color: "#fff" },
+              duration: 2000,
+            });
+            fetchDevices();
+            fetchPlaylists();
+            fetchAnnouncements();
+            
+            (window as any).refreshPlatformData = () => {
+              fetchDevices();
+              fetchPlaylists();
+              fetchAnnouncements();
+            };
+          } else {
+            toast.error("You are not authorized to access this page.");
+            localStorage.clear();
+            window.location.href = "/login";
+          }
+        } else {
+          localStorage.clear();
+          window.location.href = "/login";
+        }
+      } catch (err) {
+        console.error(err);
+        window.location.href = "/login";
+      }
     };
+    
+    verifyUser();
   }, []);
 
   // --- Derived Data ---
