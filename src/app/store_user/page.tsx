@@ -95,6 +95,26 @@ const Sidebar: React.FC<SidebarProps> = ({
   setMobileOpen,
   isSubUser,
 }) => {
+  const [loadingSSO, setLoadingSSO] = useState(false);
+
+  const handleVideoTemplateClick = async () => {
+    try {
+      setLoadingSSO(true);
+      const res = await fetch("/api/sso/video-template");
+      const data = await res.json();
+      if (data.success && data.data?.redirect_url) {
+        window.open(data.data.redirect_url, "_blank");
+      } else {
+        alert("Failed to generate SSO link: " + (data.message || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error generating SSO link");
+    } finally {
+      setLoadingSSO(false);
+    }
+  };
+
   const isActive = (view: ViewKey) => activeView === view;
   const isMediaActive =
     activeView === "mediaManagement" ||
@@ -211,6 +231,16 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>📅</span>
             <span>Timelines / Schedules</span>
+          </button>
+
+          {/* Video Template */}
+          <button
+            className="store-nav-item"
+            onClick={handleVideoTemplateClick}
+            disabled={loadingSSO}
+          >
+            <FaFilm className="store-nav-item__icon" />
+            <span>{loadingSSO ? "Loading..." : "Video Template"}</span>
           </button>
 
           {!isSubUser && (
