@@ -318,9 +318,27 @@ export const advancedPlaylistScheduleService = {
       throw new ServiceError('Serial number is required', 400);
     }
 
-    const device = await Device.findOne({ serialNumber }, '_id');
+    const device = await Device.findOne({ serialNumber }).populate('typeId');
     if (!device) {
       throw new ServiceError('Device not found with this serial number', 404);
+    }
+
+    let targetRatio: string | null = null;
+    if ((device as any)?.screenRatio) {
+      targetRatio = (device as any).screenRatio;
+    } else if ((device as any)?.typeId?.screenSize) {
+      const { width, height } = (device as any).typeId.screenSize;
+      if (width && height) {
+        const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+        const div = gcd(width, height);
+        targetRatio = `${width / div}:${height / div}`;
+        if (width > height && targetRatio !== "16:9") {
+          if (Math.abs(width/height - 16/9) < 0.1) targetRatio = "16:9";
+        } else if (height > width && targetRatio !== "9:16") {
+          if (Math.abs(height/width - 16/9) < 0.1) targetRatio = "9:16";
+          else if (Math.abs(height/width - 5/4) < 0.1) targetRatio = "4:5";
+        }
+      }
     }
 
     // Server-side calculation of current time in Melbourne timezone (Australia/Melbourne)
@@ -584,7 +602,27 @@ export const advancedPlaylistScheduleService = {
               const rawFid = fileObj.fileId || fileObj.mediaId;
               if (rawFid) {
                  const idStr = typeof rawFid === 'object' ? rawFid._id?.toString() || rawFid.toString() : String(rawFid);
-                 const dbMedia = mediaItemMap[idStr];
+                 let dbMedia = mediaItemMap[idStr];
+                 
+                 // ALIGN RATIO DYNAMICALLY
+                 if (dbMedia && dbMedia.jobId && targetRatio) {
+                    const alignedMedia = await MediaItemModel.findOne({ jobId: dbMedia.jobId, ratio: targetRatio });
+                    if (alignedMedia) {
+                       dbMedia = alignedMedia;
+                       if (dbMedia.url) {
+                          fileObj.path = dbMedia.url;
+                          fileObj.url = dbMedia.url;
+                       }
+                    } else {
+                       const mainMedia = await MediaItemModel.findOne({ jobId: dbMedia.jobId, ratio: "16:9" });
+                       if (mainMedia && mainMedia.url) {
+                          dbMedia = mainMedia;
+                          fileObj.path = dbMedia.url;
+                          fileObj.url = dbMedia.url;
+                       }
+                    }
+                 }
+
                  if (dbMedia) {
                     if (dbMedia.fileCategory) {
                        fileObj.videoCategory = dbMedia.fileCategory;
@@ -595,7 +633,7 @@ export const advancedPlaylistScheduleService = {
                        fileObj.type = dbMedia.type;
                     }
                  }
-                 fileObj.fileId = idStr;
+                 fileObj.fileId = dbMedia?._id?.toString() || idStr;
               }
               
               // Ensure videoCategory is used, default to 'offer'
