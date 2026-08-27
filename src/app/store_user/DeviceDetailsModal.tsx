@@ -8,9 +8,10 @@ interface DeviceDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   device: any;
+  onEditPlaylist?: (playlist: any, isMedia: boolean) => void;
 }
 
-export default function DeviceDetailsModal({ isOpen, onClose, device }: DeviceDetailsModalProps) {
+export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlaylist }: DeviceDetailsModalProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<any>(null);
@@ -60,6 +61,34 @@ export default function DeviceDetailsModal({ isOpen, onClose, device }: DeviceDe
       setExpandedId(null);
     }
   }, [isOpen, device]);
+
+  const handleDisconnect = async (item: any, isMedia: boolean) => {
+    if (!device?.id && !device?._id && !device?.sn) return;
+    const deviceId = data?.device?.id;
+    if (!deviceId) return;
+    
+    try {
+      let url = "";
+      if (isMedia) {
+        url = `/api/device-playlists?deviceId=${deviceId}&playlistId=${item._id}`;
+      } else {
+        url = `/api/announcement/device-announcement?deviceId=${deviceId}&announcementPlaylistId=${item._id}`;
+      }
+      const response = await fetch(url, { method: "DELETE" });
+      if (!response.ok) throw new Error("Failed to disconnect");
+      
+      // Refresh data
+      setLoading(true);
+      const res = await fetch(`/api/full-data?serialNumber=${device.sn}`);
+      const resData = await res.json();
+      if (resData.success) setData(resData);
+      setExpandedId(null);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to disconnect playlist");
+    }
+  };
 
   if (!isOpen || !device) return null;
 
@@ -585,8 +614,31 @@ export default function DeviceDetailsModal({ isOpen, onClose, device }: DeviceDe
                                   </>
                                 )}
                               </div>
+                              
+                              <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                                <button 
+                                  className="ddm-preview-btn" 
+                                  style={{ background: '#11B5BB', boxShadow: 'none' }}
+                                  onClick={() => {
+                                    if (onEditPlaylist) {
+                                      onEditPlaylist(item, isMedia);
+                                      onClose();
+                                    }
+                                  }}
+                                >
+                                  ✏️ Edit Playlist
+                                </button>
+                                <button 
+                                  className="ddm-preview-btn" 
+                                  style={{ background: '#F87171', boxShadow: 'none' }}
+                                  onClick={() => handleDisconnect(item, isMedia)}
+                                >
+                                  🗑️ Disconnect
+                                </button>
+                              </div>
+                            </div>
 
-                              {/* Files list */}
+                            {/* Files list */}
                               <div className="ddm-files-header">{isMedia ? 'Media Files' : 'Announcements'} ({fileCount})</div>
                               {files.map((f: any, fidx: number) => {
                                 const fileName = isMedia ? getFileName(f.path) : (f.name || 'Unknown');

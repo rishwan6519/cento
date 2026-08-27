@@ -347,9 +347,10 @@ interface DashboardViewProps {
   userName: string;
   devices: OfflineDevice[];
   onNavigate: (view: ViewKey) => void;
+  onEditPlaylist?: (playlist: any, isMedia: boolean) => void;
 }
 
-const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNavigate }) => {
+const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNavigate, onEditPlaylist }) => {
   const [stats, setStats] = useState({ playlists: 0, announcements: 0 });
   const [loadingStats, setLoadingStats] = useState(true);
 
@@ -510,6 +511,7 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
         isOpen={!!selectedDeviceForModal} 
         onClose={() => setSelectedDeviceForModal(null)} 
         device={selectedDeviceForModal} 
+        onEditPlaylist={onEditPlaylist}
       />
     </div>
   );
@@ -634,6 +636,10 @@ export default function StoreUserPage() {
             userName={userName}
             devices={devices}
             onNavigate={handleNavigate}
+            onEditPlaylist={(playlist, isMedia) => {
+              handleNavigate(isMedia ? "createMediaPlaylist" : "createAnnouncement");
+              setTimeout(() => setEditingPlaylist(playlist), 0);
+            }}
           />
         );
       case "mediaManagement":
