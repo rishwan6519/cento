@@ -636,9 +636,8 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
                                   🗑️ Disconnect
                                 </button>
                               </div>
-                            </div>
 
-                            {/* Files list */}
+                              {/* Files list */}
                               <div className="ddm-files-header">{isMedia ? 'Media Files' : 'Announcements'} ({fileCount})</div>
                               {files.map((f: any, fidx: number) => {
                                 const fileName = isMedia ? getFileName(f.path) : (f.name || 'Unknown');
