@@ -255,7 +255,7 @@ async function checkAndResolveJob(jobId: string) {
                 
               let mediaItem = new MediaItemModel({
                 userId: targetUserObj,
-                name: `Cloudbases AI Video ${index + 1} – ${new Date().toLocaleString()}`,
+                name: `Generated Promo Video (${videoInfo.ratio}) – ${new Date().toLocaleString()}`,
                 type: "video",
                 fileCategory: "offer",
                 url: localVideoUrl,
