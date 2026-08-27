@@ -215,11 +215,14 @@ async function checkAndResolveJob(jobId: string) {
         }
       }
 
-      let videosToProcess: { originalUrl: string, ratio: string }[] = [];
+      let videosToProcess: { originalUrl: string, ratio: string, width?: number, height?: number, duration?: number }[] = [];
       if (finalResultData.data && Array.isArray(finalResultData.data.videos) && finalResultData.data.videos.length > 0) {
         videosToProcess = finalResultData.data.videos.map((v: any) => ({
            originalUrl: v.url || v.file,
-           ratio: v.ratio || "16:9"
+           ratio: v.ratio || "16:9",
+           width: v.width,
+           height: v.height,
+           duration: v.duration
         })).filter((v: any) => !!v.originalUrl);
       } else {
         const fallbackUrl = finalResultData.data?.url || finalResultData.data?.file || finalResultData.video_url || finalResultData.videoUrl || finalResultData.url || finalResultData.file;
@@ -264,6 +267,11 @@ async function checkAndResolveJob(jobId: string) {
                 socialMediaHeading: cloudJob.socialMediaHeading || "",
                 socialMediaCaption: cloudJob.socialMediaCaption || "",
                 hashTags: cloudJob.hashTags || [],
+                ratio: videoInfo.ratio,
+                width: videoInfo.width,
+                height: videoInfo.height,
+                duration: videoInfo.duration,
+                jobId: jobId,
                 createdAt: new Date(),
               });
               await mediaItem.save();

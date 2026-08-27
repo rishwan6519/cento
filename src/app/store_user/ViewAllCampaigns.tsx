@@ -147,7 +147,7 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
             <table className="su-vc-table">
               <thead><tr>
                 {showTypeColumn && <th>CAMPAIGN TYPE</th>}
-                <th>NAME</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
+                <th>NAME</th><th>CREATED ON</th><th>SCHEDULE</th><th>PREVIEW</th><th>STATUS</th><th>ACTION</th>
               </tr></thead>
               <tbody>
                 {filtered.map(p => {
@@ -169,6 +169,9 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                         </td>
                       )}
                       <td style={{ fontWeight: 600, color: "#162B30" }}>{p.name || "Playlist name"}</td>
+                      <td style={{ fontSize: '0.8rem', color: '#64848D', fontWeight: 600 }}>
+                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : "—"}
+                      </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
