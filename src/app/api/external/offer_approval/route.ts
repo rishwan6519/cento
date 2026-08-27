@@ -286,8 +286,8 @@ export async function POST(req: NextRequest) {
                 if (!existingMedia) {
                   await MediaItemModel.create({
                     userId: targetUserId,
-                    name: vid.file || 'Generated Video',
-                    type: 'video/mp4',
+                    name: `Generated Promo Video (${vid.ratio || "16:9"}) – ${new Date().toLocaleString()}`,
+                    type: 'video',
                     url: vid.url,
                     ratio: vid.ratio,
                     suffix: vid.suffix,
