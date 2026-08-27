@@ -632,6 +632,9 @@ export const advancedPlaylistScheduleService = {
                     if (dbMedia.type) {
                        fileObj.type = dbMedia.type;
                     }
+                    if (dbMedia.ratio) fileObj.ratio = dbMedia.ratio;
+                    if (dbMedia.width) fileObj.width = dbMedia.width;
+                    if (dbMedia.height) fileObj.height = dbMedia.height;
                  }
                  fileObj.fileId = dbMedia?._id?.toString() || idStr;
               }

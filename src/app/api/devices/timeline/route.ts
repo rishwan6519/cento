@@ -89,7 +89,10 @@ export async function GET(req: NextRequest) {
         medias: (block.medias || block.media || []).map((m: any) => ({
           path: m.path,
           startTime: m.startTime,
-          endTime: m.endTime
+          endTime: m.endTime,
+          ratio: m.ratio,
+          width: m.width,
+          height: m.height
         }))
       }));
     };
@@ -266,7 +269,10 @@ export async function GET(req: NextRequest) {
                  url: m.url || m.path,
                  fileCategory: m.fileCategory,
                  videoCategory: m.videoCategory,
-                 duration: dur
+                 duration: dur,
+                 ratio: m.ratio,
+                 width: m.width,
+                 height: m.height
               };
 
               generatedItems.push(cleanM);
@@ -318,7 +324,10 @@ export async function GET(req: NextRequest) {
                  url: mediaItem.url || mediaItem.path,
                  fileCategory: mediaItem.fileCategory,
                  videoCategory: mediaItem.videoCategory,
-                 duration: dur
+                 duration: dur,
+                 ratio: mediaItem.ratio,
+                 width: mediaItem.width,
+                 height: mediaItem.height
             };
 
             unrolledMedias.push(cleanMedia);
