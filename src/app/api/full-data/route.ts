@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
         id: device._id,
         serialNumber: device.serialNumber,
         name: device.name,
-        location: device.location,
+        location: (device as any).location,
       },
       dateTime: {
         australian: currentTime,
