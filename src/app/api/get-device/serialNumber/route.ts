@@ -44,11 +44,11 @@ export async function GET(req: NextRequest) {
         color: device.color,
         status: device.status,
         type: {
-          id: device.typeId._id,
-          name: device.typeId.name,
-          handMovements: device.typeId.handMovements,
-          bodyMovements: device.typeId.bodyMovements,
-          screenSize: device.typeId.screenSize
+          id: (device.typeId as any)._id,
+          name: (device.typeId as any).name,
+          handMovements: (device.typeId as any).handMovements,
+          bodyMovements: (device.typeId as any).bodyMovements,
+          screenSize: (device.typeId as any).screenSize
         }
       }
     });
