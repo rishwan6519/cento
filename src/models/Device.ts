@@ -64,7 +64,10 @@ const deviceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-
-const Device = mongoose.models.Device || mongoose.model('Device', deviceSchema);
+// Clear cached model in dev to pick up schema changes
+if (mongoose.models.Device) {
+  delete (mongoose.models as any).Device;
+}
+const Device = mongoose.model('Device', deviceSchema);
 
 export default Device;
