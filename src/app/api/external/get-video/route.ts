@@ -137,7 +137,7 @@ async function checkAndResolveJob(jobId: string) {
       if (cloudJob.status === 'processing') {
         try {
           const apiKey = process.env.CLOUDBASES_API_KEY || "";
-          const extRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api//external/video/${jobId}`, {
+          const extRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api/external/videos?job_id=${jobId}`, {
             headers: {
               ...(apiKey ? { 'X-API-Key': apiKey } : {})
             }
@@ -347,7 +347,7 @@ async function checkAndResolveJob(jobId: string) {
     // Fallback: If not found in any local DB, try directly fetching from cloudbases API
     try {
       const apiKey = process.env.CLOUDBASES_API_KEY || "";
-      const extRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api//external/video/${jobId}`, {
+      const extRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api/external/videos?job_id=${jobId}`, {
         headers: { ...(apiKey ? { 'X-API-Key': apiKey } : {}) }
       });
       if (extRes.ok) {
