@@ -38,10 +38,10 @@ export async function GET(req: NextRequest) {
         color: device.color,
         status: device.status,
         type: {
-          name: device.typeId.name,
-          handMovements: device.typeId.handMovements,
-          bodyMovements: device.typeId.bodyMovements,
-          screenSize: device.typeId.screenSize
+          name: (device.typeId as any).name,
+          handMovements: (device.typeId as any).handMovements,
+          bodyMovements: (device.typeId as any).bodyMovements,
+          screenSize: (device.typeId as any).screenSize
         }
       }
     });
