@@ -605,6 +605,7 @@ export default function TimelineSchedulesView() {
                                                   <div className="tsv-media-list-item__time">
                                                     <span>#{mIdx + 1} | {med.startTime} - {med.endTime}</span>
                                                     <span className="tsv-status-badge tsv-status-badge--past">Played</span>
+                                                    <span className="tsv-status-badge" style={{ background: '#f8fafb', border: '1px solid #e2e8f0', color: '#64748b', textTransform: 'capitalize' }}>{med.videoCategory || 'other'}</span>
                                                   </div>
                                                 </div>
                                                 <div className="tsv-media-list-item__duration">
@@ -644,6 +645,7 @@ export default function TimelineSchedulesView() {
                                                        <div className="tsv-media-list-item__time">
                                                           <span>#{globalIdx} | {med.startTime} - {med.endTime}</span>
                                                           {status === 'CURRENT' && <span className="tsv-status-badge tsv-status-badge--current">Playing Now</span>}
+                                                          <span className="tsv-status-badge" style={{ background: '#e0e7ff', color: '#4f46e5', textTransform: 'capitalize' }}>{med.videoCategory || 'other'}</span>
                                                        </div>
                                                      </div>
                                                      <div className="tsv-media-list-item__duration">{med.durationSeconds}s</div>
