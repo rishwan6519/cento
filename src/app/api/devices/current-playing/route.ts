@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import { DeviceCurrentPlaying } from '@/models/DeviceCurrentPlaying';
+import mongoose from 'mongoose';
+import '@/models/MediaItems'; // Ensure it's registered
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,7 +43,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'serialNumber is required' }, { status: 400 });
     }
 
-    const currentPlaying = await DeviceCurrentPlaying.findOne({ serialNumber }).lean();
+    const currentPlaying: any = await DeviceCurrentPlaying.findOne({ serialNumber }).lean();
+    
+    if (currentPlaying && currentPlaying.path) {
+      const MediaItemModel = mongoose.models.MediaItem || mongoose.model('MediaItem');
+      const escapedPath = currentPlaying.path.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const media = await MediaItemModel.findOne({ url: { $regex: new RegExp(escapedPath + '$', 'i') } }).lean();
+      
+      if (media) {
+        currentPlaying.fullPath = `https://iot.centelon.com/${(media.url || '').replace(/^(https?:\\/\\/iot\\.centelon\\.com)?\\/?/, '')}`;
+        currentPlaying.mediaId = media._id.toString();
+        currentPlaying.fileCategory = media.fileCategory || media.videoCategory || 'other';
+      } else {
+        currentPlaying.fullPath = currentPlaying.path.startsWith('http') ? currentPlaying.path : `https://iot.centelon.com/uploads/${currentPlaying.path}`;
+      }
+    }
+
     return NextResponse.json({ success: true, data: currentPlaying }, { status: 200 });
   } catch (error) {
     console.error('Error fetching currently playing:', error);

@@ -24,7 +24,7 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
     if (isOpen && device) {
       const fetchCurrent = async () => {
         try {
-          const res = await fetch(`/api/devices/current-playing?serialNumber=${device.sn}`);
+          const res = await fetch(`/api/devices/current-playing?serialNumber=${device.sn}&_t=${Date.now()}`);
           const resData = await res.json();
           if (resData.success && resData.data) {
             setCurrentPlaying(resData.data);
@@ -106,6 +106,9 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
       });
       if (res.ok) {
         // Optimistically update local data
+        if (playlistId === 'currently_playing') {
+          setCurrentPlaying((prev: any) => prev ? { ...prev, fileCategory: newCategory } : prev);
+        }
         setData((prev: any) => {
            if (!prev || !prev.playlists) return prev;
            const newPlaylists = prev.playlists.map((pl: any) => {
@@ -495,8 +498,25 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
                   {currentPlaying && <span className="live-dot" />}
                   Currently Playing
                 </div>
-                <div className="ddm-now-playing-title">
-                  {currentPlaying ? getFileName(currentPlaying.path) : "No active media currently playing"}
+                <div className="ddm-now-playing-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {currentPlaying ? getFileName(currentPlaying.fullPath || currentPlaying.path) : "No active media currently playing"}
+                  {currentPlaying && currentPlaying.fullPath && (
+                     <select 
+                       value={(currentPlaying.fileCategory || "other").toLowerCase()}
+                       onChange={(e) => handleUpdateFileCategory(e, 'currently_playing', currentPlaying.mediaId, currentPlaying.fullPath)}
+                       onClick={e => e.stopPropagation()}
+                       style={{ border: "1px solid rgba(255,255,255,0.2)", outline: "none", cursor: "pointer", background: "rgba(0,0,0,0.3)", color: "#38BDF8", padding: "2px 8px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: 700, textTransform: "capitalize" }}
+                     >
+                       <option value="video">Video</option>
+                       <option value="audio">Audio</option>
+                       <option value="image">Image</option>
+                       <option value="offer">Offer</option>
+                       <option value="generic">Generic</option>
+                       <option value="general">General</option>
+                       <option value="featured">Featured</option>
+                       <option value="other">Other</option>
+                     </select>
+                  )}
                 </div>
               </div>
               <div className="ddm-now-playing-action">
@@ -507,12 +527,13 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
                       onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
                       onClick={() => {
-                          const pathLower = currentPlaying.path.toLowerCase();
+                          const actualPath = currentPlaying.fullPath || currentPlaying.path;
+                          const pathLower = actualPath.toLowerCase();
                           let type = 'file';
                           if (pathLower.endsWith('.mp4') || pathLower.endsWith('.webm') || pathLower.endsWith('.ogg')) type = 'video';
                           else if (pathLower.endsWith('.mp3') || pathLower.endsWith('.wav')) type = 'audio';
                           else if (pathLower.endsWith('.jpg') || pathLower.endsWith('.jpeg') || pathLower.endsWith('.png')) type = 'image';
-                          setPreviewMedia({ path: currentPlaying.path, name: getFileName(currentPlaying.path), type });
+                          setPreviewMedia({ path: actualPath, name: getFileName(actualPath), type });
                       }}
                    >
                      <FaEye size={12} /> Preview
