@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
       const media = await MediaItemModel.findOne({ url: { $regex: new RegExp(escapedPath + '$', 'i') } }).lean();
       
       if (media) {
-        currentPlaying.fullPath = `https://iot.centelon.com/${(media.url || '').replace(/^(https?:\\/\\/iot\\.centelon\\.com)?\\/?/, '')}`;
+        const cleanUrl = (media.url || '').replace('https://iot.centelon.com/', '').replace(/^\//, '');
+        currentPlaying.fullPath = `https://iot.centelon.com/${cleanUrl}`;
         currentPlaying.mediaId = media._id.toString();
         currentPlaying.fileCategory = media.fileCategory || media.videoCategory || 'other';
       } else {
