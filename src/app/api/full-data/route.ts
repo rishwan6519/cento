@@ -68,7 +68,8 @@ export async function GET(req: NextRequest) {
     }> = [];
 
     if (devicePlaylist && devicePlaylist.playlistIds.length > 0) {
-      const playlists = await Playlist.find({ _id: { $in: devicePlaylist.playlistIds } });
+      const playlists = await Playlist.find({ _id: { $in: devicePlaylist.playlistIds } })
+        .populate({ path: 'files.mediaId', select: 'fileCategory videoCategory _id' });
       playlistDetails = playlists.map((p: any) => {
         const payload = {
           name: p.name,
@@ -81,6 +82,8 @@ export async function GET(req: NextRequest) {
           shuffle: p.shuffle,
           priority: p.priority !== undefined ? p.priority : (devicePlaylist.priorities ? (devicePlaylist.priorities.get(p._id.toString()) || 0) : 0),
           files: p.files.map((f: any) => ({
+            mediaId: f.mediaId?._id ? f.mediaId._id.toString() : (f.mediaId ? f.mediaId.toString() : null),
+            fileCategory: f.mediaId?.fileCategory || f.mediaId?.videoCategory || 'other',
             path: `https://iot.centelon.com/${(f.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
             displayOrder: f.displayOrder,
             type: f.type,

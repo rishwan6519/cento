@@ -90,6 +90,42 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
     }
   };
 
+  const handleUpdateFileCategory = async (e: React.ChangeEvent<HTMLSelectElement>, playlistId: string, mediaId: string) => {
+    e.stopPropagation();
+    if (!mediaId) {
+       alert("Cannot update this file because it does not have a linked media record.");
+       return;
+    }
+    const newCategory = e.target.value;
+    try {
+      const res = await fetch(`/api/media?mediaId=${mediaId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileCategory: newCategory })
+      });
+      if (res.ok) {
+        // Optimistically update local data
+        setData((prev: any) => {
+           if (!prev || !prev.playlists) return prev;
+           const newPlaylists = prev.playlists.map((pl: any) => {
+              if (pl.id === playlistId) {
+                 return {
+                    ...pl,
+                    files: pl.files.map((f: any) => f.mediaId === mediaId ? { ...f, fileCategory: newCategory } : f)
+                 };
+              }
+              return pl;
+           });
+           return { ...prev, playlists: newPlaylists };
+        });
+      } else {
+        alert("Failed to update category");
+      }
+    } catch {
+      alert("Error updating category");
+    }
+  };
+
   if (!isOpen || !device) return null;
 
   const playlists = data?.playlists || [];
@@ -647,7 +683,26 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
                                     <div className="ddm-file-icon">{getFileIcon(isMedia ? (f.type || f.path || '') : 'audio')}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div className="ddm-file-name">{fileName}</div>
-                                      <div className="ddm-file-type">{fileType}{!isMedia && f.delay ? ` • Delay: ${f.delay}s` : ''}</div>
+                                      <div className="ddm-file-type" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        {fileType}{!isMedia && f.delay ? ` • Delay: ${f.delay}s` : ''}
+                                        {isMedia && (
+                                            <select 
+                                              value={(f.fileCategory || "other").toLowerCase()}
+                                              onChange={(e) => handleUpdateFileCategory(e, item.id || item._id, f.mediaId)}
+                                              onClick={e => e.stopPropagation()}
+                                              style={{ border: "1px solid #D6E6E9", outline: "none", cursor: "pointer", background: "#e6f7f8", color: "#11b5bb", padding: "1px 6px", borderRadius: "4px", fontSize: "0.65rem", fontWeight: 700, textTransform: "capitalize" }}
+                                            >
+                                              <option value="video">Video</option>
+                                              <option value="audio">Audio</option>
+                                              <option value="image">Image</option>
+                                              <option value="offer">Offer</option>
+                                              <option value="generic">Generic</option>
+                                              <option value="general">General</option>
+                                              <option value="featured">Featured</option>
+                                              <option value="other">Other</option>
+                                            </select>
+                                        )}
+                                      </div>
                                     </div>
                                     <button
                                       className="ddm-preview-btn"
