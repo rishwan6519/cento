@@ -69,7 +69,28 @@ export async function GET(req: NextRequest) {
 
     if (devicePlaylist && devicePlaylist.playlistIds.length > 0) {
       const playlists = await Playlist.find({ _id: { $in: devicePlaylist.playlistIds } })
-        .populate({ path: 'files.fileId', model: 'MediaItem', select: 'fileCategory videoCategory _id' });
+        .populate({ path: 'files.fileId', model: 'MediaItem', select: 'fileCategory videoCategory type _id' });
+        
+      // Build a fallback map for files missing fileId
+      const missingPaths: string[] = [];
+      playlists.forEach((p: any) => {
+         p.files.forEach((f: any) => {
+            if (!f.fileId || typeof f.fileId !== 'object') {
+               const relativePath = '/' + (f.path || '').replace(/^(https?:\/\/[^\/]+)?\/?/, '');
+               missingPaths.push(relativePath);
+            }
+         });
+      });
+      
+      const fallbackMediaMap: any = {};
+      if (missingPaths.length > 0) {
+         const MediaItemModel = mongoose.models.MediaItem || mongoose.model('MediaItem');
+         const fallbackMedia = await MediaItemModel.find({ url: { $in: missingPaths } }).lean();
+         fallbackMedia.forEach((m: any) => {
+            fallbackMediaMap[m.url] = m;
+         });
+      }
+
       playlistDetails = playlists.map((p: any) => {
         const payload = {
           name: p.name,
@@ -81,18 +102,37 @@ export async function GET(req: NextRequest) {
           endTime: p.endTime,
           shuffle: p.shuffle,
           priority: p.priority !== undefined ? p.priority : (devicePlaylist.priorities ? (devicePlaylist.priorities.get(p._id.toString()) || 0) : 0),
-          files: p.files.map((f: any) => ({
-            mediaId: typeof f.fileId === 'object' && f.fileId ? f.fileId._id.toString() : (f.fileId ? f.fileId.toString() : null),
-            fileCategory: typeof f.fileId === 'object' && f.fileId ? (f.fileId.fileCategory || f.fileId.videoCategory || 'other') : 'other',
-            path: `https://iot.centelon.com/${(f.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
-            displayOrder: f.displayOrder,
-            type: f.type,
+          files: p.files.map((f: any) => {
+            let actualMedia: any = null;
+            if (typeof f.fileId === 'object' && f.fileId) {
+              actualMedia = f.fileId;
+            } else {
+              const relativePath = '/' + (f.path || '').replace(/^(https?:\/\/[^\/]+)?\/?/, '');
+              actualMedia = fallbackMediaMap[relativePath];
+            }
+            
+            let fType = actualMedia ? actualMedia.type : f.type;
+            if (!fType || fType === 'file' || fType === 'generic') {
+               const pLow = (f.path || '').toLowerCase();
+               if (pLow.endsWith('.mp4') || pLow.endsWith('.webm') || pLow.endsWith('.ogg')) fType = 'video';
+               else if (pLow.endsWith('.mp3') || pLow.endsWith('.wav')) fType = 'audio';
+               else if (pLow.endsWith('.jpg') || pLow.endsWith('.jpeg') || pLow.endsWith('.png')) fType = 'image';
+               else fType = 'file';
+            }
+
+            return {
+              mediaId: actualMedia ? actualMedia._id.toString() : null,
+              fileCategory: actualMedia ? (actualMedia.fileCategory || actualMedia.videoCategory || 'other') : 'other',
+              path: `https://iot.centelon.com/${(f.path || '').replace(/^(https?:\/\/[^\/]+)?\/?/, '')}`,
+              displayOrder: f.displayOrder,
+              type: fType,
             delay: f.delay,
             maxVolume: f.maxVolume,
             minVolume: f.minVolume,
-            backgroundImageEnabled: f.backgroundImageEnabled,
-            backgroundImage: f.backgroundImage
-          }))
+              backgroundImageEnabled: f.backgroundImageEnabled,
+              backgroundImage: f.backgroundImage
+            };
+          })
         };
 
         return {
