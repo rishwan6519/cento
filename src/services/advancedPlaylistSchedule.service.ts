@@ -528,13 +528,37 @@ export const advancedPlaylistScheduleService = {
       }
     }
 
-    // Fetch the MediaItems
+    // Fetch the MediaItems by ID
     let mediaItemMap: Record<string, any> = {};
     if (mediaIdsToFetch.size > 0) {
        const items = await MediaItemModel.find({ _id: { $in: Array.from(mediaIdsToFetch) } }).lean();
        items.forEach((item: any) => {
          mediaItemMap[item._id.toString()] = item;
        });
+    }
+
+    // FALLBACK: Gather all paths for files missing fileId to fetch from MediaLibrary by URL
+    const missingPaths: string[] = [];
+    for (const sched of validSchedules) {
+      const playlist = sched.playlistId as any;
+      if (Array.isArray(playlist.files)) {
+        for (const file of playlist.files) {
+          const fid = file.fileId || file.mediaId;
+          if (!fid || !mongoose.Types.ObjectId.isValid(typeof fid === 'object' ? fid._id?.toString() || fid.toString() : String(fid))) {
+            const rawPath = file.path || '';
+            const relativePath = '/' + rawPath.replace(/^(https?:\/\/[^\/]+)?\/?/, '');
+            missingPaths.push(relativePath);
+          }
+        }
+      }
+    }
+    
+    let fallbackMediaMap: Record<string, any> = {};
+    if (missingPaths.length > 0) {
+      const fallbackItems = await MediaItemModel.find({ url: { $in: missingPaths } }).lean();
+      fallbackItems.forEach((item: any) => {
+        fallbackMediaMap[item.url] = item;
+      });
     }
 
     // Collect all unique start and end boundaries from both advanced and legacy schedules
@@ -600,9 +624,17 @@ export const advancedPlaylistScheduleService = {
                 fileObj.url = null;
               }
               const rawFid = fileObj.fileId || fileObj.mediaId;
-              if (rawFid) {
-                 const idStr = typeof rawFid === 'object' ? rawFid._id?.toString() || rawFid.toString() : String(rawFid);
-                 let dbMedia = mediaItemMap[idStr];
+              let dbMedia: any = null;
+              let idStr: string = '';
+              
+              if (rawFid && mongoose.Types.ObjectId.isValid(typeof rawFid === 'object' ? rawFid._id?.toString() || rawFid.toString() : String(rawFid))) {
+                 idStr = typeof rawFid === 'object' ? rawFid._id?.toString() || rawFid.toString() : String(rawFid);
+                 dbMedia = mediaItemMap[idStr];
+              } else {
+                 // Try fallback map
+                 const relativePath = '/' + (fileObj.path || '').replace(/^(https?:\/\/[^\/]+)?\/?/, '');
+                 dbMedia = fallbackMediaMap[relativePath];
+              }
                  
                  // ALIGN RATIO DYNAMICALLY
                  if (dbMedia && dbMedia.jobId && targetRatio) {
@@ -637,7 +669,7 @@ export const advancedPlaylistScheduleService = {
                     if (dbMedia.height) fileObj.height = dbMedia.height;
                  }
                  fileObj.fileId = dbMedia?._id?.toString() || idStr;
-              }
+              
               
               // Ensure videoCategory is used, default to 'other'
               if (!fileObj.videoCategory) {
