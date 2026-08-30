@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     if (currentPlaying && currentPlaying.path) {
       const MediaItemModel = mongoose.models.MediaItem || mongoose.model('MediaItem');
       const escapedPath = currentPlaying.path.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const media = await MediaItemModel.findOne({ url: { $regex: new RegExp(escapedPath + '$', 'i') } }).lean();
+      const media: any = await MediaItemModel.findOne({ url: { $regex: new RegExp(escapedPath + '$', 'i') } }).lean();
       
       if (media) {
         const cleanUrl = (media.url || '').replace('https://iot.centelon.com/', '').replace(/^\//, '');
