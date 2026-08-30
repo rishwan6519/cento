@@ -150,7 +150,7 @@ export default function TimelineSchedulesView() {
                    name: m.name,
                    url: m.url || m.path,
                    type: m.type || m.videoCategory || 'unknown',
-                   videoCategory: m.videoCategory || 'general',
+                   videoCategory: m.videoCategory || 'other',
                    durationSeconds: m.duration || 12,
                    startTime: m.startTime,
                    endTime: m.endTime
