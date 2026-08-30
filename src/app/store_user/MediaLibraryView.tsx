@@ -137,6 +137,25 @@ export default function MediaLibraryView() {
     }
   };
 
+  const handleUpdateCategory = async (e: React.ChangeEvent<HTMLSelectElement>, id: string) => {
+    e.stopPropagation();
+    const newCategory = e.target.value;
+    try {
+      const res = await fetch(`/api/media?mediaId=${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileCategory: newCategory })
+      });
+      if (res.ok) {
+        setMediaItems(prev => prev.map(m => (m._id === id ? { ...m, fileCategory: newCategory, videoCategory: newCategory } : m)));
+      } else {
+        alert("Failed to update category");
+      }
+    } catch {
+      alert("Error updating category");
+    }
+  };
+
   const getPreviewUrl = (item: any) => {
     const url = item.url || "";
     if (url.startsWith("http")) return url;
@@ -451,9 +470,31 @@ export default function MediaLibraryView() {
                 </div>
                 <div className="ml-grid-info">
                   <p className="ml-grid-name">{item.name}</p>
-                  <div className="ml-grid-meta">
+                  <div className="ml-grid-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     <span className={`ml-grid-type ml-grid-type--${category}`}>{category}</span>
-                    <span className="ml-grid-source">{item.sourceName}</span>
+                    {item.source === "upload" ? (
+                      <select 
+                        value={(item.fileCategory || item.videoCategory || "other").toLowerCase()}
+                        onChange={(e) => handleUpdateCategory(e, item._id)}
+                        onClick={e => e.stopPropagation()}
+                        className="ml-grid-type"
+                        style={{ border: "1px solid #D6E6E9", outline: "none", cursor: "pointer", background: "#fff", color: "#162B30", padding: "2px 6px" }}
+                      >
+                        <option value="video">video</option>
+                        <option value="audio">audio</option>
+                        <option value="image">image</option>
+                        <option value="offer">offer</option>
+                        <option value="generic">generic</option>
+                        <option value="general">general</option>
+                        <option value="featured">featured</option>
+                        <option value="other">other</option>
+                      </select>
+                    ) : (
+                      <span className="ml-grid-type" style={{ background: "#F5F7F8", color: "#64748B" }}>
+                         {item.fileCategory || item.videoCategory || "other"}
+                      </span>
+                    )}
+                    <span className="ml-grid-source" style={{ width: '100%' }}>{item.sourceName}</span>
                   </div>
                   {item.createdAt && <p className="ml-grid-date">{new Date(item.createdAt).toLocaleDateString()}</p>}
                 </div>
@@ -480,6 +521,28 @@ export default function MediaLibraryView() {
                 </div>
                 <span className="ml-list-cell">
                   <span className={`ml-grid-type ml-grid-type--${category}`}>{category}</span>
+                  {item.source === "upload" ? (
+                      <select 
+                        value={(item.fileCategory || item.videoCategory || "other").toLowerCase()}
+                        onChange={(e) => handleUpdateCategory(e, item._id)}
+                        onClick={e => e.stopPropagation()}
+                        className="ml-grid-type"
+                        style={{ border: "1px solid #D6E6E9", outline: "none", cursor: "pointer", background: "#fff", color: "#162B30", marginLeft: "8px", padding: "2px 6px" }}
+                      >
+                        <option value="video">video</option>
+                        <option value="audio">audio</option>
+                        <option value="image">image</option>
+                        <option value="offer">offer</option>
+                        <option value="generic">generic</option>
+                        <option value="general">general</option>
+                        <option value="featured">featured</option>
+                        <option value="other">other</option>
+                      </select>
+                    ) : (
+                      <span className="ml-grid-type" style={{ background: "#F5F7F8", color: "#64748B", marginLeft: "8px" }}>
+                         {item.fileCategory || item.videoCategory || "other"}
+                      </span>
+                  )}
                 </span>
                 <span className="ml-list-cell">{item.sourceName}</span>
                 <span className="ml-list-cell">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "—"}</span>
