@@ -85,10 +85,11 @@ export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const mediaId = searchParams.get('mediaId') || searchParams.get('id');
+    const path = searchParams.get('path');
 
-    if (!mediaId || !mongoose.Types.ObjectId.isValid(mediaId)) {
+    if ((!mediaId || !mongoose.Types.ObjectId.isValid(mediaId)) && !path) {
       return NextResponse.json(
-        { error: 'Invalid or missing mediaId' },
+        { error: 'Invalid or missing mediaId and path' },
         { status: 400 }
       );
     }
@@ -109,11 +110,18 @@ export async function PUT(request: NextRequest) {
 
     await connectToDatabase();
 
-    const mediaItem = await MediaItemModel.findByIdAndUpdate(
-      mediaId,
-      updateData,
-      { new: true }
-    );
+    let mediaItem;
+    if (mediaId && mongoose.Types.ObjectId.isValid(mediaId)) {
+      mediaItem = await MediaItemModel.findByIdAndUpdate(mediaId, updateData, { new: true });
+    } else if (path) {
+      const relativePath = '/' + path.replace(/^(https?:\/\/[^\/]+)?\/?/, '');
+      const regexPath = relativePath.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$';
+      mediaItem = await MediaItemModel.findOneAndUpdate(
+        { url: { $regex: new RegExp(regexPath, 'i') } },
+        updateData,
+        { new: true }
+      );
+    }
 
     if (!mediaItem) {
       return NextResponse.json(

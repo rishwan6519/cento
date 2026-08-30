@@ -90,15 +90,16 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
     }
   };
 
-  const handleUpdateFileCategory = async (e: React.ChangeEvent<HTMLSelectElement>, playlistId: string, mediaId: string) => {
+  const handleUpdateFileCategory = async (e: React.ChangeEvent<HTMLSelectElement>, playlistId: string, mediaId: string, path: string) => {
     e.stopPropagation();
-    if (!mediaId) {
+    if (!mediaId && !path) {
        alert("Cannot update this file because it does not have a linked media record.");
        return;
     }
     const newCategory = e.target.value;
     try {
-      const res = await fetch(`/api/media?mediaId=${mediaId}`, {
+      const url = mediaId ? `/api/media?mediaId=${mediaId}` : `/api/media?path=${encodeURIComponent(path)}`;
+      const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileCategory: newCategory })
@@ -111,7 +112,10 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
               if (pl.id === playlistId) {
                  return {
                     ...pl,
-                    files: pl.files.map((f: any) => f.mediaId === mediaId ? { ...f, fileCategory: newCategory } : f)
+                    files: pl.files.map((f: any) => {
+                      const isMatch = mediaId ? (f.mediaId === mediaId) : (f.path === path);
+                      return isMatch ? { ...f, fileCategory: newCategory } : f;
+                    })
                  };
               }
               return pl;
@@ -688,7 +692,7 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
                                         {isMedia && (
                                             <select 
                                               value={(f.fileCategory || "other").toLowerCase()}
-                                              onChange={(e) => handleUpdateFileCategory(e, item.id || item._id, f.mediaId)}
+                                              onChange={(e) => handleUpdateFileCategory(e, item.id || item._id, f.mediaId, f.path)}
                                               onClick={e => e.stopPropagation()}
                                               style={{ border: "1px solid #D6E6E9", outline: "none", cursor: "pointer", background: "#e6f7f8", color: "#11b5bb", padding: "1px 6px", borderRadius: "4px", fontSize: "0.65rem", fontWeight: 700, textTransform: "capitalize" }}
                                             >
@@ -740,7 +744,10 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
               <button className="ddm-preview-close" onClick={() => setPreviewMedia(null)}><FaTimes size={14} /></button>
               <div className="ddm-preview-box">
                 {previewMedia.type?.includes('video') ? (
-                  <video src={previewMedia.path} controls autoPlay />
+                  <div className="ddm-preview-video" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div className="ddm-preview-audio-name" style={{ color: 'white', marginBottom: '10px', fontSize: '1.2rem' }}>{previewMedia.name || getFileName(previewMedia.path)}</div>
+                    <video src={previewMedia.path} controls autoPlay style={{ maxHeight: '70vh', maxWidth: '100%' }} />
+                  </div>
                 ) : previewMedia.type === 'audio' ? (
                   <div className="ddm-preview-audio">
                     <div className="ddm-preview-audio-icon">🎵</div>
@@ -748,7 +755,10 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
                     <audio src={previewMedia.path} controls autoPlay />
                   </div>
                 ) : (
-                  <img src={previewMedia.path} alt="Preview" />
+                  <div className="ddm-preview-image" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div className="ddm-preview-audio-name" style={{ color: 'white', marginBottom: '10px', fontSize: '1.2rem' }}>{previewMedia.name || getFileName(previewMedia.path)}</div>
+                    <img src={previewMedia.path} alt="Preview" style={{ maxHeight: '70vh', maxWidth: '100%' }} />
+                  </div>
                 )}
               </div>
             </div>
