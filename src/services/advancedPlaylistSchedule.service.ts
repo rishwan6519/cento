@@ -639,9 +639,9 @@ export const advancedPlaylistScheduleService = {
                  fileObj.fileId = dbMedia?._id?.toString() || idStr;
               }
               
-              // Ensure videoCategory is used, default to 'offer'
+              // Ensure videoCategory is used, default to 'general'
               if (!fileObj.videoCategory) {
-                fileObj.videoCategory = 'offer';
+                fileObj.videoCategory = 'general';
               }
               // Clean up old fileCategory so it doesn't appear in the response
               if (fileObj.fileCategory) {

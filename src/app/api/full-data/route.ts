@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
             backgroundImage: f.backgroundImage
           }))
         };
-        
+
         return {
           id: p._id,
           versionId: crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex'),
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
             })
             .filter(Boolean)
         };
-        
+
         return {
           id: ap._id.toString(),
           versionId: crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex'),
@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
     const groups = await MediaGroup.find({ deviceIds: deviceObjectId })
       .populate('mediaIds')
       .populate('deviceIds');
-    
+
     // 5️⃣ Fetch media files for each group
     const groupDetails = groups.map((group: any) => {
       // Extract media file URLs
@@ -162,7 +162,7 @@ export async function GET(req: NextRequest) {
         type: media.type,
         createdAt: media.createdAt
       })) || [];
-      
+
       return {
         id: group._id,
         name: group.name,
