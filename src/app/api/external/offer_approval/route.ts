@@ -273,6 +273,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3.5 Fetch additional videos from Cloudbases if we have a job_id
+    let fetchedCloudVideos: any[] = [];
     const targetJobId = videoJob?.jobId || (typeof rawId === "string" ? rawId.trim() : "");
     if (targetJobId) {
       try {
@@ -280,7 +281,8 @@ export async function POST(req: NextRequest) {
         if (cloudRes.ok) {
           const cloudData = await cloudRes.json();
           if (cloudData?.success && cloudData?.data?.videos) {
-            for (const vid of cloudData.data.videos) {
+            fetchedCloudVideos = cloudData.data.videos;
+            for (const vid of fetchedCloudVideos) {
               if (vid.url) {
                 const existingMedia = await MediaItemModel.findOne({ url: vid.url });
                 if (!existingMedia) {
@@ -365,6 +367,66 @@ export async function POST(req: NextRequest) {
         ? { $or: [{ _id: trimmedId }, { offerId: trimmedId }] }
         : { offerId: trimmedId };
       linkedOfferData = await Offer.findOne(query).lean().catch(() => null);
+    }
+
+    // 3.6 Facebook Video Scheduling Integration
+    if (finalChannels && finalChannels.some((c: string) => c.toLowerCase() === "facebook")) {
+      try {
+        if (fetchedCloudVideos.length > 0) {
+          const portraitVideo = fetchedCloudVideos.find((v: any) => v.ratio === "9:16");
+          if (portraitVideo && portraitVideo.video_id) {
+            const joinedTags = finalTags.map((tag: string) => tag.startsWith('#') ? tag : `#${tag}`).join(' ');
+            const fbMessage = `${finalCaption}\n\n${joinedTags}`.trim();
+            
+            // Scheduling config
+            const FB_SCHEDULE_MODE: 'testing' | 'production' = 'testing';
+            const TEST_SCHEDULE_OFFSET_DAYS = 10;
+            const PROD_POST_BEFORE_START_DAYS = 1;
+            const PROD_POST_TIME = "18:00";
+            
+            let scheduledAtDate = new Date();
+            const offerStart = (linkedOfferData?.startDate || startDate) ? new Date(linkedOfferData?.startDate || startDate) : new Date();
+            
+            if (FB_SCHEDULE_MODE === 'testing') {
+              scheduledAtDate = new Date(offerStart);
+              scheduledAtDate.setDate(scheduledAtDate.getDate() + TEST_SCHEDULE_OFFSET_DAYS);
+            } else {
+              scheduledAtDate = new Date(offerStart);
+              scheduledAtDate.setDate(scheduledAtDate.getDate() - PROD_POST_BEFORE_START_DAYS);
+              const [hours, minutes] = PROD_POST_TIME.split(':').map(Number);
+              scheduledAtDate.setHours(hours, minutes, 0, 0);
+            }
+            
+            // Ensure format YYYY-MM-DDTHH:mm
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const scheduledAtStr = `${scheduledAtDate.getFullYear()}-${pad(scheduledAtDate.getMonth() + 1)}-${pad(scheduledAtDate.getDate())}T${pad(scheduledAtDate.getHours())}:${pad(scheduledAtDate.getMinutes())}`;
+
+            const fbPayload = {
+              message: fbMessage,
+              media_type: "video",
+              video_id: portraitVideo.video_id,
+              publish_mode: "schedule",
+              scheduled_at: scheduledAtStr
+            };
+            
+            const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(fbPayload)
+            });
+            
+            if (!fbRes.ok) {
+               console.warn(`[offer_approval] Facebook Post API failed with status ${fbRes.status}`);
+            }
+          } else {
+            console.warn("[offer_approval] Facebook scheduling skipped: No 9:16 video found in cloud generated videos.");
+          }
+        } else {
+          console.warn("[offer_approval] Facebook scheduling skipped: Video generation not completed or videos array empty.");
+        }
+      } catch (fbErr) {
+        console.warn("[offer_approval] Error during Facebook scheduling workflow:", fbErr);
+      }
     }
 
     const response: Record<string, any> = {
