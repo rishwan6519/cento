@@ -397,9 +397,11 @@ export async function POST(req: NextRequest) {
             } else {
               scheduledAtDate = new Date(offerStart);
               scheduledAtDate.setDate(scheduledAtDate.getDate() - PROD_POST_BEFORE_START_DAYS);
-              const [hours, minutes] = PROD_POST_TIME.split(':').map(Number);
-              scheduledAtDate.setHours(hours, minutes, 0, 0);
             }
+            
+            // Force the time to 6:00 PM (18:00) regardless of the testing/production mode
+            const [hours, minutes] = PROD_POST_TIME.split(':').map(Number);
+            scheduledAtDate.setHours(hours, minutes, 0, 0);
             
             // Ensure format YYYY-MM-DDTHH:mm
             const pad = (n: number) => n.toString().padStart(2, '0');
