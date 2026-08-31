@@ -274,7 +274,7 @@ export async function POST(req: NextRequest) {
 
     // 3.5 Fetch additional videos from Cloudbases if we have a job_id
     let fetchedCloudVideos: any[] = [];
-    const targetJobId = videoJob?.jobId || (typeof rawId === "string" ? rawId.trim() : "");
+    const targetJobId = videoJob?.jobId || mediaItem?.jobId || (typeof rawId === "string" ? rawId.trim() : "");
     if (targetJobId) {
       try {
         const cloudRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api/external/videos?job_id=${targetJobId}`);
