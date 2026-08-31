@@ -277,7 +277,10 @@ export async function POST(req: NextRequest) {
     const targetJobId = videoJob?.jobId || mediaItem?.jobId || (typeof rawId === "string" ? rawId.trim() : "");
     if (targetJobId) {
       try {
-        const cloudRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api/external/videos?job_id=${targetJobId}`);
+        const apiKey = process.env.CLOUDBASES_API_KEY || "";
+        const cloudRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api/external/videos?job_id=${targetJobId}`, {
+          headers: { ...(apiKey ? { 'X-API-Key': apiKey } : {}) }
+        });
         if (cloudRes.ok) {
           const cloudData = await cloudRes.json();
           if (cloudData?.success && cloudData?.data?.videos) {
@@ -410,9 +413,13 @@ export async function POST(req: NextRequest) {
               scheduled_at: scheduledAtStr
             };
             
+            const apiKey = process.env.CLOUDBASES_API_KEY || "";
             const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { 
+                "Content-Type": "application/json",
+                ...(apiKey ? { 'X-API-Key': apiKey } : {})
+              },
               body: JSON.stringify(fbPayload)
             });
             
