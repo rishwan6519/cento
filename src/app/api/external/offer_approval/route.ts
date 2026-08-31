@@ -370,6 +370,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3.6 Facebook Video Scheduling Integration
+    let facebookSchedulingStatus = "Skipped (facebook not in channels)";
     if (finalChannels && finalChannels.some((c: string) => c.toLowerCase() === "facebook")) {
       try {
         if (fetchedCloudVideos.length > 0) {
@@ -416,15 +417,21 @@ export async function POST(req: NextRequest) {
             });
             
             if (!fbRes.ok) {
+               facebookSchedulingStatus = `Failed (API status ${fbRes.status})`;
                console.warn(`[offer_approval] Facebook Post API failed with status ${fbRes.status}`);
+            } else {
+               facebookSchedulingStatus = "Scheduled Successfully";
             }
           } else {
+            facebookSchedulingStatus = "Skipped (No 9:16 video found)";
             console.warn("[offer_approval] Facebook scheduling skipped: No 9:16 video found in cloud generated videos.");
           }
         } else {
+          facebookSchedulingStatus = "Skipped (Video generation not completed or empty)";
           console.warn("[offer_approval] Facebook scheduling skipped: Video generation not completed or videos array empty.");
         }
-      } catch (fbErr) {
+      } catch (fbErr: any) {
+        facebookSchedulingStatus = `Failed (Internal Error: ${fbErr.message || "Unknown error"})`;
         console.warn("[offer_approval] Error during Facebook scheduling workflow:", fbErr);
       }
     }
@@ -432,6 +439,7 @@ export async function POST(req: NextRequest) {
     const response: Record<string, any> = {
       status: "success",
       videoId: mediaItem?._id ? mediaItem._id.toString() : videoJob?.videoId || "",
+      facebookSchedulingStatus,
     };
 
     if (targetUserId) {
