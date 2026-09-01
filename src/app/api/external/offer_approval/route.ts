@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
       if (tagline !== undefined) videoJob.tagline = String(tagline).trim();
       if (mediaItem && videoJob.videoId !== undefined) videoJob.videoId = mediaItem._id.toString();
       videoJob.approvalStatus = "success";
-      await videoJob.save().catch(() => {});
+      await videoJob.save().catch(() => { });
     }
 
     // 3.5 Fetch additional videos from Cloudbases if we have a job_id
@@ -372,15 +372,20 @@ export async function POST(req: NextRequest) {
       linkedOfferData = await Offer.findOne(query).lean().catch(() => null);
     }
 
-    // 3.6 Facebook Video Scheduling Integration
+    // 3.6 Social Media Video Scheduling Integration
     let facebookSchedulingStatus = "Skipped (facebook not in channels)";
-    if (finalChannels && finalChannels.some((c: string) => c.toLowerCase() === "facebook")) {
+    let instagramSchedulingStatus = "Skipped (instagram not in channels)";
+    
+    const shouldPostFb = finalChannels && finalChannels.some((c: string) => c.toLowerCase() === "facebook");
+    const shouldPostIg = finalChannels && finalChannels.some((c: string) => c.toLowerCase() === "instagram");
+
+    if (shouldPostFb || shouldPostIg) {
       try {
         if (fetchedCloudVideos.length > 0) {
           const portraitVideo = fetchedCloudVideos.find((v: any) => v.ratio === "9:16");
           if (portraitVideo && portraitVideo.video_id) {
             const joinedTags = finalTags.map((tag: string) => tag.startsWith('#') ? tag : `#${tag}`).join(' ');
-            const fbMessage = `${finalCaption}\n\n${joinedTags}`.trim();
+            const postMessage = `${finalCaption}\n\n${joinedTags}`.trim();
             
             // Scheduling config
             const FB_SCHEDULE_MODE: 'testing' | 'production' = 'testing';
@@ -407,8 +412,8 @@ export async function POST(req: NextRequest) {
             const pad = (n: number) => n.toString().padStart(2, '0');
             const scheduledAtStr = `${scheduledAtDate.getFullYear()}-${pad(scheduledAtDate.getMonth() + 1)}-${pad(scheduledAtDate.getDate())}T${pad(scheduledAtDate.getHours())}:${pad(scheduledAtDate.getMinutes())}`;
 
-            const fbPayload = {
-              message: fbMessage,
+            const payload = {
+              message: postMessage,
               media_type: "video",
               video_id: portraitVideo.video_id,
               publish_mode: "schedule",
@@ -416,32 +421,58 @@ export async function POST(req: NextRequest) {
             };
             
             const apiKey = process.env.CLOUDBASES_API_KEY || "";
-            const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
-              method: "POST",
-              headers: { 
-                "Content-Type": "application/json",
-                ...(apiKey ? { 'X-API-Key': apiKey } : {})
-              },
-              body: JSON.stringify(fbPayload)
-            });
-            
-            if (!fbRes.ok) {
-               facebookSchedulingStatus = `Failed (API status ${fbRes.status})`;
-               console.warn(`[offer_approval] Facebook Post API failed with status ${fbRes.status}`);
-            } else {
-               facebookSchedulingStatus = "Scheduled Successfully";
+            const headers = { 
+              "Content-Type": "application/json",
+              ...(apiKey ? { 'X-API-Key': apiKey } : {})
+            };
+
+            // Post to Facebook if enabled
+            if (shouldPostFb) {
+              const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
+                method: "POST",
+                headers,
+                body: JSON.stringify(payload)
+              });
+              if (!fbRes.ok) {
+                 facebookSchedulingStatus = `Failed (API status ${fbRes.status})`;
+                 console.warn(`[offer_approval] Facebook Post API failed with status ${fbRes.status}`);
+              } else {
+                 facebookSchedulingStatus = "Scheduled Successfully";
+              }
             }
+
+            // Post to Instagram if enabled
+            if (shouldPostIg) {
+              const igRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/instagram/posts", {
+                method: "POST",
+                headers,
+                body: JSON.stringify(payload)
+              });
+              if (!igRes.ok) {
+                 instagramSchedulingStatus = `Failed (API status ${igRes.status})`;
+                 console.warn(`[offer_approval] Instagram Post API failed with status ${igRes.status}`);
+              } else {
+                 instagramSchedulingStatus = "Scheduled Successfully";
+              }
+            }
+
           } else {
-            facebookSchedulingStatus = "Skipped (No 9:16 video found)";
-            console.warn("[offer_approval] Facebook scheduling skipped: No 9:16 video found in cloud generated videos.");
+            const skipReason = "Skipped (No 9:16 video found)";
+            if (shouldPostFb) facebookSchedulingStatus = skipReason;
+            if (shouldPostIg) instagramSchedulingStatus = skipReason;
+            console.warn("[offer_approval] Social scheduling skipped: No 9:16 video found in cloud generated videos.");
           }
         } else {
-          facebookSchedulingStatus = "Skipped (Video generation not completed or empty)";
-          console.warn("[offer_approval] Facebook scheduling skipped: Video generation not completed or videos array empty.");
+          const skipReason = "Skipped (Video generation not completed or empty)";
+          if (shouldPostFb) facebookSchedulingStatus = skipReason;
+          if (shouldPostIg) instagramSchedulingStatus = skipReason;
+          console.warn("[offer_approval] Social scheduling skipped: Video generation not completed or videos array empty.");
         }
-      } catch (fbErr: any) {
-        facebookSchedulingStatus = `Failed (Internal Error: ${fbErr.message || "Unknown error"})`;
-        console.warn("[offer_approval] Error during Facebook scheduling workflow:", fbErr);
+      } catch (err: any) {
+        const failReason = `Failed (Internal Error: ${err.message || "Unknown error"})`;
+        if (shouldPostFb) facebookSchedulingStatus = failReason;
+        if (shouldPostIg) instagramSchedulingStatus = failReason;
+        console.warn("[offer_approval] Error during Social scheduling workflow:", err);
       }
     }
 
@@ -449,6 +480,7 @@ export async function POST(req: NextRequest) {
       status: "success",
       videoId: mediaItem?._id ? mediaItem._id.toString() : videoJob?.videoId || "",
       facebookSchedulingStatus,
+      instagramSchedulingStatus,
     };
 
     if (targetUserId) {
