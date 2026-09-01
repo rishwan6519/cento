@@ -408,9 +408,9 @@ export async function POST(req: NextRequest) {
             const [hours, minutes] = PROD_POST_TIME.split(':').map(Number);
             scheduledAtDate.setHours(hours, minutes, 0, 0);
             
-            // Ensure format YYYY-MM-DDTHH:mm
+            // Ensure format YYYY-MM-DD HH:mm:ss
             const pad = (n: number) => n.toString().padStart(2, '0');
-            const scheduledAtStr = `${scheduledAtDate.getFullYear()}-${pad(scheduledAtDate.getMonth() + 1)}-${pad(scheduledAtDate.getDate())}T${pad(scheduledAtDate.getHours())}:${pad(scheduledAtDate.getMinutes())}`;
+            const scheduledAtStr = `${scheduledAtDate.getFullYear()}-${pad(scheduledAtDate.getMonth() + 1)}-${pad(scheduledAtDate.getDate())} ${pad(scheduledAtDate.getHours())}:${pad(scheduledAtDate.getMinutes())}:00`;
 
             const payload = {
               message: postMessage,
