@@ -23,6 +23,10 @@ export interface IVideoJob extends Document {
   socialMediaHeading?: string;
   socialMediaCaption?: string;
   hashTags?: string[];
+  facebookCaption?: string;
+  facebookHashTags?: string[];
+  instagramCaption?: string;
+  instagramHashTags?: string[];
   images?: string[];
   imageTypes?: string[];
   channels?: string[];
@@ -47,6 +51,10 @@ const VideoJobSchema = new Schema<IVideoJob>({
   socialMediaHeading: { type: String, default: "" },
   socialMediaCaption: { type: String, default: "" },
   hashTags: { type: [String], default: [] },
+  facebookCaption: { type: String, default: "" },
+  facebookHashTags: { type: [String], default: [] },
+  instagramCaption: { type: String, default: "" },
+  instagramHashTags: { type: [String], default: [] },
   images: { type: [String], default: [] },
   imageTypes: { type: [String], default: [] },
   channels: { type: [String], default: [] },

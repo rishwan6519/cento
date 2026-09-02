@@ -18,6 +18,10 @@ export interface ICloudbasesJob extends Document {
   socialMediaHeading?: string;
   socialMediaCaption?: string;
   hashTags?: string[];
+  facebookCaption?: string;
+  facebookHashTags?: string[];
+  instagramCaption?: string;
+  instagramHashTags?: string[];
   // Output
   resultData: Record<string, any>;
   errorMessage: string;
@@ -41,6 +45,10 @@ const CloudbasesJobSchema = new Schema<ICloudbasesJob>({
   socialMediaHeading: { type: String, default: "" },
   socialMediaCaption: { type: String, default: "" },
   hashTags:      { type: [String], default: [] },
+  facebookCaption: { type: String, default: "" },
+  facebookHashTags: { type: [String], default: [] },
+  instagramCaption: { type: String, default: "" },
+  instagramHashTags: { type: [String], default: [] },
   resultData:    { type: Schema.Types.Mixed, default: {} },
   errorMessage:  { type: String, default: "" },
   createdAt:     { type: Date, default: Date.now },

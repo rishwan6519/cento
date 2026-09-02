@@ -94,8 +94,10 @@ export async function POST(req: NextRequest) {
       channels,
       socialMedia,
       socialMediaHeading,
-      socialMediaCaption,
-      hashTags,
+      facebookCaption,
+      facebookHashTags,
+      instagramCaption,
+      instagramHashTags,
       offerId,
       offer_id,
       templateId,
@@ -231,22 +233,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let newHashTags: string[] | undefined = undefined;
-    if (hashTags !== undefined) {
-      if (Array.isArray(hashTags)) {
-        newHashTags = hashTags.map((h: any) => String(h).trim()).filter(Boolean);
-      } else if (typeof hashTags === "string") {
-        newHashTags = hashTags.split(",").map((s: string) => s.trim()).filter(Boolean);
-      }
-    }
+
 
     // Apply updates to MediaItem
     if (mediaItem) {
       if (newChannels !== undefined) mediaItem.channels = newChannels;
       if (voiceoverScript !== undefined) mediaItem.voiceoverScript = String(voiceoverScript).trim();
       if (socialMediaHeading !== undefined) mediaItem.socialMediaHeading = String(socialMediaHeading).trim();
-      if (socialMediaCaption !== undefined) mediaItem.socialMediaCaption = String(socialMediaCaption).trim();
-      if (newHashTags !== undefined) mediaItem.hashTags = newHashTags;
       if (newOfferId !== undefined) mediaItem.offerId = newOfferId;
       if (newTemplateId !== undefined) mediaItem.templateId = newTemplateId;
       if (tagline !== undefined) mediaItem.tagline = String(tagline).trim();
@@ -262,8 +255,6 @@ export async function POST(req: NextRequest) {
       }
       if (voiceoverScript !== undefined) videoJob.voiceoverScript = String(voiceoverScript).trim();
       if (socialMediaHeading !== undefined) videoJob.socialMediaHeading = String(socialMediaHeading).trim();
-      if (socialMediaCaption !== undefined) videoJob.socialMediaCaption = String(socialMediaCaption).trim();
-      if (newHashTags !== undefined) videoJob.hashTags = newHashTags;
       if (newOfferId !== undefined) videoJob.offerId = newOfferId;
       if (newTemplateId !== undefined) videoJob.templateId = newTemplateId;
       if (tagline !== undefined) videoJob.tagline = String(tagline).trim();
@@ -325,8 +316,15 @@ export async function POST(req: NextRequest) {
     const finalVideoUrl = mediaItem?.url || videoJob?.falRequests?.find((r: any) => r.videoUrl)?.videoUrl || videoJob?.videoUrl || "";
     const finalScript = voiceoverScript !== undefined ? String(voiceoverScript).trim() : (mediaItem?.voiceoverScript || videoJob?.voiceoverScript || "");
     const finalHeading = socialMediaHeading !== undefined ? String(socialMediaHeading).trim() : (mediaItem?.socialMediaHeading || videoJob?.socialMediaHeading || "");
-    const finalCaption = socialMediaCaption !== undefined ? String(socialMediaCaption).trim() : (mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
-    const finalTags = newHashTags !== undefined ? newHashTags : (mediaItem?.hashTags || videoJob?.hashTags || []);
+    
+    const finalCaption = (mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
+    const finalTags = (mediaItem?.hashTags || videoJob?.hashTags || []);
+    
+    const finalFbCaption = facebookCaption !== undefined ? String(facebookCaption).trim() : (mediaItem?.facebookCaption || videoJob?.facebookCaption || mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
+    const finalFbTags = facebookHashTags !== undefined ? facebookHashTags : (mediaItem?.facebookHashTags || videoJob?.facebookHashTags || mediaItem?.hashTags || videoJob?.hashTags || []);
+    const finalIgCaption = instagramCaption !== undefined ? String(instagramCaption).trim() : (mediaItem?.instagramCaption || videoJob?.instagramCaption || mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
+    const finalIgTags = instagramHashTags !== undefined ? instagramHashTags : (mediaItem?.instagramHashTags || videoJob?.instagramHashTags || mediaItem?.hashTags || videoJob?.hashTags || []);
+    
     const finalChannels = newChannels !== undefined ? newChannels : (mediaItem?.channels || videoJob?.channels || videoJob?.socialMedia || []);
     const finalOfferId = newOfferId !== undefined ? newOfferId : (mediaItem?.offerId || videoJob?.offerId || "");
     const finalTemplateId = newTemplateId !== undefined ? newTemplateId : (mediaItem?.templateId || videoJob?.templateId || "");
@@ -338,19 +336,32 @@ export async function POST(req: NextRequest) {
     }
     if (!mediaMetadata && mediaItem) {
       mediaMetadata = await MediaMetadataModel.findOne({ mediaId: mediaItem._id });
-    }
-    if (!mediaMetadata && mediaItem) {
-      mediaMetadata = new MediaMetadataModel({
-        mediaId: mediaItem._id,
-        userId: mediaItem.userId,
-      });
+        if (!mediaMetadata) {
+        mediaMetadata = await MediaMetadataModel.create({
+          mediaId: mediaItem?._id || new mongoose.Types.ObjectId(),
+          userId: targetUserId,
+          channels: finalChannels,
+          voiceoverScript: finalScript,
+          socialMediaHeading: finalHeading,
+          facebookCaption: finalFbCaption,
+          facebookHashTags: finalFbTags,
+          instagramCaption: finalIgCaption,
+          instagramHashTags: finalIgTags,
+          approvalStatus: "success",
+          offerId: finalOfferId,
+          templateId: finalTemplateId,
+          ...(tagline !== undefined ? { tagline: String(tagline).trim() } : {}),
+        });
+      }
     }
     if (mediaMetadata) {
       mediaMetadata.channels = finalChannels;
       mediaMetadata.voiceoverScript = finalScript;
       mediaMetadata.socialMediaHeading = finalHeading;
-      mediaMetadata.socialMediaCaption = finalCaption;
-      mediaMetadata.hashTags = finalTags;
+      mediaMetadata.facebookCaption = finalFbCaption;
+      mediaMetadata.facebookHashTags = finalFbTags;
+      mediaMetadata.instagramCaption = finalIgCaption;
+      mediaMetadata.instagramHashTags = finalIgTags;
       mediaMetadata.approvalStatus = "success";
       if (finalOfferId) mediaMetadata.offerId = finalOfferId;
       if (finalTemplateId) mediaMetadata.templateId = finalTemplateId;
@@ -384,8 +395,11 @@ export async function POST(req: NextRequest) {
         if (fetchedCloudVideos.length > 0) {
           const portraitVideo = fetchedCloudVideos.find((v: any) => v.ratio === "9:16");
           if (portraitVideo && portraitVideo.video_id) {
-            const joinedTags = finalTags.map((tag: string) => tag.startsWith('#') ? tag : `#${tag}`).join(' ');
-            const postMessage = `${finalCaption}\n\n${joinedTags}`.trim();
+            const fbJoinedTags = finalFbTags.map((tag: string) => tag.startsWith('#') ? tag : `#${tag}`).join(' ');
+            const fbPostMessage = `${finalFbCaption}\n\n${fbJoinedTags}`.trim();
+            
+            const igJoinedTags = finalIgTags.map((tag: string) => tag.startsWith('#') ? tag : `#${tag}`).join(' ');
+            const igPostMessage = `${finalIgCaption}\n\n${igJoinedTags}`.trim();
             
             // Scheduling config
             const FB_SCHEDULE_MODE: 'testing' | 'production' = 'testing';
@@ -412,8 +426,16 @@ export async function POST(req: NextRequest) {
             const pad = (n: number) => n.toString().padStart(2, '0');
             const scheduledAtStr = `${scheduledAtDate.getFullYear()}-${pad(scheduledAtDate.getMonth() + 1)}-${pad(scheduledAtDate.getDate())} ${pad(scheduledAtDate.getHours())}:${pad(scheduledAtDate.getMinutes())}:00`;
 
-            const payload = {
-              message: postMessage,
+            const fbPayload = {
+              message: fbPostMessage,
+              media_type: "video",
+              video_id: portraitVideo.video_id,
+              publish_mode: "schedule",
+              scheduled_at: scheduledAtStr
+            };
+            
+            const igPayload = {
+              message: igPostMessage,
               media_type: "video",
               video_id: portraitVideo.video_id,
               publish_mode: "schedule",
@@ -431,7 +453,7 @@ export async function POST(req: NextRequest) {
               const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
                 method: "POST",
                 headers,
-                body: JSON.stringify(payload)
+                body: JSON.stringify(fbPayload)
               });
               if (!fbRes.ok) {
                  facebookSchedulingStatus = `Failed (API status ${fbRes.status})`;
@@ -446,7 +468,7 @@ export async function POST(req: NextRequest) {
               const igRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/instagram/posts", {
                 method: "POST",
                 headers,
-                body: JSON.stringify(payload)
+                body: JSON.stringify(igPayload)
               });
               if (!igRes.ok) {
                  instagramSchedulingStatus = `Failed (API status ${igRes.status})`;

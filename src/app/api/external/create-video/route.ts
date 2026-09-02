@@ -51,7 +51,7 @@ async function enhancePromptAndScript(
   aspectRatio: string,
   duration: number,
   openAiKey: string
-): Promise<{ enhancedPrompt: string; voiceoverScript: string; socialMediaHeading: string; socialMediaCaption: string; hashTags: string[] }> {
+): Promise<{ enhancedPrompt: string; voiceoverScript: string; socialMediaHeading: string; facebookCaption: string; facebookHashTags: string[]; instagramCaption: string; instagramHashTags: string[]; socialMediaCaption: string; hashTags: string[] }> {
   const systemContent = `You are an expert AI Prompt Engineer specializing in creating cinematic product advertisement prompts for AI video generation models such as Google Flow, Veo, Higgsfield AI, Seedance, Kling, Runway, Pika, Luma and similar models (${model}).
 
 When a marketing promotional offer or tagline is provided, you MUST explicitly command the AI video generator to render a crisp, bold, readable typographic graphic banner at the VERY TOP of the video frame displaying the exact promotional wording!
@@ -156,7 +156,11 @@ You MUST respond ONLY with a valid JSON object matching this schema:
   "voiceoverScript": "An emotionally compelling television advertisement narration voiceover matching the product (${duration} seconds, ~15-30 words).",
   "socialMediaHeading": "An attention-grabbing, promotional social media heading/title for this video ad (approx 5-10 words).",
   "socialMediaCaption": "A highly engaging, interaction-driven social media caption designed to maximize clicks and shares (approx 15-30 words).",
-  "hashTags": ["#Tag1", "#Tag2", "#Tag3", "#Tag4", "#Tag5"]
+  "hashTags": ["#Tag1", "#Tag2", "#Tag3", "#Tag4", "#Tag5"],
+  "facebookCaption": "A professional, engaging caption tailored specifically for Facebook audiences, focusing on community and external links (approx 20-40 words).",
+  "facebookHashTags": ["#FBTag1", "#FBTag2", "#FBTag3"],
+  "instagramCaption": "A highly visual, emoji-rich, and aesthetic caption designed for high engagement on Instagram (approx 20-40 words).",
+  "instagramHashTags": ["#InstaGood", "#Trending", "#IGTag1"]
 }`;
 
   const maxRetries = 3;
@@ -202,6 +206,10 @@ You MUST respond ONLY with a valid JSON object matching this schema:
         socialMediaHeading: parsed.socialMediaHeading || "Special Promotion",
         socialMediaCaption: parsed.socialMediaCaption || `Check out our exclusive offer for ${roughText.slice(0, 40)}...`,
         hashTags: Array.isArray(parsed.hashTags) ? parsed.hashTags : ["#Viral", "#Ad", "#Trending", "#Exclusive"],
+        facebookCaption: parsed.facebookCaption || parsed.socialMediaCaption || `Check out our exclusive offer for ${roughText.slice(0, 40)}...`,
+        facebookHashTags: Array.isArray(parsed.facebookHashTags) ? parsed.facebookHashTags : ["#FacebookOffer", "#Ad", "#Trending"],
+        instagramCaption: parsed.instagramCaption || parsed.socialMediaCaption || `Check out our exclusive offer for ${roughText.slice(0, 40)}... ✨📸`,
+        instagramHashTags: Array.isArray(parsed.instagramHashTags) ? parsed.instagramHashTags : ["#InstaGood", "#Trending", "#Ad"],
       };
     } catch (err) {
       if (attempt === maxRetries) {
@@ -218,6 +226,10 @@ You MUST respond ONLY with a valid JSON object matching this schema:
     socialMediaHeading: "Experience Uncompromising Luxury",
     socialMediaCaption: `Elevated performance and flawless design. Discover the ultimate experience with our exclusive collection today!`,
     hashTags: ["#Luxury", "#Trending", "#Viral", "#NewRelease", "#Ad"],
+    facebookCaption: `Elevated performance and flawless design. Discover the ultimate experience with our exclusive collection today! Click the link to learn more.`,
+    facebookHashTags: ["#Luxury", "#Trending", "#Ad"],
+    instagramCaption: `Elevated performance and flawless design ✨ Discover the ultimate experience with our exclusive collection today! 📸🔥`,
+    instagramHashTags: ["#LuxuryLifestyle", "#Trending", "#InstaGood", "#Ad"],
   };
 }
 
@@ -354,6 +366,10 @@ export async function POST(req: NextRequest) {
       let socialMediaHeading = "";
       let socialMediaCaption = "";
       let hashTags: string[] = [];
+      let facebookCaption = "";
+      let facebookHashTags: string[] = [];
+      let instagramCaption = "";
+      let instagramHashTags: string[] = [];
 
       if (openAiKey && mapped_description) {
         try {
@@ -369,6 +385,10 @@ export async function POST(req: NextRequest) {
           socialMediaHeading = enhancedData.socialMediaHeading;
           socialMediaCaption = enhancedData.socialMediaCaption;
           hashTags = enhancedData.hashTags;
+          facebookCaption = enhancedData.facebookCaption;
+          facebookHashTags = enhancedData.facebookHashTags;
+          instagramCaption = enhancedData.instagramCaption;
+          instagramHashTags = enhancedData.instagramHashTags;
         } catch (e) {
           console.warn("[create-video] Failed to generate enhanced script for cloudbases job:", e);
         }
@@ -392,10 +412,14 @@ export async function POST(req: NextRequest) {
         socialMediaHeading,
         socialMediaCaption,
         hashTags,
+        facebookCaption,
+        facebookHashTags,
+        instagramCaption,
+        instagramHashTags,
         resultData: resultData
       });
 
-      return NextResponse.json({
+      const responsePayload: any = {
         success: true,
         status: 'processing',
         jobId: cloudJobId,
@@ -406,10 +430,20 @@ export async function POST(req: NextRequest) {
         message: `Video queued. Poll for result at POST /api/external/get-video with { jobId: '${cloudJobId}' }`,
         voiceoverScript,
         socialMediaHeading,
-        socialMediaCaption,
-        hashTags,
         channels: channelsList,
-      });
+      };
+
+      if (channelsList.some((c: string) => c.toLowerCase() === 'facebook')) {
+        responsePayload.facebookCaption = facebookCaption;
+        responsePayload.facebookHashTags = facebookHashTags;
+      }
+      
+      if (channelsList.some((c: string) => c.toLowerCase() === 'instagram')) {
+        responsePayload.instagramCaption = instagramCaption;
+        responsePayload.instagramHashTags = instagramHashTags;
+      }
+
+      return NextResponse.json(responsePayload);
     }
     // -- END NEW --
 

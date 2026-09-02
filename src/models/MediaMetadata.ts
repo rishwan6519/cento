@@ -8,6 +8,10 @@ export interface IMediaMetadata extends Document {
   socialMediaHeading?: string;
   socialMediaCaption?: string;
   hashTags?: string[];
+  facebookCaption?: string;
+  facebookHashTags?: string[];
+  instagramCaption?: string;
+  instagramHashTags?: string[];
   approvalStatus?: string;
   offerId?: string;
   templateId?: string;
@@ -23,6 +27,10 @@ const MediaMetadataSchema = new Schema<IMediaMetadata>({
   socialMediaHeading: { type: String, required: false },
   socialMediaCaption: { type: String, required: false },
   hashTags: { type: [String], default: undefined },
+  facebookCaption: { type: String, required: false },
+  facebookHashTags: { type: [String], default: undefined },
+  instagramCaption: { type: String, required: false },
+  instagramHashTags: { type: [String], default: undefined },
   approvalStatus: { type: String, required: false },
   offerId: { type: String, required: false },
   templateId: { type: String, required: false },

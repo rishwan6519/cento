@@ -267,6 +267,10 @@ async function checkAndResolveJob(jobId: string) {
                 socialMediaHeading: cloudJob.socialMediaHeading || "",
                 socialMediaCaption: cloudJob.socialMediaCaption || "",
                 hashTags: cloudJob.hashTags || [],
+                facebookCaption: cloudJob.facebookCaption || "",
+                facebookHashTags: cloudJob.facebookHashTags || [],
+                instagramCaption: cloudJob.instagramCaption || "",
+                instagramHashTags: cloudJob.instagramHashTags || [],
                 ratio: videoInfo.ratio,
                 width: videoInfo.width,
                 height: videoInfo.height,
@@ -284,6 +288,10 @@ async function checkAndResolveJob(jobId: string) {
                 socialMediaHeading: cloudJob.socialMediaHeading || "",
                 socialMediaCaption: cloudJob.socialMediaCaption || "",
                 hashTags: cloudJob.hashTags || [],
+                facebookCaption: cloudJob.facebookCaption || "",
+                facebookHashTags: cloudJob.facebookHashTags || [],
+                instagramCaption: cloudJob.instagramCaption || "",
+                instagramHashTags: cloudJob.instagramHashTags || [],
                 approvalStatus: "pending",
                 templateId: String(cloudJob.templateId),
                 ...(cloudJob.offerId ? { offerId: cloudJob.offerId } : {}),
@@ -324,10 +332,18 @@ async function checkAndResolveJob(jobId: string) {
           : finalResultData.saved_videos,
         voiceoverScript: cloudJob.voiceoverScript || "",
         socialMediaHeading: cloudJob.socialMediaHeading || "",
-        socialMediaCaption: cloudJob.socialMediaCaption || "",
-        hashTags: cloudJob.hashTags || [],
         channels: cloudJob.channels || [],
       };
+
+      if (cloudJob.channels && cloudJob.channels.some((c: string) => c.toLowerCase() === 'facebook')) {
+        responsePayload.facebookCaption = cloudJob.facebookCaption || "";
+        responsePayload.facebookHashTags = cloudJob.facebookHashTags || [];
+      }
+      
+      if (cloudJob.channels && cloudJob.channels.some((c: string) => c.toLowerCase() === 'instagram')) {
+        responsePayload.instagramCaption = cloudJob.instagramCaption || "";
+        responsePayload.instagramHashTags = cloudJob.instagramHashTags || [];
+      }
 
       if (cloudJob.offerId) {
         const trimmedId = String(cloudJob.offerId).trim();
