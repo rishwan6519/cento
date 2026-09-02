@@ -4,6 +4,47 @@ import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { connectToDatabase } from "@/lib/db";
 import Device from "@/models/Device";
+import DeviceScreenshot from "@/models/DeviceScreenshot";
+
+export async function GET(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    
+    const { searchParams } = new URL(req.url);
+    const serialNumber = searchParams.get("serialNumber");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "6", 10);
+    
+    if (!serialNumber) {
+      return NextResponse.json({ success: false, message: "Missing serialNumber" }, { status: 400 });
+    }
+    
+    const skip = (page - 1) * limit;
+    
+    const total = await DeviceScreenshot.countDocuments({ serialNumber });
+    const screenshots = await DeviceScreenshot.find({ serialNumber })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+      
+    return NextResponse.json({
+      success: true,
+      data: screenshots,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error: any) {
+    console.error("[GET /api/devices/screenshot] Error:", error);
+    return NextResponse.json(
+      { success: false, message: "Internal server error", error: error.message },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,17 +87,18 @@ export async function POST(req: NextRequest) {
 
     const fileUrl = `/uploads/screenshots/${filename}`;
 
-    // Find the device and update latestScreenshotUrl
-    const device = await Device.findOne({ serialNumber });
-    if (!device) {
-      return NextResponse.json(
-        { success: false, message: "Device not found" },
-        { status: 404 }
-      );
-    }
+    // Create a new DeviceScreenshot history record
+    await DeviceScreenshot.create({
+      serialNumber,
+      url: fileUrl
+    });
 
-    device.latestScreenshotUrl = fileUrl;
-    await device.save();
+    // Find the device and update latestScreenshotUrl for backward compatibility
+    const device = await Device.findOne({ serialNumber });
+    if (device) {
+      device.latestScreenshotUrl = fileUrl;
+      await device.save();
+    }
 
     return NextResponse.json({
       success: true,

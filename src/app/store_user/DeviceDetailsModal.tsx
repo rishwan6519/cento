@@ -18,7 +18,29 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentPlaying, setCurrentPlaying] = useState<any>(null);
   const [showScreenshot, setShowScreenshot] = useState(false);
+  const [ssData, setSsData] = useState<any[]>([]);
+  const [ssPage, setSsPage] = useState(1);
+  const [ssTotalPages, setSsTotalPages] = useState(1);
+  const [loadingSs, setLoadingSs] = useState(false);
 
+  // Fetch paginated screenshots
+  useEffect(() => {
+    if (showScreenshot && device?.sn) {
+      setLoadingSs(true);
+      fetch(`/api/devices/screenshot?serialNumber=${device.sn}&page=${ssPage}&limit=1`)
+        .then(res => res.json())
+        .then(resData => {
+          if (resData.success && resData.data.length > 0) {
+            setSsData(resData.data);
+            setSsTotalPages(resData.pagination.totalPages);
+          } else if (resData.success && resData.data.length === 0) {
+            setSsData([]);
+            setSsTotalPages(1);
+          }
+        })
+        .finally(() => setLoadingSs(false));
+    }
+  }, [showScreenshot, device, ssPage]);
   // Poll for Currently Playing
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -785,11 +807,43 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={e => e.stopPropagation()}
             >
-              <button className="ddm-preview-close" onClick={() => setShowScreenshot(false)}>
+              <button className="ddm-preview-close" onClick={() => { setShowScreenshot(false); setSsPage(1); }}>
                 <FaTimes size={16} />
               </button>
-              <div className="ddm-preview-box" style={{ background: '#000' }}>
-                <img src={data.device.latestScreenshotUrl} alt="Device Screenshot" style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain' }} />
+              <div className="ddm-preview-box" style={{ background: '#000', paddingBottom: '60px', position: 'relative' }}>
+                {loadingSs ? (
+                  <div style={{ padding: '60px', color: '#fff', textAlign: 'center' }}>Loading screenshot...</div>
+                ) : ssData.length > 0 ? (
+                  <>
+                    <img src={ssData[0].url} alt="Device Screenshot" style={{ width: '100%', maxHeight: '75vh', objectFit: 'contain' }} />
+                    <div style={{ position: 'absolute', bottom: '60px', left: 0, right: 0, textAlign: 'center', background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '8px', fontSize: '0.85rem' }}>
+                      Captured on: {new Date(ssData[0].createdAt).toLocaleString('en-US', { timeZone: 'Australia/Melbourne' })}
+                    </div>
+                  </>
+                ) : (
+                  <img src={data.device.latestScreenshotUrl} alt="Device Screenshot (Latest)" style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain' }} />
+                )}
+                
+                {/* Pagination Controls */}
+                {(ssTotalPages > 1 || ssPage > 1) && (
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '20px', padding: '15px', background: '#111', borderTop: '1px solid #333' }}>
+                     <button 
+                       disabled={ssPage >= ssTotalPages}
+                       onClick={() => setSsPage(p => p + 1)}
+                       style={{ background: '#333', color: '#fff', border: 'none', padding: '5px 15px', borderRadius: '4px', cursor: ssPage >= ssTotalPages ? 'not-allowed' : 'pointer', opacity: ssPage >= ssTotalPages ? 0.5 : 1 }}
+                     >
+                       Older
+                     </button>
+                     <span style={{ color: '#aaa', fontSize: '0.9rem', alignSelf: 'center' }}>Page {ssPage} of {ssTotalPages}</span>
+                     <button 
+                       disabled={ssPage === 1}
+                       onClick={() => setSsPage(p => p - 1)}
+                       style={{ background: '#333', color: '#fff', border: 'none', padding: '5px 15px', borderRadius: '4px', cursor: ssPage === 1 ? 'not-allowed' : 'pointer', opacity: ssPage === 1 ? 0.5 : 1 }}
+                     >
+                       Newer
+                     </button>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
