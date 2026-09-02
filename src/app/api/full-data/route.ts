@@ -226,6 +226,7 @@ export async function GET(req: NextRequest) {
         serialNumber: device.serialNumber,
         name: device.name,
         location: (device as any).location,
+        latestScreenshotUrl: (device as any).latestScreenshotUrl,
       },
       dateTime: {
         australian: currentTime,

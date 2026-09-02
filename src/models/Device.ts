@@ -55,6 +55,11 @@ const deviceSchema = new mongoose.Schema({
     required: false,
     default: null
   },
+  latestScreenshotUrl: {
+    type: String,
+    required: false,
+    default: null
+  },
   notifiedUsers: {
     type: Map,
     of: Date,

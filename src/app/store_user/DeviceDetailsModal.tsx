@@ -17,6 +17,7 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
   const [previewMedia, setPreviewMedia] = useState<any>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentPlaying, setCurrentPlaying] = useState<any>(null);
+  const [showScreenshot, setShowScreenshot] = useState(false);
 
   // Poll for Currently Playing
   useEffect(() => {
@@ -477,10 +478,25 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
               <div className="ddm-header-left">
                 <div className="ddm-device-icon"><MdComputer size={22} /></div>
                 <div>
-                  <div className="ddm-device-name">{device.name}</div>
+                  <div className="ddm-device-name" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {device.name}
+                    {data?.device?.latestScreenshotUrl && (
+                      <button 
+                        onClick={() => setShowScreenshot(true)}
+                        style={{
+                          background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
+                          color: '#fff', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '6px',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                          fontWeight: 'bold', letterSpacing: '0.05em'
+                        }}
+                      >
+                        <FaEye size={10} /> View Screen
+                      </button>
+                    )}
+                  </div>
                   <div className="ddm-device-meta">
-                    <span className="ddm-status-dot" style={{ background: statusOnline ? '#34D399' : '#F87171' }} />
-                    {device.status || 'inactive'} &nbsp;•&nbsp; SN: {device.sn} &nbsp;•&nbsp; {device.type}
+                    <span className="ddm-status-dot" style={{ background: statusOnline ? '#22C55E' : '#EF4444' }} />
+                    {statusOnline ? 'Online' : 'Offline'} • SN: {device.sn}
                   </div>
                 </div>
               </div>
@@ -749,6 +765,35 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
             </div>
           </motion.div>
         </motion.div>
+      </AnimatePresence>
+
+      {/* Screenshot Overlay */}
+      <AnimatePresence>
+        {showScreenshot && data?.device?.latestScreenshotUrl && (
+          <motion.div
+            className="ddm-preview-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowScreenshot(false)}
+            style={{ zIndex: 10005 }}
+          >
+            <motion.div
+              className="ddm-preview-container"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <button className="ddm-preview-close" onClick={() => setShowScreenshot(false)}>
+                <FaTimes size={16} />
+              </button>
+              <div className="ddm-preview-box" style={{ background: '#000' }}>
+                <img src={data.device.latestScreenshotUrl} alt="Device Screenshot" style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain' }} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Preview overlay */}

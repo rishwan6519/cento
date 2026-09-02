@@ -319,7 +319,9 @@ async function checkAndResolveJob(jobId: string) {
         provider: 'cloudbases',
         templateId: cloudJob.templateId,
         message: finalResultData.message || 'Video created successfully',
-        videos: finalResultData.saved_videos,
+        videos: finalResultData.saved_videos.filter((v: any) => v.ratio === "16:9").length > 0 
+          ? finalResultData.saved_videos.filter((v: any) => v.ratio === "16:9") 
+          : finalResultData.saved_videos,
         voiceoverScript: cloudJob.voiceoverScript || "",
         socialMediaHeading: cloudJob.socialMediaHeading || "",
         socialMediaCaption: cloudJob.socialMediaCaption || "",
