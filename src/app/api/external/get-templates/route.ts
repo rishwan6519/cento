@@ -126,7 +126,27 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    return await getTemplatesFromExternalAPI(authHeader);
+    
+    let offerTypeStr = "";
+    try {
+      const body = await req.json();
+      offerTypeStr = body.offer_type || "";
+    } catch (e) {
+      // Ignore if body is empty or invalid
+    }
+    
+    const response = await getTemplatesFromExternalAPI(authHeader);
+    const data = await response.json();
+    
+    if (offerTypeStr && offerTypeStr.trim() !== "" && data.success && data.data && Array.isArray(data.data.templates)) {
+      const keyword = offerTypeStr.trim().toLowerCase();
+      data.data.templates = data.data.templates.filter((t: any) => 
+        t.name && String(t.name).toLowerCase().includes(keyword)
+      );
+      data.data.count = data.data.templates.length;
+    }
+    
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server Error" },
