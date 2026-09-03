@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoTemplate from "@/models/VideoTemplate";
 import { DUMMY_TEMPLATES } from "@/lib/dummyTemplates";
+import OfferType from "@/models/OfferType";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +132,13 @@ export async function POST(req: NextRequest) {
     try {
       const body = await req.json();
       offerTypeStr = body.offer_type || "";
+      if (!offerTypeStr && body.offertypeId && String(body.offertypeId).trim() !== "") {
+        await connectToDatabase();
+        const offerTypeDoc = await OfferType.findOne({ offertypeId: body.offertypeId });
+        if (offerTypeDoc && offerTypeDoc.offertypename) {
+           offerTypeStr = offerTypeDoc.offertypename;
+        }
+      }
     } catch (e) {
       // Ignore if body is empty or invalid
     }

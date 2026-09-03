@@ -196,13 +196,16 @@ Generate exactly ${count} compelling marketing content sets in the required JSON
       }).slice(0, count);
     }
 
+    const fbTagsFlat = wantsFacebook ? Array.from(new Set(generatedSets.flatMap(s => s.facebookHashTags || []))).slice(0, 10) : undefined;
+    const igTagsFlat = wantsInstagram ? Array.from(new Set(generatedSets.flatMap(s => s.instagramHashTags || []))).slice(0, 10) : undefined;
+
     return NextResponse.json({
       success: true,
       taglines: wantsInstore ? generatedSets.map(s => s.tagline) : undefined,
       facebookCaptions: wantsFacebook ? generatedSets.map(s => s.facebookCaption) : undefined,
-      facebookHashTags: wantsFacebook ? generatedSets.map(s => s.facebookHashTags) : undefined,
+      facebookHashTags: fbTagsFlat,
       instagramCaptions: wantsInstagram ? generatedSets.map(s => s.instagramCaption) : undefined,
-      instagramHashTags: wantsInstagram ? generatedSets.map(s => s.instagramHashTags) : undefined,
+      instagramHashTags: igTagsFlat,
       count: generatedSets.length,
       meta: {
         storeName: storeName || null,
