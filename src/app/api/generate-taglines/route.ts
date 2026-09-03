@@ -31,29 +31,31 @@ export async function POST(req: NextRequest) {
     }
 
     const systemContent = `You are a world-class creative retail marketing copywriter and brand advertising specialist.
-Your task is to craft high-converting, unforgettable, and punchy marketing taglines based on store offers, promotional text, or discounts provided by the user.
+Your task is to craft high-converting, unforgettable, and punchy marketing content based on store offers, promotional text, or discounts provided by the user.
 
-### GUIDELINES FOR TAGLINES:
-1. Generate exactly ${count} distinct, engaging marketing taglines tailored for retail signage, digital banners, social media announcements, and store promotions.
-2. Keep each tagline succinct (under 12 words), energetic, action-oriented, and easy to read at a glance.
-3. Incorporate key offer mechanics (like discounts, freebies, dates, or product benefits) naturally without sounding repetitive.
-4. Ensure variety across the ${count} taglines by employing different psychological triggers:
-   - Urgency & Scarcity (e.g., "Limited time offer", "Don't miss out", "Offer ends soon")
-   - Value & Savings (e.g., "Max savings", "Unbeatable deals")
-   - Excitement & Boldness (e.g., "Elevate your style", "Experience the hype")
-   - Playful & Catchy (e.g., clever wordplay or memorable rhythm)
-5. If a store or brand name is provided, incorporate it organically into 1 or 2 of the taglines.
+### GUIDELINES FOR CONTENT SETS:
+1. Generate exactly ${count} distinct sets of marketing content tailored for retail signage, digital banners, social media announcements, and store promotions.
+2. For each set, provide:
+   - tagline: A succinct, energetic, action-oriented phrase (under 12 words).
+   - facebookCaption: A professional, engaging caption optimized for a Facebook post, incorporating key offer mechanics naturally.
+   - facebookHashTags: An array of 3 to 5 relevant hashtags for Facebook.
+   - instagramCaption: A visually descriptive, engaging caption optimized for an Instagram post, using a professional tone.
+   - instagramHashTags: An array of 3 to 5 relevant hashtags for Instagram.
+3. Ensure variety across the ${count} sets by employing different psychological triggers (Urgency & Scarcity, Value & Savings, Excitement & Boldness, Playful & Catchy).
+4. If a store or brand name is provided, incorporate it organically into 1 or 2 of the captions/taglines.
 
 ### OUTPUT FORMAT:
-You MUST respond with a valid JSON object containing exactly one property named "taglines", which is an array of ${count} string taglines.
+You MUST respond with a valid JSON object containing exactly one property named "results", which is an array of ${count} objects.
 Example format:
 {
-  "taglines": [
-    "Big savings wait for no one — grab your deal today!",
-    "Unlock exclusive store discounts before time runs out!",
-    "Your favorite styles, now at unbeatable prices!",
-    "Shop smart, save big: your ultimate retail upgrade is here!",
-    "Don't miss the sale of the season — hurry in today!"
+  "results": [
+    {
+      "tagline": "Big savings wait for no one — grab your deal today!",
+      "facebookCaption": "Don't miss out on our biggest sale of the season! Visit us today to unlock exclusive store discounts. 🛍️✨",
+      "facebookHashTags": ["#BigSale", "#StoreDeals", "#ShopLocal"],
+      "instagramCaption": "Your ultimate retail upgrade is here! ✨ Dive into our latest collection and enjoy unbeatable prices for a limited time only. Tap the link in bio to shop now! 🛒💖",
+      "instagramHashTags": ["#StyleUpgrade", "#UnbeatablePrices", "#ShopNow"]
+    }
   ]
 }
 Do not include any extra commentary, markdown formatting outside the JSON object, or numbered lists in the strings.`;
@@ -63,10 +65,10 @@ Do not include any extra commentary, markdown formatting outside the JSON object
 ${storeName ? `\nStore / Brand Name: ${storeName}` : ''}
 ${tone ? `\nDesired Tone & Style: ${tone}` : ''}
 
-Generate exactly ${count} compelling marketing taglines in the required JSON structure.`;
+Generate exactly ${count} compelling marketing content sets in the required JSON structure.`;
 
     const maxRetries = 3;
-    let generatedTaglines: string[] = [];
+    let generatedSets: any[] = [];
     let lastError = '';
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -104,8 +106,8 @@ Generate exactly ${count} compelling marketing taglines in the required JSON str
         const rawContent = data.choices?.[0]?.message?.content?.trim();
         if (rawContent) {
           const parsed = JSON.parse(rawContent);
-          if (Array.isArray(parsed.taglines) && parsed.taglines.length > 0) {
-            generatedTaglines = parsed.taglines.map((t: unknown) => String(t).trim()).slice(0, count);
+          if (Array.isArray(parsed.results) && parsed.results.length > 0) {
+            generatedSets = parsed.results.slice(0, count);
             break;
           }
         }
@@ -120,22 +122,34 @@ Generate exactly ${count} compelling marketing taglines in the required JSON str
     }
 
     // Smart fallback if OpenAI service is unreachable or rate-limited
-    if (generatedTaglines.length === 0) {
+    if (generatedSets.length === 0) {
       const baseText = String(offerText).trim();
       const shortSnippet = baseText.length > 35 ? baseText.substring(0, 35) + '...' : baseText;
-      generatedTaglines = [
-        `Don't miss out: ${shortSnippet} – Claim your offer today!`,
-        `Unbeatable savings inside! Grab the best deals on ${storeName || 'our exclusive offers'} now!`,
-        `Limited time only: ${shortSnippet}. Hurry in before it ends!`,
-        `Experience premier deals and instant discounts right here!`,
-        `Your exclusive deal is waiting — tap to shop and save big today!`,
-      ].slice(0, count);
+      const dummySets = [
+        { tagline: `Don't miss out: ${shortSnippet} – Claim your offer today!` },
+        { tagline: `Unbeatable savings inside! Grab the best deals on ${storeName || 'our exclusive offers'} now!` },
+        { tagline: `Limited time only: ${shortSnippet}. Hurry in before it ends!` },
+        { tagline: `Experience premier deals and instant discounts right here!` },
+        { tagline: `Your exclusive deal is waiting — tap to shop and save big today!` }
+      ];
+      
+      generatedSets = dummySets.map(ds => ({
+        tagline: ds.tagline,
+        facebookCaption: `Check out our amazing offer: ${shortSnippet}. Visit us today and claim your discount! 🛍️`,
+        facebookHashTags: ["#SpecialOffer", "#BigSavings", "#ShopLocal"],
+        instagramCaption: `Upgrade your shopping experience with our exclusive deal! ✨ ${shortSnippet}. Link in bio to grab yours! 🛒💖`,
+        instagramHashTags: ["#ExclusiveDeal", "#ShopNow", "#Discounts"]
+      })).slice(0, count);
     }
+
+    // Extract just taglines for backwards compatibility
+    const generatedTaglines = generatedSets.map(s => s.tagline);
 
     return NextResponse.json({
       success: true,
       taglines: generatedTaglines,
-      count: generatedTaglines.length,
+      sets: generatedSets,
+      count: generatedSets.length,
       meta: {
         storeName: storeName || null,
         tone,
