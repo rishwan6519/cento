@@ -402,7 +402,7 @@ export async function POST(req: NextRequest) {
             const igPostMessage = `${finalIgCaption}\n\n${igJoinedTags}`.trim();
             
             // Scheduling config
-            const FB_SCHEDULE_MODE: 'testing' | 'production' = 'testing';
+            let FB_SCHEDULE_MODE: 'testing' | 'production' = 'production';
             const TEST_SCHEDULE_OFFSET_DAYS = 10;
             const PROD_POST_BEFORE_START_DAYS = 1;
             const PROD_POST_TIME = "18:00";
@@ -422,25 +422,37 @@ export async function POST(req: NextRequest) {
             const [hours, minutes] = PROD_POST_TIME.split(':').map(Number);
             scheduledAtDate.setHours(hours, minutes, 0, 0);
             
+            const now = new Date();
+            let publishMode = "schedule";
+            
+            // If the calculated schedule time has already passed, post instantly
+            if (scheduledAtDate <= now) {
+              publishMode = "publish"; // Change to "now" if cloudbases API expects that
+            }
+            
             // Ensure format YYYY-MM-DD HH:mm:ss
             const pad = (n: number) => n.toString().padStart(2, '0');
             const scheduledAtStr = `${scheduledAtDate.getFullYear()}-${pad(scheduledAtDate.getMonth() + 1)}-${pad(scheduledAtDate.getDate())} ${pad(scheduledAtDate.getHours())}:${pad(scheduledAtDate.getMinutes())}:00`;
 
-            const fbPayload = {
+            const fbPayload: any = {
               message: fbPostMessage,
               media_type: "video",
               video_id: portraitVideo.video_id,
-              publish_mode: "schedule",
-              scheduled_at: scheduledAtStr
+              publish_mode: publishMode
             };
+            if (publishMode === "schedule") {
+              fbPayload.scheduled_at = scheduledAtStr;
+            }
             
-            const igPayload = {
+            const igPayload: any = {
               message: igPostMessage,
               media_type: "video",
               video_id: portraitVideo.video_id,
-              publish_mode: "schedule",
-              scheduled_at: scheduledAtStr
+              publish_mode: publishMode
             };
+            if (publishMode === "schedule") {
+              igPayload.scheduled_at = scheduledAtStr;
+            }
             
             const apiKey = process.env.CLOUDBASES_API_KEY || "";
             const headers = { 
