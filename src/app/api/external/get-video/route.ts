@@ -111,8 +111,6 @@ async function buildCompletedJobResponse(job: any): Promise<NextResponse> {
 
   if (currentChannels && currentChannels.length > 0) {
     responsePayload.socialMediaHeading = job.socialMediaHeading || defaultHeading;
-    responsePayload.socialMediaCaption = job.socialMediaCaption || defaultCaption;
-    responsePayload.hashTags = (job.hashTags && job.hashTags.length > 0) ? job.hashTags : defaultTags;
     responsePayload.channels = currentChannels;
   }
 
@@ -172,8 +170,6 @@ async function checkAndResolveJob(jobId: string) {
           message: 'Video generation is in progress. Please check again in a minute.',
           voiceoverScript: cloudJob.voiceoverScript || "",
           socialMediaHeading: cloudJob.socialMediaHeading || "",
-          socialMediaCaption: cloudJob.socialMediaCaption || "",
-          hashTags: cloudJob.hashTags || [],
           channels: cloudJob.channels || [],
         });
       }
@@ -188,8 +184,6 @@ async function checkAndResolveJob(jobId: string) {
           message: cloudJob.errorMessage || 'Video generation failed.',
           voiceoverScript: cloudJob.voiceoverScript || "",
           socialMediaHeading: cloudJob.socialMediaHeading || "",
-          socialMediaCaption: cloudJob.socialMediaCaption || "",
-          hashTags: cloudJob.hashTags || [],
           channels: cloudJob.channels || [],
         });
       }
@@ -334,16 +328,6 @@ async function checkAndResolveJob(jobId: string) {
         socialMediaHeading: cloudJob.socialMediaHeading || "",
         channels: cloudJob.channels || [],
       };
-
-      if (cloudJob.channels && cloudJob.channels.some((c: string) => c.toLowerCase() === 'facebook')) {
-        responsePayload.facebookCaption = cloudJob.facebookCaption || "";
-        responsePayload.facebookHashTags = cloudJob.facebookHashTags || [];
-      }
-      
-      if (cloudJob.channels && cloudJob.channels.some((c: string) => c.toLowerCase() === 'instagram')) {
-        responsePayload.instagramCaption = cloudJob.instagramCaption || "";
-        responsePayload.instagramHashTags = cloudJob.instagramHashTags || [];
-      }
 
       if (cloudJob.offerId) {
         const trimmedId = String(cloudJob.offerId).trim();
@@ -611,8 +595,6 @@ async function checkAndResolveJob(jobId: string) {
       ...((job.channels || job.socialMedia || []).length > 0
         ? {
           socialMediaHeading: job.socialMediaHeading || "",
-          socialMediaCaption: job.socialMediaCaption || "",
-          hashTags: job.hashTags || [],
           channels: job.channels || job.socialMedia || [],
         }
         : {}),
