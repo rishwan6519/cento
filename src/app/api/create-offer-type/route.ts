@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
     
     const body = await req.json();
-    const { userId, categoryId, offerTypes } = body;
+    const { userId, categoryId, category, offerTypes } = body;
+    const finalCategoryId = categoryId || category;
     
     if (!userId) {
       return NextResponse.json(
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
       try {
         const newOfferType = await OfferType.create({
           userId,
-          categoryId: categoryId ? String(categoryId).trim() : undefined,
+          categoryId: finalCategoryId ? String(finalCategoryId).trim() : undefined,
           offertypeId: String(offertypeId).trim(),
           offertypename: String(offertypename).trim()
         });

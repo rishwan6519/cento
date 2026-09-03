@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
-    const categoryId = searchParams.get("categoryId");
+    const categoryId = searchParams.get("categoryId") || searchParams.get("category");
     
     if (!userId) {
       return NextResponse.json(
