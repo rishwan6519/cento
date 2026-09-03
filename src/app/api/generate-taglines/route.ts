@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
     const storeName = body.storeName || '';
     const tone = body.tone || ''; // Optional tone; if not provided, relies on system prompt
     const count = Math.min(Math.max(parseInt(body.count || '5', 10), 1), 10); // Default to 5 taglines, bound between 1 and 10
+    const channels = Array.isArray(body.channels) ? body.channels.map((c: string) => c.toLowerCase()) : ['facebook', 'instagram'];
 
     if (!offerText || !String(offerText).trim()) {
       return NextResponse.json(
@@ -30,17 +31,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const wantsFacebook = channels.includes('facebook');
+    const wantsInstagram = channels.includes('instagram');
+
+    let contentGuidelines = `   - tagline: A succinct, energetic, action-oriented phrase (under 12 words).\n`;
+    let outputFormat = `      "tagline": "Big savings wait for no one — grab your deal today!"`;
+
+    if (wantsFacebook) {
+      contentGuidelines += `   - facebookCaption: A professional, engaging caption optimized for a Facebook post, incorporating key offer mechanics naturally.\n`;
+      contentGuidelines += `   - facebookHashTags: An array of 3 to 5 relevant hashtags for Facebook.\n`;
+      outputFormat += `,\n      "facebookCaption": "Don't miss out on our biggest sale of the season! Visit us today to unlock exclusive store discounts. 🛍️✨",\n      "facebookHashTags": ["#BigSale", "#StoreDeals", "#ShopLocal"]`;
+    }
+
+    if (wantsInstagram) {
+      contentGuidelines += `   - instagramCaption: A visually descriptive, engaging caption optimized for an Instagram post, using a professional tone.\n`;
+      contentGuidelines += `   - instagramHashTags: An array of 3 to 5 relevant hashtags for Instagram.\n`;
+      outputFormat += `,\n      "instagramCaption": "Your ultimate retail upgrade is here! ✨ Dive into our latest collection and enjoy unbeatable prices for a limited time only. Tap the link in bio to shop now! 🛒💖",\n      "instagramHashTags": ["#StyleUpgrade", "#UnbeatablePrices", "#ShopNow"]`;
+    }
+
     const systemContent = `You are a world-class creative retail marketing copywriter and brand advertising specialist.
 Your task is to craft high-converting, unforgettable, and punchy marketing content based on store offers, promotional text, or discounts provided by the user.
 
 ### GUIDELINES FOR CONTENT SETS:
 1. Generate exactly ${count} distinct sets of marketing content tailored for retail signage, digital banners, social media announcements, and store promotions.
 2. For each set, provide:
-   - tagline: A succinct, energetic, action-oriented phrase (under 12 words).
-   - facebookCaption: A professional, engaging caption optimized for a Facebook post, incorporating key offer mechanics naturally.
-   - facebookHashTags: An array of 3 to 5 relevant hashtags for Facebook.
-   - instagramCaption: A visually descriptive, engaging caption optimized for an Instagram post, using a professional tone.
-   - instagramHashTags: An array of 3 to 5 relevant hashtags for Instagram.
+${contentGuidelines}
 3. Ensure variety across the ${count} sets by employing different psychological triggers (Urgency & Scarcity, Value & Savings, Excitement & Boldness, Playful & Catchy).
 4. If a store or brand name is provided, incorporate it organically into 1 or 2 of the captions/taglines.
 
@@ -50,11 +65,7 @@ Example format:
 {
   "results": [
     {
-      "tagline": "Big savings wait for no one — grab your deal today!",
-      "facebookCaption": "Don't miss out on our biggest sale of the season! Visit us today to unlock exclusive store discounts. 🛍️✨",
-      "facebookHashTags": ["#BigSale", "#StoreDeals", "#ShopLocal"],
-      "instagramCaption": "Your ultimate retail upgrade is here! ✨ Dive into our latest collection and enjoy unbeatable prices for a limited time only. Tap the link in bio to shop now! 🛒💖",
-      "instagramHashTags": ["#StyleUpgrade", "#UnbeatablePrices", "#ShopNow"]
+${outputFormat}
     }
   ]
 }
@@ -133,13 +144,18 @@ Generate exactly ${count} compelling marketing content sets in the required JSON
         { tagline: `Your exclusive deal is waiting — tap to shop and save big today!` }
       ];
       
-      generatedSets = dummySets.map(ds => ({
-        tagline: ds.tagline,
-        facebookCaption: `Check out our amazing offer: ${shortSnippet}. Visit us today and claim your discount! 🛍️`,
-        facebookHashTags: ["#SpecialOffer", "#BigSavings", "#ShopLocal"],
-        instagramCaption: `Upgrade your shopping experience with our exclusive deal! ✨ ${shortSnippet}. Link in bio to grab yours! 🛒💖`,
-        instagramHashTags: ["#ExclusiveDeal", "#ShopNow", "#Discounts"]
-      })).slice(0, count);
+      generatedSets = dummySets.map(ds => {
+        const fallbackSet: any = { tagline: ds.tagline };
+        if (wantsFacebook) {
+          fallbackSet.facebookCaption = `Check out our amazing offer: ${shortSnippet}. Visit us today and claim your discount! 🛍️`;
+          fallbackSet.facebookHashTags = ["#SpecialOffer", "#BigSavings", "#ShopLocal"];
+        }
+        if (wantsInstagram) {
+          fallbackSet.instagramCaption = `Upgrade your shopping experience with our exclusive deal! ✨ ${shortSnippet}. Link in bio to grab yours! 🛒💖`;
+          fallbackSet.instagramHashTags = ["#ExclusiveDeal", "#ShopNow", "#Discounts"];
+        }
+        return fallbackSet;
+      }).slice(0, count);
     }
 
     // Extract just taglines for backwards compatibility
