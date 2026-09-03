@@ -402,7 +402,7 @@ export async function POST(req: NextRequest) {
             const igPostMessage = `${finalIgCaption}\n\n${igJoinedTags}`.trim();
             
             // Scheduling config
-            let FB_SCHEDULE_MODE: 'testing' | 'production' = 'production';
+            const FB_SCHEDULE_MODE = 'production' as string;
             const TEST_SCHEDULE_OFFSET_DAYS = 10;
             const PROD_POST_BEFORE_START_DAYS = 1;
             const PROD_POST_TIME = "18:00";
