@@ -14,7 +14,6 @@ export async function POST(req: NextRequest) {
     const storeName = body.storeName || '';
     const tone = body.tone || ''; // Optional tone; if not provided, relies on system prompt
     const count = Math.min(Math.max(parseInt(body.count || '5', 10), 1), 10); // Default to 5, bound between 1 and 10
-    const channels = Array.isArray(body.channels) ? body.channels.map((c: string) => c.toLowerCase()) : ['facebook', 'instagram', 'instore'];
 
     if (!offerText || !String(offerText).trim()) {
       return NextResponse.json(
@@ -31,29 +30,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const wantsFacebook = channels.includes('facebook');
-    const wantsInstagram = channels.includes('instagram');
-    const wantsInstore = channels.includes('instore');
-
-    let contentGuidelines = "";
-    let outputFormat = "";
-
-    if (wantsInstore) {
-      contentGuidelines += `   - tagline: A succinct, energetic, action-oriented phrase (under 12 words) for in-store signage.\n`;
-      outputFormat += `\n      "tagline": "Big savings wait for no one — grab your deal today!"`;
-    }
-
-    if (wantsFacebook) {
-      contentGuidelines += `   - facebookCaption: A professional, engaging caption optimized for a Facebook post, incorporating key offer mechanics naturally.\n`;
-      contentGuidelines += `   - facebookHashTags: An array of 3 to 5 relevant hashtags for Facebook.\n`;
-      outputFormat += `${outputFormat ? ',' : ''}\n      "facebookCaption": "Don't miss out on our biggest sale of the season! Visit us today to unlock exclusive store discounts. 🛍️✨",\n      "facebookHashTags": ["#BigSale", "#StoreDeals", "#ShopLocal"]`;
-    }
-
-    if (wantsInstagram) {
-      contentGuidelines += `   - instagramCaption: A visually descriptive, engaging caption optimized for an Instagram post, using a professional tone.\n`;
-      contentGuidelines += `   - instagramHashTags: An array of up to 10 relevant and trending hashtags for Instagram.\n`;
-      outputFormat += `${outputFormat ? ',' : ''}\n      "instagramCaption": "Your ultimate retail upgrade is here! ✨ Dive into our latest collection and enjoy unbeatable prices for a limited time only. Tap the link in bio to shop now! 🛒💖",\n      "instagramHashTags": ["#StyleUpgrade", "#UnbeatablePrices", "#ShopNow", "#Fashion", "#Trending", "#InstaGood", "#OOTD", "#Sale", "#Deals", "#MustHave"]`;
-    }
+    let contentGuidelines = `   - tagline: A succinct, energetic, action-oriented phrase (under 12 words) for in-store signage.\n`;
+    let outputFormat = `\n      "tagline": "Big savings wait for no one — grab your deal today!"`;
 
     const systemContent = `You are a world-class creative retail marketing copywriter and brand advertising specialist.
 Your task is to craft high-converting, unforgettable, and punchy marketing content based on store offers, promotional text, or discounts provided by the user.
@@ -143,69 +121,19 @@ Generate exactly ${count} compelling marketing content sets in the required JSON
       const shortSnippet = baseText.length > 35 ? baseText.substring(0, 35) + '...' : baseText;
       const dummySets = [
         { 
-          tagline: `Don't miss out: ${shortSnippet} – Claim your offer today!`,
-          fb: `Check out our amazing offer: ${shortSnippet}. Visit us today and claim your discount! 🛍️`,
-          fbTags: ["#SpecialOffer", "#BigSavings", "#ShopLocal"],
-          ig: `Upgrade your shopping experience with our exclusive deal! ✨ ${shortSnippet}. Link in bio to grab yours! 🛒💖`,
-          igTags: ["#ExclusiveDeal", "#ShopNow", "#Discounts", "#Trending", "#MustHave", "#Style", "#OOTD", "#Fashion", "#Shopping", "#Sale"]
-        },
-        { 
-          tagline: `Unbeatable savings inside! Grab the best deals on ${storeName || 'our exclusive offers'} now!`,
-          fb: `Incredible savings are here! Get your hands on ${storeName || 'this exclusive deal'} before it's gone. 🏃‍♂️💨`,
-          fbTags: ["#MegaSale", "#Deals", "#DiscountOffer"],
-          ig: `Trending now 🔥 Treat yourself to ${shortSnippet} and save big! Swipe up to shop the look! 🛍️✨`,
-          igTags: ["#HotDeals", "#FlashSale", "#Offer", "#TreatYourself", "#StyleInspo", "#InstaShopping", "#Promo", "#DealOfTheDay", "#Love", "#Trend"]
-        },
-        { 
-          tagline: `Limited time only: ${shortSnippet}. Hurry in before it ends!`,
-          fb: `Time is ticking! ⏰ Grab ${shortSnippet} today and enjoy massive discounts. Don't let this slip away!`,
-          fbTags: ["#LimitedTime", "#HurryUp", "#FlashSale"],
-          ig: `Your daily dose of savings! 💸 Discover the magic of ${shortSnippet} at unbeatable prices. Double tap if you love a good deal! ❤️`,
-          igTags: ["#DailyDeals", "#BargainHunter", "#StealDeal", "#Savings", "#ShopTillYouDrop", "#MustBuy", "#Lifestyle", "#Shop", "#WeekendVibes", "#InstaDaily"]
-        },
-        { 
-          tagline: `Experience premier deals and instant discounts right here!`,
-          fb: `Premium quality, unbeatable prices! Dive into our latest offers featuring ${shortSnippet}. Click to learn more! 🌟`,
-          fbTags: ["#PremiumQuality", "#BestPrice", "#Offers"],
-          ig: `Level up your style with our premium collection! ✨ Score ${shortSnippet} today. Link in bio! 👗🎉`,
-          igTags: ["#Premium", "#LuxuryStyle", "#NewArrivals", "#Discounted", "#InstaFashion", "#FashionBlogger", "#OutfitIdeas", "#GetTheLook", "#Chic", "#Offers"]
-        },
-        { 
-          tagline: `Your exclusive deal is waiting — tap to shop and save big today!`,
-          fb: `We've got a surprise for you! 🎁 Unlock special savings on ${shortSnippet}. Shop with us and elevate your lifestyle!`,
-          fbTags: ["#SurpriseDeal", "#ExclusiveOffer", "#ShopWithUs"],
-          ig: `Because you deserve the best! 💖 Treat yourself to ${shortSnippet} with our limited-time offer. Shop now and thank us later! 🛒✨`,
-          igTags: ["#TreatYourself", "#BestDeals", "#ShoppingAddict", "#RetailTherapy", "#OnlineShopping", "#SaleAlert", "#FashionGram", "#StyleGram", "#Shopaholic", "#Deals"]
-        }
+        { tagline: `Don't miss out: ${shortSnippet} – Claim your offer today!` },
+        { tagline: `Unbeatable savings inside! Grab the best deals on ${storeName || 'our exclusive offers'} now!` },
+        { tagline: `Limited time only: ${shortSnippet}. Hurry in before it ends!` },
+        { tagline: `Experience premier deals and instant discounts right here!` },
+        { tagline: `Your exclusive deal is waiting — tap to shop and save big today!` }
       ];
       
-      generatedSets = dummySets.map(ds => {
-        const fallbackSet: any = {};
-        if (wantsInstore) {
-          fallbackSet.tagline = ds.tagline;
-        }
-        if (wantsFacebook) {
-          fallbackSet.facebookCaption = ds.fb;
-          fallbackSet.facebookHashTags = ds.fbTags;
-        }
-        if (wantsInstagram) {
-          fallbackSet.instagramCaption = ds.ig;
-          fallbackSet.instagramHashTags = ds.igTags;
-        }
-        return fallbackSet;
-      }).slice(0, count);
+      generatedSets = dummySets.slice(0, count);
     }
-
-    const fbTagsFlat = wantsFacebook ? Array.from(new Set(generatedSets.flatMap(s => s.facebookHashTags || []))).slice(0, 10) : undefined;
-    const igTagsFlat = wantsInstagram ? Array.from(new Set(generatedSets.flatMap(s => s.instagramHashTags || []))).slice(0, 10) : undefined;
 
     return NextResponse.json({
       success: true,
-      taglines: wantsInstore ? generatedSets.map(s => s.tagline) : undefined,
-      facebookCaptions: wantsFacebook ? generatedSets.map(s => s.facebookCaption) : undefined,
-      facebookHashTags: fbTagsFlat,
-      instagramCaptions: wantsInstagram ? generatedSets.map(s => s.instagramCaption) : undefined,
-      instagramHashTags: igTagsFlat,
+      taglines: generatedSets.map(s => s.tagline),
       count: generatedSets.length,
       meta: {
         storeName: storeName || null,

@@ -131,12 +131,15 @@ export async function POST(req: NextRequest) {
     let offerTypeStr = "";
     try {
       const body = await req.json();
-      offerTypeStr = body.offer_type || "";
-      if (!offerTypeStr && body.offertypeId && String(body.offertypeId).trim() !== "") {
+      const rawOfferType = body.offer_type || body.offertypeId || body.offertype || "";
+      
+      if (rawOfferType && String(rawOfferType).trim() !== "") {
         await connectToDatabase();
-        const offerTypeDoc = await OfferType.findOne({ offertypeId: body.offertypeId });
+        const offerTypeDoc = await OfferType.findOne({ offertypeId: rawOfferType });
         if (offerTypeDoc && offerTypeDoc.offertypename) {
            offerTypeStr = offerTypeDoc.offertypename;
+        } else {
+           offerTypeStr = String(rawOfferType).trim();
         }
       }
     } catch (e) {
@@ -152,6 +155,10 @@ export async function POST(req: NextRequest) {
         t.name && String(t.name).toLowerCase().includes(keyword)
       );
       data.data.count = data.data.templates.length;
+      
+      if (data.data.count === 0) {
+        data.data = null;
+      }
     }
     
     return NextResponse.json(data);

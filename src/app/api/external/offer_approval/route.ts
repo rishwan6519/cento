@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const assignedOfferId = String(mediaItem?.offerId || videoJob?.offerId || "").trim();
-    let newOfferId = (offerId !== undefined || offer_id !== undefined) ? String(offerId || offer_id).trim() : undefined;
+    let newOfferId = (offerId != null || offer_id != null) ? String(offerId ?? offer_id).trim() : undefined;
 
     // STRICT VALIDATION: If an offerId is passed in request body and video already has an assigned offerId, verify they match!
     if (newOfferId && assignedOfferId && newOfferId !== assignedOfferId) {
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       newOfferId = assignedOfferId;
     }
 
-    const newTemplateId = (templateId !== undefined || template_id !== undefined) ? String(templateId || template_id).trim() : undefined;
+    const newTemplateId = (templateId != null || template_id != null) ? String(templateId ?? template_id).trim() : undefined;
     const targetUserId = userId || user_id || storeUserId || mediaItem?.userId?.toString() || videoJob?.userId || "";
 
     let createdOffer: any = null;
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
                 storeUserId: targetUserId,
                 offerName: String(offerName).trim(),
                 offerDescription: String(offerDescription).trim(),
-                ...(tagline !== undefined ? { tagline: String(tagline).trim() } : {}),
+                ...(tagline != null ? { tagline: String(tagline).trim() } : {}),
                 startDate: start,
                 endDate: end,
                 isActive: true,
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
               offerId: newOfferId,
               offerName: String(offerName).trim(),
               offerDescription: String(offerDescription).trim(),
-              ...(tagline !== undefined ? { tagline: String(tagline).trim() } : {}),
+              ...(tagline != null ? { tagline: String(tagline).trim() } : {}),
               startDate: start,
               endDate: end,
               isActive: true,
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
 
     const rawChannels = channels || socialMedia;
     let newChannels: string[] | undefined = undefined;
-    if (rawChannels !== undefined) {
+    if (rawChannels != null) {
       if (Array.isArray(rawChannels)) {
         newChannels = rawChannels.map((c: any) => String(c).trim()).filter(Boolean);
       } else if (typeof rawChannels === "string") {
@@ -238,11 +238,11 @@ export async function POST(req: NextRequest) {
     // Apply updates to MediaItem
     if (mediaItem) {
       if (newChannels !== undefined) mediaItem.channels = newChannels;
-      if (voiceoverScript !== undefined) mediaItem.voiceoverScript = String(voiceoverScript).trim();
-      if (socialMediaHeading !== undefined) mediaItem.socialMediaHeading = String(socialMediaHeading).trim();
+      if (voiceoverScript != null) mediaItem.voiceoverScript = String(voiceoverScript).trim();
+      if (socialMediaHeading != null) mediaItem.socialMediaHeading = String(socialMediaHeading).trim();
       if (newOfferId !== undefined) mediaItem.offerId = newOfferId;
       if (newTemplateId !== undefined) mediaItem.templateId = newTemplateId;
-      if (tagline !== undefined) mediaItem.tagline = String(tagline).trim();
+      if (tagline != null) mediaItem.tagline = String(tagline).trim();
       mediaItem.approvalStatus = "success";
       await mediaItem.save();
     }
@@ -253,11 +253,11 @@ export async function POST(req: NextRequest) {
         videoJob.channels = newChannels;
         if (videoJob.socialMedia !== undefined) videoJob.socialMedia = newChannels;
       }
-      if (voiceoverScript !== undefined) videoJob.voiceoverScript = String(voiceoverScript).trim();
-      if (socialMediaHeading !== undefined) videoJob.socialMediaHeading = String(socialMediaHeading).trim();
+      if (voiceoverScript != null) videoJob.voiceoverScript = String(voiceoverScript).trim();
+      if (socialMediaHeading != null) videoJob.socialMediaHeading = String(socialMediaHeading).trim();
       if (newOfferId !== undefined) videoJob.offerId = newOfferId;
       if (newTemplateId !== undefined) videoJob.templateId = newTemplateId;
-      if (tagline !== undefined) videoJob.tagline = String(tagline).trim();
+      if (tagline != null) videoJob.tagline = String(tagline).trim();
       if (mediaItem && videoJob.videoId !== undefined) videoJob.videoId = mediaItem._id.toString();
       videoJob.approvalStatus = "success";
       await videoJob.save().catch(() => { });
@@ -314,16 +314,16 @@ export async function POST(req: NextRequest) {
 
     // 4. Return updated approved metadata in clean, logical ordering
     const finalVideoUrl = mediaItem?.url || videoJob?.falRequests?.find((r: any) => r.videoUrl)?.videoUrl || videoJob?.videoUrl || "";
-    const finalScript = voiceoverScript !== undefined ? String(voiceoverScript).trim() : (mediaItem?.voiceoverScript || videoJob?.voiceoverScript || "");
-    const finalHeading = socialMediaHeading !== undefined ? String(socialMediaHeading).trim() : (mediaItem?.socialMediaHeading || videoJob?.socialMediaHeading || "");
+    const finalScript = voiceoverScript != null ? String(voiceoverScript).trim() : (mediaItem?.voiceoverScript || videoJob?.voiceoverScript || "");
+    const finalHeading = socialMediaHeading != null ? String(socialMediaHeading).trim() : (mediaItem?.socialMediaHeading || videoJob?.socialMediaHeading || "");
     
     const finalCaption = (mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
     const finalTags = (mediaItem?.hashTags || videoJob?.hashTags || []);
     
-    const finalFbCaption = facebookCaption !== undefined ? String(facebookCaption).trim() : (mediaItem?.facebookCaption || videoJob?.facebookCaption || mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
-    const finalFbTags = facebookHashTags !== undefined ? facebookHashTags : (mediaItem?.facebookHashTags || videoJob?.facebookHashTags || mediaItem?.hashTags || videoJob?.hashTags || []);
-    const finalIgCaption = instagramCaption !== undefined ? String(instagramCaption).trim() : (mediaItem?.instagramCaption || videoJob?.instagramCaption || mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
-    const finalIgTags = instagramHashTags !== undefined ? instagramHashTags : (mediaItem?.instagramHashTags || videoJob?.instagramHashTags || mediaItem?.hashTags || videoJob?.hashTags || []);
+    const finalFbCaption = facebookCaption != null ? String(facebookCaption).trim() : (mediaItem?.facebookCaption || videoJob?.facebookCaption || mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
+    const finalFbTags = facebookHashTags != null ? facebookHashTags : (mediaItem?.facebookHashTags || videoJob?.facebookHashTags || mediaItem?.hashTags || videoJob?.hashTags || []);
+    const finalIgCaption = instagramCaption != null ? String(instagramCaption).trim() : (mediaItem?.instagramCaption || videoJob?.instagramCaption || mediaItem?.socialMediaCaption || videoJob?.socialMediaCaption || "");
+    const finalIgTags = instagramHashTags != null ? instagramHashTags : (mediaItem?.instagramHashTags || videoJob?.instagramHashTags || mediaItem?.hashTags || videoJob?.hashTags || []);
     
     const finalChannels = newChannels !== undefined ? newChannels : (mediaItem?.channels || videoJob?.channels || videoJob?.socialMedia || []);
     const finalOfferId = newOfferId !== undefined ? newOfferId : (mediaItem?.offerId || videoJob?.offerId || "");
@@ -350,7 +350,7 @@ export async function POST(req: NextRequest) {
           approvalStatus: "success",
           offerId: finalOfferId,
           templateId: finalTemplateId,
-          ...(tagline !== undefined ? { tagline: String(tagline).trim() } : {}),
+          ...(tagline != null ? { tagline: String(tagline).trim() } : {}),
         });
       }
     }
@@ -365,7 +365,7 @@ export async function POST(req: NextRequest) {
       mediaMetadata.approvalStatus = "success";
       if (finalOfferId) mediaMetadata.offerId = finalOfferId;
       if (finalTemplateId) mediaMetadata.templateId = finalTemplateId;
-      if (tagline !== undefined) mediaMetadata.tagline = String(tagline).trim();
+      if (tagline != null) mediaMetadata.tagline = String(tagline).trim();
       await mediaMetadata.save();
 
       if (mediaItem && (!mediaItem.metadataId || mediaItem.metadataId.toString() !== mediaMetadata._id.toString())) {
@@ -543,7 +543,7 @@ export async function POST(req: NextRequest) {
     }
 
     response["video 1"] = finalVideoUrl;
-    if (tagline !== undefined) {
+    if (tagline != null) {
       response.tagline = String(tagline).trim();
     } else {
       const existingTagline = mediaItem?.tagline || videoJob?.tagline || "";
