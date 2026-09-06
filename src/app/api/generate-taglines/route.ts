@@ -120,7 +120,6 @@ Generate exactly ${count} compelling marketing content sets in the required JSON
       const baseText = String(offerText).trim();
       const shortSnippet = baseText.length > 35 ? baseText.substring(0, 35) + '...' : baseText;
       const dummySets = [
-        { 
         { tagline: `Don't miss out: ${shortSnippet} – Claim your offer today!` },
         { tagline: `Unbeatable savings inside! Grab the best deals on ${storeName || 'our exclusive offers'} now!` },
         { tagline: `Limited time only: ${shortSnippet}. Hurry in before it ends!` },
