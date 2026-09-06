@@ -147,7 +147,6 @@ async function buildCompletedJobResponse(job: any): Promise<NextResponse> {
   responsePayload.voiceoverScript = job.voiceoverScript || "";
 
   if (currentChannels && currentChannels.length > 0) {
-    responsePayload.socialMediaHeading = job.socialMediaHeading || defaultHeading;
     responsePayload.channels = currentChannels;
     injectSocialCaptions(responsePayload, currentChannels, job.offerDescription || job.voiceoverScript || job.tagline || job.enhancedPrompt || "");
   }
@@ -207,7 +206,6 @@ async function checkAndResolveJob(jobId: string) {
           templateId: cloudJob.templateId,
           message: 'Video generation is in progress. Please check again in a minute.',
           voiceoverScript: cloudJob.voiceoverScript || "",
-          socialMediaHeading: cloudJob.socialMediaHeading || "",
           channels: cloudJob.channels || [],
         });
       }
@@ -221,7 +219,6 @@ async function checkAndResolveJob(jobId: string) {
           provider: 'cloudbases',
           message: cloudJob.errorMessage || 'Video generation failed.',
           voiceoverScript: cloudJob.voiceoverScript || "",
-          socialMediaHeading: cloudJob.socialMediaHeading || "",
           channels: cloudJob.channels || [],
         });
       }
@@ -363,7 +360,6 @@ async function checkAndResolveJob(jobId: string) {
           ? finalResultData.saved_videos.filter((v: any) => v.ratio === "16:9") 
           : finalResultData.saved_videos,
         voiceoverScript: cloudJob.voiceoverScript || "",
-        socialMediaHeading: cloudJob.socialMediaHeading || "",
         channels: cloudJob.channels || [],
       };
 
@@ -634,7 +630,6 @@ async function checkAndResolveJob(jobId: string) {
       ...(job.imageTypes && job.imageTypes.length > 0 ? { imageTypes: job.imageTypes } : {}),
       ...((job.channels || job.socialMedia || []).length > 0
         ? {
-          socialMediaHeading: job.socialMediaHeading || "",
           channels: job.channels || job.socialMedia || [],
         }
         : {}),

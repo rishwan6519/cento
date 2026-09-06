@@ -552,10 +552,15 @@ export async function POST(req: NextRequest) {
     response.voiceoverScript = finalScript;
 
     if (finalChannels && finalChannels.length > 0) {
-      response.socialMediaHeading = finalHeading;
-      response.socialMediaCaption = finalCaption;
-      response.hashTags = finalTags;
       response.channels = finalChannels;
+      if (finalChannels.some((c: string) => c.toLowerCase() === 'facebook')) {
+        response.facebookCaption = finalFbCaption;
+        response.facebookHashTags = finalFbTags;
+      }
+      if (finalChannels.some((c: string) => c.toLowerCase() === 'instagram')) {
+        response.instagramCaption = finalIgCaption;
+        response.instagramHashTags = finalIgTags;
+      }
     }
 
     if (videoJob?.enhancedPrompt) {
