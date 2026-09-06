@@ -128,25 +128,19 @@ export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     
-    let offerTypeStr = "generic";
+    let targetOfferTypeId = "generic";
     try {
       const body = await req.json();
       const rawOfferType = body.offertypeId !== undefined ? body.offertypeId : (body.offer_type || body.offertype || "");
       
       if (rawOfferType && String(rawOfferType).trim() !== "") {
-        await connectToDatabase();
-        const offerTypeDoc = await OfferType.findOne({ offertypeId: rawOfferType });
-        if (offerTypeDoc && offerTypeDoc.offertypename) {
-           offerTypeStr = offerTypeDoc.offertypename;
-        } else {
-           offerTypeStr = String(rawOfferType).trim();
-        }
+         targetOfferTypeId = String(rawOfferType).trim();
       }
     } catch (e) {
       // Ignore if body is empty or invalid
     }
     
-    const response = await getTemplatesFromExternalAPI(authHeader, offerTypeStr);
+    const response = await getTemplatesFromExternalAPI(authHeader, targetOfferTypeId);
     const data = await response.json();
     
     if (data && data.success && data.data && Array.isArray(data.data.templates)) {
