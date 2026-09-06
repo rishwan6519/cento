@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 
 // ─── NEW: Fetch templates from external API ────────────────────────────────
 // OLD code is preserved below in comments for reference
-async function getTemplatesFromExternalAPI(authHeader?: string | null) {
-  const EXTERNAL_API_URL = "https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1";
+async function getTemplatesFromExternalAPI(authHeader?: string | null, offerTypeId: string = "generic") {
+  const EXTERNAL_API_URL = `https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1&offertypeId=${encodeURIComponent(offerTypeId)}`;
   const apiKey = process.env.CLOUDBASES_API_KEY;
   const headers: Record<string, string> = {};
   if (authHeader) headers["Authorization"] = authHeader;
@@ -114,7 +114,7 @@ async function getTemplatesForUser(userId: string, templateId?: string, search?:
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    return await getTemplatesFromExternalAPI(authHeader);
+    return await getTemplatesFromExternalAPI(authHeader, "generic");
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server Error" },
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     
-    let offerTypeStr = "";
+    let offerTypeStr = "generic";
     try {
       const body = await req.json();
       const rawOfferType = body.offer_type || body.offertypeId || body.offertype || "";
@@ -146,17 +146,11 @@ export async function POST(req: NextRequest) {
       // Ignore if body is empty or invalid
     }
     
-    const response = await getTemplatesFromExternalAPI(authHeader);
+    const response = await getTemplatesFromExternalAPI(authHeader, offerTypeStr);
     const data = await response.json();
     
-    if (offerTypeStr && offerTypeStr.trim() !== "" && data.success && data.data && Array.isArray(data.data.templates)) {
-      const keyword = offerTypeStr.trim().toLowerCase();
-      data.data.templates = data.data.templates.filter((t: any) => 
-        t.name && String(t.name).toLowerCase().includes(keyword)
-      );
-      data.data.count = data.data.templates.length;
-      
-      if (data.data.count === 0) {
+    if (data && data.success && data.data && Array.isArray(data.data.templates)) {
+      if (data.data.templates.length === 0) {
         data.data = null;
       }
     }
