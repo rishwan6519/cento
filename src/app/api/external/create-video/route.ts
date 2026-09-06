@@ -429,19 +429,8 @@ export async function POST(req: NextRequest) {
         videoCategory: 'offer',
         message: `Video queued. Poll for result at POST /api/external/get-video with { jobId: '${cloudJobId}' }`,
         voiceoverScript,
-        socialMediaHeading,
         channels: channelsList,
       };
-
-      if (channelsList.some((c: string) => c.toLowerCase() === 'facebook')) {
-        responsePayload.facebookCaption = facebookCaption;
-        responsePayload.facebookHashTags = facebookHashTags;
-      }
-      
-      if (channelsList.some((c: string) => c.toLowerCase() === 'instagram')) {
-        responsePayload.instagramCaption = instagramCaption;
-        responsePayload.instagramHashTags = instagramHashTags;
-      }
 
       return NextResponse.json(responsePayload);
     }
