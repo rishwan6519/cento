@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
     let offerTypeStr = "generic";
     try {
       const body = await req.json();
-      const rawOfferType = body.offer_type || body.offertypeId || body.offertype || "";
+      const rawOfferType = body.offertypeId !== undefined ? body.offertypeId : (body.offer_type || body.offertype || "");
       
       if (rawOfferType && String(rawOfferType).trim() !== "") {
         await connectToDatabase();
