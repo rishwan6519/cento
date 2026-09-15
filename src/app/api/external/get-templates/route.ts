@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 // ─── NEW: Fetch templates from external API ────────────────────────────────
 // OLD code is preserved below in comments for reference
-async function getTemplatesFromExternalAPI(authHeader?: string | null, offerTypeId: string = "generic") {
+async function getTemplatesFromExternalAPI(authHeader?: string | null, offerTypeId: string = "") {
   const EXTERNAL_API_URL = `https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1&offertypeId=${encodeURIComponent(offerTypeId)}`;
   const apiKey = process.env.CLOUDBASES_API_KEY;
   const headers: Record<string, string> = {};
@@ -114,7 +114,7 @@ async function getTemplatesForUser(userId: string, templateId?: string, search?:
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    return await getTemplatesFromExternalAPI(authHeader, "generic");
+    return await getTemplatesFromExternalAPI(authHeader, "");
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server Error" },
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     
-    let targetOfferTypeId = "generic";
+    let targetOfferTypeId = "";
     try {
       const body = await req.json();
       const rawOfferType = body.offertypeId !== undefined ? body.offertypeId : (body.offer_type || body.offertype || "");
@@ -142,12 +142,6 @@ export async function POST(req: NextRequest) {
     
     const response = await getTemplatesFromExternalAPI(authHeader, targetOfferTypeId);
     const data = await response.json();
-    
-    if (data && data.success && data.data && Array.isArray(data.data.templates)) {
-      if (data.data.templates.length === 0) {
-        data.data = null;
-      }
-    }
     
     return NextResponse.json(data);
   } catch (error) {
