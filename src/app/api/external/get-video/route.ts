@@ -61,18 +61,18 @@ function extractMediaUrl(obj: any, visited = new Set()): string {
 // ---------------------------------------------------------------------------
 function injectSocialCaptions(payload: any, channels: string[], baseText: string) {
   if (!channels || channels.length === 0) return;
-  const shortSnippet = baseText.length > 35 ? baseText.substring(0, 35) + "..." : (baseText || "our exclusive offers");
+  const shortSnippet = baseText || "our exclusive offers";
   
   const wantsFacebook = channels.some(c => String(c).toLowerCase() === "facebook");
   const wantsInstagram = channels.some(c => String(c).toLowerCase() === "instagram");
   
   if (wantsFacebook) {
     payload.facebookCaptions = [
-        `Check out our amazing offer: ${shortSnippet}. Visit us today and claim your discount! 🛍️`,
-        `Incredible savings are here! Get your hands on this exclusive deal before it's gone. 🏃‍♂️💨`,
-        `Time is ticking! ⏰ Grab ${shortSnippet} today and enjoy massive discounts. Don't let this slip away!`,
-        `Premium quality, unbeatable prices! Dive into our latest offers featuring ${shortSnippet}. Click to learn more! 🌟`,
-        `We've got a surprise for you! 🎁 Unlock special savings on ${shortSnippet}. Shop with us and elevate your lifestyle!`
+        `${shortSnippet}\n\nCheck out our amazing offer today! Visit us and claim your discount! 🛍️`,
+        `${shortSnippet}\n\nIncredible savings are here! Get your hands on this exclusive deal before it's gone. 🏃‍♂️💨`,
+        `${shortSnippet}\n\nTime is ticking! ⏰ Grab this offer today and enjoy massive discounts. Don't let this slip away!`,
+        `${shortSnippet}\n\nPremium quality, unbeatable prices! Dive into our latest offers. Click to learn more! 🌟`,
+        `${shortSnippet}\n\nWe've got a surprise for you! 🎁 Unlock special savings. Shop with us and elevate your lifestyle!`
     ];
     payload.facebookHashTags = [
         "#SpecialOffer", "#BigSavings", "#ShopLocal", "#MegaSale", "#Deals", "#DiscountOffer", "#LimitedTime", "#HurryUp", "#FlashSale", "#PremiumQuality"
@@ -81,11 +81,11 @@ function injectSocialCaptions(payload: any, channels: string[], baseText: string
   
   if (wantsInstagram) {
     payload.instagramCaptions = [
-        `Upgrade your shopping experience with our exclusive deal! ✨ ${shortSnippet}. Link in bio to grab yours! 🛒💖`,
-        `Trending now 🔥 Treat yourself to ${shortSnippet} and save big! Swipe up to shop the look! 🛍️✨`,
-        `Your daily dose of savings! 💸 Discover the magic of ${shortSnippet} at unbeatable prices. Double tap if you love a good deal! ❤️`,
-        `Level up your style with our premium collection! ✨ Score ${shortSnippet} today. Link in bio! 👗🎉`,
-        `Because you deserve the best! 💖 Treat yourself to ${shortSnippet} with our limited-time offer. Shop now and thank us later! 🛒✨`
+        `${shortSnippet}\n\nUpgrade your shopping experience with our exclusive deal! ✨ Link in bio to grab yours! 🛒💖`,
+        `${shortSnippet}\n\nTrending now 🔥 Treat yourself and save big! Swipe up to shop the look! 🛍️✨`,
+        `${shortSnippet}\n\nYour daily dose of savings! 💸 Discover the magic at unbeatable prices. Double tap if you love a good deal! ❤️`,
+        `${shortSnippet}\n\nLevel up your style with our premium collection! ✨ Score this today. Link in bio! 👗🎉`,
+        `${shortSnippet}\n\nBecause you deserve the best! 💖 Treat yourself with our limited-time offer. Shop now and thank us later! 🛒✨`
     ];
     payload.instagramHashTags = [
         "#ExclusiveDeal", "#ShopNow", "#Discounts", "#Trending", "#MustHave", "#Style", "#OOTD", "#Fashion", "#Shopping", "#Sale"
