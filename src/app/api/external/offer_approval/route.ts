@@ -393,8 +393,10 @@ export async function POST(req: NextRequest) {
     if (shouldPostFb || shouldPostIg) {
       try {
         if (fetchedCloudVideos.length > 0) {
-          const portraitVideo = fetchedCloudVideos.find((v: any) => v.ratio === "9:16");
-          if (portraitVideo && portraitVideo.video_id) {
+          let fbVideo = fetchedCloudVideos.find((v: any) => v.ratio === "4:5");
+          let igVideo = fetchedCloudVideos.find((v: any) => v.ratio === "9:16");
+
+          if (fbVideo?.video_id || igVideo?.video_id) {
             const fbJoinedTags = finalFbTags.map((tag: string) => tag.startsWith('#') ? tag : `#${tag}`).join(' ');
             const fbPostMessage = `${finalFbCaption}\n\n${fbJoinedTags}`.trim();
             
@@ -425,35 +427,16 @@ export async function POST(req: NextRequest) {
             const now = new Date();
             let publishMode = "schedule";
             
-            // If the calculated schedule time has already passed, post instantly
-            if (scheduledAtDate <= now) {
-              publishMode = "publish"; // Change to "now" if cloudbases API expects that
+            // If the calculated schedule time has already passed, or is happening today 
+            // (within 12 hours), post instantly to avoid timezone "in the past" 422 errors from the API.
+            if (scheduledAtDate <= now || scheduledAtDate.getTime() - now.getTime() < 12 * 60 * 60 * 1000) {
+              publishMode = "now"; // Changed from "publish" to "now"
             }
             
             // Ensure format YYYY-MM-DD HH:mm:ss
             const pad = (n: number) => n.toString().padStart(2, '0');
             const scheduledAtStr = `${scheduledAtDate.getFullYear()}-${pad(scheduledAtDate.getMonth() + 1)}-${pad(scheduledAtDate.getDate())} ${pad(scheduledAtDate.getHours())}:${pad(scheduledAtDate.getMinutes())}:00`;
 
-            const fbPayload: any = {
-              message: fbPostMessage,
-              media_type: "video",
-              video_id: portraitVideo.video_id,
-              publish_mode: publishMode
-            };
-            if (publishMode === "schedule") {
-              fbPayload.scheduled_at = scheduledAtStr;
-            }
-            
-            const igPayload: any = {
-              message: igPostMessage,
-              media_type: "video",
-              video_id: portraitVideo.video_id,
-              publish_mode: publishMode
-            };
-            if (publishMode === "schedule") {
-              igPayload.scheduled_at = scheduledAtStr;
-            }
-            
             const apiKey = process.env.CLOUDBASES_API_KEY || "";
             const headers = { 
               "Content-Type": "application/json",
@@ -462,39 +445,64 @@ export async function POST(req: NextRequest) {
 
             // Post to Facebook if enabled
             if (shouldPostFb) {
-              const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
-                method: "POST",
-                headers,
-                body: JSON.stringify(fbPayload)
-              });
-              if (!fbRes.ok) {
-                 facebookSchedulingStatus = `Failed (API status ${fbRes.status})`;
-                 console.warn(`[offer_approval] Facebook Post API failed with status ${fbRes.status}`);
+              if (fbVideo && fbVideo.video_id) {
+                const fbPayload: any = {
+                  message: fbPostMessage,
+                  media_type: "video",
+                  video_id: fbVideo.video_id,
+                  publish_mode: publishMode
+                };
+                if (publishMode === "schedule") {
+                  fbPayload.scheduled_at = scheduledAtStr;
+                }
+                const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify(fbPayload)
+                });
+                if (!fbRes.ok) {
+                   facebookSchedulingStatus = `Failed (API status ${fbRes.status})`;
+                   console.warn(`[offer_approval] Facebook Post API failed with status ${fbRes.status}`);
+                } else {
+                   facebookSchedulingStatus = "Scheduled Successfully";
+                }
               } else {
-                 facebookSchedulingStatus = "Scheduled Successfully";
+                facebookSchedulingStatus = "Skipped (No 9:16 or 4:5 video found)";
               }
             }
 
             // Post to Instagram if enabled
             if (shouldPostIg) {
-              const igRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/instagram/posts", {
-                method: "POST",
-                headers,
-                body: JSON.stringify(igPayload)
-              });
-              if (!igRes.ok) {
-                 instagramSchedulingStatus = `Failed (API status ${igRes.status})`;
-                 console.warn(`[offer_approval] Instagram Post API failed with status ${igRes.status}`);
+              if (igVideo && igVideo.video_id) {
+                const igPayload: any = {
+                  message: igPostMessage,
+                  media_type: "video",
+                  video_id: igVideo.video_id,
+                  publish_mode: publishMode
+                };
+                if (publishMode === "schedule") {
+                  igPayload.scheduled_at = scheduledAtStr;
+                }
+                const igRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/instagram/posts", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify(igPayload)
+                });
+                if (!igRes.ok) {
+                   instagramSchedulingStatus = `Failed (API status ${igRes.status})`;
+                   console.warn(`[offer_approval] Instagram Post API failed with status ${igRes.status}`);
+                } else {
+                   instagramSchedulingStatus = "Scheduled Successfully";
+                }
               } else {
-                 instagramSchedulingStatus = "Scheduled Successfully";
+                instagramSchedulingStatus = "Skipped (No 9:16 video found)";
               }
             }
 
           } else {
-            const skipReason = "Skipped (No 9:16 video found)";
-            if (shouldPostFb) facebookSchedulingStatus = skipReason;
-            if (shouldPostIg) instagramSchedulingStatus = skipReason;
-            console.warn("[offer_approval] Social scheduling skipped: No 9:16 video found in cloud generated videos.");
+            if (shouldPostFb) facebookSchedulingStatus = "Skipped (No 9:16 or 4:5 video found)";
+            if (shouldPostIg) instagramSchedulingStatus = "Skipped (No 9:16 video found)";
+            console.warn("[offer_approval] Social scheduling skipped: No valid video formats found.");
           }
         } else {
           const skipReason = "Skipped (Video generation not completed or empty)";
