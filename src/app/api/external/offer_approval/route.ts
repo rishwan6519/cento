@@ -10,6 +10,8 @@ import Notification from "@/models/Notification";
 import MediaMetadataModel from "@/models/MediaMetadata";
 import { sendPushNotification } from "@/lib/firebase-admin";
 import mongoose from "mongoose";
+import OfferApprovalJobModel from "@/models/OfferApprovalJob";
+import { v4 as uuidv4 } from "uuid";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,7 @@ export async function POST(req: NextRequest) {
 
     const rawId = body.videoId || body.id || body.mediaId || body.jobId;
     const videoUrlParam = body["video 1"] || body.videoUrl || body.url;
+    const idempotencyKey = body.idempotencyKey;
 
     if (!rawId && !videoUrlParam) {
       return NextResponse.json(
@@ -28,6 +31,20 @@ export async function POST(req: NextRequest) {
     }
 
     await connectToDatabase();
+
+    if (idempotencyKey) {
+      const existingJob = await OfferApprovalJobModel.findOne({ idempotencyKey });
+      if (existingJob) {
+        if (existingJob.status === "completed") {
+          return NextResponse.json({ ...existingJob.resultData, status: "success" });
+        }
+        return NextResponse.json({
+          status: existingJob.status,
+          jobId: existingJob.jobId,
+          message: "Offer approval is currently processing. Poll GET /api/external/offer_approval for status."
+        });
+      }
+    }
 
     let mediaItem: any = null;
     let videoJob: any = null;
@@ -88,7 +105,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Process offer creation & FCM push notification if offer details were supplied
+    const jobId = uuidv4();
+    const newJob = await OfferApprovalJobModel.create({
+      jobId,
+      idempotencyKey: idempotencyKey || undefined,
+      status: "processing"
+    });
+
+    // Fire unawaited background job
+    (async () => {
+      try {
+        // 3. Process offer creation & FCM push notification if offer details were supplied
     const {
       voiceoverScript,
       channels,
@@ -575,12 +602,64 @@ export async function POST(req: NextRequest) {
       response.enhancedPrompt = videoJob.enhancedPrompt;
     }
 
-    return NextResponse.json(response);
+        newJob.status = "completed";
+        newJob.resultData = response;
+        await newJob.save();
+      } catch (err: any) {
+        console.error("[external/offer_approval] Async Job Error:", err);
+        newJob.status = "failed";
+        newJob.error = err.message || String(err);
+        await newJob.save();
+      }
+    })();
+
+    return NextResponse.json({
+      success: true,
+      status: "processing",
+      jobId,
+      message: "Offer approval is processing in the background. Poll GET /api/external/offer_approval?jobId=" + jobId + " to check status."
+    });
   } catch (error: any) {
     console.error("[external/offer_approval] Error:", error);
     return NextResponse.json(
       { error: "Failed to process offer approval", details: error.message || String(error) },
       { status: 500 }
     );
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const jobId = searchParams.get("jobId");
+
+    if (!jobId) {
+      return NextResponse.json({ success: false, error: "jobId query parameter is required" }, { status: 400 });
+    }
+
+    await connectToDatabase();
+    const job = await OfferApprovalJobModel.findOne({ jobId });
+
+    if (!job) {
+      return NextResponse.json({ success: false, error: "Job not found" }, { status: 404 });
+    }
+
+    if (job.status === "completed") {
+      return NextResponse.json({ ...job.resultData, status: "success" });
+    }
+
+    if (job.status === "failed") {
+      return NextResponse.json({ success: false, status: "failed", error: job.error }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      status: "processing",
+      jobId: job.jobId,
+      message: "Job is still processing"
+    });
+  } catch (error: any) {
+    console.error("[external/offer_approval] GET Error:", error);
+    return NextResponse.json({ error: "Failed to fetch job status", details: error.message || String(error) }, { status: 500 });
   }
 }
