@@ -46,8 +46,8 @@ async function getApprovedOffersData(userId: string) {
     const resultData = [];
 
     for (const item of mediaItems) {
-      let offerData = null;
-      let metadata = null;
+      let offerData: any = null;
+      let metadata: any = null;
 
       // 2. Fetch linked Offer details
       if (item.offerId) {
