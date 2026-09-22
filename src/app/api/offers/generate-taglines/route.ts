@@ -57,15 +57,15 @@ Your task is to craft high-converting, unforgettable, and punchy marketing tagli
     systemContent += `\n### OUTPUT FORMAT:\nYou MUST respond with a valid JSON object.`;
     if (includeSocial) {
       systemContent += `\nThe JSON object MUST contain the following properties:\n- "taglines": an array of ${count} string taglines\n`;
-      if (includeFacebook) systemContent += `- "facebookCaption": string (An engaging Facebook post caption)\n- "facebookHashTags": array of strings (5-8 relevant hashtags for Facebook)\n`;
-      if (includeInstagram) systemContent += `- "instagramCaption": string (A highly engaging Instagram post caption)\n- "instagramHashTags": array of strings (5-8 relevant hashtags for Instagram)\n`;
+      if (includeFacebook) systemContent += `- "facebookCaptions": an array of ${count} highly engaging Facebook post captions\n- "facebookHashTags": an array of exactly 10 relevant hashtags for Facebook\n`;
+      if (includeInstagram) systemContent += `- "instagramCaptions": an array of ${count} highly engaging Instagram post captions\n- "instagramHashTags": an array of exactly 10 relevant hashtags for Instagram\n`;
     } else {
       systemContent += `\nThe JSON object must contain exactly one property named "taglines", which is an array of ${count} string taglines.\n`;
     }
 
     systemContent += `\nExample format:\n{\n  "taglines": [\n    "Big savings wait for no one — grab your deal today!",\n    "Unlock exclusive store discounts before time runs out!"\n  ]`;
-    if (includeFacebook) systemContent += `,\n  "facebookCaption": "Huge savings are here! 🚀 Get the best deals in store today.",\n  "facebookHashTags": ["#Deals", "#Savings"]`;
-    if (includeInstagram) systemContent += `,\n  "instagramCaption": "Don't miss out on these exclusive offers! ✨ Shop now and save big.",\n  "instagramHashTags": ["#Sale", "#ShopNow"]`;
+    if (includeFacebook) systemContent += `,\n  "facebookCaptions": ["Huge savings are here! 🚀 Get the best deals in store today.", "Don't walk, run to our weekend sale! 🏃‍♂️"],\n  "facebookHashTags": ["#Deals", "#Savings", "#Sale", "#ShopNow", "#Discount", "#Offer", "#Promo", "#Shopping", "#WeekendSale", "#MustHave"]`;
+    if (includeInstagram) systemContent += `,\n  "instagramCaptions": ["Don't miss out on these exclusive offers! ✨ Shop now and save big.", "Double the fun with our BOGO deals! 🎉"],\n  "instagramHashTags": ["#Deals", "#Savings", "#Sale", "#ShopNow", "#Discount", "#Offer", "#Promo", "#Shopping", "#WeekendSale", "#MustHave"]`;
     systemContent += `\n}\nDo not include any extra commentary, markdown formatting outside the JSON object, or numbered lists in the strings.`;
 
     const userContent = `Here are the store offer details / promotional text:
@@ -144,12 +144,24 @@ Generate exactly ${count} compelling marketing taglines in the required JSON str
       ].slice(0, count);
 
       if (includeFacebook) {
-        parsedData.facebookCaption = `Check out our latest offer: ${baseText}. Don't miss out!`;
-        parsedData.facebookHashTags = ["#Offer", "#Sale", "#Deals"];
+        parsedData.facebookCaptions = [
+          `Check out our latest offer: ${baseText}. Don't miss out!`,
+          `Huge savings alert! 🚨 ${baseText}. Shop now!`,
+          `Ready to save? ${baseText}. Grab yours today!`,
+          `Don't walk, run! ${baseText}. In-store now.`,
+          `Weekend special: ${baseText}. See you there!`
+        ].slice(0, count);
+        parsedData.facebookHashTags = ["#Offer", "#Sale", "#Deals", "#Discount", "#Shopping", "#Promo", "#Savings", "#ShopNow", "#WeekendSale", "#Exclusive"];
       }
       if (includeInstagram) {
-        parsedData.instagramCaption = `Exclusive deals just for you! 🌟 ${baseText}. Shop today!`;
-        parsedData.instagramHashTags = ["#Exclusive", "#ShopNow", "#Savings"];
+        parsedData.instagramCaptions = [
+          `Exclusive deals just for you! 🌟 ${baseText}. Shop today!`,
+          `Sparkle and save! ✨ ${baseText}. Link in bio.`,
+          `Your perfect deal is here! 🛍️ ${baseText}.`,
+          `Treat yourself! 🎁 ${baseText}. Shop the sale.`,
+          `Weekend vibes & huge savings! 🎉 ${baseText}.`
+        ].slice(0, count);
+        parsedData.instagramHashTags = ["#Exclusive", "#ShopNow", "#Savings", "#InstaSale", "#Deals", "#Discount", "#Shopping", "#Promo", "#WeekendSale", "#MustHave"];
       }
     }
 
@@ -160,12 +172,12 @@ Generate exactly ${count} compelling marketing taglines in the required JSON str
     };
 
     if (includeFacebook) {
-      responsePayload.facebookCaption = parsedData.facebookCaption || "";
+      responsePayload.facebookCaptions = Array.isArray(parsedData.facebookCaptions) ? parsedData.facebookCaptions : [];
       responsePayload.facebookHashTags = Array.isArray(parsedData.facebookHashTags) ? parsedData.facebookHashTags : [];
     }
 
     if (includeInstagram) {
-      responsePayload.instagramCaption = parsedData.instagramCaption || "";
+      responsePayload.instagramCaptions = Array.isArray(parsedData.instagramCaptions) ? parsedData.instagramCaptions : [];
       responsePayload.instagramHashTags = Array.isArray(parsedData.instagramHashTags) ? parsedData.instagramHashTags : [];
     }
 
