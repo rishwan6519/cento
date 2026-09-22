@@ -54,12 +54,13 @@ Your task is to craft high-converting, unforgettable, and punchy marketing tagli
       systemContent += `\n### SOCIAL MEDIA CONTENT:\nThe user has requested social media content for the following channels: ${channels.filter((c: string) => c === 'facebook' || c === 'instagram').join(', ')}.\nPlease also generate a dedicated, engaging caption and a list of 5-8 relevant hashtags for each requested platform, based on the overall offer.\n`;
     }
 
-    systemContent += `\n### OUTPUT FORMAT:\nYou MUST respond with a valid JSON object.\nThe JSON object must contain a property named "taglines", which is an array of ${count} string taglines.\n`;
-
+    systemContent += `\n### OUTPUT FORMAT:\nYou MUST respond with a valid JSON object.`;
     if (includeSocial) {
-      systemContent += `Additionally, include the following properties if their respective channel was requested:\n`;
+      systemContent += `\nThe JSON object MUST contain the following properties:\n- "taglines": an array of ${count} string taglines\n`;
       if (includeFacebook) systemContent += `- "facebookCaption": string (An engaging Facebook post caption)\n- "facebookHashTags": array of strings (5-8 relevant hashtags for Facebook)\n`;
       if (includeInstagram) systemContent += `- "instagramCaption": string (A highly engaging Instagram post caption)\n- "instagramHashTags": array of strings (5-8 relevant hashtags for Instagram)\n`;
+    } else {
+      systemContent += `\nThe JSON object must contain exactly one property named "taglines", which is an array of ${count} string taglines.\n`;
     }
 
     systemContent += `\nExample format:\n{\n  "taglines": [\n    "Big savings wait for no one — grab your deal today!",\n    "Unlock exclusive store discounts before time runs out!"\n  ]`;
