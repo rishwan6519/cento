@@ -154,8 +154,8 @@ Generate exactly ${count} compelling marketing taglines in the required JSON str
 
     const responsePayload: any = {
       success: true,
-      taglines: generatedTaglines,
       count: generatedTaglines.length,
+      taglines: generatedTaglines,
     };
 
     if (includeFacebook) {
