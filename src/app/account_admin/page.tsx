@@ -54,16 +54,19 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
     if (!userData?._id || !userData?.customerId) return;
     const fetchStats = async () => {
       try {
-        const [devicesRes, usersRes] = await Promise.all([
+        const [devicesRes, usersRes, assignRes] = await Promise.all([
           fetch(`/api/devices?customerId=${userData.customerId}`),
-          fetch(`/api/user?controllerId=${userData._id}`)
+          fetch(`/api/user?controllerId=${userData._id}`),
+          fetch(`/api/assign-device?customerId=${userData.customerId}`)
         ]);
         const dData = await devicesRes.json();
         const uData = await usersRes.json();
+        const aData = await assignRes.json();
         
         let devicesArr = Array.isArray(dData) ? dData : [];
         let allUsers = uData.success && Array.isArray(uData.data) ? uData.data : [];
         let storesArr = allUsers.filter((u:any) => u.role === 'store');
+        let assignments = aData.success && Array.isArray(aData.data) ? aData.data : (aData.data || aData.assignments || []);
         
         let video = 0; let audio = 0;
         devicesArr.forEach(d => {
@@ -71,13 +74,16 @@ const DashboardView = ({ setActiveView, userData }: { setActiveView: (view: stri
           else if (d.typeId?.name?.toLowerCase().includes('audio')) audio++;
         });
 
+        const assignedStoreIds = new Set(assignments.map((a: any) => a.userId?._id || a.userId));
+        let storesNoDevices = storesArr.filter((s: any) => !assignedStoreIds.has(s._id)).length;
+
         setStats({
           stores: storesArr.length,
           devices: devicesArr.length,
           video,
           audio,
           marketingUsers: allUsers.filter((u:any) => u.role === 'account_marketing').length,
-          storesNoDevices: 0,
+          storesNoDevices: storesNoDevices,
           devicesNoStores: 0
         });
       } catch (err) {
@@ -1849,15 +1855,22 @@ export default function AccountAdminDashboard() {
   };
 
   const isSubUser = !!userData?.createdBy;
+  const permissions = userData?.permissions || [];
 
-  const sidebarLinks = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "video_template", label: loadingSSO ? "Loading..." : "Video Template", icon: Film },
+  const hasPermission = (permId: string) => {
+    if (!isSubUser) return true;
+    return permissions.includes(permId);
+  };
+
+  const rawSidebarLinks = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: null },
+    { id: "video_template", label: loadingSSO ? "Loading..." : "Video Template", icon: Film, perm: "video_template" },
   
     { 
       id: "stores", 
       label: "Store Management", 
       icon: Store,
+      perm: "stores",
       subItems: [
         { id: "onboard_store", label: "Onboard new store", icon: Plus },
         { id: "all_stores", label: "View all stores", icon: ListIcon },
@@ -1869,16 +1882,22 @@ export default function AccountAdminDashboard() {
       id: "users", 
       label: "User Management", 
       icon: Users,
+      perm: "users",
       subItems: [
         { id: "onboard_user", label: "Onboard Central marketing user", icon: Plus },
         { id: "all_users", label: "View Central marketing user", icon: ListIcon },
-        ...(isSubUser ? [] : [{ id: "sub_users", label: "Sub-Users", icon: Users }])
+        ...(isSubUser ? [] : [{ id: "sub_users", label: "Store Staff", icon: Users }])
       ]
     },
-    { id: "audit_logs", label: "Audit Logs", icon: ListIcon },
-    { id: "profile", label: "Profile", icon: User },
-    { id: "support", label: "Support", icon: HeadphonesIcon },
+    { id: "audit_logs", label: "Audit Logs", icon: ListIcon, perm: "audit_logs" },
+    { id: "profile", label: "Profile", icon: User, perm: null },
+    { id: "support", label: "Support", icon: HeadphonesIcon, perm: null },
   ];
+
+  const sidebarLinks = rawSidebarLinks.filter(link => {
+    if (link.perm && !hasPermission(link.perm)) return false;
+    return true;
+  });
 
   const handleMenuClick = async (linkId: string, hasSubItems: boolean) => {
     if (linkId === "video_template") {
@@ -1935,7 +1954,7 @@ export default function AccountAdminDashboard() {
           />
         </div>
       );
-      case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'account_admin'} />;
+      case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'account_admin'} isAccountAdminCreatingStoreStaff={true} />;
       case "audit_logs": return <AuditLogsView userId={userData?._id} />;
       case "profile": return <ProfileView userData={userData} />;
       default: return <div className="text-gray-500 font-medium">This module is under development.</div>;

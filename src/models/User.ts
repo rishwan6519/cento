@@ -101,6 +101,10 @@ export interface UserDocument extends Document {
   accountStatus?: 'active' | 'paused' | 'deleted';
   createdBy?: mongoose.Types.ObjectId;
   activeAlerts?: any[];
+  photo?: string;
+  employeeId?: string;
+  idProofAttach?: string;
+  permissions?: string[];
 }
 
 const UserSchema: Schema = new Schema({
@@ -197,7 +201,11 @@ const UserSchema: Schema = new Schema({
   activeAlerts: {
     type: [mongoose.Schema.Types.Mixed],
     default: []
-  }
+  },
+  photo: { type: String, required: false },
+  employeeId: { type: String, required: false },
+  idProofAttach: { type: String, required: false },
+  permissions: { type: [String], default: [] }
 }, { 
   timestamps: true 
 });

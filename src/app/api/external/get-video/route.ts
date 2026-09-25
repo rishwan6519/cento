@@ -62,33 +62,33 @@ function extractMediaUrl(obj: any, visited = new Set()): string {
 function injectSocialCaptions(payload: any, channels: string[], baseText: string) {
   if (!channels || channels.length === 0) return;
   const shortSnippet = baseText || "our exclusive offers";
-  
+
   const wantsFacebook = channels.some(c => String(c).toLowerCase() === "facebook");
   const wantsInstagram = channels.some(c => String(c).toLowerCase() === "instagram");
-  
+
   if (wantsFacebook) {
     payload.facebookCaptions = [
-        `${shortSnippet} Check out our amazing offer today! Visit us and claim your discount! 🛍️`,
-        `${shortSnippet} Incredible savings are here! Get your hands on this exclusive deal before it's gone. 🏃‍♂️💨`,
-        `${shortSnippet} Time is ticking! ⏰ Grab this offer today and enjoy massive discounts. Don't let this slip away!`,
-        `${shortSnippet} Premium quality, unbeatable prices! Dive into our latest offers. Click to learn more! 🌟`,
-        `${shortSnippet} We've got a surprise for you! 🎁 Unlock special savings. Shop with us and elevate your lifestyle!`
+      `${shortSnippet} Check out our amazing offer today! Visit us and claim your discount! 🛍️`,
+      `${shortSnippet} Incredible savings are here! Get your hands on this exclusive deal before it's gone. 🏃‍♂️💨`,
+      `${shortSnippet} Time is ticking! ⏰ Grab this offer today and enjoy massive discounts. Don't let this slip away!`,
+      `${shortSnippet} Premium quality, unbeatable prices! Dive into our latest offers. Click to learn more! 🌟`,
+      `${shortSnippet} We've got a surprise for you! 🎁 Unlock special savings. Shop with us and elevate your lifestyle!`
     ];
     payload.facebookHashTags = [
-        "#SpecialOffer", "#BigSavings", "#ShopLocal", "#MegaSale", "#Deals", "#DiscountOffer", "#LimitedTime", "#HurryUp", "#FlashSale", "#PremiumQuality"
+      "#SpecialOffer", "#BigSavings", "#ShopLocal", "#MegaSale", "#Deals", "#DiscountOffer", "#LimitedTime", "#HurryUp", "#FlashSale", "#PremiumQuality"
     ];
   }
-  
+
   if (wantsInstagram) {
     payload.instagramCaptions = [
-        `${shortSnippet} Upgrade your shopping experience with our exclusive deal! ✨ Link in bio to grab yours! 🛒💖`,
-        `${shortSnippet} Trending now 🔥 Treat yourself and save big! Swipe up to shop the look! 🛍️✨`,
-        `${shortSnippet} Your daily dose of savings! 💸 Discover the magic at unbeatable prices. Double tap if you love a good deal! ❤️`,
-        `${shortSnippet} Level up your style with our premium collection! ✨ Score this today. Link in bio! 👗🎉`,
-        `${shortSnippet} Because you deserve the best! 💖 Treat yourself with our limited-time offer. Shop now and thank us later! 🛒✨`
+      `${shortSnippet} Upgrade your shopping experience with our exclusive deal! ✨ Link in bio to grab yours! 🛒💖`,
+      `${shortSnippet} Trending now 🔥 Treat yourself and save big! Swipe up to shop the look! 🛍️✨`,
+      `${shortSnippet} Your daily dose of savings! 💸 Discover the magic at unbeatable prices. Double tap if you love a good deal! ❤️`,
+      `${shortSnippet} Level up your style with our premium collection! ✨ Score this today. Link in bio! 👗🎉`,
+      `${shortSnippet} Because you deserve the best! 💖 Treat yourself with our limited-time offer. Shop now and thank us later! 🛒✨`
     ];
     payload.instagramHashTags = [
-        "#ExclusiveDeal", "#ShopNow", "#Discounts", "#Trending", "#MustHave", "#Style", "#OOTD", "#Fashion", "#Shopping", "#Sale"
+      "#ExclusiveDeal", "#ShopNow", "#Discounts", "#Trending", "#MustHave", "#Style", "#OOTD", "#Fashion", "#Shopping", "#Sale"
     ];
   }
 }
@@ -225,7 +225,7 @@ async function checkAndResolveJob(jobId: string) {
       // completed
       let finalResultData = { ...cloudJob.resultData };
       const jobUserId = cloudJob.userId;
-      
+
       if (!finalResultData.saved_videos) {
         finalResultData.saved_videos = [];
         // Migrate old saved video if present
@@ -240,24 +240,24 @@ async function checkAndResolveJob(jobId: string) {
                 ratio: "16:9"
               });
             }
-          } catch(e) {}
+          } catch (e) { }
         }
       }
 
       let videosToProcess: { originalUrl: string, ratio: string, width?: number, height?: number, duration?: number }[] = [];
       if (finalResultData.data && Array.isArray(finalResultData.data.videos) && finalResultData.data.videos.length > 0) {
         videosToProcess = finalResultData.data.videos.map((v: any) => ({
-           originalUrl: v.url || v.file,
-           ratio: v.ratio || "16:9",
-           width: v.width,
-           height: v.height,
-           duration: v.duration
+          originalUrl: v.url || v.file,
+          ratio: v.ratio || "16:9",
+          width: v.width,
+          height: v.height,
+          duration: v.duration
         })).filter((v: any) => !!v.originalUrl);
       } else {
         const fallbackUrl = finalResultData.data?.url || finalResultData.data?.file || finalResultData.video_url || finalResultData.videoUrl || finalResultData.url || finalResultData.file;
         const fallbackRatio = finalResultData.data?.ratio || "16:9";
         if (fallbackUrl) {
-           videosToProcess.push({ originalUrl: fallbackUrl, ratio: fallbackRatio });
+          videosToProcess.push({ originalUrl: fallbackUrl, ratio: fallbackRatio });
         }
       }
 
@@ -275,13 +275,13 @@ async function checkAndResolveJob(jobId: string) {
               }
               const fileName = `${uuidv4()}-cloudbases-generated.mp4`;
               await writeFile(join(uploadDir, fileName), videoBuffer);
-              
+
               const localVideoUrl = `/uploads/${jobUserId}/video/${fileName}`;
-              
+
               const targetUserObj = mongoose.Types.ObjectId.isValid(jobUserId)
                 ? new mongoose.Types.ObjectId(jobUserId)
                 : jobUserId;
-                
+
               let mediaItem = new MediaItemModel({
                 userId: targetUserObj,
                 name: `Generated Promo Video (${videoInfo.ratio}) – ${new Date().toLocaleString()}`,
@@ -356,8 +356,8 @@ async function checkAndResolveJob(jobId: string) {
         provider: 'cloudbases',
         templateId: cloudJob.templateId,
         message: finalResultData.message || 'Video created successfully',
-        videos: finalResultData.saved_videos.filter((v: any) => v.ratio === "16:9").length > 0 
-          ? finalResultData.saved_videos.filter((v: any) => v.ratio === "16:9") 
+        videos: finalResultData.saved_videos.filter((v: any) => v.ratio === "16:9").length > 0
+          ? finalResultData.saved_videos.filter((v: any) => v.ratio === "16:9")
           : finalResultData.saved_videos,
         voiceoverScript: cloudJob.voiceoverScript || "",
         channels: cloudJob.channels || [],
@@ -381,7 +381,7 @@ async function checkAndResolveJob(jobId: string) {
 
       return NextResponse.json(responsePayload);
     }
-    
+
     // Fallback: If not found in any local DB, try directly fetching from cloudbases API
     try {
       const apiKey = process.env.CLOUDBASES_API_KEY || "";
@@ -391,14 +391,14 @@ async function checkAndResolveJob(jobId: string) {
       if (extRes.ok) {
         const extJson = await extRes.json();
         if (extJson && extJson.success && extJson.data) {
-           return NextResponse.json({
-             success: true,
-             status: extJson.data.status || 'completed',
-             jobId,
-             provider: 'cloudbases',
-             message: extJson.message || 'Video generation found externally',
-             data: extJson.data
-           });
+          return NextResponse.json({
+            success: true,
+            status: extJson.data.status || 'completed',
+            jobId,
+            provider: 'cloudbases',
+            message: extJson.message || 'Video generation found externally',
+            data: extJson.data
+          });
         }
       }
     } catch (e) {

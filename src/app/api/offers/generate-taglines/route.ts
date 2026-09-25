@@ -56,14 +56,14 @@ Your task is to craft high-converting, unforgettable, and punchy marketing tagli
 
     systemContent += `\n### OUTPUT FORMAT:\nYou MUST respond with a valid JSON object.`;
     if (includeSocial) {
-      systemContent += `\nThe JSON object MUST contain the following properties:\n- "taglines": an array of ${count} string taglines\n`;
+      systemContent += `\nThe JSON object MUST contain the following properties:\n- "taglines": an array of ${count} string taglines\n- "announcementScripts": an array of exactly 3 short, engaging audio announcement scripts (spoken word scripts for in-store public address systems)\n`;
       if (includeFacebook) systemContent += `- "facebookCaptions": an array of ${count} highly engaging Facebook post captions\n- "facebookHashTags": an array of exactly 10 relevant hashtags for Facebook\n`;
       if (includeInstagram) systemContent += `- "instagramCaptions": an array of ${count} highly engaging Instagram post captions\n- "instagramHashTags": an array of exactly 10 relevant hashtags for Instagram\n`;
     } else {
-      systemContent += `\nThe JSON object must contain exactly one property named "taglines", which is an array of ${count} string taglines.\n`;
+      systemContent += `\nThe JSON object must contain exactly two properties:\n- "taglines": an array of ${count} string taglines.\n- "announcementScripts": an array of exactly 3 short, engaging audio announcement scripts (spoken word scripts for in-store public address systems).\n`;
     }
 
-    systemContent += `\nExample format:\n{\n  "taglines": [\n    "Big savings wait for no one — grab your deal today!",\n    "Unlock exclusive store discounts before time runs out!"\n  ]`;
+    systemContent += `\nExample format:\n{\n  "taglines": [\n    "Big savings wait for no one — grab your deal today!",\n    "Unlock exclusive store discounts before time runs out!"\n  ],\n  "announcementScripts": [\n    "Attention shoppers! Don't miss out on our huge deals today. Grab yours before they're gone!",\n    "Welcome to the store! Head over to our special promo section to unlock massive savings.",\n    "Friendly reminder that our exclusive sale is happening now!"\n  ]`;
     if (includeFacebook) systemContent += `,\n  "facebookCaptions": ["Huge savings are here! 🚀 Get the best deals in store today.", "Don't walk, run to our weekend sale! 🏃‍♂️"],\n  "facebookHashTags": ["#Deals", "#Savings", "#Sale", "#ShopNow", "#Discount", "#Offer", "#Promo", "#Shopping", "#WeekendSale", "#MustHave"]`;
     if (includeInstagram) systemContent += `,\n  "instagramCaptions": ["Don't miss out on these exclusive offers! ✨ Shop now and save big.", "Double the fun with our BOGO deals! 🎉"],\n  "instagramHashTags": ["#Deals", "#Savings", "#Sale", "#ShopNow", "#Discount", "#Offer", "#Promo", "#Shopping", "#WeekendSale", "#MustHave"]`;
     systemContent += `\n}\nDo not include any extra commentary, markdown formatting outside the JSON object, or numbered lists in the strings.`;
@@ -169,6 +169,11 @@ Generate exactly ${count} compelling marketing taglines in the required JSON str
       success: true,
       count: generatedTaglines.length,
       taglines: generatedTaglines,
+      announcementScripts: Array.isArray(parsedData.announcementScripts) && parsedData.announcementScripts.length > 0 ? parsedData.announcementScripts.slice(0, 3) : [
+        "Attention shoppers! Our exclusive deals are live right now. Shop today and save big!",
+        "Welcome! Discover our new promotions across the store. Huge savings waiting for you.",
+        "Don't miss our limited time offer happening today. Check it out before it's gone!"
+      ]
     };
 
     if (includeFacebook) {

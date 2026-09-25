@@ -127,22 +127,22 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    
+
     let targetOfferTypeId = "";
     try {
       const body = await req.json();
       const rawOfferType = body.offertypeId !== undefined ? body.offertypeId : (body.offer_type || body.offertype || "");
-      
+
       if (rawOfferType && String(rawOfferType).trim() !== "") {
-         targetOfferTypeId = String(rawOfferType).trim();
+        targetOfferTypeId = String(rawOfferType).trim();
       }
     } catch (e) {
       // Ignore if body is empty or invalid
     }
-    
+
     const response = await getTemplatesFromExternalAPI(authHeader, targetOfferTypeId);
     const data = await response.json();
-    
+
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(

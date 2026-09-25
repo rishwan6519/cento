@@ -17,8 +17,25 @@ async function getMediaForUser(userId: string, mediaType?: string, search?: stri
       );
     }
 
+    const User = (await import('@/models/User')).default;
+    const requestingUser = await User.findById(userId);
+    let userIdsToFetch = [new mongoose.Types.ObjectId(userId)];
+
+    if (requestingUser) {
+      const adminId = requestingUser.role === 'account_admin' ? requestingUser._id : requestingUser.controllerId;
+      if (adminId) {
+         const relatedUsers = await User.find({ 
+            $or: [
+               { _id: adminId },
+               { controllerId: adminId }
+            ] 
+         }).select('_id');
+         userIdsToFetch = relatedUsers.map(u => u._id);
+      }
+    }
+
     const query: Record<string, unknown> = {
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: { $in: userIdsToFetch },
     };
 
     if (mediaType && mediaType.trim()) {

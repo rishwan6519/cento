@@ -20,9 +20,27 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    const media = await MediaItemModel.find({ userId: new mongoose.Types.ObjectId(userId) })
+    const User = (await import('@/models/User')).default;
+    const requestingUser = await User.findById(userId);
+    
+    let userIdsToFetch = [new mongoose.Types.ObjectId(userId)];
+    
+    if (requestingUser) {
+      const adminId = requestingUser.role === 'account_admin' ? requestingUser._id : requestingUser.controllerId;
+      if (adminId) {
+         const relatedUsers = await User.find({ 
+            $or: [
+               { _id: adminId },
+               { controllerId: adminId }
+            ] 
+         }).select('_id');
+         userIdsToFetch = relatedUsers.map(u => u._id);
+      }
+    }
+
+    const media = await MediaItemModel.find({ userId: { $in: userIdsToFetch } })
       .sort({ createdAt: -1 });
-    console.log("Media items fetched successfully:", media);
+    console.log("Media items fetched successfully:", media.length);
 
     return NextResponse.json({ media });
   } catch (error) {

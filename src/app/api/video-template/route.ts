@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
 
     const response = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1", fetchOptions);
     const data = await response.json();
-    
+
     // Pass the response directly as requested
     return NextResponse.json(data);
   } catch (error) {

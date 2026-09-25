@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
             { jobId: cloudJobId },
             { status: 'failed', errorMessage: err?.message || 'Unknown error' }
           );
-        } catch (_) {}
+        } catch (_) { }
       }
     })();
 

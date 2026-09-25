@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const resolvedType = type || category || 'media';
+    const isAnnouncement = ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(resolvedType);
 
     if (!name) {
       return NextResponse.json(
@@ -153,6 +154,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Return error if a device was provided but could not be found
+    if (rawDeviceInputs.length > 0 && resolvedDevicesToConnect.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid device: The provided serial number or device ID could not be found' },
+        { status: 404 }
+      );
+    }
+
     // Fallback if userId is still null after checking devices
     if (!autoResolvedUserId && resolvedDevicesToConnect.length > 0) {
       const onboarded = await OnboardedDevice.findOne({ deviceId: resolvedDevicesToConnect[0].id });
@@ -170,9 +179,9 @@ export async function POST(req: NextRequest) {
     const finalSelectedDeviceId = resolvedDevicesToConnect.length > 0 ? resolvedDevicesToConnect[0].id : (selectedDeviceId || null);
     const finalDeviceIds = resolvedDevicesToConnect.map(d => d.id);
 
-    // 2.5 Determine target device ratio to align media automatically
+    // 2.5 Determine target device ratio to align media automatically (skip for announcements)
     let targetRatio: string | null = null;
-    if (resolvedDevicesToConnect.length > 0) {
+    if (!isAnnouncement && resolvedDevicesToConnect.length > 0) {
       const dev = await Device.findById(resolvedDevicesToConnect[0].id).populate('typeId');
       if ((dev as any)?.screenRatio) {
         targetRatio = (dev as any).screenRatio;
@@ -264,8 +273,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Create new playlist with resolved device ID and resolved user ID
-    const isAnnouncement = ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(resolvedType);
-    
     let playlist;
     if (isAnnouncement) {
       playlist = await AnnouncementPlaylist.create({
@@ -467,9 +474,20 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    // Return error if a device was provided but could not be found
+    if (rawDeviceInputs.length > 0 && resolvedDevicesToConnect.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid device: The provided serial number or device ID could not be found' },
+        { status: 404 }
+      );
+    }
+
+    const resolvedType = type || 'media';
+    const isAnnouncement = ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(resolvedType);
+
     const updateFields: any = {
       name,
-      type: type || 'media',
+      type: resolvedType,
       startTime: startTime || null,
       endTime: endTime || null,
       startDate: startDate || null,
@@ -496,9 +514,9 @@ export async function PUT(req: NextRequest) {
       };
     }
 
-    // Determine target device ratio to align media automatically
+    // Determine target device ratio to align media automatically (skip for announcements)
     let targetRatio: string | null = null;
-    if (resolvedDevicesToConnect.length > 0) {
+    if (!isAnnouncement && resolvedDevicesToConnect.length > 0) {
       const dev = await Device.findById(resolvedDevicesToConnect[0]).populate('typeId');
       if ((dev as any)?.screenRatio) {
         targetRatio = (dev as any).screenRatio;

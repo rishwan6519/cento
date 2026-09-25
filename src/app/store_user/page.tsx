@@ -82,6 +82,7 @@ interface SidebarProps {
   mobileOpen: boolean;
   setMobileOpen: (v: boolean) => void;
   isSubUser?: boolean;
+  permissions?: string[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -94,8 +95,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen,
   setMobileOpen,
   isSubUser,
+  permissions,
 }) => {
   const [loadingSSO, setLoadingSSO] = useState(false);
+
+  const hasPermission = (perm: string) => {
+    if (!isSubUser) return true;
+    if (!permissions) return false;
+    return permissions.includes(perm);
+  };
 
   const handleVideoTemplateClick = async () => {
     try {
@@ -161,29 +169,35 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span>Dashboard</span>
           </button>
 
-          <button
-            className={`store-nav-item ${isMediaActive ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("mediaManagement")}
-          >
-            <BsMusicNoteList className="store-nav-item__icon" />
-            <span>Create New Store Campaign</span>
-          </button>
+          {hasPermission("mediaManagement") && (
+            <button
+              className={`store-nav-item ${isMediaActive ? "store-nav-item--active" : ""}`}
+              onClick={() => onNavigate("mediaManagement")}
+            >
+              <BsMusicNoteList className="store-nav-item__icon" />
+              <span>Create New Store Campaign</span>
+            </button>
+          )}
 
-          <button
-            className={`store-nav-item ${isActive("viewAllCampaigns") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("viewAllCampaigns")}
-          >
-            <MdCampaign className="store-nav-item__icon" />
-            <span>View all active campaigns</span>
-          </button>
+          {hasPermission("viewAllCampaigns") && (
+            <button
+              className={`store-nav-item ${isActive("viewAllCampaigns") ? "store-nav-item--active" : ""}`}
+              onClick={() => onNavigate("viewAllCampaigns")}
+            >
+              <MdCampaign className="store-nav-item__icon" />
+              <span>View all active campaigns</span>
+            </button>
+          )}
 
-          <button
-            className={`store-nav-item ${isActive("mediaLibrary") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("mediaLibrary")}
-          >
-            <FaFolderOpen className="store-nav-item__icon" />
-            <span>Media Library</span>
-          </button>
+          {hasPermission("mediaLibrary") && (
+            <button
+              className={`store-nav-item ${isActive("mediaLibrary") ? "store-nav-item--active" : ""}`}
+              onClick={() => onNavigate("mediaLibrary")}
+            >
+              <FaFolderOpen className="store-nav-item__icon" />
+              <span>Media Library</span>
+            </button>
+          )}
 
           {/* Hiding AI features and Offer creation temporarily as requested */}
           {false && (
@@ -225,23 +239,27 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {/* Timelines / Schedules */}
-          <button
-            className={`store-nav-item ${isActive("timelineSchedules") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("timelineSchedules")}
-          >
-            <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>📅</span>
-            <span>Timelines / Schedules</span>
-          </button>
+          {hasPermission("timelineSchedules") && (
+            <button
+              className={`store-nav-item ${isActive("timelineSchedules") ? "store-nav-item--active" : ""}`}
+              onClick={() => onNavigate("timelineSchedules")}
+            >
+              <span className="store-nav-item__icon" style={{ fontSize: "1.1rem" }}>📅</span>
+              <span>Timelines / Schedules</span>
+            </button>
+          )}
 
           {/* Video Template */}
-          <button
-            className="store-nav-item"
-            onClick={handleVideoTemplateClick}
-            disabled={loadingSSO}
-          >
-            <FaFilm className="store-nav-item__icon" />
-            <span>{loadingSSO ? "Loading..." : "Video Template"}</span>
-          </button>
+          {hasPermission("videoTemplate") && (
+            <button
+              className="store-nav-item"
+              onClick={handleVideoTemplateClick}
+              disabled={loadingSSO}
+            >
+              <FaFilm className="store-nav-item__icon" />
+              <span>{loadingSSO ? "Loading..." : "Video Template"}</span>
+            </button>
+          )}
 
           {!isSubUser && (
             <button
@@ -249,17 +267,19 @@ const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => onNavigate("subUsers")}
             >
               <FaUser className="store-nav-item__icon" />
-              <span>Sub-Users</span>
+              <span>Employees</span>
             </button>
           )}
 
-          <button
-            className={`store-nav-item ${isActive("auditLogs") ? "store-nav-item--active" : ""}`}
-            onClick={() => onNavigate("auditLogs")}
-          >
-            <BsMusicNoteList className="store-nav-item__icon" />
-            <span>Audit Logs</span>
-          </button>
+          {hasPermission("auditLogs") && (
+            <button
+              className={`store-nav-item ${isActive("auditLogs") ? "store-nav-item--active" : ""}`}
+              onClick={() => onNavigate("auditLogs")}
+            >
+              <BsMusicNoteList className="store-nav-item__icon" />
+              <span>Audit Logs</span>
+            </button>
+          )}
 
           <button
             className={`store-nav-item ${isActive("profile") ? "store-nav-item--active" : ""}`}
@@ -929,6 +949,7 @@ export default function StoreUserPage() {
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
           isSubUser={!!userData?.createdBy}
+          permissions={userData?.permissions}
         />
         <div className="store-layout-right">
           <Header userName={userName} onMobileMenuOpen={() => setMobileOpen(true)} />
