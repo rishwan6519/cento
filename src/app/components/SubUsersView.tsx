@@ -216,7 +216,7 @@ export default function SubUsersView({
     const data = await res.json();
     if (data.success) {
       toast.success(`Employee access ${newStatus}`);
-      fetchSubUsers();
+      fetchSubUsers(isAccountAdminCreatingStoreStaff ? formData.selectedStoreId : (creatorId || ''));
     } else {
       toast.error("Failed to update status");
     }
@@ -230,7 +230,7 @@ export default function SubUsersView({
     const data = await res.json();
     if (data.success) {
       toast.success("Employee deleted");
-      fetchSubUsers();
+      fetchSubUsers(isAccountAdminCreatingStoreStaff ? formData.selectedStoreId : (creatorId || ''));
     } else {
       toast.error("Failed to delete employee");
     }
