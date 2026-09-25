@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await apiResponse.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
 
-    // Save the file to public/uploads
+    // Save the file to root uploads folder (outside public)
     const fileName = `announcement-${crypto.randomUUID()}.mp3`;
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = path.join(process.cwd(), 'uploads');
     
     try {
       await fs.mkdir(uploadsDir, { recursive: true });
