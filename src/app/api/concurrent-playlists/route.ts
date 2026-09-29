@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
       frequencyInMinutes,
     } = body;
 
-    const resolvedType = type || category || 'media';
+    const rawType = type || category || 'media';
+    const resolvedType = rawType.trim().replace(/\.$/, "");
     const isAnnouncement = ["announcement", "Instant Announcement", "offer", "alert", "info"].includes(resolvedType);
 
     if (!name) {
@@ -282,7 +283,7 @@ export async function POST(req: NextRequest) {
         announcements: resolvedFiles.map(f => ({
           file: f.path || f.url || f.fileUrl,
           displayOrder: f.displayOrder,
-          delay: f.delay || 0,
+          delay: f.delay !== undefined ? f.delay : 3,
           maxVolume: globalMaxVolume ?? 100
         })),
         schedule: {

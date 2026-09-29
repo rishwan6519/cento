@@ -145,6 +145,10 @@ export async function GET(req: NextRequest) {
 
     // 3️⃣ Fetch linked Announcement Playlists
     const connections = await ConnectedAnnouncement.find({ deviceId: device._id });
+    
+    // Also include announcements connected via DevicePlaylist (concurrent-playlists)
+    const devicePlaylistsAnnouncements = await DevicePlaylist.find({ deviceId: device._id }, 'announcementPlaylistIds');
+    
     let announcementDetails: Array<{
       id: string;
       versionId: string;
@@ -157,9 +161,13 @@ export async function GET(req: NextRequest) {
       }>;
     }> = [];
 
-    if (connections && connections.length > 0) {
-      const allIds = connections.flatMap((c: any) => c.announcementPlaylistIds);
-      const announcementPlaylists = await AnnouncementPlaylist.find({ _id: { $in: allIds } }).populate({
+    const allAnnIds = [
+      ...connections.flatMap((c: any) => c.announcementPlaylistIds || []),
+      ...devicePlaylistsAnnouncements.flatMap((c: any) => c.announcementPlaylistIds || [])
+    ];
+
+    if (allAnnIds.length > 0) {
+      const announcementPlaylists = await AnnouncementPlaylist.find({ _id: { $in: allAnnIds } }).populate({
         path: 'announcements.file',
         model: Announcement
       });
