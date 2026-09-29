@@ -142,6 +142,7 @@ import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
 import ConnectedAnnouncement from '@/models/AnnouncementConnection';
 import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
+import DevicePlaylist from '@/models/ConectPlaylist';
 
 export async function GET(req: NextRequest) {
   try {
@@ -158,21 +159,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Device not found with this serial number' }, { status: 404 });
     }
 
-    // Step 2: Find ALL announcement connections for the device
+    // Step 2: Find ALL announcement connections for the device from both collections
     const connections = await ConnectedAnnouncement.find(
       { deviceId: device._id },
       'announcementPlaylistIds'
     );
 
-    if (!connections || connections.length === 0) {
-      return NextResponse.json({ 
-        activeAnnouncements: [], 
-        scheduledHourlyAnnouncements: [] 
-      });
-    }
+    const devicePlaylists = await DevicePlaylist.find(
+      { deviceId: device._id },
+      'announcementPlaylistIds'
+    );
 
-    // Aggregate all playlist IDs from all connection documents
-    const allAnnouncementPlaylistIds = connections.flatMap(conn => conn.announcementPlaylistIds);
+    const allAnnouncementPlaylistIds = [
+      ...connections.flatMap(conn => conn.announcementPlaylistIds || []),
+      ...devicePlaylists.flatMap(conn => conn.announcementPlaylistIds || [])
+    ];
 
     if (allAnnouncementPlaylistIds.length === 0) {
       return NextResponse.json({ 
