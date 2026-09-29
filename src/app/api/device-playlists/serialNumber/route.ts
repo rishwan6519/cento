@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/db';
 import Device from '@/models/Device';
 import DevicePlaylist from '@/models/ConectPlaylist';
 import Playlist from '@/models/PlaylistConfig';
+import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 import { advancedPlaylistScheduleService } from '@/services/advancedPlaylistSchedule.service';
 import { generateDailyTimeline } from '@/lib/timelineHelper';
 
@@ -78,13 +79,14 @@ export async function GET(req: NextRequest) {
     // Step 2: Find device's playlist connections
     const devicePlaylists = await DevicePlaylist.findOne(
       { deviceId: device._id },
-      'playlistIds'
+      'playlistIds announcementPlaylistIds'
     );
     console.log('devicePlaylists', devicePlaylists);
 
-    if (!devicePlaylists || !devicePlaylists.playlistIds.length) {
+    if (!devicePlaylists || (!devicePlaylists.playlistIds?.length && !devicePlaylists.announcementPlaylistIds?.length)) {
       return NextResponse.json({
         currentPlaylist: null,
+        currentAnnouncement: null
       });
     }
 
@@ -116,8 +118,12 @@ export async function GET(req: NextRequest) {
 
     // Step 5: Fetch all playlists and sort by start time
     const playlists = await Playlist.find({
-      _id: { $in: devicePlaylists.playlistIds }
+      _id: { $in: devicePlaylists.playlistIds || [] }
     }).sort({ startTime: 1 });
+
+    const announcements = await AnnouncementPlaylist.find({
+      _id: { $in: devicePlaylists.announcementPlaylistIds || [] }
+    });
 
     // Step 6: Determine current active playlist and announcement
     let currentPlaylist = null;
@@ -159,12 +165,51 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    for (let i = 0; i < announcements.length; i++) {
+      const ann = announcements[i] as any;
+      const schedule = ann.schedule || {};
+      
+      // Check date range
+      if (
+        schedule.startDate &&
+        schedule.endDate &&
+        (todayStr < schedule.startDate || todayStr > schedule.endDate)
+      ) {
+        continue;
+      }
+
+      // Check day of week
+      if (
+        Array.isArray(schedule.daysOfWeek) &&
+        schedule.daysOfWeek.length > 0 &&
+        !schedule.daysOfWeek.includes(todayWeekDay)
+      ) {
+        continue;
+      }
+
+      // Check time range
+      if (
+        schedule.startTime &&
+        schedule.endTime &&
+        currentTime >= schedule.startTime &&
+        currentTime < schedule.endTime
+      ) {
+        currentAnnouncement = ann;
+      }
+    }
+
     // Step 7: Return result
     return NextResponse.json({
       currentPlaylist: currentPlaylist
         ? {
             playlistId: currentPlaylist._id,
-            versionId: currentPlaylist.updatedAt.getTime().toString()
+            versionId: currentPlaylist.updatedAt?.getTime().toString() || Date.now().toString()
+          }
+        : null,
+      currentAnnouncement: currentAnnouncement
+        ? {
+            playlistId: currentAnnouncement._id,
+            versionId: currentAnnouncement.updatedAt?.getTime().toString() || Date.now().toString()
           }
         : null,
         
