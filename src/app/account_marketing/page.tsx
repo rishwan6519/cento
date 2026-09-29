@@ -1100,8 +1100,11 @@ const ViewCentralCampaignsView = ({ setActiveView, setEditingCampaign }: { setAc
               ) : filteredPlaylists.length === 0 ? (
                 <tr><td colSpan={6} className="p-12 text-center text-gray-500 italic font-medium">No campaigns found matching filters</td></tr>
               ) : filteredPlaylists.map((row, i) => {
-                const days = Array.isArray(row.daysOfWeek) ? row.daysOfWeek.join(",") : "";
-                const time = row.startTime && row.endTime ? `${row.startTime} to ${row.endTime}` : "";
+                const arrDays = Array.isArray(row.daysOfWeek) ? row.daysOfWeek : (row.schedule?.daysOfWeek || []);
+                const days = Array.isArray(arrDays) ? arrDays.join(",") : "";
+                const st = row.startTime || row.schedule?.startTime;
+                const et = row.endTime || row.schedule?.endTime;
+                const time = st && et ? `${st} to ${et}` : "";
                 const schedule = [days, time].filter(Boolean).join(" | ") || "—";
                 const hasMedia = row.mediaIds?.length || row.announcements?.length;
                 const preview = hasMedia ? `Display file link - uploaded by ${row.userId?.username || "user"}` : "—";
@@ -1335,8 +1338,11 @@ const ViewPlaylistView = ({ setActiveView, setEditingCampaign }: { setActiveView
               ) : filteredPlaylists.length === 0 ? (
                 <tr><td colSpan={6} className="p-12 text-center text-gray-500 italic font-medium">No playlists found matching filters</td></tr>
               ) : filteredPlaylists.map((row, i) => {
-                const days = Array.isArray(row.daysOfWeek) ? row.daysOfWeek.join(",") : "";
-                const time = row.startTime && row.endTime ? `${row.startTime} to ${row.endTime}` : "";
+                const arrDays = Array.isArray(row.daysOfWeek) ? row.daysOfWeek : (row.schedule?.daysOfWeek || []);
+                const days = Array.isArray(arrDays) ? arrDays.join(",") : "";
+                const st = row.startTime || row.schedule?.startTime;
+                const et = row.endTime || row.schedule?.endTime;
+                const time = st && et ? `${st} to ${et}` : "";
                 const schedule = [days, time].filter(Boolean).join(" | ") || "—";
                 const hasMedia = row.mediaIds?.length || row.announcements?.length;
                 const preview = hasMedia ? `Display file link - uploaded by ${row.userId?.username || "user"}` : "—";

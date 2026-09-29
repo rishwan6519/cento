@@ -153,8 +153,10 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
                 {filtered.map(p => {
                   const id = p._id || p.id;
                   const status = getStatus(p);
-                  const daysArr = Array.isArray(p.daysOfWeek) ? p.daysOfWeek : [];
-                  const time = p.startTime && p.endTime ? `${p.startTime} - ${p.endTime}` : "";
+                  const daysArr = Array.isArray(p.daysOfWeek) ? p.daysOfWeek : (p.schedule && Array.isArray(p.schedule.daysOfWeek) ? p.schedule.daysOfWeek : []);
+                  const st = p.startTime || p.schedule?.startTime;
+                  const et = p.endTime || p.schedule?.endTime;
+                  const time = st && et ? `${st} - ${et}` : "";
                   const filesArr = p.files || p.announcements || [];
                   const fileCount = filesArr.length;
                   const isAnn = !!p.announcements || ["announcement", "Instant Announcement", "offer", "alert", "info"].some(t => (p.type || "").toLowerCase().includes(t.toLowerCase()));
@@ -231,21 +233,21 @@ export default function ViewAllCampaigns({ onNavigate, onEdit }: Props) {
               <div style={{ background: '#fff', padding: '12px 14px', borderRadius: 10, border: '1px solid #E8ECEE' }}>
                 <p style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8CA3AB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>📅 Date Range</p>
                 <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', margin: 0 }}>
-                  {viewingPlaylist.startDate ? new Date(viewingPlaylist.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                  {viewingPlaylist.startDate || viewingPlaylist.schedule?.startDate ? new Date(viewingPlaylist.startDate || viewingPlaylist.schedule?.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
                   {' → '}
-                  {viewingPlaylist.endDate ? new Date(viewingPlaylist.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                  {viewingPlaylist.endDate || viewingPlaylist.schedule?.endDate ? new Date(viewingPlaylist.endDate || viewingPlaylist.schedule?.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
                 </p>
               </div>
               <div style={{ background: '#fff', padding: '12px 14px', borderRadius: 10, border: '1px solid #E8ECEE' }}>
                 <p style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8CA3AB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>⏰ Active Hours</p>
                 <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155', margin: 0 }}>
-                  {viewingPlaylist.startTime || '00:00'} – {viewingPlaylist.endTime || '23:59'}
+                  {viewingPlaylist.startTime || viewingPlaylist.schedule?.startTime || '00:00'} – {viewingPlaylist.endTime || viewingPlaylist.schedule?.endTime || '23:59'}
                 </p>
               </div>
               <div style={{ gridColumn: '1 / -1', background: '#fff', padding: '12px 14px', borderRadius: 10, border: '1px solid #E8ECEE' }}>
                 <p style={{ fontSize: '0.62rem', fontWeight: 700, color: '#8CA3AB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>🗓️ Active Days</p>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {(viewingPlaylist.daysOfWeek || []).length > 0 ? (viewingPlaylist.daysOfWeek || []).map((d: string) => (
+                  {(viewingPlaylist.daysOfWeek || viewingPlaylist.schedule?.daysOfWeek || []).length > 0 ? (viewingPlaylist.daysOfWeek || viewingPlaylist.schedule?.daysOfWeek || []).map((d: string) => (
                     <span key={d} style={{ background: '#EAF6F8', color: '#11B5BB', padding: '3px 10px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 700, textTransform: 'capitalize' }}>{d}</span>
                   )) : <span style={{ fontSize: '0.78rem', color: '#8CA3AB' }}>Everyday</span>}
                 </div>

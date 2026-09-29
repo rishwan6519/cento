@@ -167,10 +167,23 @@ export async function GET(req: NextRequest) {
     ];
 
     if (allAnnIds.length > 0) {
-      const announcementPlaylists = await AnnouncementPlaylist.find({ _id: { $in: allAnnIds } }).populate({
-        path: 'announcements.file',
-        model: Announcement
-      });
+      const announcementPlaylists = await AnnouncementPlaylist.find({ _id: { $in: allAnnIds } });
+
+      // Manually populate files if they are ObjectIds to avoid CastError with URL strings
+      for (const ap of announcementPlaylists) {
+        if (ap.announcements) {
+          for (const a of ap.announcements) {
+            if (a.file && mongoose.Types.ObjectId.isValid(a.file) && a.file.toString().length === 24) {
+              try {
+                const doc = await Announcement.findById(a.file);
+                if (doc) {
+                  a.file = doc;
+                }
+              } catch (err) {}
+            }
+          }
+        }
+      }
 
       announcementDetails = announcementPlaylists.map((ap: any) => {
         const payload = {
@@ -179,9 +192,13 @@ export async function GET(req: NextRequest) {
           announcements: ap.announcements
             .map((a: any) => {
               if (!a.file) return null;
+              const fileName = typeof a.file === 'object' && a.file.name ? a.file.name : 
+                              (typeof a.file === 'string' ? a.file.split('/').pop() : 'Announcement');
+              const filePath = typeof a.file === 'object' && a.file.path ? a.file.path : 
+                              (typeof a.file === 'string' ? a.file : '');
               return {
-                name: a.file.name,
-                path: `https://iot.centelon.com/${(a.file.path || '').replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
+                name: fileName,
+                path: `https://iot.centelon.com/${(filePath).replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
                 displayOrder: a.displayOrder,
                 delay: a.delay
               };
