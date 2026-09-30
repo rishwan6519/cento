@@ -21,6 +21,7 @@ import {
   FaTag,
   FaLayerGroup,
   FaFolderOpen,
+  FaCog,
 } from "react-icons/fa";
 import { MdCampaign, MdComputer } from "react-icons/md";
 import { BsMusicNoteList } from "react-icons/bs";
@@ -40,6 +41,7 @@ import DeviceDetailsModal from "./DeviceDetailsModal";
 import TimelineSchedulesView from "./TimelineSchedulesView";
 import SubUsersView from "../components/SubUsersView";
 import AuditLogsView from "../components/AuditLogsView";
+import SettingsView from "./SettingsView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ViewKey =
@@ -60,7 +62,8 @@ export type ViewKey =
   | "mediaLibrary"
   | "subUsers"
   | "auditLogs"
-  | "timelineSchedules";
+  | "timelineSchedules"
+  | "settings";
 
 interface OfflineDevice {
   id: string;
@@ -287,6 +290,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <FaUser className="store-nav-item__icon" />
             <span>Profile</span>
+          </button>
+
+          <button
+            className={`store-nav-item ${isActive("settings") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("settings")}
+          >
+            <FaCog className="store-nav-item__icon" />
+            <span>Settings</span>
           </button>
 
           <button
@@ -736,6 +747,8 @@ export default function StoreUserPage() {
         return <SubUsersView creatorId={localStorage.getItem("userId") || ''} role="store" />;
       case "auditLogs":
         return <AuditLogsView userId={localStorage.getItem("userId") || ''} />;
+      case "settings":
+        return <SettingsView />;
       default:
         return (
           <div className="store-placeholder">

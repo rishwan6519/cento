@@ -105,6 +105,7 @@ export interface UserDocument extends Document {
   employeeId?: string;
   idProofAttach?: string;
   permissions?: string[];
+  defaultAnnouncementFrequency?: number;
 }
 
 const UserSchema: Schema = new Schema({
@@ -205,7 +206,8 @@ const UserSchema: Schema = new Schema({
   photo: { type: String, required: false },
   employeeId: { type: String, required: false },
   idProofAttach: { type: String, required: false },
-  permissions: { type: [String], default: [] }
+  permissions: { type: [String], default: [] },
+  defaultAnnouncementFrequency: { type: Number, default: 1 }
 }, { 
   timestamps: true 
 });

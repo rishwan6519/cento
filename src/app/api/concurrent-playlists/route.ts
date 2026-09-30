@@ -177,6 +177,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let defaultFreq = 1;
+    if (autoResolvedUserId) {
+      const userDoc = await User.findById(autoResolvedUserId);
+      if (userDoc && userDoc.defaultAnnouncementFrequency !== undefined) {
+        defaultFreq = userDoc.defaultAnnouncementFrequency;
+      }
+    }
+
     const finalSelectedDeviceId = resolvedDevicesToConnect.length > 0 ? resolvedDevicesToConnect[0].id : (selectedDeviceId || null);
     const finalDeviceIds = resolvedDevicesToConnect.map(d => d.id);
 
@@ -288,7 +296,7 @@ export async function POST(req: NextRequest) {
         })),
         schedule: {
           scheduleType: 'hourly',
-          frequency: frequencyInMinutes ? Number(frequencyInMinutes) : 2,
+          frequency: frequencyInMinutes ? Number(frequencyInMinutes) : defaultFreq,
           startDate: startDate || null,
           endDate: endDate || null,
           daysOfWeek: (() => {

@@ -183,7 +183,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const { username, password, currentPassword, storeName, storeLocation, phone, email, companyName, location, mediaProvisioning, hasAllStoreAccess, assignedStoreId, provisionedFiles, approvalStatus } = await req.json();
+    const { username, password, currentPassword, storeName, storeLocation, phone, email, companyName, location, mediaProvisioning, hasAllStoreAccess, assignedStoreId, provisionedFiles, approvalStatus, defaultAnnouncementFrequency } = await req.json();
 
     const user = await User.findById(userId);
     if (!user) {
@@ -222,6 +222,7 @@ export async function PUT(req: NextRequest) {
     if (assignedStoreId !== undefined) (user as any).assignedStoreId = assignedStoreId ? mongoose.Types.ObjectId.createFromHexString(assignedStoreId) : null;
     if (provisionedFiles !== undefined) (user as any).provisionedFiles = provisionedFiles;
     if (approvalStatus !== undefined) (user as any).approvalStatus = approvalStatus;
+    if (defaultAnnouncementFrequency !== undefined) (user as any).defaultAnnouncementFrequency = defaultAnnouncementFrequency;
 
     await user.save();
 
