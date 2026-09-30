@@ -283,7 +283,7 @@ export async function POST(req: NextRequest) {
         announcements: resolvedFiles.map(f => ({
           file: f.path || f.url || f.fileUrl,
           displayOrder: f.displayOrder,
-          delay: f.delay || 180,
+          delay: f.delay || 0,
           maxVolume: globalMaxVolume ?? 100
         })),
         schedule: {
