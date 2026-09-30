@@ -141,6 +141,12 @@ export async function GET(req: NextRequest) {
       serialNumber: device.serialNumber,
       versionId,
       lastUpdated: new Date()
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
 
   } catch (error) {

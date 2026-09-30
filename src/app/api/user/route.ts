@@ -227,15 +227,14 @@ export async function PUT(req: NextRequest) {
       (user as any).defaultAnnouncementFrequency = defaultAnnouncementFrequency;
       
       // Retroactively update all existing announcement playlists for this user
-      await AnnouncementPlaylist.updateMany(
-        { 
-          type: { $in: ['announcement', 'Instant Announcement', 'offer', 'alert', 'info', 'announcement.'] },
-          'schedule.scheduleType': 'hourly' 
-        },
-        { 
-          $set: { 'schedule.frequency': defaultAnnouncementFrequency } 
+      const playlists = await AnnouncementPlaylist.find({ 'schedule.scheduleType': 'hourly' });
+      for (const p of playlists) {
+        if (p.schedule) {
+          p.schedule.frequency = defaultAnnouncementFrequency;
+          p.markModified('schedule');
+          await p.save();
         }
-      );
+      }
     }
 
     await user.save();
