@@ -185,17 +185,47 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      announcementDetails = announcementPlaylists.map((ap: any) => {
+      const melbourneTimeZone = 'Australia/Melbourne';
+      const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: melbourneTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+      const todayStr = dateFormatter.format(new Date());
+
+      announcementDetails = announcementPlaylists
+        .filter((ap: any) => {
+          if (ap.schedule && ap.schedule.endDate) {
+             return ap.schedule.endDate >= todayStr;
+          }
+          return true;
+        })
+        .map((ap: any) => {
         const payload = {
           name: ap.name,
           schedule: ap.schedule,
           announcements: ap.announcements
             .map((a: any) => {
               if (!a.file) return null;
-              const fileName = typeof a.file === 'object' && a.file.name ? a.file.name : 
-                              (typeof a.file === 'string' ? a.file.split('/').pop() : 'Announcement');
-              const filePath = typeof a.file === 'object' && a.file.path ? a.file.path : 
-                              (typeof a.file === 'string' ? a.file : '');
+              
+              let fileName = 'Announcement';
+              let filePath = '';
+              
+              if (typeof a.file === 'object') {
+                 fileName = a.file.name || 'Announcement';
+                 filePath = a.file.path || '';
+              } else if (typeof a.file === 'string') {
+                 if (a.file.includes("path: '")) {
+                    const pathMatch = a.file.match(/path:\s*'([^']+)'/);
+                    if (pathMatch) filePath = pathMatch[1];
+                 } else {
+                    filePath = a.file;
+                 }
+
+                 if (a.file.includes("name: '")) {
+                    const nameMatch = a.file.match(/name:\s*'([^']+)'/);
+                    if (nameMatch) fileName = nameMatch[1];
+                 } else {
+                    fileName = filePath.split('/').pop() || 'Announcement';
+                 }
+              }
+
               return {
                 name: fileName,
                 path: `https://iot.centelon.com/${(filePath).replace(/^(https?:\/\/iot\.centelon\.com)?\/?/, '')}`,
