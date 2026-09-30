@@ -9,6 +9,8 @@ import Announcement from '@/models/AnnouncementFiles';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();

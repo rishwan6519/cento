@@ -229,8 +229,7 @@ export async function PUT(req: NextRequest) {
       // Retroactively update all existing announcement playlists for this user
       await AnnouncementPlaylist.updateMany(
         { 
-          userId: user._id, 
-          type: { $in: ['announcement', 'Instant Announcement', 'offer', 'alert', 'info'] },
+          type: { $in: ['announcement', 'Instant Announcement', 'offer', 'alert', 'info', 'announcement.'] },
           'schedule.scheduleType': 'hourly' 
         },
         { 
