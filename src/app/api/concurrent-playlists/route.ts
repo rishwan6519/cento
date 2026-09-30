@@ -287,8 +287,8 @@ export async function POST(req: NextRequest) {
           maxVolume: globalMaxVolume ?? 100
         })),
         schedule: {
-          scheduleType: frequencyInMinutes ? 'hourly' : 'timed',
-          frequency: frequencyInMinutes ? Number(frequencyInMinutes) : undefined,
+          scheduleType: 'hourly',
+          frequency: frequencyInMinutes ? Number(frequencyInMinutes) : 2,
           startDate: startDate || null,
           endDate: endDate || null,
           daysOfWeek: (() => {
