@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import User, { UserRole } from '@/models/User';
 import { connectToDatabase } from '@/lib/db';
 import ActivityLog from '@/models/ActivityLog';
+import AnnouncementPlaylist from '@/models/AnnouncementPlaylist';
 
 export async function POST(req: NextRequest) {
   try {
@@ -222,7 +223,21 @@ export async function PUT(req: NextRequest) {
     if (assignedStoreId !== undefined) (user as any).assignedStoreId = assignedStoreId ? mongoose.Types.ObjectId.createFromHexString(assignedStoreId) : null;
     if (provisionedFiles !== undefined) (user as any).provisionedFiles = provisionedFiles;
     if (approvalStatus !== undefined) (user as any).approvalStatus = approvalStatus;
-    if (defaultAnnouncementFrequency !== undefined) (user as any).defaultAnnouncementFrequency = defaultAnnouncementFrequency;
+    if (defaultAnnouncementFrequency !== undefined) {
+      (user as any).defaultAnnouncementFrequency = defaultAnnouncementFrequency;
+      
+      // Retroactively update all existing announcement playlists for this user
+      await AnnouncementPlaylist.updateMany(
+        { 
+          userId: user._id, 
+          type: { $in: ['announcement', 'Instant Announcement', 'offer', 'alert', 'info'] },
+          'schedule.scheduleType': 'hourly' 
+        },
+        { 
+          $set: { 'schedule.frequency': defaultAnnouncementFrequency } 
+        }
+      );
+    }
 
     await user.save();
 
