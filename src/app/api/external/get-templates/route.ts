@@ -11,14 +11,31 @@ export const dynamic = "force-dynamic";
 async function getTemplatesFromExternalAPI(authHeader?: string | null, offerTypeId: string = "") {
   const EXTERNAL_API_URL = `https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1&offertypeId=${encodeURIComponent(offerTypeId)}`;
   const apiKey = process.env.CLOUDBASES_API_KEY;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    "User-Agent": "CentoPlatform/1.0",
+    "Accept": "application/json",
+  };
   if (authHeader) headers["Authorization"] = authHeader;
   if (apiKey) headers["X-API-Key"] = apiKey;
 
   const fetchOptions: RequestInit = { headers };
   const response = await fetch(EXTERNAL_API_URL, fetchOptions);
-  const data = await response.json();
-  return NextResponse.json(data);
+
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  }
+
+  const rawText = await response.text();
+  return NextResponse.json(
+    {
+      success: false,
+      message: `Upstream returned status ${response.status}`,
+      error: rawText.slice(0, 300),
+    },
+    { status: response.status }
+  );
 }
 
 /*
@@ -140,10 +157,7 @@ export async function POST(req: NextRequest) {
       // Ignore if body is empty or invalid
     }
 
-    const response = await getTemplatesFromExternalAPI(authHeader, targetOfferTypeId);
-    const data = await response.json();
-
-    return NextResponse.json(data);
+    return await getTemplatesFromExternalAPI(authHeader, targetOfferTypeId);
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server Error" },
