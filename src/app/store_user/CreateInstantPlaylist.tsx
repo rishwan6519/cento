@@ -9,6 +9,8 @@ interface MediaItem {
   type: string;
   url?: string;
   duration?: string;
+  fileCategory?: string;
+  templateId?: string | number;
 }
 
 interface DeviceItem {
