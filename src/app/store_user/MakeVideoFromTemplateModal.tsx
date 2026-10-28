@@ -863,12 +863,12 @@ export default function MakeVideoFromTemplateModal({
                       value={musicPreset}
                       onChange={(e) => setMusicPreset(e.target.value)}
                     >
-                      <option value="upbeat_retail">🛍️ Upbeat Retail Pop (Default)</option>
-                      <option value="energetic_sale">⚡ Energetic Mega Sale</option>
-                      <option value="modern_store">🏢 Modern Store Lounge</option>
-                      <option value="luxury_minimal">✨ Luxury &amp; Minimalist</option>
-                      <option value="electric_pulse">🔥 Electric Pulse Beat</option>
-                      <option value="gentle_acoustic">🎸 Gentle Melody</option>
+                      <option value="upbeat_retail">🔔 Bright Retail Chime (Default Pure Tune)</option>
+                      <option value="ambient_piano">🎹 Soft Ambient Piano</option>
+                      <option value="energetic_sale">🛍️ Retail Marimba Beat</option>
+                      <option value="luxury_minimal">✨ Luxury Ambient Lounge</option>
+                      <option value="modern_store">🎸 Gentle Acoustic Melody</option>
+                      <option value="electric_pulse">⚡ Modern Tech Pulse</option>
                       <option value="none">🚫 No Audio (Mute)</option>
                     </select>
                   </div>

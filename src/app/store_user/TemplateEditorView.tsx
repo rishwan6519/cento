@@ -154,12 +154,12 @@ export interface DemoAudioTune {
 }
 
 export const DEMO_AUDIO_TUNES: DemoAudioTune[] = [
-  { id: "upbeat_retail", name: "Upbeat Retail Pop", desc: "Catchy, bright commercial groove (Default)", url: "/audio/presets/upbeat_retail.mp3", icon: "🛍️" },
-  { id: "energetic_sale", name: "Energetic Mega Sale", desc: "Fast-paced, vibrant promotion beats", url: "/audio/presets/energetic_sale.mp3", icon: "⚡" },
-  { id: "modern_store", name: "Modern Store Lounge", desc: "Sophisticated, smooth lifestyle background", url: "/audio/presets/modern_store.mp3", icon: "🏢" },
-  { id: "luxury_minimal", name: "Luxury & Minimalist", desc: "Subtle, high-end ambient elegance", url: "/audio/presets/luxury_minimal.mp3", icon: "✨" },
-  { id: "electric_pulse", name: "Electric Pulse Beat", desc: "Punchy, modern electronic sale rhythm", url: "/audio/presets/electric_pulse.mp3", icon: "🔥" },
-  { id: "gentle_acoustic", name: "Gentle Melody", desc: "Warm, friendly boutique acoustic theme", url: "/audio/presets/gentle_acoustic.mp3", icon: "🎸" },
+  { id: "upbeat_retail", name: "Bright Retail Chime", desc: "Soft acoustic bells & gentle marimba chords (Pure tune, no vocals)", url: "/audio/presets/upbeat_retail.mp3", icon: "🔔" },
+  { id: "ambient_piano", name: "Soft Ambient Piano", desc: "Calm, relaxing instrumental piano chord progression", url: "/audio/presets/ambient_piano.mp3", icon: "🎹" },
+  { id: "energetic_sale", name: "Retail Marimba Beat", desc: "Clean wooden marimba plucks with a subtle store groove", url: "/audio/presets/energetic_sale.mp3", icon: "🛍️" },
+  { id: "luxury_minimal", name: "Luxury Ambient Lounge", desc: "Warm soothing synth pads & glass bell accents", url: "/audio/presets/luxury_minimal.mp3", icon: "✨" },
+  { id: "modern_store", name: "Gentle Acoustic Melody", desc: "Warm nylon-pluck acoustic guitar arpeggios", url: "/audio/presets/modern_store.mp3", icon: "🎸" },
+  { id: "electric_pulse", name: "Modern Tech Pulse", desc: "Minimalist, rhythmic digital background tune", url: "/audio/presets/electric_pulse.mp3", icon: "⚡" },
 ];
 
 const DEFAULT_LAYERS: Record<AspectRatio, LayersConfig> = {
