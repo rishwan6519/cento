@@ -1536,6 +1536,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const animFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Template Library & Modals
   const [savedTemplatesList, setSavedTemplatesList] = useState<SavedTemplateItem[]>([]);
@@ -1757,17 +1758,21 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   useEffect(() => {
     if (!isPlaying) {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (audioRef.current && isPlayingAudio) {
+      if (audioRef.current) {
         audioRef.current.pause();
-        setIsPlayingAudio(false);
       }
       return;
+    }
+
+    // If canvas animation begins, pause standalone demo tune preview
+    if (previewAudioRef.current && !previewAudioRef.current.paused) {
+      previewAudioRef.current.pause();
+      setPreviewingTuneId(null);
     }
 
     if (musicUrl && audioRef.current) {
       audioRef.current.volume = musicVolume / 100;
       audioRef.current.play().catch(() => {});
-      setIsPlayingAudio(true);
     }
 
     const animate = (timestamp: number) => {
@@ -1787,7 +1792,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isPlaying, duration, playbackTime, musicUrl, musicVolume, isPlayingAudio]);
+  }, [isPlaying, duration, playbackTime, musicUrl, musicVolume]);
 
   const togglePlay = () => {
     if (isPlaying) {
@@ -3402,8 +3407,16 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
   return (
     <div className="ste-root">
-      {/* ── Audio element for music preview ── */}
+      {/* ── Audio elements for music ── */}
       {musicUrl && <audio ref={audioRef} src={musicUrl} loop />}
+      <audio
+        ref={previewAudioRef}
+        preload="auto"
+        onEnded={() => setPreviewingTuneId(null)}
+        onPause={() => {
+          if (previewAudioRef.current?.paused) setPreviewingTuneId(null);
+        }}
+      />
 
       {/* ── Toast ── */}
       {toastMessage && <div className="ste-toast">{toastMessage}</div>}
@@ -4469,17 +4482,20 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                                 e.stopPropagation();
                                 setSelectedPresetId(tune.id);
                                 setMusicUrl(tune.url);
-                                if (isPlayingThis && audioRef.current) {
-                                  audioRef.current.pause();
-                                  setIsPlayingAudio(false);
+                                if (!previewAudioRef.current) return;
+                                if (previewingTuneId === tune.id && !previewAudioRef.current.paused) {
+                                  previewAudioRef.current.pause();
                                   setPreviewingTuneId(null);
-                                } else if (audioRef.current) {
-                                  audioRef.current.src = tune.url;
-                                  audioRef.current.volume = musicVolume / 100;
-                                  audioRef.current.play().then(() => {
-                                    setIsPlayingAudio(true);
+                                } else {
+                                  if (audioRef.current) audioRef.current.pause();
+                                  previewAudioRef.current.src = tune.url;
+                                  previewAudioRef.current.volume = musicVolume / 100;
+                                  previewAudioRef.current.currentTime = 0;
+                                  previewAudioRef.current.play().then(() => {
                                     setPreviewingTuneId(tune.id);
-                                  }).catch(() => {});
+                                  }).catch((err) => {
+                                    console.warn('Playback error:', err);
+                                  });
                                 }
                               }}
                               style={{
@@ -4548,18 +4564,22 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                         type="button"
                         className="ste-btn ste-btn--secondary ste-btn--sm"
                         onClick={() => {
-                          if (isPlayingAudio && audioRef.current) {
-                            audioRef.current.pause();
-                            setIsPlayingAudio(false);
+                          if (!previewAudioRef.current || !musicUrl) return;
+                          if (!previewAudioRef.current.paused) {
+                            previewAudioRef.current.pause();
                             setPreviewingTuneId(null);
-                          } else if (audioRef.current) {
-                            audioRef.current.volume = musicVolume / 100;
-                            audioRef.current.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+                          } else {
+                            if (audioRef.current) audioRef.current.pause();
+                            previewAudioRef.current.src = musicUrl;
+                            previewAudioRef.current.volume = musicVolume / 100;
+                            previewAudioRef.current.play().then(() => {
+                              setPreviewingTuneId(selectedPresetId || 'active');
+                            }).catch((err) => console.warn(err));
                           }
                         }}
                       >
-                        {isPlayingAudio ? <FaVolumeXmark /> : <FaVolumeHigh />}
-                        <span>{isPlayingAudio ? "Stop All" : "Listen Active"}</span>
+                        {previewingTuneId ? <FaVolumeXmark /> : <FaVolumeHigh />}
+                        <span>{previewingTuneId ? "Stop Audio" : "Listen Active"}</span>
                       </button>
                       <span style={{ fontSize: "0.72rem", color: "#11B5BB" }}>
                         {musicMode === "preset" ? `Track: ${DEMO_AUDIO_TUNES.find(d => d.id === selectedPresetId)?.name || 'Demo Preset'}` : "Custom Track Uploaded"}
@@ -4581,6 +4601,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                         const vol = Number(e.target.value);
                         setMusicVolume(vol);
                         if (audioRef.current) audioRef.current.volume = vol / 100;
+                        if (previewAudioRef.current) previewAudioRef.current.volume = vol / 100;
                       }}
                     />
                   </div>
