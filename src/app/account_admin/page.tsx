@@ -203,7 +203,12 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
     email: '',
     location: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    facebookPageName: '',
+    facebookPageId: '',
+    facebookPageAccessToken: '',
+    instagramUsername: '',
+    instagramBusinessId: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -234,12 +239,23 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
           storeLocation: formData.location,
           controllerId: accountAdminId,
           customerId: customerId,
+          socialCredentials: {
+            facebookPageName: formData.facebookPageName.trim() || undefined,
+            facebookPageId: formData.facebookPageId.trim() || undefined,
+            facebookPageAccessToken: formData.facebookPageAccessToken.trim() || undefined,
+            instagramUsername: formData.instagramUsername.trim() || undefined,
+            instagramBusinessId: formData.instagramBusinessId.trim() || undefined,
+          }
         })
       });
       const data = await res.json();
       if (data.success) {
         toast.success(`Store "${username}" created successfully!`);
-        setFormData({ storeName: '', email: '', location: '', password: '', confirmPassword: '' });
+        setFormData({ 
+          storeName: '', email: '', location: '', password: '', confirmPassword: '',
+          facebookPageName: '', facebookPageId: '', facebookPageAccessToken: '',
+          instagramUsername: '', instagramBusinessId: ''
+        });
         if (onComplete) onComplete();
       } else {
         toast.error(data.message || 'Failed to create store');
@@ -284,6 +300,40 @@ const OnboardStoreView = ({ accountAdminId, customerId, onComplete }: { accountA
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm Password <span className="text-red-500">*</span></label>
           <input type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+        </div>
+
+        {/* Social Media Broadcasting Credentials */}
+        <div className="md:col-span-2 pt-4 border-t border-gray-100">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-sm">
+              🌐
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Social Media Broadcasting Accounts</h3>
+              <p className="text-xs text-gray-500">Configure this store's Facebook Page & Instagram account for automated video & post publishing.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Facebook Page Name</label>
+          <input type="text" placeholder="e.g. Cento Store Downtown" value={formData.facebookPageName} onChange={e => setFormData({...formData, facebookPageName: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Facebook Page ID</label>
+          <input type="text" placeholder="e.g. 102938475610293" value={formData.facebookPageId} onChange={e => setFormData({...formData, facebookPageId: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Facebook Page Access Token</label>
+          <input type="password" placeholder="e.g. EAAB..." value={formData.facebookPageAccessToken} onChange={e => setFormData({...formData, facebookPageAccessToken: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 font-mono text-xs" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Instagram Business Account ID</label>
+          <input type="text" placeholder="e.g. 17841400000000000" value={formData.instagramBusinessId} onChange={e => setFormData({...formData, instagramBusinessId: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Instagram Username / Handle</label>
+          <input type="text" placeholder="e.g. @centostore_downtown" value={formData.instagramUsername} onChange={e => setFormData({...formData, instagramUsername: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
         </div>
       </div>
 
@@ -437,7 +487,44 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, custom
               <Store size={24} />
             </div>
             <h3 className="text-xl font-bold">{store.storeName || store.username || "Unnamed Store"}</h3>
-            <p className="text-white/60 text-sm">{store._id.substring(0,8).toUpperCase()}</p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(store._id);
+                  toast.success("Store Account ID copied!");
+                }}
+                className="bg-black/30 hover:bg-black/50 text-white/90 font-mono text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors"
+                title="Click to copy full Store Account ID"
+              >
+                <span className="text-white/50 text-[10px]">Account ID:</span>
+                <span className="font-semibold">{store._id.substring(0, 10)}...</span>
+                <span className="text-cyan-300 text-[10px]">Copy</span>
+              </button>
+              {store.socialCredentials?.facebookPageId && (
+                <span className="bg-blue-600/80 text-white text-[11px] px-2.5 py-0.5 rounded-full font-medium" title={`FB Page: ${store.socialCredentials.facebookPageName || ''} (ID: ${store.socialCredentials.facebookPageId})`}>
+                  📘 {store.socialCredentials.facebookPageName || 'FB Configured'}
+                </span>
+              )}
+              {store.socialCredentials?.instagramBusinessId && (
+                <span className="bg-pink-600/80 text-white text-[11px] px-2.5 py-0.5 rounded-full font-medium" title={`IG: ${store.socialCredentials.instagramUsername || ''} (ID: ${store.socialCredentials.instagramBusinessId})`}>
+                  📸 {store.socialCredentials.instagramUsername || 'IG Configured'}
+                </span>
+              )}
+              {(!store.socialCredentials?.facebookPageId && !store.socialCredentials?.instagramBusinessId) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit?.(store);
+                  }}
+                  className="bg-amber-500/30 hover:bg-amber-500/50 text-amber-200 border border-amber-400/30 text-[10px] px-2 py-0.5 rounded-full font-semibold transition-colors"
+                >
+                  + Add Social Credentials
+                </button>
+              )}
+            </div>
           </div>
           <div className="p-6">
             <div className="space-y-3 mb-6 text-sm text-gray-600">
@@ -504,7 +591,7 @@ const AllStoresView = ({ setActiveView, setSelectedStore, accountAdminId, custom
   );
 };
 
-const StoreDetailView = ({ store, setActiveView }: { store: any, setActiveView: (v:string)=>void }) => {
+const StoreDetailView = ({ store, setActiveView, onEdit }: { store: any, setActiveView: (v:string)=>void, onEdit?: (s:any)=>void }) => {
   const [devices, setDevices] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -558,11 +645,107 @@ const StoreDetailView = ({ store, setActiveView }: { store: any, setActiveView: 
 
   return (
     <div className="pb-12">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">{storeName}</h1>
-      <div className="flex items-center gap-2 text-gray-600 mb-8">
-        <MapPin size={18} className="text-[#FF5722]" />
-        <span>{storeAddr}</span>
+      {/* Top Navigation & Edit Action */}
+      <div className="flex items-center justify-between mb-6">
+        <button 
+          onClick={() => setActiveView("all_stores")} 
+          className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+        >
+          <ArrowRight className="rotate-180" size={16} />
+          Back to All Stores
+        </button>
+        <button 
+          onClick={() => onEdit ? onEdit(store) : setActiveView("edit_store")} 
+          className="flex items-center gap-2 text-sm font-bold text-white bg-[#FF5722] hover:bg-[#F4511E] px-5 py-2.5 rounded-xl transition-all shadow-md shadow-[#FF5722]/20"
+        >
+          <Edit size={16} />
+          Edit Store & Credentials
+        </button>
       </div>
+
+      {/* Store Account & Credentials Card */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-8">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF5722]">
+              <Store size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{storeName}</h1>
+              <div className="flex items-center gap-2 text-gray-500 text-xs mt-0.5">
+                <MapPin size={14} className="text-[#FF5722]" />
+                <span>{storeAddr}</span>
+                <span>•</span>
+                <span>Created: {new Date(store?.createdAt || Date.now()).toLocaleDateString()}</span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => onEdit ? onEdit(store) : setActiveView("edit_store")}
+            className="text-xs font-bold text-[#FF5722] hover:underline flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
+          >
+            <Edit size={13} /> Edit Credentials
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Store Account ID */}
+          <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <span className="text-xs font-bold text-gray-500 block mb-1">Store Account ID (User ID)</span>
+            <div className="flex items-center justify-between gap-2 mt-1">
+              <span className="font-mono text-xs font-bold text-gray-900 truncate" title={store?._id}>{store?._id}</span>
+              <button
+                type="button"
+                onClick={() => { navigator.clipboard.writeText(store?._id || ""); toast.success("Store Account ID copied!"); }}
+                className="text-xs text-cyan-600 hover:text-cyan-700 font-bold px-2 py-1 bg-cyan-50 rounded hover:bg-cyan-100 shrink-0 border border-cyan-200/60"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+
+          {/* Facebook Broadcasting */}
+          <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-blue-900 flex items-center gap-1">📘 Facebook Page</span>
+              {store?.socialCredentials?.facebookPageId ? (
+                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Connected</span>
+              ) : (
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">Not set</span>
+              )}
+            </div>
+            <p className="text-xs font-semibold text-gray-800 truncate">
+              {store?.socialCredentials?.facebookPageName || "No Page Name"}
+            </p>
+            <p className="text-[11px] font-mono text-gray-500 truncate mt-0.5">
+              ID: {store?.socialCredentials?.facebookPageId || "—"}
+            </p>
+          </div>
+
+          {/* Instagram Broadcasting */}
+          <div className="p-4 rounded-xl bg-pink-50/50 border border-pink-100">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-pink-900 flex items-center gap-1">📸 Instagram Account</span>
+              {store?.socialCredentials?.instagramBusinessId ? (
+                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Connected</span>
+              ) : (
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">Not set</span>
+              )}
+            </div>
+            <p className="text-xs font-semibold text-gray-800 truncate">
+              {store?.socialCredentials?.instagramUsername || "No Handle"}
+            </p>
+            <p className="text-[11px] font-mono text-gray-500 truncate mt-0.5">
+              ID: {store?.socialCredentials?.instagramBusinessId || "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <Monitor size={20} className="text-[#00BCD4]" />
+        Connected Devices
+      </h2>
 
       {devices.length === 0 ? (
         <div className="bg-white border rounded-2xl p-12 flex flex-col items-center justify-center shadow-sm border-orange-200/50 max-w-[800px]">
@@ -1321,7 +1504,12 @@ const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { stor
     email: store?.email || '',
     location: store?.storeLocation || store?.location || '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    facebookPageName: store?.socialCredentials?.facebookPageName || '',
+    facebookPageId: store?.socialCredentials?.facebookPageId || '',
+    facebookPageAccessToken: store?.socialCredentials?.facebookPageAccessToken || '',
+    instagramUsername: store?.socialCredentials?.instagramUsername || '',
+    instagramBusinessId: store?.socialCredentials?.instagramBusinessId || ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1341,7 +1529,14 @@ const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { stor
         storeName: formData.storeName,
         email: formData.email,
         storeLocation: formData.location,
-        username: formData.storeName // Keep username synced with store name
+        username: formData.storeName, // Keep username synced with store name
+        socialCredentials: {
+          facebookPageName: formData.facebookPageName.trim() || undefined,
+          facebookPageId: formData.facebookPageId.trim() || undefined,
+          facebookPageAccessToken: formData.facebookPageAccessToken.trim() || undefined,
+          instagramUsername: formData.instagramUsername.trim() || undefined,
+          instagramBusinessId: formData.instagramBusinessId.trim() || undefined,
+        }
       };
       if (formData.password) body.password = formData.password;
 
@@ -1411,6 +1606,40 @@ const EditStoreView = ({ store, accountAdminId, customerId, onComplete }: { stor
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm New Password</label>
             <input type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+
+          {/* Social Media Broadcasting Credentials */}
+          <div className="md:col-span-2 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-sm">
+                🌐
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Social Media Broadcasting Accounts</h3>
+                <p className="text-xs text-gray-500">Edit this store's Facebook Page & Instagram account for automated video & post publishing.</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Facebook Page Name</label>
+            <input type="text" placeholder="e.g. Cento Store Downtown" value={formData.facebookPageName} onChange={e => setFormData({...formData, facebookPageName: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Facebook Page ID</label>
+            <input type="text" placeholder="e.g. 102938475610293" value={formData.facebookPageId} onChange={e => setFormData({...formData, facebookPageId: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Facebook Page Access Token</label>
+            <input type="password" placeholder="e.g. EAAB..." value={formData.facebookPageAccessToken} onChange={e => setFormData({...formData, facebookPageAccessToken: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50 font-mono text-xs" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Instagram Business Account ID</label>
+            <input type="text" placeholder="e.g. 17841400000000000" value={formData.instagramBusinessId} onChange={e => setFormData({...formData, instagramBusinessId: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Instagram Username / Handle</label>
+            <input type="text" placeholder="e.g. @centostore_downtown" value={formData.instagramUsername} onChange={e => setFormData({...formData, instagramUsername: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00BCD4]/50" />
           </div>
         </div>
 
@@ -1936,7 +2165,7 @@ export default function AccountAdminDashboard() {
       case "onboard_store": return <OnboardStoreView accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;
       case "all_stores": return <AllStoresView setActiveView={setActiveView} setSelectedStore={setSelectedStore} accountAdminId={userData?._id} customerId={userData?.customerId} onEdit={(s) => { setSelectedStore(s); setActiveView("edit_store"); }} />;
       case "edit_store": return <EditStoreView store={selectedStore} accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;
-      case "store_detail": return <StoreDetailView store={selectedStore} setActiveView={setActiveView} />;
+      case "store_detail": return <StoreDetailView store={selectedStore} setActiveView={setActiveView} onEdit={(s) => { setSelectedStore(s); setActiveView("edit_store"); }} />;
       case "connect_devices": return <AssignDeviceView customerId={userData?.customerId} accountAdminId={userData?._id} />;
       case "all_devices": return <AllDevicesView customerId={userData?.customerId} setActiveView={setActiveView} />;
       case "onboard_user": return <OnboardUserView accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_users")} />;

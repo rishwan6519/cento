@@ -8,6 +8,7 @@ import DeviceAnnouncementConnection from '@/models/AnnouncementConnection';
 import "@/models/Device";
 import "@/models/User";
 import mongoose from 'mongoose';
+const { ObjectId } = mongoose.Types;
 import { isTimeOverlapping } from '@/lib/conflictCheck';
 
 
@@ -191,20 +192,37 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Playlist ID is required for disconnection' }, { status: 400 });
     }
 
-    // Try removing from regular playlistIds first
+    // Cast to ObjectId so Mongoose $pull matches correctly
+    let deviceObjId: mongoose.Types.ObjectId;
+    let playlistObjId: mongoose.Types.ObjectId;
+    try {
+      deviceObjId = new ObjectId(deviceId);
+      playlistObjId = new ObjectId(playlistId);
+    } catch {
+      return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+    }
+
+    // Try removing from regular playlistIds
     const result = await DevicePlaylist.updateOne(
-      { deviceId },
-      { $pull: { playlistIds: playlistId } }
+      { deviceId: deviceObjId },
+      { $pull: { playlistIds: playlistObjId } }
     );
 
     // Also try removing from announcementPlaylistIds
     const annResult = await DevicePlaylist.updateOne(
-      { deviceId },
-      { $pull: { announcementPlaylistIds: playlistId } }
+      { deviceId: deviceObjId },
+      { $pull: { announcementPlaylistIds: playlistObjId } }
     );
 
     if (result.modifiedCount === 0 && annResult.modifiedCount === 0) {
-      return NextResponse.json({ error: 'Device or playlist not found' }, { status: 404 });
+      // Fallback: try string-based match in case data was stored as string
+      const strResult = await DevicePlaylist.updateOne(
+        { deviceId: deviceId },
+        { $pull: { playlistIds: playlistId as any, announcementPlaylistIds: playlistId as any } }
+      );
+      if (strResult.modifiedCount === 0) {
+        return NextResponse.json({ error: 'Device or playlist not found' }, { status: 404 });
+      }
     }
 
     return NextResponse.json({ success: true, message: "Playlist disconnected successfully" });

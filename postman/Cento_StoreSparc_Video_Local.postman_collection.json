@@ -1,0 +1,721 @@
+{
+  "info": {
+    "_postman_id": "c1d2e3f4-cento-local-video-testing-01",
+    "name": "Cento StoreSparc Video API (Local Next.js)",
+    "description": "Postman testing collection for the newly integrated StoreSparc Video Rendering Engine in cento-local Next.js.\n\nBase URL: {{baseUrl}} (default: http://localhost:3000)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "jobId",
+      "value": ""
+    },
+    {
+      "key": "templateId",
+      "value": "6797a1f8b1a3e9c4d2800001"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create Video (POST /api/external/video - Form Data)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 202 Accepted', function () {",
+              "    pm.response.to.have.status(202);",
+              "});",
+              "const json = pm.response.json();",
+              "if (json.success && json.job_id) {",
+              "    pm.collectionVariables.set('jobId', json.job_id);",
+              "    console.log('Saved jobId:', json.job_id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "template_id",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "product_url",
+              "value": "https://images.unsplash.com/photo-1523275335684-37898b6baf30",
+              "type": "text",
+              "description": "Image URL (or uncheck and attach a file with key 'product')"
+            },
+            {
+              "key": "headline",
+              "value": "Premium Smart Watch",
+              "type": "text"
+            },
+            {
+              "key": "discount",
+              "value": "50% OFF",
+              "type": "text"
+            },
+            {
+              "key": "description",
+              "value": "Mega Weekend Flash Sale",
+              "type": "text"
+            },
+            {
+              "key": "validity",
+              "value": "Valid till Sunday",
+              "type": "text"
+            },
+            {
+              "key": "footer",
+              "value": "*T&C Apply. Limited stock available.",
+              "type": "text"
+            },
+            {
+              "key": "ratio",
+              "value": "16:9",
+              "type": "text",
+              "description": "9:16 | 16:9 | 1:1 | 4:5"
+            },
+            {
+              "key": "resolution",
+              "value": "720",
+              "type": "text"
+            },
+            {
+              "key": "duration",
+              "value": "10",
+              "type": "text"
+            },
+            {
+              "key": "music_preset",
+              "value": "upbeat_retail",
+              "description": "Music presets: upbeat_retail, energetic_sale, modern_store, luxury_minimal, none",
+              "type": "text"
+            },
+            {
+              "key": "music_volume",
+              "value": "75",
+              "description": "Volume 0-100 (default: 70)",
+              "type": "text"
+            },
+            {
+              "key": "music",
+              "type": "file",
+              "description": "Optional custom MP3/WAV audio track upload"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/external/video",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "external",
+            "video"
+          ]
+        },
+        "description": "Queues a new video render job. Automatically saves job_id into collection variable {{jobId}}."
+      },
+      "response": []
+    },
+    {
+      "name": "1b. Create Video (POST /api/external/video - JSON Body)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 202 Accepted', function () {",
+              "    pm.response.to.have.status(202);",
+              "});",
+              "const json = pm.response.json();",
+              "if (json.success && json.job_id) {",
+              "    pm.collectionVariables.set('jobId', json.job_id);",
+              "    console.log('Saved jobId:', json.job_id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"template_id\": \"1\",\n  \"product_url\": \"https://images.unsplash.com/photo-1505740420928-5e560c06d30e\",\n  \"headline\": \"Wireless Noise-Canceling Headphones\",\n  \"discount\": \"40% OFF\",\n  \"description\": \"Immersive Audio Experience\",\n  \"validity\": \"Valid till End of Month\",\n  \"footer\": \"*T&C Apply · StoreSparc\",\n  \"ratio\": \"16:9\",\n  \"resolution\": 720,\n  \"duration\": 10,\n  \"music_preset\": \"upbeat_retail\",\n  \"music_volume\": 75\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/external/video",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "external",
+            "video"
+          ]
+        },
+        "description": "Same as 1, but using JSON payload."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Poll Video Status (GET /api/external/video/:jobId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Response is valid', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "});",
+              "if (json.status === 'completed') {",
+              "    console.log('Video completed! URL:', json.url);",
+              "} else {",
+              "    console.log('Status:', json.status);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/external/video/{{jobId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "external",
+            "video",
+            "{{jobId}}"
+          ]
+        },
+        "description": "Polls the status of the job. Returns completed MP4 video details when finished."
+      },
+      "response": []
+    },
+    {
+      "name": "3. Get Multi-Aspect Videos Pack (GET /api/external/videos)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Pack received', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "});",
+              "if (json.data && json.data.videos) {",
+              "    console.log('Total aspect videos:', json.data.videos.length);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/external/videos?job_id={{jobId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "external",
+            "videos"
+          ],
+          "query": [
+            {
+              "key": "job_id",
+              "value": "{{jobId}}"
+            }
+          ]
+        },
+        "description": "Returns all aspect ratios (9:16, 16:9, 1:1, 4:5) rendered for this job."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Unified Create Video (POST /api/external/create-video)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Create Video queued', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "});",
+              "if (json.jobId) {",
+              "    pm.collectionVariables.set('jobId', json.jobId);",
+              "    console.log('Saved jobId:', json.jobId);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"template_id\": \"1\",\n  \"userId\": \"64f3b2c1a4e2d1234567890a\",\n  \"product_url\": \"https://images.unsplash.com/photo-1523275335684-37898b6baf30\",\n  \"headline\": \"Exclusive Watch Offer\",\n  \"discount\": \"50% OFF\",\n  \"description\": \"Luxury stainless steel chronograph\",\n  \"validity\": \"Valid till Sunday\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/external/create-video",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "external",
+            "create-video"
+          ]
+        },
+        "description": "Tests the existing /create-video route which now uses the local video rendering engine."
+      },
+      "response": []
+    },
+    {
+      "name": "5. Unified Get Video (POST /api/external/get-video)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/external/get-video",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "external",
+            "get-video"
+          ]
+        },
+        "description": "Tests the existing /get-video endpoint for checking and resolving the video."
+      },
+      "response": []
+    },
+    {
+      "name": "6. List Video Templates (GET /api/video-template)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Templates listed successfully', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "    pm.expect(json.data).to.be.an('array');",
+              "});",
+              "if (json.data && json.data.length > 0) {",
+              "    console.log('Total templates found:', json.data.length);",
+              "    pm.collectionVariables.set('templateId', json.data[0]._id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/video-template",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "video-template"
+          ]
+        },
+        "description": "Lists all video templates (both custom created templates from MongoDB and built-in templates)."
+      },
+      "response": []
+    },
+    {
+      "name": "7. Create Video Template (POST /api/video-template)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Template created successfully', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "});",
+              "if (json.templateId || (json.data && json.data._id)) {",
+              "    const tid = json.templateId || json.data._id;",
+              "    pm.collectionVariables.set('templateId', tid);",
+              "    console.log('New templateId saved:', tid);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"templateName\": \"Mega Weekend Super Sale\",\n  \"templateDescription\": \"High-energy animated flash offer template with bold discount badge and subtitle.\",\n  \"aspectRatio\": \"16:9\",\n  \"videoDuration\": 10,\n  \"offerType\": \"Flash Sale\",\n  \"aiStyle\": \"Premium commercial\",\n  \"aiColorTheme\": \"Orange\",\n  \"productUrl\": \"https://images.unsplash.com/photo-1523275335684-37898b6baf30\",\n  \"status\": \"Active\",\n  \"layers\": {\n    \"product\": {\n      \"type\": \"product\",\n      \"x\": 0.5,\n      \"y\": 0.32,\n      \"size\": 70,\n      \"animation\": \"slide_up\",\n      \"animStart\": 0.2,\n      \"animEnd\": 1.2\n    },\n    \"discount\": {\n      \"type\": \"text\",\n      \"text\": \"50% OFF\",\n      \"x\": 0.5,\n      \"y\": 0.48,\n      \"size\": 10,\n      \"shape\": \"circle\",\n      \"fontColor\": \"#ffffff\",\n      \"bgColor\": \"#F05A28\",\n      \"border\": \"1\",\n      \"borderColor\": \"#ffffff\",\n      \"animation\": \"zoom_bounce\",\n      \"animStart\": 0.8,\n      \"animEnd\": 1.5\n    },\n    \"headline\": {\n      \"type\": \"text\",\n      \"text\": \"MEGA WEEKEND SALE\",\n      \"x\": 0.5,\n      \"y\": 0.6,\n      \"size\": 5.8,\n      \"shape\": \"none\",\n      \"fontColor\": \"#ffffff\",\n      \"animation\": \"fade_in\",\n      \"animStart\": 1.4,\n      \"animEnd\": 2.2\n    },\n    \"description\": {\n      \"type\": \"text\",\n      \"text\": \"Exclusive In-Store Discounts\",\n      \"x\": 0.5,\n      \"y\": 0.7,\n      \"size\": 3.4,\n      \"shape\": \"none\",\n      \"fontColor\": \"#E2E8F0\",\n      \"animation\": \"fade_up\",\n      \"animStart\": 2,\n      \"animEnd\": 2.8\n    },\n    \"validity\": {\n      \"type\": \"text\",\n      \"text\": \"Valid Till Sunday\",\n      \"x\": 0.5,\n      \"y\": 0.8,\n      \"size\": 2.8,\n      \"shape\": \"pill\",\n      \"fontColor\": \"#0B2830\",\n      \"bgColor\": \"#11B5BB\",\n      \"animation\": \"slide_up\",\n      \"animStart\": 2.6,\n      \"animEnd\": 3.3\n    },\n    \"footer\": {\n      \"type\": \"text\",\n      \"text\": \"*T&C Apply · StoreSparc Video\",\n      \"x\": 0.5,\n      \"y\": 0.94,\n      \"size\": 2,\n      \"shape\": \"none\",\n      \"fontColor\": \"#94A3B8\",\n      \"animation\": \"fade_in\",\n      \"animStart\": 3,\n      \"animEnd\": 3.6\n    }\n  },\n  \"aspectStore\": {\n    \"16:9\": {\n      \"product\": {\n        \"type\": \"product\",\n        \"x\": 0.28,\n        \"y\": 0.52,\n        \"size\": 45,\n        \"animation\": \"slide_up\"\n      },\n      \"discount\": {\n        \"type\": \"text\",\n        \"text\": \"50% OFF\",\n        \"x\": 0.75,\n        \"y\": 0.18,\n        \"size\": 11,\n        \"shape\": \"circle\",\n        \"fontColor\": \"#ffffff\",\n        \"bgColor\": \"#F05A28\"\n      },\n      \"headline\": {\n        \"type\": \"text\",\n        \"text\": \"MEGA WEEKEND SALE\",\n        \"x\": 0.75,\n        \"y\": 0.34,\n        \"size\": 5.5,\n        \"fontColor\": \"#ffffff\"\n      },\n      \"description\": {\n        \"type\": \"text\",\n        \"text\": \"Premium quality guaranteed.\",\n        \"x\": 0.75,\n        \"y\": 0.46,\n        \"size\": 3,\n        \"fontColor\": \"#E2E8F0\"\n      },\n      \"validity\": {\n        \"type\": \"text\",\n        \"text\": \"Offer Valid Till Sunday\",\n        \"x\": 0.75,\n        \"y\": 0.7,\n        \"size\": 2.4,\n        \"shape\": \"pill\",\n        \"fontColor\": \"#0B2830\",\n        \"bgColor\": \"#E2E8F0\"\n      },\n      \"footer\": {\n        \"type\": \"text\",\n        \"text\": \"*Terms & Conditions Apply\",\n        \"x\": 0.5,\n        \"y\": 0.94,\n        \"size\": 1.8,\n        \"fontColor\": \"#64848D\"\n      }\n    },\n    \"9:16\": {\n      \"product\": {\n        \"type\": \"product\",\n        \"x\": 0.5,\n        \"y\": 0.32,\n        \"size\": 70,\n        \"animation\": \"slide_up\"\n      },\n      \"discount\": {\n        \"type\": \"text\",\n        \"text\": \"50% OFF\",\n        \"x\": 0.5,\n        \"y\": 0.48,\n        \"size\": 10,\n        \"shape\": \"circle\",\n        \"fontColor\": \"#ffffff\",\n        \"bgColor\": \"#F05A28\"\n      },\n      \"headline\": {\n        \"type\": \"text\",\n        \"text\": \"MEGA WEEKEND SALE\",\n        \"x\": 0.5,\n        \"y\": 0.58,\n        \"size\": 5.8,\n        \"fontColor\": \"#ffffff\"\n      },\n      \"description\": {\n        \"type\": \"text\",\n        \"text\": \"Limited stocks available in store.\",\n        \"x\": 0.5,\n        \"y\": 0.66,\n        \"size\": 3.2,\n        \"fontColor\": \"#E2E8F0\"\n      },\n      \"validity\": {\n        \"type\": \"text\",\n        \"text\": \"Offer Valid Till Sunday\",\n        \"x\": 0.5,\n        \"y\": 0.81,\n        \"size\": 2.6,\n        \"shape\": \"pill\",\n        \"fontColor\": \"#0B2830\",\n        \"bgColor\": \"#E2E8F0\"\n      },\n      \"footer\": {\n        \"type\": \"text\",\n        \"text\": \"*T&C Apply · StoreSparc Video\",\n        \"x\": 0.5,\n        \"y\": 0.96,\n        \"size\": 1.8,\n        \"fontColor\": \"#64848D\"\n      }\n    },\n    \"1:1\": {\n      \"product\": {\n        \"type\": \"product\",\n        \"x\": 0.32,\n        \"y\": 0.48,\n        \"size\": 52,\n        \"animation\": \"slide_up\"\n      },\n      \"discount\": {\n        \"type\": \"text\",\n        \"text\": \"50% OFF\",\n        \"x\": 0.76,\n        \"y\": 0.2,\n        \"size\": 11,\n        \"shape\": \"circle\",\n        \"fontColor\": \"#ffffff\",\n        \"bgColor\": \"#F05A28\"\n      },\n      \"headline\": {\n        \"type\": \"text\",\n        \"text\": \"MEGA WEEKEND SALE\",\n        \"x\": 0.72,\n        \"y\": 0.36,\n        \"size\": 4.8,\n        \"fontColor\": \"#ffffff\"\n      },\n      \"description\": {\n        \"type\": \"text\",\n        \"text\": \"Special Offer Available In Store\",\n        \"x\": 0.72,\n        \"y\": 0.48,\n        \"size\": 2.8,\n        \"fontColor\": \"#E2E8F0\"\n      },\n      \"validity\": {\n        \"type\": \"text\",\n        \"text\": \"Valid Till Sunday\",\n        \"x\": 0.72,\n        \"y\": 0.72,\n        \"size\": 2.4,\n        \"shape\": \"pill\",\n        \"fontColor\": \"#0B2830\",\n        \"bgColor\": \"#E2E8F0\"\n      },\n      \"footer\": {\n        \"type\": \"text\",\n        \"text\": \"*T&C Apply · StoreSparc Video\",\n        \"x\": 0.5,\n        \"y\": 0.95,\n        \"size\": 1.8,\n        \"fontColor\": \"#64848D\"\n      }\n    },\n    \"4:5\": {\n      \"product\": {\n        \"type\": \"product\",\n        \"x\": 0.5,\n        \"y\": 0.34,\n        \"size\": 65,\n        \"animation\": \"slide_up\"\n      },\n      \"discount\": {\n        \"type\": \"text\",\n        \"text\": \"50% OFF\",\n        \"x\": 0.5,\n        \"y\": 0.49,\n        \"size\": 10,\n        \"shape\": \"circle\",\n        \"fontColor\": \"#ffffff\",\n        \"bgColor\": \"#F05A28\"\n      },\n      \"headline\": {\n        \"type\": \"text\",\n        \"text\": \"MEGA WEEKEND SALE\",\n        \"x\": 0.5,\n        \"y\": 0.6,\n        \"size\": 5.2,\n        \"fontColor\": \"#ffffff\"\n      },\n      \"description\": {\n        \"type\": \"text\",\n        \"text\": \"Exclusive in-store discounts this weekend.\",\n        \"x\": 0.5,\n        \"y\": 0.68,\n        \"size\": 3,\n        \"fontColor\": \"#E2E8F0\"\n      },\n      \"validity\": {\n        \"type\": \"text\",\n        \"text\": \"Offer Valid Till Sunday\",\n        \"x\": 0.5,\n        \"y\": 0.83,\n        \"size\": 2.5,\n        \"shape\": \"pill\",\n        \"fontColor\": \"#0B2830\",\n        \"bgColor\": \"#E2E8F0\"\n      },\n      \"footer\": {\n        \"type\": \"text\",\n        \"text\": \"*T&C Apply · StoreSparc Video\",\n        \"x\": 0.5,\n        \"y\": 0.96,\n        \"size\": 1.8,\n        \"fontColor\": \"#64848D\"\n      }\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/video-template",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "video-template"
+          ]
+        },
+        "description": "Creates a new full-fidelity Storesparc Video template with custom layers, coordinates, animations, and aspect settings."
+      },
+      "response": []
+    },
+    {
+      "name": "8. View Video Template Details (GET /api/video-template/:templateId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Template details fetched successfully', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "    pm.expect(json.data).to.be.an('object');",
+              "});",
+              "console.log('Template Name:', json.data.templateName);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/video-template/{{templateId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "video-template",
+            "{{templateId}}"
+          ]
+        },
+        "description": "Fetches the full specification and layers for a specific template (View Option)."
+      },
+      "response": []
+    },
+    {
+      "name": "9. Update / Edit Video Template (PUT /api/video-template/:templateId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Template updated successfully', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "});",
+              "console.log('Updated template message:', json.message);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"templateName\": \"Mega Weekend Super Sale (Updated)\",\n  \"videoDuration\": 12,\n  \"offerType\": \"Flash Sale\",\n  \"layers\": {\n    \"headline\": { \"type\": \"text\", \"text\": \"UPDATED FLASH SALE NOW ON!\", \"x\": 0.5, \"y\": 0.60, \"size\": 6.0, \"shape\": \"none\", \"fontColor\": \"#FFE600\", \"animation\": \"zoom_bounce\" }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/video-template/{{templateId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "video-template",
+            "{{templateId}}"
+          ]
+        },
+        "description": "Updates layers, timings, or specifications for an existing template (Edit Option)."
+      },
+      "response": []
+    },
+    {
+      "name": "10. Delete Video Template (DELETE /api/video-template/:templateId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Template deleted successfully', function () {",
+              "    pm.expect(json.success).to.be.true;",
+              "});",
+              "console.log('Delete message:', json.message);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/video-template/{{templateId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "video-template",
+            "{{templateId}}"
+          ]
+        },
+        "description": "Permanently deletes a template by ID (Delete Option)."
+      },
+      "response": []
+    },
+    {
+      "name": "12. Offer Approval & Auto Social Media Schedule (POST /api/external/offer-approval-schedule)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"videoId\": \"6a9508a804b7b464db506a18\",\n  \"userId\": \"69eef932429094a24c358638\",\n  \"offerId\": \"149051\",\n  \"templateId\": \"14\",\n  \"offerName\": \"Weekend Mega Sale\",\n  \"offerDescription\": \"Flat 50% discount on all energizing beverages this weekend only.\",\n  \"startDate\": \"2026-09-26\",\n  \"endDate\": \"2026-09-30\",\n  \"tagline\": \"tagline\",\n  \"voiceoverScript\": \"Experience the ultimate rush of flavor and energy with our brand new silver can. Enjoy fifty percent off this weekend in store!\",\n  \"facebookCaption\": \"Electrify Your Summer! ⚡ Grab your flat 50% discount on all energizing beverages this weekend only! Check out the offer now.\",\n  \"facebookHashTags\": [\n    \"#EnergyDrink\",\n    \"#WeekendSale\",\n    \"#MegaOffer\",\n    \"#FacebookOffers\"\n  ],\n  \"instagramCaption\": \"Weekend Mega Sale! 💥 Flat 50% discount on all energizing beverages! 🥤✨ Treat yourself before the weekend ends! 🏃‍♂️💨\",\n  \"instagramHashTags\": [\n    \"#WeekendVibes\",\n    \"#EnergyDrink\",\n    \"#InstaGood\",\n    \"#MegaSale\"\n  ],\n  \"channels\": [\n    \"facebook\"\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/external/offer-approval-schedule",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "external",
+            "offer-approval-schedule"
+          ]
+        },
+        "description": "Approves offer, updates media item status, and automatically schedules Facebook and Instagram posts. Post timing: Day before startDate at 6:00 PM (or immediately if already passed)."
+      }
+    },
+    {
+      "name": "13. Standalone Social Media Scheduler (POST /api/social/schedule)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"69eef932429094a24c358638\",\n  \"channels\": [\n    \"facebook\",\n    \"instagram\"\n  ],\n  \"startDate\": \"2026-10-25\",\n  \"facebookCaption\": \"Weekend Mega Sale on Facebook!\",\n  \"facebookHashTags\": [\n    \"#WeekendSale\",\n    \"#FacebookOffers\"\n  ],\n  \"instagramCaption\": \"Weekend Mega Sale on Instagram! 💥\",\n  \"instagramHashTags\": [\n    \"#WeekendVibes\",\n    \"#MegaSale\"\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/social/schedule",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "social",
+            "schedule"
+          ]
+        },
+        "description": "Dedicated API for direct social media scheduling (Facebook & Instagram)."
+      }
+    },
+    {
+      "name": "14. Create Single Social Post (POST /api/social/posts)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channel\": \"instagram\",\n  \"message\": \"🔥 Weekend Flash Sale is live now! Grab up to 75% OFF on exclusive collection! #Sale #Style #LimitedTime\",\n  \"mediaType\": \"video\",\n  \"mediaUrl\": \"/uploads/rendered/cr_d2f68a4a3f6c4f54_16x9.mp4\",\n  \"templateId\": \"4\",\n  \"publishMode\": \"schedule\",\n  \"scheduledAt\": \"2026-10-28T14:30:00.000Z\",\n  \"timezone\": \"Asia/Kolkata\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/social/posts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "social",
+            "posts"
+          ]
+        },
+        "description": "Creates an individual scheduled or instant post for Facebook, Instagram, TikTok, or WhatsApp."
+      }
+    },
+    {
+      "name": "15. List Social Posts (GET /api/social/posts)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/social/posts?channel=all&status=all&limit=20&page=1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "social",
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "channel",
+              "value": "all",
+              "description": "Filter by: all, facebook, instagram, tiktok, whatsapp"
+            },
+            {
+              "key": "status",
+              "value": "all",
+              "description": "Filter by: all, scheduled, published, draft, failed"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            }
+          ]
+        },
+        "description": "Lists all scheduled and published social media posts with pagination and filters."
+      }
+    },
+    {
+      "name": "16. Get Calendar Planner View (GET /api/social/planner)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/social/planner?view=week&channel=all&date=2026-10-29",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "social",
+            "planner"
+          ],
+          "query": [
+            {
+              "key": "view",
+              "value": "week",
+              "description": "View mode: week or month"
+            },
+            {
+              "key": "channel",
+              "value": "all",
+              "description": "Filter by channel: all, facebook, instagram"
+            },
+            {
+              "key": "date",
+              "value": "2026-10-29",
+              "description": "Anchor date YYYY-MM-DD"
+            }
+          ]
+        },
+        "description": "Returns the 7-day week or full month planner calendar with all scheduled posts organized by day."
+      }
+    },
+    {
+      "name": "17. Delete / Cancel Post (DELETE /api/social/posts/:postId)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/social/posts/{{postId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "social",
+            "posts",
+            "{{postId}}"
+          ]
+        },
+        "description": "Cancels and permanently deletes a scheduled social media post by ID."
+      }
+    }
+  ]
+}

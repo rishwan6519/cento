@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { FaEye, FaTrash, FaSearch, FaTimes, FaPlay, FaFilter, FaThLarge, FaList } from "react-icons/fa";
 
 type ViewMode = "grid" | "list";
-type FilterType = "all" | "image" | "video" | "audio";
+type FilterType = "all" | "image" | "video" | "audio" | "offer";
 
 const getFileIcon = (type: string) => {
   const t = (type || "").toLowerCase();
@@ -13,7 +13,8 @@ const getFileIcon = (type: string) => {
   return "📄";
 };
 
-const getFileCategory = (type: string): FilterType => {
+const getFileCategory = (type: string, item?: any): FilterType => {
+  if (item && (item.fileCategory === "offer" || item.templateId)) return "offer";
   const t = (type || "").toLowerCase();
   if (t.includes("video") || t.includes("mp4")) return "video";
   if (t.includes("audio") || t.includes("mp3") || t.includes("wav")) return "audio";
@@ -110,16 +111,17 @@ export default function MediaLibraryView() {
         item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.sourceName?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchFilter = filter === "all" || getFileCategory(item.type) === filter;
+      const matchFilter = filter === "all" || (filter === "offer" ? (item.fileCategory === "offer" || !!item.templateId) : (filter === "video" ? (getFileCategory(item.type, item) === "video" || item.type === "video") : getFileCategory(item.type, item) === filter));
       return matchSearch && matchFilter;
     });
   }, [allFiles, searchTerm, filter]);
 
   const counts = useMemo(() => ({
     all: allFiles.length,
-    image: allFiles.filter(f => getFileCategory(f.type) === "image").length,
-    video: allFiles.filter(f => getFileCategory(f.type) === "video").length,
-    audio: allFiles.filter(f => getFileCategory(f.type) === "audio").length,
+    offer: allFiles.filter(f => f.fileCategory === "offer" || !!f.templateId).length,
+    video: allFiles.filter(f => (f.type || "").includes("video")).length,
+    image: allFiles.filter(f => getFileCategory(f.type, f) === "image").length,
+    audio: allFiles.filter(f => getFileCategory(f.type, f) === "audio").length,
   }), [allFiles]);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {

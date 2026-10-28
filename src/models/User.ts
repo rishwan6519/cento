@@ -106,6 +106,13 @@ export interface UserDocument extends Document {
   idProofAttach?: string;
   permissions?: string[];
   defaultAnnouncementFrequency?: number;
+  socialCredentials?: {
+    facebookPageId?: string;
+    facebookPageAccessToken?: string;
+    facebookPageName?: string;
+    instagramBusinessId?: string;
+    instagramUsername?: string;
+  };
 }
 
 const UserSchema: Schema = new Schema({
@@ -207,7 +214,14 @@ const UserSchema: Schema = new Schema({
   employeeId: { type: String, required: false },
   idProofAttach: { type: String, required: false },
   permissions: { type: [String], default: [] },
-  defaultAnnouncementFrequency: { type: Number, default: 1 }
+  defaultAnnouncementFrequency: { type: Number, default: 1 },
+  socialCredentials: {
+    facebookPageId: { type: String, required: false },
+    facebookPageAccessToken: { type: String, required: false },
+    facebookPageName: { type: String, required: false },
+    instagramBusinessId: { type: String, required: false },
+    instagramUsername: { type: String, required: false },
+  }
 }, { 
   timestamps: true 
 });

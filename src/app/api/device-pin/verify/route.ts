@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import DevicePin from "@/models/DevicePin";
-import Device from "@/models/Device";
+import mongoose from "mongoose";
 
 // POST — Verify a PIN and return the associated serial number
 export async function POST(request: Request) {
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
     devicePin.isVerified = true;
     await devicePin.save();
 
+    const Device = mongoose.models.Device || mongoose.model('Device', require('@/models/Device').deviceSchema);
     await Device.findByIdAndUpdate(devicePin.deviceId, { lastConnection: new Date() });
 
     return NextResponse.json({

@@ -22,6 +22,7 @@ export interface VideoTemplateDocument extends Document {
   address: string;
   backgroundColor: string;
   primaryTextColor: string;
+  templateId?: number;
   secondaryTextColor: string;
   buttonColor: string;
   animationStyle: string;
@@ -31,6 +32,17 @@ export interface VideoTemplateDocument extends Document {
   aiModel?: string;
   isDummyOverride?: boolean;
   description?: string;
+  layers?: any;
+  aspectStore?: any;
+  configJson?: any;
+  backgroundUrl?: string;
+  logoUrl?: string;
+  musicUrl?: string;
+  fps?: number;
+  resolution?: number;
+  lastRenderedVideoUrl?: string;
+  renderedVideos?: any[];
+  decorations?: any[];
   status: TemplateStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -40,6 +52,10 @@ const positionOptions: PositionOption[] = ['left', 'right', 'top', 'bottom', 'ce
 
 const VideoTemplateSchema: Schema = new Schema(
   {
+    templateId: {
+      type: Number,
+      index: true,
+    },
     storeUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -178,6 +194,50 @@ const VideoTemplateSchema: Schema = new Schema(
       type: String,
       enum: ['Active', 'Inactive'],
       default: 'Active',
+    },
+    layers: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    aspectStore: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    configJson: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    backgroundUrl: {
+      type: String,
+      default: '',
+    },
+    logoUrl: {
+      type: String,
+      default: '',
+    },
+    musicUrl: {
+      type: String,
+      default: '',
+    },
+    fps: {
+      type: Number,
+      default: 30,
+    },
+    resolution: {
+      type: Number,
+      default: 720,
+    },
+    lastRenderedVideoUrl: {
+      type: String,
+      default: "",
+    },
+    decorations: {
+      type: mongoose.Schema.Types.Mixed,
+      default: [],
+    },
+    renderedVideos: {
+      type: mongoose.Schema.Types.Mixed,
+      default: [],
     },
   },
   {

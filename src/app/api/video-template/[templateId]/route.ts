@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import VideoTemplate from '@/models/VideoTemplate';
 
@@ -38,17 +39,16 @@ interface RouteContext {
 // ─── GET /api/video-template/:templateId ────────────────────────────────────
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
-    const auth = getAuthenticatedUser(req);
-    if (!auth || !auth.userId) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized: Missing or invalid authentication token' },
-        { status: 401 }
-      );
-    }
-
     await connectToDatabase();
     const { templateId } = await context.params;
-    const template: any = await VideoTemplate.findById(templateId).lean();
+    let template: any = null;
+
+    if (mongoose.Types.ObjectId.isValid(templateId)) {
+      template = await VideoTemplate.findById(templateId).lean();
+    }
+    if (!template && !isNaN(Number(templateId))) {
+      template = await VideoTemplate.findOne({ templateId: Number(templateId) }).lean();
+    }
 
     if (!template) {
       return NextResponse.json(
@@ -57,17 +57,13 @@ export async function GET(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // Always validate ownership before returning data
-    if (String(template.storeUserId) !== String(auth.userId)) {
-      return NextResponse.json(
-        { success: false, message: 'Forbidden: You do not own this template' },
-        { status: 403 }
-      );
-    }
-
     return NextResponse.json({
       success: true,
-      data: template,
+      data: {
+        ...template,
+        _id: String(template._id),
+        templateId: template.templateId || 1,
+      },
     });
   } catch (error) {
     console.error('[GET /api/video-template/:templateId] Error:', error);
@@ -84,19 +80,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
 // ─── PUT /api/video-template/:templateId ────────────────────────────────────
 export async function PUT(req: NextRequest, context: RouteContext) {
   try {
-    const auth = getAuthenticatedUser(req);
-    if (!auth || !auth.userId) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized: Missing or invalid authentication token' },
-        { status: 401 }
-      );
-    }
-
     await connectToDatabase();
+    const auth = getAuthenticatedUser(req);
     const { templateId } = await context.params;
     const body = await req.json();
+    const resolvedUserId = auth?.userId || body.storeUserId || body.userId || '64f3b2c1a4e2d1234567890a';
 
-    // Prevent overriding sensitive immutable properties
     const { storeUserId: _ignoredStoreUser, _id: _ignoredId, createdAt: _ignoredCreated, ...updateData } = body;
 
     if (updateData.templateName !== undefined && !String(updateData.templateName).trim()) {
@@ -106,21 +95,39 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // Upsert: if the template doesn't exist in DB (dummy first edit), create it with this _id
+    let filter: any = null;
+    if (mongoose.Types.ObjectId.isValid(templateId)) {
+      filter = { _id: templateId };
+    } else if (!isNaN(Number(templateId))) {
+      filter = { templateId: Number(templateId) };
+    } else {
+      filter = { _id: templateId };
+    }
+
     const updatedTemplate = await VideoTemplate.findOneAndUpdate(
-      { _id: templateId },
+      filter,
       {
         ...updateData,
-        storeUserId: auth.userId,
-        isDummyOverride: true,
+        storeUserId: resolvedUserId,
       },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { new: true, setDefaultsOnInsert: true }
     );
+
+    if (!updatedTemplate) {
+      return NextResponse.json(
+        { success: false, message: 'Template not found to update' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
       message: 'Template updated successfully',
-      data: updatedTemplate,
+      data: {
+        ...updatedTemplate.toObject(),
+        _id: String(updatedTemplate._id),
+        templateId: updatedTemplate.templateId || 1,
+      },
     });
   } catch (error) {
     console.error('[PUT /api/video-template/:templateId] Error:', error);
@@ -137,17 +144,16 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 // ─── DELETE /api/video-template/:templateId ─────────────────────────────────
 export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
-    const auth = getAuthenticatedUser(req);
-    if (!auth || !auth.userId) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized: Missing or invalid authentication token' },
-        { status: 401 }
-      );
-    }
-
     await connectToDatabase();
     const { templateId } = await context.params;
-    const template: any = await VideoTemplate.findById(templateId);
+    let template: any = null;
+
+    if (mongoose.Types.ObjectId.isValid(templateId)) {
+      template = await VideoTemplate.findById(templateId);
+    }
+    if (!template && !isNaN(Number(templateId))) {
+      template = await VideoTemplate.findOne({ templateId: Number(templateId) });
+    }
 
     if (!template) {
       return NextResponse.json(
@@ -156,15 +162,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       );
     }
 
-    // Only the owner can delete
-    if (String(template.storeUserId) !== String(auth.userId)) {
-      return NextResponse.json(
-        { success: false, message: 'Forbidden: You do not own this template' },
-        { status: 403 }
-      );
-    }
-
-    await VideoTemplate.findByIdAndDelete(templateId);
+    await VideoTemplate.findByIdAndDelete(template._id);
 
     return NextResponse.json({
       success: true,

@@ -256,14 +256,18 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
           border-color: #11B5BB;
           box-shadow: 0 4px 20px rgba(17, 181, 187, 0.1);
         }
+        .ddm-accordion.ddm-accordion--completed {
+          border-color: #CBD5E1;
+          opacity: 0.82;
+        }
         .ddm-accordion-header {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 16px 20px; cursor: pointer;
+          padding: 14px 20px; cursor: pointer;
           background: #fff; border: none; width: 100%;
           transition: background 0.15s;
         }
         .ddm-accordion-header:hover { background: #FAFBFC; }
-        .ddm-accordion-left { display: flex; align-items: center; gap: 14px; }
+        .ddm-accordion-left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
         .ddm-accordion-badge {
           width: 42px; height: 42px; border-radius: 12px;
           display: flex; align-items: center; justify-content: center;
@@ -271,14 +275,53 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
         }
         .ddm-accordion-badge--media { background: #EEF6FF; color: #2563EB; }
         .ddm-accordion-badge--announcement { background: #F0FDF9; color: #0D9488; }
-        .ddm-accordion-title { font-size: 0.92rem; font-weight: 700; color: #162B30; text-align: left; }
-        .ddm-accordion-subtitle { font-size: 0.72rem; color: #8CA3AB; font-weight: 600; margin-top: 2px; text-align: left; }
+        .ddm-accordion-info { flex: 1; min-width: 0; text-align: left; }
+        .ddm-accordion-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .ddm-accordion-title { font-size: 0.92rem; font-weight: 700; color: #162B30; }
+        .ddm-status-badge {
+          display: inline-flex; align-items: center; gap: 4px;
+          padding: 2px 8px; border-radius: 20px;
+          font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em;
+          flex-shrink: 0;
+        }
+        .ddm-status-badge--active {
+          background: #DCFCE7; color: #16A34A;
+        }
+        .ddm-status-badge--active::before {
+          content: ''; display: inline-block;
+          width: 5px; height: 5px; border-radius: 50%;
+          background: #22C55E;
+          box-shadow: 0 0 0 0 rgba(34,197,94,0.5);
+          animation: ddm-pulse-active 1.8s infinite;
+        }
+        @keyframes ddm-pulse-active {
+          0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+          70% { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+          100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+        }
+        .ddm-status-badge--completed {
+          background: #F1F5F9; color: #64748B;
+        }
+        .ddm-status-badge--upcoming {
+          background: #FEF3C7; color: #D97706;
+        }
+        .ddm-accordion-subtitle { font-size: 0.72rem; color: #8CA3AB; font-weight: 600; margin-top: 3px; }
+        .ddm-date-chips { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+        .ddm-date-chip {
+          display: inline-flex; align-items: center; gap: 4px;
+          background: #F8FAFB; border: 1px solid #E2E8F0;
+          border-radius: 6px; padding: 2px 7px;
+          font-size: 0.65rem; font-weight: 600; color: #475569;
+        }
+        .ddm-date-chip--time {
+          background: #F0F9FF; border-color: #BAE6FD; color: #0369A1;
+        }
         .ddm-accordion-chevron {
           width: 28px; height: 28px; border-radius: 8px;
           background: #F1F5F9; color: #94A3B8;
           display: flex; align-items: center; justify-content: center;
           transition: transform 0.3s, background 0.2s;
-          flex-shrink: 0; font-size: 0.75rem;
+          flex-shrink: 0; font-size: 0.75rem; margin-left: 10px;
         }
         .ddm-accordion--open .ddm-accordion-chevron {
           transform: rotate(180deg);
@@ -619,19 +662,73 @@ export default function DeviceDetailsModal({ isOpen, onClose, device, onEditPlay
                   const files = isMedia ? (item.files || []) : (item.announcements || []);
                   const fileCount = files.length;
 
+                  // Compute active/completed/upcoming status
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  const startDate = isMedia ? item.startDate : item.schedule?.startDate;
+                  const endDate = isMedia ? item.endDate : item.schedule?.endDate;
+                  let playlistStatus: 'active' | 'completed' | 'upcoming' | 'always' = 'always';
+                  if (endDate) {
+                    const end = new Date(endDate);
+                    end.setHours(23,59,59,999);
+                    if (end < today) {
+                      playlistStatus = 'completed';
+                    } else if (startDate) {
+                      const start = new Date(startDate);
+                      start.setHours(0,0,0,0);
+                      playlistStatus = start > today ? 'upcoming' : 'active';
+                    } else {
+                      playlistStatus = 'active';
+                    }
+                  } else if (startDate) {
+                    const start = new Date(startDate);
+                    start.setHours(0,0,0,0);
+                    playlistStatus = start > today ? 'upcoming' : 'active';
+                  }
+
+                  const formatShortDate = (d: string) => {
+                    try { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }); }
+                    catch { return d; }
+                  };
+
                   return (
-                    <div key={id} className={`ddm-accordion ${isExpanded ? 'ddm-accordion--open' : ''}`}>
+                    <div key={id} className={`ddm-accordion ${isExpanded ? 'ddm-accordion--open' : ''} ${playlistStatus === 'completed' ? 'ddm-accordion--completed' : ''}`}>
                       <button className="ddm-accordion-header" onClick={() => setExpandedId(isExpanded ? null : id)}>
                         <div className="ddm-accordion-left">
                           <div className={`ddm-accordion-badge ${isMedia ? 'ddm-accordion-badge--media' : 'ddm-accordion-badge--announcement'}`}>
                             {isMedia ? '🎬' : '📢'}
                           </div>
-                          <div>
-                            <div className="ddm-accordion-title">{item.name || (isMedia ? `Media Playlist ${item._idx + 1}` : `Announcement ${item._idx + 1}`)}</div>
+                          <div className="ddm-accordion-info">
+                            <div className="ddm-accordion-title-row">
+                              <span className="ddm-accordion-title">{item.name || (isMedia ? `Media Playlist ${item._idx + 1}` : `Announcement ${item._idx + 1}`)}</span>
+                              {playlistStatus === 'active' && (
+                                <span className="ddm-status-badge ddm-status-badge--active">Active</span>
+                              )}
+                              {playlistStatus === 'completed' && (
+                                <span className="ddm-status-badge ddm-status-badge--completed">✓ Completed</span>
+                              )}
+                              {playlistStatus === 'upcoming' && (
+                                <span className="ddm-status-badge ddm-status-badge--upcoming">⏳ Upcoming</span>
+                              )}
+                            </div>
                             <div className="ddm-accordion-subtitle">
                               {isMedia ? `${fileCount} media file${fileCount !== 1 ? 's' : ''}` : `${fileCount} announcement${fileCount !== 1 ? 's' : ''}`}
                               {isMedia && item.contentType ? ` • ${item.contentType}` : ''}
                             </div>
+                            {(startDate || endDate) && (
+                              <div className="ddm-date-chips">
+                                {startDate && (
+                                  <span className="ddm-date-chip">📅 {formatShortDate(startDate)}</span>
+                                )}
+                                {startDate && endDate && <span style={{ color: '#94A3B8', fontSize: '0.6rem' }}>→</span>}
+                                {endDate && (
+                                  <span className="ddm-date-chip">{formatShortDate(endDate)}</span>
+                                )}
+                                {isMedia && item.startTime && (
+                                  <span className="ddm-date-chip ddm-date-chip--time">⏰ {item.startTime}–{item.endTime || '23:59'}</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="ddm-accordion-chevron"><FaChevronDown size={11} /></div>

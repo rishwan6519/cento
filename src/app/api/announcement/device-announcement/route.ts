@@ -124,13 +124,46 @@ export async function DELETE(req: NextRequest) {
 
     await connectToDatabase();
 
-    // Find the connection and pull the specific announcement playlist ID from the array
-    const result = await AnnouncementConnection.updateOne(
-      { deviceId: deviceId },
-      { $pull: { announcementPlaylistIds: announcementPlaylistId as any } } 
-    );
+    // Cast to ObjectId for proper matching
+    let deviceObjId: mongoose.Types.ObjectId | null = null;
+    let annObjId: mongoose.Types.ObjectId | null = null;
+    try {
+      deviceObjId = new mongoose.Types.ObjectId(deviceId);
+      annObjId = new mongoose.Types.ObjectId(announcementPlaylistId);
+    } catch { /* ids may not be valid ObjectIds */ }
 
-    if (result.modifiedCount === 0) {
+    let totalModified = 0;
+
+    // 1. Remove from AnnouncementConnection collection (ObjectId match)
+    if (deviceObjId && annObjId) {
+      const r1 = await AnnouncementConnection.updateOne(
+        { deviceId: deviceObjId },
+        { $pull: { announcementPlaylistIds: annObjId } }
+      );
+      totalModified += r1.modifiedCount;
+
+      // 2. Also remove from DevicePlaylist.announcementPlaylistIds (ObjectId match)
+      const r2 = await DevicePlaylist.updateOne(
+        { deviceId: deviceObjId },
+        { $pull: { announcementPlaylistIds: annObjId } }
+      );
+      totalModified += r2.modifiedCount;
+    }
+
+    // Fallback: string-based match
+    if (totalModified === 0) {
+      const r3 = await AnnouncementConnection.updateOne(
+        { deviceId: deviceId },
+        { $pull: { announcementPlaylistIds: announcementPlaylistId as any } }
+      );
+      const r4 = await DevicePlaylist.updateOne(
+        { deviceId: deviceId },
+        { $pull: { announcementPlaylistIds: announcementPlaylistId as any } }
+      );
+      totalModified += r3.modifiedCount + r4.modifiedCount;
+    }
+
+    if (totalModified === 0) {
       return NextResponse.json(
         { error: "Device connection not found or playlist already disconnected" },
         { status: 404 }

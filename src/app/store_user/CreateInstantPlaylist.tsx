@@ -118,6 +118,9 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
 
   const filteredMedia = mediaItems.filter(m => {
     if (activeFilter === "All") return true;
+    if (activeFilter === "Ad Video") {
+      return m.fileCategory === "offer" || !!m.templateId || (m.name || "").toLowerCase().includes("offer") || (m.name || "").toLowerCase().includes("promo");
+    }
     return (m.type || "").toLowerCase().includes(activeFilter.toLowerCase());
   });
 
@@ -238,7 +241,7 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
           <div className="su-ip-media-header">
             <h3 className="su-ip-card-title">Available Media</h3>
             <div className="su-ip-filter-pills" style={{ alignItems: 'center' }}>
-              {["All", "Audio", "Video", "Image"].map(f => (
+              {["All", "Ad Video", "Video", "Audio", "Image"].map(f => (
                 <button
                   key={f}
                   className={`su-ip-filter-pill ${activeFilter === f ? "su-ip-filter-pill--active" : ""}`}
@@ -274,7 +277,14 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
                       {getMediaIcon(m.type)}
                     </div>
                     <div className="su-ip-media-info">
-                      <p className="su-ip-media-name">{m.name}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <p className="su-ip-media-name" style={{ margin: 0 }}>{m.name}</p>
+                        {(m.fileCategory === "offer" || m.templateId) && (
+                          <span style={{ fontSize: "0.65rem", background: "rgba(240, 90, 40, 0.12)", color: "#F05A28", border: "1px solid rgba(240, 90, 40, 0.3)", padding: "1px 5px", borderRadius: 4, fontWeight: 700, whiteSpace: "nowrap" }}>
+                            Ad Video
+                          </span>
+                        )}
+                      </div>
                       <p className="su-ip-media-meta">{m.duration || "0:45"}</p>
                     </div>
                     <button className="su-ip-add-btn" onClick={() => addToPlaylist(m)}>
@@ -324,7 +334,7 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
       <div className="su-ip-card su-ip-stores-section">
         <div className="su-ip-stores-header">
           <div>
-            <h3 className="su-ip-card-title">Select stores</h3>
+            <h3 className="su-ip-card-title">Select Device</h3>
             <p className="su-ip-stores-subtitle">Choose which store will play this announcement</p>
           </div>
           {devices.length > 0 && (

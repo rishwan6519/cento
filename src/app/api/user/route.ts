@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
       companyName,
       location,
       hasAllStoreAccess,
-      assignedStoreId
+      assignedStoreId,
+      socialCredentials
     } = await req.json();
     
     if (!username?.trim() || !password) {
@@ -66,6 +67,13 @@ export async function POST(req: NextRequest) {
       customerId: customerId ? mongoose.Types.ObjectId.createFromHexString(customerId) : undefined,
       hasAllStoreAccess: hasAllStoreAccess !== undefined ? hasAllStoreAccess : false,
       assignedStoreId: assignedStoreId ? mongoose.Types.ObjectId.createFromHexString(assignedStoreId) : undefined,
+      socialCredentials: socialCredentials ? {
+        facebookPageId: socialCredentials.facebookPageId?.trim() || undefined,
+        facebookPageAccessToken: socialCredentials.facebookPageAccessToken?.trim() || undefined,
+        facebookPageName: socialCredentials.facebookPageName?.trim() || undefined,
+        instagramBusinessId: socialCredentials.instagramBusinessId?.trim() || undefined,
+        instagramUsername: socialCredentials.instagramUsername?.trim() || undefined,
+      } : undefined,
     });
 
     try {
@@ -184,7 +192,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const { username, password, currentPassword, storeName, storeLocation, phone, email, companyName, location, mediaProvisioning, hasAllStoreAccess, assignedStoreId, provisionedFiles, approvalStatus, defaultAnnouncementFrequency } = await req.json();
+    const { username, password, currentPassword, storeName, storeLocation, phone, email, companyName, location, mediaProvisioning, hasAllStoreAccess, assignedStoreId, provisionedFiles, approvalStatus, defaultAnnouncementFrequency, socialCredentials } = await req.json();
 
     const user = await User.findById(userId);
     if (!user) {
@@ -223,6 +231,16 @@ export async function PUT(req: NextRequest) {
     if (assignedStoreId !== undefined) (user as any).assignedStoreId = assignedStoreId ? mongoose.Types.ObjectId.createFromHexString(assignedStoreId) : null;
     if (provisionedFiles !== undefined) (user as any).provisionedFiles = provisionedFiles;
     if (approvalStatus !== undefined) (user as any).approvalStatus = approvalStatus;
+    if (socialCredentials !== undefined) {
+      (user as any).socialCredentials = {
+        facebookPageId: socialCredentials?.facebookPageId?.trim() || undefined,
+        facebookPageAccessToken: socialCredentials?.facebookPageAccessToken?.trim() || undefined,
+        facebookPageName: socialCredentials?.facebookPageName?.trim() || undefined,
+        instagramBusinessId: socialCredentials?.instagramBusinessId?.trim() || undefined,
+        instagramUsername: socialCredentials?.instagramUsername?.trim() || undefined,
+      };
+      user.markModified('socialCredentials');
+    }
     if (defaultAnnouncementFrequency !== undefined) {
       (user as any).defaultAnnouncementFrequency = defaultAnnouncementFrequency;
       

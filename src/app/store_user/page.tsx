@@ -42,6 +42,8 @@ import TimelineSchedulesView from "./TimelineSchedulesView";
 import SubUsersView from "../components/SubUsersView";
 import AuditLogsView from "../components/AuditLogsView";
 import SettingsView from "./SettingsView";
+import TemplateEditorView from "./TemplateEditorView";
+import SocialSchedulerView from "./SocialSchedulerView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ViewKey =
@@ -63,7 +65,9 @@ export type ViewKey =
   | "subUsers"
   | "auditLogs"
   | "timelineSchedules"
-  | "settings";
+  | "settings"
+  | "templateEditor"
+  | "socialScheduler";
 
 interface OfflineDevice {
   id: string;
@@ -77,7 +81,7 @@ interface OfflineDevice {
 // ─── Sidebar Component ────────────────────────────────────────────────────────
 interface SidebarProps {
   activeView: ViewKey;
-  onNavigate: (view: ViewKey) => void;
+  onNavigate: (view: ViewKey, extra?: any) => void;
   mediaOpen: boolean;
   setMediaOpen: (v: boolean) => void;
   supportOpen: boolean;
@@ -252,17 +256,34 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
-          {/* Video Template */}
-          {hasPermission("videoTemplate") && (
+          {/* Video Templates Library */}
+          <button
+            className={`store-nav-item ${isActive("aiVideoTemplates") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("aiVideoTemplates")}
+          >
+            <FaLayerGroup className="store-nav-item__icon" />
+            <span>Video Templates Library</span>
+          </button>
+
+          {/* Video Template Studio */}
+          {(hasPermission("videoTemplate") || !isSubUser) && (
             <button
-              className="store-nav-item"
-              onClick={handleVideoTemplateClick}
-              disabled={loadingSSO}
+              className={`store-nav-item ${isActive("templateEditor") ? "store-nav-item--active" : ""}`}
+              onClick={() => onNavigate("templateEditor")}
             >
               <FaFilm className="store-nav-item__icon" />
-              <span>{loadingSSO ? "Loading..." : "Video Template"}</span>
+              <span>Video Template Studio</span>
             </button>
           )}
+
+          {/* Social Media Content Planner & Scheduling */}
+          <button
+            className={`store-nav-item ${isActive("socialScheduler") ? "store-nav-item--active" : ""}`}
+            onClick={() => onNavigate("socialScheduler")}
+          >
+            <span className="store-nav-item__icon" style={{ fontSize: "1.05rem" }}>📅</span>
+            <span>Social Media Scheduling</span>
+          </button>
 
           {!isSubUser && (
             <button
@@ -551,6 +572,7 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function StoreUserPage() {
   const [activeView, setActiveView] = useState<ViewKey>("dashboard");
+  const [socialTemplateId, setSocialTemplateId] = useState<string | undefined>(undefined);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -625,7 +647,12 @@ export default function StoreUserPage() {
     fetchDevices();
   }, []);
 
-  const handleNavigate = (view: ViewKey) => {
+  const handleNavigate = (view: ViewKey, extra?: any) => {
+    if (extra?.templateId) {
+      setSocialTemplateId(extra.templateId);
+    } else if (extra?.createNew || view === "templateEditor") {
+      setSocialTemplateId(undefined);
+    }
     // Clear editingPlaylist when going to any creation view directly
     // (the Edit flow sets editingPlaylist BEFORE calling handleNavigate, so it's safe)
     if (
@@ -641,7 +668,9 @@ export default function StoreUserPage() {
       view === "aiVideoTemplates" ||
       view === "offerCreation" ||
       view === "veo3TextVideo" ||
-      view === "timelineSchedules"
+      view === "timelineSchedules" ||
+      view === "templateEditor" ||
+      view === "socialScheduler"
     ) {
       setEditingPlaylist(null);
     }
@@ -734,7 +763,7 @@ export default function StoreUserPage() {
       case "aiVideoGeneration":
         return <AIVideoGenerationView />;
       case "aiVideoTemplates":
-        return <AIVideoTemplatesView />;
+        return <AIVideoTemplatesView onNavigate={handleNavigate} />;
       case "offerCreation":
         return <OfferCreation />;
       case "mediaLibrary":
@@ -749,6 +778,10 @@ export default function StoreUserPage() {
         return <AuditLogsView userId={localStorage.getItem("userId") || ''} />;
       case "settings":
         return <SettingsView />;
+      case "templateEditor":
+        return <TemplateEditorView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} key={socialTemplateId || "new_template_studio"} />;
+      case "socialScheduler":
+        return <SocialSchedulerView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} />;
       default:
         return (
           <div className="store-placeholder">
@@ -857,6 +890,7 @@ export default function StoreUserPage() {
 
         /* ── Content Area ── */
         .store-content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+        .store-content--editor { padding: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; height: calc(100vh - 70px) !important; }
         
         .store-dashboard-view { display: flex; flex-direction: column; gap: 24px; }
 
@@ -966,7 +1000,9 @@ export default function StoreUserPage() {
         />
         <div className="store-layout-right">
           <Header userName={userName} onMobileMenuOpen={() => setMobileOpen(true)} />
-          <main className="store-content">{renderContent()}</main>
+          <main className={`store-content ${activeView === "templateEditor" ? "store-content--editor" : ""}`}>
+            {renderContent()}
+          </main>
         </div>
       </div>
     </>

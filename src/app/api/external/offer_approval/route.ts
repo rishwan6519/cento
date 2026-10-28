@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
         if (targetJobId) {
           try {
             const apiKey = process.env.CLOUDBASES_API_KEY || "";
-            const cloudRes = await fetch(`https://cloudbases.in/storesparc_video/index.php/api/external/videos?job_id=${targetJobId}`, {
+            const cloudRes = await fetch(`https://video-generator.storesparc.com/index.php/api/external/videos?job_id=${targetJobId}`, {
               headers: { ...(apiKey ? { 'X-API-Key': apiKey } : {}) }
             });
             if (cloudRes.ok) {
@@ -482,7 +482,7 @@ export async function POST(req: NextRequest) {
                     if (publishMode === "schedule") {
                       fbPayload.scheduled_at = scheduledAtStr;
                     }
-                    const fbRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/facebook/posts", {
+                    const fbRes = await fetch("https://video-generator.storesparc.com/index.php/api/external/facebook/posts", {
                       method: "POST",
                       headers,
                       body: JSON.stringify(fbPayload)
@@ -510,7 +510,7 @@ export async function POST(req: NextRequest) {
                     if (publishMode === "schedule") {
                       igPayload.scheduled_at = scheduledAtStr;
                     }
-                    const igRes = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/instagram/posts", {
+                    const igRes = await fetch("https://video-generator.storesparc.com/index.php/api/external/instagram/posts", {
                       method: "POST",
                       headers,
                       body: JSON.stringify(igPayload)

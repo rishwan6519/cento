@@ -611,7 +611,14 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                       <tr key={id}>
                         <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(String(id))} onChange={() => toggleMedia(id)} /></td>
                         <td style={{ fontWeight: 500, color: '#445459' }}>
-                          {media.name}
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span>{media.name}</span>
+                            {(media.fileCategory === 'offer' || media.templateId) && (
+                              <span style={{ fontSize: '0.65rem', background: 'rgba(240, 90, 40, 0.12)', color: '#F05A28', border: '1px solid rgba(240, 90, 40, 0.3)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                Ad Video
+                              </span>
+                            )}
+                          </div>
                           {badge === 'audio' && selectedMediaIds.includes(String(id)) && (
                             <div style={{ marginTop: 8, padding: '8px 10px', background: '#F8FAFB', borderRadius: 6, border: '1px dashed #D6E6E9', maxWidth: 220 }}>
                               <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#162B30' }}>

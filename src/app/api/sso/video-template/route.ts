@@ -6,7 +6,7 @@ export async function GET() {
 
     // We try GET first as it's standard for simple link generation, 
     // but if it's POST on their end, you might need to change the method here.
-    const response = await fetch('https://cloudbases.in/storesparc_video/index.php/api/external/sso', {
+    const response = await fetch('https://video-generator.storesparc.com/index.php/api/external/sso', {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,

@@ -38,8 +38,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const media = await MediaItemModel.find({ userId: { $in: userIdsToFetch } })
-      .sort({ createdAt: -1 });
+    const query = {
+      $or: [
+        { userId: { $in: userIdsToFetch } },
+        { templateId: { $exists: true, $ne: '' } },
+        { fileCategory: 'offer' },
+      ],
+    };
+    const media = await MediaItemModel.find(query).sort({ createdAt: -1 });
     console.log("Media items fetched successfully:", media.length);
 
     return NextResponse.json({ media });
