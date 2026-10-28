@@ -10,10 +10,15 @@ export async function GET(
     const { file: fileArray } = await params;
     
     // Construct the absolute path to the file in the root 'uploads' directory
-    const filePath = path.join(process.cwd(), "uploads", ...fileArray);
+    let filePath = path.join(process.cwd(), "uploads", ...fileArray);
 
     if (!fs.existsSync(filePath)) {
-      return new NextResponse("File not found", { status: 404 });
+      const fallbackPublicPath = path.join(process.cwd(), "public", "uploads", ...fileArray);
+      if (fs.existsSync(fallbackPublicPath)) {
+        filePath = fallbackPublicPath;
+      } else {
+        return new NextResponse("File not found", { status: 404 });
+      }
     }
 
     const fileBuffer = fs.readFileSync(filePath);

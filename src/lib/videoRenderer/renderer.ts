@@ -481,7 +481,7 @@ export async function renderSingleAspect(
   }
 
   // 4. Setup directories
-  const renderedDir = join(process.cwd(), 'public', 'uploads', 'rendered');
+  const renderedDir = join(process.cwd(), 'uploads', 'rendered');
   if (!existsSync(renderedDir)) {
     await mkdir(renderedDir, { recursive: true });
   }

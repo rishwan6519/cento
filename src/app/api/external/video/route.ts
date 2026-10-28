@@ -1,3 +1,4 @@
+import { writeFile, mkdir } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import { queueRenderJob } from '@/lib/videoRenderer/renderService';
 import { RenderInputFiles } from '@/lib/videoRenderer/types';
@@ -77,14 +78,35 @@ export async function POST(req: NextRequest) {
           const ab = await value.arrayBuffer();
           const buf = Buffer.from(ab);
 
+          const safeSubdir = (lowerKey === 'background' || lowerKey.includes('background') || lowerKey.includes('bg'))
+            ? 'backgrounds'
+            : (lowerKey === 'logo' || lowerKey.includes('logo'))
+            ? 'logo'
+            : (lowerKey === 'music' || lowerKey.includes('music') || lowerKey === 'audio' || lowerKey.includes('audio'))
+            ? 'music'
+            : 'products';
+
+          const targetUploadDir = join(process.cwd(), 'uploads', safeSubdir);
+          if (!existsSync(targetUploadDir)) {
+            await mkdir(targetUploadDir, { recursive: true });
+          }
+          const sanitizedFilename = `${Date.now()}_${value.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+          const savedFilePath = join(targetUploadDir, sanitizedFilename);
+          await writeFile(savedFilePath, buf);
+          const localSavedUrl = `/uploads/${safeSubdir}/${sanitizedFilename}`;
+
           if (lowerKey === 'background' || lowerKey.includes('background') || lowerKey.includes('bg')) {
             inputFiles.backgroundBuffer = buf;
+            inputFiles.backgroundUrl = localSavedUrl;
           } else if (lowerKey === 'product' || lowerKey.includes('product') || lowerKey === 'image' || lowerKey.includes('image')) {
             inputFiles.productBuffer = buf;
+            inputFiles.productUrl = localSavedUrl;
           } else if (lowerKey === 'logo' || lowerKey.includes('logo')) {
             inputFiles.logoBuffer = buf;
+            inputFiles.logoUrl = localSavedUrl;
           } else if (lowerKey === 'music' || lowerKey.includes('music') || lowerKey === 'audio' || lowerKey.includes('audio')) {
             inputFiles.musicBuffer = buf;
+            inputFiles.musicUrl = localSavedUrl;
           } else if (lowerKey.includes('decor')) {
             if (!inputFiles.decorations) inputFiles.decorations = [];
             inputFiles.decorations.push({ buffer: buf });
