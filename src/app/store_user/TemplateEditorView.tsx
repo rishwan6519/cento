@@ -145,6 +145,23 @@ const ASPECT_SPECS: Record<AspectRatio, AspectDimension> = {
   "4:5": { ratio: "4:5", label: "4:5 Portrait (Social Ad)", width: 1080, height: 1350 },
 };
 
+export interface DemoAudioTune {
+  id: string;
+  name: string;
+  desc: string;
+  url: string;
+  icon: string;
+}
+
+export const DEMO_AUDIO_TUNES: DemoAudioTune[] = [
+  { id: "upbeat_retail", name: "Upbeat Retail Pop", desc: "Catchy, bright commercial groove (Default)", url: "/audio/presets/upbeat_retail.mp3", icon: "🛍️" },
+  { id: "energetic_sale", name: "Energetic Mega Sale", desc: "Fast-paced, vibrant promotion beats", url: "/audio/presets/energetic_sale.mp3", icon: "⚡" },
+  { id: "modern_store", name: "Modern Store Lounge", desc: "Sophisticated, smooth lifestyle background", url: "/audio/presets/modern_store.mp3", icon: "🏢" },
+  { id: "luxury_minimal", name: "Luxury & Minimalist", desc: "Subtle, high-end ambient elegance", url: "/audio/presets/luxury_minimal.mp3", icon: "✨" },
+  { id: "electric_pulse", name: "Electric Pulse Beat", desc: "Punchy, modern electronic sale rhythm", url: "/audio/presets/electric_pulse.mp3", icon: "🔥" },
+  { id: "gentle_acoustic", name: "Gentle Melody", desc: "Warm, friendly boutique acoustic theme", url: "/audio/presets/gentle_acoustic.mp3", icon: "🎸" },
+];
+
 const DEFAULT_LAYERS: Record<AspectRatio, LayersConfig> = {
   "16:9": {
     product: { type: "product", x: 0.18, y: 0.45, size: 38, shape: "none", bgMode: "transparent", bgColor: "transparent", animation: "slide_up", animStart: 0.2, animEnd: 1.2 },
@@ -1428,6 +1445,9 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   );
   const [musicUrl, setMusicUrl] = useState<string>("");
   const [musicVolume, setMusicVolume] = useState<number>(70);
+  const [musicMode, setMusicMode] = useState<"preset" | "upload" | "none">("preset");
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("upbeat_retail");
+  const [previewingTuneId, setPreviewingTuneId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   // Decorations
@@ -2946,7 +2966,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         templateName: nameToSave,
         templateId: targetNumericId,
         aspectRatio: activeRatio,       // primary/active ratio
-        videoDuration: duration,
+        videoDuration: duration || 10,
+        musicUrl: musicMode === "none" ? "" : (musicUrl || `/audio/presets/${selectedPresetId}.mp3`),
         fps,
         resolution,
         layers: currentLayers,          // active ratio layers (for backward compat)
@@ -2958,7 +2979,6 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         bgGradIndex,
         logoUrl: logoImageUrl,
         productUrl: productImageUrl,
-        musicUrl,
         offerType,
         animationStyle,
         animation: { enabled: animationStyle !== "static", style: animationStyle },
@@ -3013,7 +3033,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     if (tpl.offerType) setOfferType(tpl.offerType);
     if (tpl.decorations && Array.isArray(tpl.decorations)) setDecorations(tpl.decorations);
     else setDecorations([]);
-    if (tpl.videoDuration) setDuration(tpl.videoDuration);
+    const tplDur = Number(tpl.videoDuration || (tpl as any).video_duration || (tpl as any).duration);
+    if (tplDur && !isNaN(tplDur)) setDuration(tplDur);
 
     const targetRatio: AspectRatio = preferRatio || initialRatio || (tpl.aspectRatio && ["9:16", "16:9", "1:1", "4:5"].includes(tpl.aspectRatio) ? tpl.aspectRatio as AspectRatio : "16:9");
     setActiveRatio(targetRatio);
@@ -3084,7 +3105,21 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     }
     if (tpl.logoUrl) setLogoImageUrl(tpl.logoUrl);
     if (tpl.productUrl) setProductImageUrl(tpl.productUrl);
-    if (tpl.musicUrl) setMusicUrl(tpl.musicUrl);
+    const tplMusic = tpl.musicUrl || (tpl as any).music_url || "";
+    if (tplMusic) {
+      setMusicUrl(tplMusic);
+      const matched = DEMO_AUDIO_TUNES.find(d => d.url === tplMusic || tplMusic.includes(d.id));
+      if (matched) {
+        setMusicMode("preset");
+        setSelectedPresetId(matched.id);
+      } else {
+        setMusicMode("upload");
+      }
+    } else {
+      setMusicMode("preset");
+      setSelectedPresetId("upbeat_retail");
+      setMusicUrl("/audio/presets/upbeat_retail.mp3");
+    }
     if (tpl.animationStyle) setAnimationStyle(tpl.animationStyle);
     else if (tpl.animation && tpl.animation.style) setAnimationStyle(tpl.animation.style);
 
@@ -4324,54 +4359,232 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                 </div>
               </div>
 
-              {/* Music Library */}
+              {/* Multi-Option Background Music & Demo Tunes */}
               <div className="ste-field-group">
-                <label className="ste-label">Background Music</label>
-                <div className="ste-upload-box">
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={(e) => handleUploadFile(e, "music")}
-                    id="ste-music-upload"
-                  />
-                  <label htmlFor="ste-music-upload" className="ste-upload-label">
-                    <FaMusic /> Upload Audio Track (MP3/WAV)
-                  </label>
-                </div>
-                {musicUrl && (
-                  <div style={{ marginTop: "6px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <label className="ste-label" style={{ margin: 0 }}>Background Music</label>
+                  <div style={{ display: "inline-flex", background: "rgba(255,255,255,0.06)", borderRadius: "6px", padding: "2px", gap: "2px" }}>
                     <button
-                      className="ste-btn ste-btn--secondary ste-btn--sm"
+                      type="button"
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        background: musicMode === "preset" ? "#11B5BB" : "transparent",
+                        color: musicMode === "preset" ? "#0a192f" : "#cbd5e1",
+                      }}
                       onClick={() => {
-                        if (isPlayingAudio && audioRef.current) {
+                        setMusicMode("preset");
+                        const current = DEMO_AUDIO_TUNES.find(d => d.id === selectedPresetId) || DEMO_AUDIO_TUNES[0];
+                        setMusicUrl(current.url);
+                      }}
+                    >
+                      Demo Tunes
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        background: musicMode === "upload" ? "#11B5BB" : "transparent",
+                        color: musicMode === "upload" ? "#0a192f" : "#cbd5e1",
+                      }}
+                      onClick={() => setMusicMode("upload")}
+                    >
+                      Custom Upload
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        background: musicMode === "none" ? "#ef4444" : "transparent",
+                        color: musicMode === "none" ? "#ffffff" : "#94a3b8",
+                      }}
+                      onClick={() => {
+                        setMusicMode("none");
+                        setMusicUrl("");
+                        if (audioRef.current) {
                           audioRef.current.pause();
                           setIsPlayingAudio(false);
-                        } else if (audioRef.current) {
-                          audioRef.current.volume = musicVolume / 100;
-                          audioRef.current.play();
-                          setIsPlayingAudio(true);
                         }
                       }}
                     >
-                      {isPlayingAudio ? <FaVolumeXmark /> : <FaVolumeHigh />}
-                      <span>{isPlayingAudio ? "Stop" : "Listen"}</span>
+                      Mute
                     </button>
-                    <span style={{ fontSize: "0.72rem", color: "#11B5BB" }}>Track Loaded</span>
+                  </div>
+                </div>
+
+                {/* 1. Demo Audio Presets List */}
+                {musicMode === "preset" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
+                    {DEMO_AUDIO_TUNES.map((tune) => {
+                      const isSelected = selectedPresetId === tune.id;
+                      const isPlayingThis = isPlayingAudio && previewingTuneId === tune.id;
+                      return (
+                        <div
+                          key={tune.id}
+                          onClick={() => {
+                            setSelectedPresetId(tune.id);
+                            setMusicUrl(tune.url);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            border: isSelected ? "1px solid #11B5BB" : "1px solid rgba(255,255,255,0.08)",
+                            background: isSelected ? "rgba(17,181,187,0.12)" : "rgba(255,255,255,0.03)",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
+                            <span style={{ fontSize: "1.05rem" }}>{tune.icon}</span>
+                            <div style={{ overflow: "hidden" }}>
+                              <div style={{ fontSize: "0.78rem", fontWeight: 600, color: isSelected ? "#11B5BB" : "#f1f5f9" }}>
+                                {tune.name}
+                              </div>
+                              <div style={{ fontSize: "0.68rem", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {tune.desc}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPresetId(tune.id);
+                                setMusicUrl(tune.url);
+                                if (isPlayingThis && audioRef.current) {
+                                  audioRef.current.pause();
+                                  setIsPlayingAudio(false);
+                                  setPreviewingTuneId(null);
+                                } else if (audioRef.current) {
+                                  audioRef.current.src = tune.url;
+                                  audioRef.current.volume = musicVolume / 100;
+                                  audioRef.current.play().then(() => {
+                                    setIsPlayingAudio(true);
+                                    setPreviewingTuneId(tune.id);
+                                  }).catch(() => {});
+                                }
+                              }}
+                              style={{
+                                padding: "4px 8px",
+                                fontSize: "0.7rem",
+                                borderRadius: "4px",
+                                border: "none",
+                                background: isPlayingThis ? "#ef4444" : "rgba(255,255,255,0.12)",
+                                color: "#fff",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              {isPlayingThis ? <FaVolumeXmark size={11} /> : <FaVolumeHigh size={11} />}
+                              <span>{isPlayingThis ? "Pause" : "Play"}</span>
+                            </button>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                width: "12px",
+                                height: "12px",
+                                borderRadius: "50%",
+                                border: isSelected ? "3px solid #11B5BB" : "2px solid rgba(255,255,255,0.3)",
+                                background: isSelected ? "#0a192f" : "transparent",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                <div className="ste-range-slider" style={{ marginTop: "8px" }}>
-                  <span className="ste-sublabel">Volume: {musicVolume}%</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={musicVolume}
-                    onChange={(e) => {
-                      setMusicVolume(Number(e.target.value));
-                      if (audioRef.current) audioRef.current.volume = Number(e.target.value) / 100;
-                    }}
-                  />
-                </div>
+
+                {/* 2. Custom Upload Box */}
+                {musicMode === "upload" && (
+                  <div className="ste-upload-box">
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => {
+                        handleUploadFile(e, "music");
+                        setSelectedPresetId("");
+                      }}
+                      id="ste-music-upload"
+                    />
+                    <label htmlFor="ste-music-upload" className="ste-upload-label">
+                      <FaMusic /> Upload Audio Track (MP3/WAV)
+                    </label>
+                  </div>
+                )}
+
+                {/* 3. Mute Notice */}
+                {musicMode === "none" && (
+                  <div style={{ padding: "8px 12px", background: "rgba(239,68,68,0.1)", borderRadius: "6px", border: "1px solid rgba(239,68,68,0.25)", fontSize: "0.72rem", color: "#fca5a5" }}>
+                    🔇 No background music will be attached. Video will render silent.
+                  </div>
+                )}
+
+                {/* Track Status & Listen Button */}
+                {musicUrl && musicMode !== "none" && (
+                  <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <button
+                        type="button"
+                        className="ste-btn ste-btn--secondary ste-btn--sm"
+                        onClick={() => {
+                          if (isPlayingAudio && audioRef.current) {
+                            audioRef.current.pause();
+                            setIsPlayingAudio(false);
+                            setPreviewingTuneId(null);
+                          } else if (audioRef.current) {
+                            audioRef.current.volume = musicVolume / 100;
+                            audioRef.current.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+                          }
+                        }}
+                      >
+                        {isPlayingAudio ? <FaVolumeXmark /> : <FaVolumeHigh />}
+                        <span>{isPlayingAudio ? "Stop All" : "Listen Active"}</span>
+                      </button>
+                      <span style={{ fontSize: "0.72rem", color: "#11B5BB" }}>
+                        {musicMode === "preset" ? `Track: ${DEMO_AUDIO_TUNES.find(d => d.id === selectedPresetId)?.name || 'Demo Preset'}` : "Custom Track Uploaded"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Volume Slider */}
+                {musicMode !== "none" && (
+                  <div className="ste-range-slider" style={{ marginTop: "8px" }}>
+                    <span className="ste-sublabel">Volume: {musicVolume}%</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={musicVolume}
+                      onChange={(e) => {
+                        const vol = Number(e.target.value);
+                        setMusicVolume(vol);
+                        if (audioRef.current) audioRef.current.volume = vol / 100;
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Video Specs */}

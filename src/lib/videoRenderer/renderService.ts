@@ -208,8 +208,12 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
               }
               fullOptions.layers = merged;
             }
-            if (tplDoc.videoDuration && !fullOptions.duration) {
-              fullOptions.duration = tplDoc.videoDuration;
+            const tplDur = Number(tplDoc.videoDuration || tplDoc.duration || tplDoc.video_duration);
+            if (tplDur && (!fullOptions.duration || fullOptions.duration === 6)) {
+              fullOptions.duration = tplDur;
+            }
+            if (!fullOptions.duration) {
+              fullOptions.duration = 10;
             }
             const targetBg = (tplDoc.aspectBackgrounds && tplDoc.aspectBackgrounds[targetRatio]) || tplDoc.backgroundUrl;
             if (targetBg && !fullOptions.files.backgroundUrl && !fullOptions.files.backgroundBuffer) {

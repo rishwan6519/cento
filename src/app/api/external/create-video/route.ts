@@ -682,7 +682,7 @@ export async function POST(req: NextRequest) {
         userId: userId.trim(),
         text: finalText || text,
         aspectRatio: finalAspectRatio || "16:9",
-        duration: Math.max(4, Math.min(8, Number(String(finalDuration || "4").replace("s", "")) || 4)),
+        duration: Math.max(4, Math.min(60, Number(String(finalDuration || "10").replace("s", "")) || 10)),
         offerId: cleanOfferId || "",
         tagline: finalTagline || "",
         templateId: templateId ? String(templateId).trim() : "",

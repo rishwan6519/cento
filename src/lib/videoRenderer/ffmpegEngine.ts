@@ -88,21 +88,38 @@ export function resolveMusicTrack(params: {
     return undefined;
   }
 
-  if (params.customPath && existsSync(params.customPath)) {
-    return params.customPath;
+  // 1. Direct custom path check (both absolute and relative)
+  if (params.customPath) {
+    const rawClean = params.customPath.replace(/^\/+/, '');
+    const pathCandidates = [
+      params.customPath,
+      join(process.cwd(), params.customPath),
+      join(process.cwd(), rawClean),
+      join(process.cwd(), 'uploads', rawClean.replace(/^uploads[\/\\]/, '')),
+      join(process.cwd(), 'public', rawClean),
+    ];
+    for (const p of pathCandidates) {
+      if (existsSync(p)) return p;
+    }
   }
 
+  // 2. Preset name check across public and uploads
   const presetName = (params.musicPreset || 'upbeat_retail').replace('.mp3', '');
-  const presetFile = join(process.cwd(), 'public', 'audio', 'presets', `${presetName}.mp3`);
-  if (existsSync(presetFile)) {
-    return presetFile;
+  if (presetName && presetName !== 'none') {
+    const presetCandidates = [
+      join(process.cwd(), 'public', 'audio', 'presets', `${presetName}.mp3`),
+      join(process.cwd(), 'uploads', 'audio', 'presets', `${presetName}.mp3`),
+    ];
+    for (const p of presetCandidates) {
+      if (existsSync(p)) return p;
+    }
   }
 
-  // Fallback to upbeat_retail.mp3
-  const defaultFile = join(process.cwd(), 'public', 'audio', 'presets', 'upbeat_retail.mp3');
-  if (existsSync(defaultFile)) {
-    return defaultFile;
-  }
+  // 3. Fallback to default upbeat_retail.mp3
+  const defaultPublic = join(process.cwd(), 'public', 'audio', 'presets', 'upbeat_retail.mp3');
+  if (existsSync(defaultPublic)) return defaultPublic;
+  const defaultUploads = join(process.cwd(), 'uploads', 'audio', 'presets', 'upbeat_retail.mp3');
+  if (existsSync(defaultUploads)) return defaultUploads;
 
   return undefined;
 }

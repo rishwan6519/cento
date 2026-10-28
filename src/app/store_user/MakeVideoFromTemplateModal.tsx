@@ -56,7 +56,13 @@ export default function MakeVideoFromTemplateModal({
     (initialTemplate?.aspectRatio as AspectRatio) || (selectedTemplate?.aspectRatio as AspectRatio) || "16:9"
   );
   const [generatePack, setGeneratePack] = useState<boolean>(true);
-  const [duration, setDuration] = useState<number>(selectedTemplate?.videoDuration || 6);
+  const initialDur = Number(
+    selectedTemplate?.videoDuration ||
+    (selectedTemplate as any)?.video_duration ||
+    (selectedTemplate as any)?.duration ||
+    10
+  );
+  const [duration, setDuration] = useState<number>(initialDur);
   const [musicPreset, setMusicPreset] = useState<string>("upbeat_retail");
 
   // ── Editable Fields: Photo & Visuals ──
@@ -160,7 +166,13 @@ export default function MakeVideoFromTemplateModal({
       setBgGradIndex(typeof (t as any).bgGradIndex === "number" ? (t as any).bgGradIndex : 0);
     }
     if (t.logoUrl) setLogoUrl(t.logoUrl);
-    if (t.videoDuration) setDuration(t.videoDuration);
+    const tDur = Number(
+      t.videoDuration ||
+      (t as any)?.video_duration ||
+      (t as any)?.duration ||
+      10
+    );
+    setDuration(tDur);
 
     // Reset playback
     startRef.current = null;
@@ -851,11 +863,13 @@ export default function MakeVideoFromTemplateModal({
                       value={musicPreset}
                       onChange={(e) => setMusicPreset(e.target.value)}
                     >
-                      <option value="upbeat_retail">Upbeat Retail (Default)</option>
-                      <option value="energetic_sale">Energetic Sale</option>
-                      <option value="modern_store">Modern Store</option>
-                      <option value="luxury_minimal">Luxury Minimal</option>
-                      <option value="none">No Audio (Mute)</option>
+                      <option value="upbeat_retail">🛍️ Upbeat Retail Pop (Default)</option>
+                      <option value="energetic_sale">⚡ Energetic Mega Sale</option>
+                      <option value="modern_store">🏢 Modern Store Lounge</option>
+                      <option value="luxury_minimal">✨ Luxury &amp; Minimalist</option>
+                      <option value="electric_pulse">🔥 Electric Pulse Beat</option>
+                      <option value="gentle_acoustic">🎸 Gentle Melody</option>
+                      <option value="none">🚫 No Audio (Mute)</option>
                     </select>
                   </div>
 
@@ -866,9 +880,11 @@ export default function MakeVideoFromTemplateModal({
                       value={duration}
                       onChange={(e) => setDuration(Number(e.target.value))}
                     >
-                      <option value={6}>6 Seconds (Quick Reel / Ad)</option>
+                      <option value={5}>5 Seconds (Quick Clip)</option>
+                      <option value={8}>8 Seconds (Dynamic Ad)</option>
                       <option value={10}>10 Seconds (Standard Retail)</option>
                       <option value={15}>15 Seconds (Extended Story)</option>
+                      <option value={30}>30 Seconds (In-Store Loop)</option>
                     </select>
                   </div>
                 </div>

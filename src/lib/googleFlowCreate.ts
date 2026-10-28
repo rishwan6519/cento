@@ -322,7 +322,7 @@ export async function startGoogleFlowVideoJob({
     finalText = text.trim() + `\n\n[MANDATORY ON-SCREEN PROMOTIONAL TEXT OVERLAY: Render a high-end commercial typographic graphic banner prominently at the VERY TOP of the video frame reading exactly: "${finalTagline}". Ensure this promotional offer text is sharp, bold, elegant, and cleanly overlaid at the top above the video scene alongside the brand logo.]`;
   }
 
-  const cleanDuration = Math.max(4, Math.min(8, Number(String(duration || 4).replace("s", "")) || 4));
+  const cleanDuration = Math.max(4, Math.min(60, Number(String(duration || 10).replace("s", "")) || 10));
   const rawImageCandidate = imageBase64 || (images && images.length > 0 ? images[0] : "");
   const resolvedImage = await resolveProductImage(rawImageCandidate, imageMimeType);
 

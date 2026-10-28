@@ -196,7 +196,8 @@ export async function POST(req: NextRequest) {
 
     const ratio = body.ratio || body.aspect_ratio || body.aspectRatio || '16:9';
     const resolution = Number(body.resolution) || 720;
-    const duration = Number(body.duration) || 6;
+    const rawDur = body.duration ?? body.videoDuration ?? body.video_duration;
+    const duration = rawDur ? Number(rawDur) : undefined;
     const fps = Number(body.fps) || 30;
 
     const musicPreset = body.music_preset || body.musicPreset || body.audio_preset || body.audioPreset || body.preset || '';
