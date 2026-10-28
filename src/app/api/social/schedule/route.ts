@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  * - Target: Day before startDate at 18:00 (6:00 PM)
  * - If target is already completed/past <= now: schedule instantly (now)
  */
-export function calculateScheduleTiming(startDateInput?: string | Date, explicitScheduledAt?: string | Date) {
+function calculateScheduleTiming(startDateInput?: string | Date, explicitScheduledAt?: string | Date) {
   const now = new Date();
 
   // If caller provided explicit scheduledAt and no startDate
@@ -90,7 +90,7 @@ export function calculateScheduleTiming(startDateInput?: string | Date, explicit
 /**
  * Format message with hashtags
  */
-export function formatSocialMessage(caption?: string, hashtags?: string[] | string): string {
+function formatSocialMessage(caption?: string, hashtags?: string[] | string): string {
   let text = (caption || '').trim();
   if (Array.isArray(hashtags) && hashtags.length > 0) {
     const tags = hashtags.map((t) => (t.startsWith('#') ? t : `#${t}`)).join(' ');
