@@ -6,7 +6,7 @@ import SocialPost from '@/models/SocialPost';
 // ─── GET /api/social/posts/[postId] ───────────────────────────────────────────
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ postId: string }> | { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
     await connectToDatabase();
@@ -34,7 +34,7 @@ export async function GET(
 // ─── PUT /api/social/posts/[postId] ───────────────────────────────────────────
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ postId: string }> | { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
     await connectToDatabase();
@@ -72,7 +72,7 @@ export async function PUT(
 // ─── DELETE /api/social/posts/[postId] ────────────────────────────────────────
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ postId: string }> | { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
     await connectToDatabase();
