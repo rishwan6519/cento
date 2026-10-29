@@ -43,6 +43,10 @@ import CreateAnnouncementWizard from "../components/CreateAnnouncementWizard";
 import SubUsersView from "../components/SubUsersView";
 import AuditLogsView from "../components/AuditLogsView";
 import { useRouter } from "next/navigation";
+import AIVideoTemplatesView from "../store_user/AIVideoTemplatesView";
+import MediaLibraryView from "../store_user/MediaLibraryView";
+import SocialSchedulerView from "../store_user/SocialSchedulerView";
+import TemplateEditorView from "../store_user/TemplateEditorView";
 
 // --- Sub-components for different views ---
 
@@ -596,6 +600,7 @@ const StoreDetailView = ({ store, setActiveView, onEdit }: { store: any, setActi
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [activeStoreTab, setActiveStoreTab] = useState<"devices" | "media" | "social">("devices");
 
   const fetchDevices = async () => {
     if (!store?._id) return;
@@ -646,7 +651,7 @@ const StoreDetailView = ({ store, setActiveView, onEdit }: { store: any, setActi
   return (
     <div className="pb-12">
       {/* Top Navigation & Edit Action */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <button 
           onClick={() => setActiveView("all_stores")} 
           className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-all shadow-sm"
@@ -654,13 +659,29 @@ const StoreDetailView = ({ store, setActiveView, onEdit }: { store: any, setActi
           <ArrowRight className="rotate-180" size={16} />
           Back to All Stores
         </button>
-        <button 
-          onClick={() => onEdit ? onEdit(store) : setActiveView("edit_store")} 
-          className="flex items-center gap-2 text-sm font-bold text-white bg-[#FF5722] hover:bg-[#F4511E] px-5 py-2.5 rounded-xl transition-all shadow-md shadow-[#FF5722]/20"
-        >
-          <Edit size={16} />
-          Edit Store & Credentials
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button 
+            onClick={() => setActiveStoreTab("social")} 
+            className="flex items-center gap-2 text-sm font-bold text-cyan-800 bg-cyan-50 border border-cyan-200 hover:bg-cyan-100 px-4 py-2.5 rounded-xl transition-all shadow-sm"
+          >
+            <Clock size={16} />
+            Schedule Social Post for {storeName}
+          </button>
+          <button 
+            onClick={() => setActiveView("ai_video_templates")} 
+            className="flex items-center gap-2 text-sm font-bold text-indigo-800 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-4 py-2.5 rounded-xl transition-all shadow-sm"
+          >
+            <Film size={16} />
+            Create Video from Template
+          </button>
+          <button 
+            onClick={() => onEdit ? onEdit(store) : setActiveView("edit_store")} 
+            className="flex items-center gap-2 text-sm font-bold text-white bg-[#FF5722] hover:bg-[#F4511E] px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#FF5722]/20"
+          >
+            <Edit size={16} />
+            Edit Credentials
+          </button>
+        </div>
       </div>
 
       {/* Store Account & Credentials Card */}
@@ -742,6 +763,69 @@ const StoreDetailView = ({ store, setActiveView, onEdit }: { store: any, setActi
         </div>
       </div>
 
+      {/* Store Navigation Tabs */}
+      <div className="flex items-center gap-3 border-b border-gray-200 mb-6 pb-2">
+        <button
+          onClick={() => setActiveStoreTab("devices")}
+          className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition-all ${
+            activeStoreTab === "devices"
+              ? "bg-[#10353C] text-white shadow-md shadow-[#10353C]/20"
+              : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+          }`}
+        >
+          <Monitor size={17} />
+          Connected Devices ({devices.length})
+        </button>
+        <button
+          onClick={() => setActiveStoreTab("media")}
+          className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition-all ${
+            activeStoreTab === "media"
+              ? "bg-[#10353C] text-white shadow-md shadow-[#10353C]/20"
+              : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+          }`}
+        >
+          <FolderOpen size={17} />
+          Store Video Library &amp; Posted Videos
+        </button>
+        <button
+          onClick={() => setActiveStoreTab("social")}
+          className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition-all ${
+            activeStoreTab === "social"
+              ? "bg-[#10353C] text-white shadow-md shadow-[#10353C]/20"
+              : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
+          }`}
+        >
+          <Clock size={17} />
+          Social Media Schedules &amp; Posts
+        </button>
+      </div>
+
+      {activeStoreTab === "media" ? (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="mb-4 pb-3 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Videos &amp; Media for {storeName}</h2>
+              <p className="text-xs text-gray-500">All promotional videos, templates, and social broadcasting media</p>
+            </div>
+            <button
+              onClick={() => setActiveStoreTab("social")}
+              className="px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-bold hover:bg-cyan-700 transition-all flex items-center gap-1.5"
+            >
+              <Clock size={14} /> Schedule Selected Media
+            </button>
+          </div>
+          <MediaLibraryView storeUserId={store?._id} storeName={storeName} />
+        </div>
+      ) : activeStoreTab === "social" ? (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="mb-4 pb-3 border-b border-gray-100">
+            <h2 className="text-xl font-bold text-gray-900">Social Media Broadcasts for {storeName}</h2>
+            <p className="text-xs text-gray-500">Scheduled promotions, instant broadcasts, live post status, and preview</p>
+          </div>
+          <SocialSchedulerView storeUserId={store?._id} storeName={storeName} onNavigate={setActiveView} />
+        </div>
+      ) : (
+        <>
       <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
         <Monitor size={20} className="text-[#00BCD4]" />
         Connected Devices
@@ -807,6 +891,8 @@ const StoreDetailView = ({ store, setActiveView, onEdit }: { store: any, setActi
       >
         <Settings2 size={18} /> Connect devices
       </button>
+        </>
+      )}
     </div>
   );
 };
@@ -2093,7 +2179,17 @@ export default function AccountAdminDashboard() {
 
   const rawSidebarLinks = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, perm: null },
-    { id: "video_template", label: loadingSSO ? "Loading..." : "Video Template", icon: Film, perm: "video_template" },
+    { 
+      id: "video_social_platform", 
+      label: "Video & Social Platform", 
+      icon: Film,
+      perm: null,
+      subItems: [
+        { id: "ai_video_templates", label: "AI Video Templates", icon: Film },
+        { id: "media_library", label: "Media Library", icon: FolderOpen },
+        { id: "social_scheduler", label: "Social Media Scheduling", icon: Clock },
+      ]
+    },
   
     { 
       id: "stores", 
@@ -2184,6 +2280,10 @@ export default function AccountAdminDashboard() {
         </div>
       );
       case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'account_admin'} isAccountAdminCreatingStoreStaff={true} />;
+      case "ai_video_templates": return <AIVideoTemplatesView onNavigate={setActiveView} />;
+      case "media_library": return <MediaLibraryView />;
+      case "social_scheduler": return <SocialSchedulerView onNavigate={setActiveView} />;
+      case "templateEditor": return <TemplateEditorView onNavigate={setActiveView} />;
       case "audit_logs": return <AuditLogsView userId={userData?._id} />;
       case "profile": return <ProfileView userData={userData} />;
       default: return <div className="text-gray-500 font-medium">This module is under development.</div>;

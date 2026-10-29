@@ -43,6 +43,10 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
 
     const filter: any = {};
+    const storeUserId = searchParams.get('storeUserId') || searchParams.get('userId');
+    if (storeUserId && storeUserId.trim()) {
+      filter.storeUserId = storeUserId.trim();
+    }
     if (channel && channel !== 'all') {
       filter.channel = channel.toLowerCase();
     }

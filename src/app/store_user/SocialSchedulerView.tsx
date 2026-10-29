@@ -50,12 +50,17 @@ const CHANNELS: { id: SocialChannel; label: string; icon: any; color: string; bg
 export default function SocialSchedulerView({
   onNavigate,
   initialTemplateId,
+  storeUserId,
+  storeName,
 }: {
   onNavigate?: (view: any) => void;
   initialTemplateId?: string;
+  storeUserId?: string;
+  storeName?: string;
 }) {
   const [viewMode, setViewMode] = useState<"week" | "month" | "list">("week");
   const [channelFilter, setChannelFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "published">("all");
   const [anchorDate, setAnchorDate] = useState<Date>(new Date());
   const [days, setDays] = useState<PlannerDay[]>([]);
   const [postsList, setPostsList] = useState<SocialPost[]>([]);
@@ -71,7 +76,7 @@ export default function SocialSchedulerView({
 
   // Fetch store social config on mount
   useEffect(() => {
-    const uid = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+    const uid = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
     if (uid) {
       fetch(`/api/user?userId=${uid}`)
         .then((r) => r.json())
@@ -131,8 +136,9 @@ export default function SocialSchedulerView({
     setLoading(true);
     try {
       const dateStr = anchorDate.toISOString().split("T")[0];
+      const uid = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : "");
       const res = await fetch(
-        `/api/social/planner?view=${viewMode === "month" ? "month" : "week"}&channel=${channelFilter}&date=${dateStr}`
+        `/api/social/planner?view=${viewMode === "month" ? "month" : "week"}&channel=${channelFilter}&date=${dateStr}${uid ? `&userId=${uid}` : ""}`
       );
       const data = await res.json();
       if (data.success && data.days) {
@@ -148,7 +154,9 @@ export default function SocialSchedulerView({
   const fetchList = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/social/posts?channel=${channelFilter}&limit=100`);
+      const uid = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : "");
+      const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
+      const res = await fetch(`/api/social/posts?channel=${channelFilter}${statusParam}&limit=100${uid ? `&userId=${uid}` : ""}`);
       const data = await res.json();
       if (data.success && data.data) {
         setPostsList(data.data);
@@ -158,7 +166,7 @@ export default function SocialSchedulerView({
     } finally {
       setLoading(false);
     }
-  }, [channelFilter]);
+  }, [channelFilter, statusFilter, storeUserId]);
 
   useEffect(() => {
     if (viewMode === "list") {
@@ -219,9 +227,9 @@ export default function SocialSchedulerView({
         combinedScheduledAt = new Date(`${scheduleDate}T${scheduleTime}:00`).toISOString();
       }
 
-      const storeUserId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+      const targetUid = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
       const payload = {
-        storeUserId: storeUserId || undefined,
+        storeUserId: targetUid || undefined,
         channel: targetChannel,
         message: postMessage.trim(),
         mediaType,
@@ -355,6 +363,28 @@ export default function SocialSchedulerView({
 
       {/* ── Toolbar ── */}
       <div className="smp-toolbar">
+        {/* Status Filter Tabs (Scheduled vs Posted vs All) */}
+        <div className="smp-status-tabs">
+          <button
+            className={`smp-status-tab ${statusFilter === "all" ? "active" : ""}`}
+            onClick={() => setStatusFilter("all")}
+          >
+            All Posts (${postsList.length})
+          </button>
+          <button
+            className={`smp-status-tab smp-status-tab--scheduled ${statusFilter === "scheduled" ? "active" : ""}`}
+            onClick={() => setStatusFilter("scheduled")}
+          >
+            <FaClock size={12} /> Scheduled Content (${postsList.filter(p => p.status === 'scheduled').length})
+          </button>
+          <button
+            className={`smp-status-tab smp-status-tab--posted ${statusFilter === "published" ? "active" : ""}`}
+            onClick={() => setStatusFilter("published")}
+          >
+            <FaCheckCircle size={12} /> Posted Content (${postsList.filter(p => p.status === 'published').length})
+          </button>
+        </div>
+
         {/* View switcher */}
         <div className="smp-view-tabs">
           <button
@@ -495,16 +525,29 @@ export default function SocialSchedulerView({
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <strong style={{ fontSize: "0.85rem", color: "#0B2830" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                            {post.status === "scheduled" ? (
+                              <span style={{ fontSize: "0.68rem", fontWeight: 800, color: "#D97706", display: "flex", alignItems: "center", gap: "4px" }}>
+                                <FaClock size={10} /> SCHEDULED TIME
+                              </span>
+                            ) : post.status === "published" ? (
+                              <span style={{ fontSize: "0.68rem", fontWeight: 800, color: "#16A34A", display: "flex", alignItems: "center", gap: "4px" }}>
+                                <FaCheckCircle size={10} /> POSTED TIME
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#64748B" }}>
+                                TIMING
+                              </span>
+                            )}
+                            <strong style={{ fontSize: "0.84rem", color: "#0B2830" }}>
                               {post.scheduledAt
                                 ? new Date(post.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                                : "Immediate"}
+                                : new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                             </strong>
                             <span style={{ fontSize: "0.75rem", color: "#64848D" }}>
                               {post.scheduledAt
                                 ? new Date(post.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                                : ""}
+                                : new Date(post.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           </div>
                         </td>
@@ -876,20 +919,38 @@ export default function SocialSchedulerView({
 
               <div style={{ marginTop: "14px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "0.82rem" }}>
                 <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "8px 10px" }}>
-                  <span style={{ color: "#64848D", fontSize: "0.7rem", textTransform: "uppercase" }}>Scheduled Time</span>
-                  <p style={{ margin: "2px 0 0", fontWeight: 700, color: "#0B2830" }}>
+                  <span style={{ color: viewingPost.status === 'published' ? '#16A34A' : '#D97706', fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase" }}>
+                    {viewingPost.status === 'published' ? '🚀 Posted Time' : '📅 Scheduled Time'}
+                  </span>
+                  <p style={{ margin: "3px 0 0", fontWeight: 700, color: "#0B2830" }}>
                     {viewingPost.scheduledAt
                       ? new Date(viewingPost.scheduledAt).toLocaleString()
-                      : "Immediate"}
+                      : new Date(viewingPost.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "8px 10px" }}>
-                  <span style={{ color: "#64848D", fontSize: "0.7rem", textTransform: "uppercase" }}>Timezone</span>
-                  <p style={{ margin: "2px 0 0", fontWeight: 700, color: "#0B2830" }}>
-                    {viewingPost.timezone || "Asia/Kolkata"}
+                  <span style={{ color: "#64848D", fontSize: "0.7rem", textTransform: "uppercase", fontWeight: 700 }}>Broadcasting Status</span>
+                  <p style={{ margin: "3px 0 0", fontWeight: 700, color: viewingPost.status === 'published' ? '#16A34A' : '#0B2830' }}>
+                    {viewingPost.status === 'published' ? `Live on ${channelMeta(viewingPost.channel).label}` : `Scheduled on ${channelMeta(viewingPost.channel).label}`}
                   </p>
                 </div>
               </div>
+              {viewingPost.externalPostId && (
+                <div style={{ marginTop: "10px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: "8px", padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#166534", fontWeight: 700 }}>
+                    Live Post ID: <code>{viewingPost.externalPostId}</code>
+                  </span>
+                  <button
+                    className="smp-copy-btn"
+                    onClick={() => {
+                      navigator.clipboard.writeText(viewingPost.externalPostId!);
+                      showToast(`Copied Post ID: ${viewingPost.externalPostId}`);
+                    }}
+                  >
+                    <FaCopy size={11} /> Copy Post ID
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="smp-modal-foot">
@@ -939,6 +1000,21 @@ export default function SocialSchedulerView({
 
       {/* ── CSS Styles ── */}
       <style>{`
+        /* Status Tabs */
+        .smp-status-tabs {
+          display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; width: 100%;
+        }
+        .smp-status-tab {
+          padding: 8px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700;
+          border: 1.5px solid #E2E8F0; background: #fff; color: #64748B;
+          cursor: pointer; display: flex; align-items: center; gap: 6px;
+          transition: all 0.2s ease;
+        }
+        .smp-status-tab:hover { background: #F8FAFB; color: #0B2830; }
+        .smp-status-tab.active { background: #0B2830; color: #fff; border-color: #0B2830; shadow: 0 4px 12px rgba(11,40,48,0.15); }
+        .smp-status-tab--scheduled.active { background: #D97706; border-color: #D97706; }
+        .smp-status-tab--posted.active { background: #16A34A; border-color: #16A34A; }
+
         .smp-root {
           display: flex;
           flex-direction: column;

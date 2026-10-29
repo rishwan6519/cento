@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { FaEye, FaTrash, FaSearch, FaTimes, FaPlay, FaFilter, FaThLarge, FaList } from "react-icons/fa";
+import { FaEye, FaTrash, FaSearch, FaTimes, FaPlay, FaFilter, FaThLarge, FaList, FaFacebook, FaInstagram } from "react-icons/fa";
 
 type ViewMode = "grid" | "list";
 type FilterType = "all" | "image" | "video" | "audio" | "offer";
@@ -29,7 +29,13 @@ const formatFileSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export default function MediaLibraryView() {
+export default function MediaLibraryView({
+  storeUserId,
+  storeName,
+}: {
+  storeUserId?: string;
+  storeName?: string;
+} = {}) {
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [playlistFiles, setPlaylistFiles] = useState<any[]>([]);
   const [announcementFiles, setAnnouncementFiles] = useState<any[]>([]);
@@ -38,7 +44,8 @@ export default function MediaLibraryView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
+  const userId = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "");
+  const [socialPostsMap, setSocialPostsMap] = useState<Record<string, { facebook: boolean; instagram: boolean; posts: any[] }>>({});
 
   useEffect(() => {
     if (!userId) return;
@@ -47,7 +54,23 @@ export default function MediaLibraryView() {
       fetch(`/api/media?userId=${userId}`).then(r => r.json()).catch(() => ({})),
       fetch(`/api/playlists?userId=${userId}`).then(r => r.json()).catch(() => []),
       fetch(`/api/announcement/playlist?userId=${userId}`).then(r => r.json()).catch(() => []),
-    ]).then(([mediaRes, playlistRes, announcementRes]) => {
+      fetch(`/api/social/posts?limit=300${userId ? `&userId=${userId}` : ''}`).then(r => r.json()).catch(() => ({})),
+    ]).then(([mediaRes, playlistRes, announcementRes, socialRes]) => {
+      // Build social posts map
+      if (socialRes && socialRes.success && Array.isArray(socialRes.data)) {
+        const sMap: Record<string, { facebook: boolean; instagram: boolean; posts: any[] }> = {};
+        socialRes.data.forEach((p: any) => {
+          if (p.mediaUrl) {
+            const u = p.mediaUrl.trim();
+            if (!sMap[u]) sMap[u] = { facebook: false, instagram: false, posts: [] };
+            sMap[u].posts.push(p);
+            const ch = String(p.channel || '').toLowerCase();
+            if (ch === 'facebook') sMap[u].facebook = true;
+            if (ch === 'instagram') sMap[u].instagram = true;
+          }
+        });
+        setSocialPostsMap(sMap);
+      }
       // 1. Direct media uploads
       const media = mediaRes.media || mediaRes.mediaFiles || mediaRes.data || [];
       setMediaItems(media);
@@ -167,6 +190,25 @@ export default function MediaLibraryView() {
   return (
     <div style={{ fontFamily: "'Inter', sans-serif" }}>
       <style>{`
+        /* Social Media Head Tags */
+        .ml-social-head-tags {
+          position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10;
+          display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none;
+        }
+        .ml-head-tag {
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 4px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 800;
+          color: #fff; letter-spacing: 0.02em; box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+          text-transform: uppercase;
+        }
+        .ml-head-tag--fb {
+          background: #1877F2; border: 1px solid rgba(255,255,255,0.4);
+        }
+        .ml-head-tag--ig {
+          background: linear-gradient(45deg, #F58529, #DD2A7B, #8134AF);
+          border: 1px solid rgba(255,255,255,0.4);
+        }
+
         /* ── Media Library Styles ── */
         .ml-header { margin-bottom: 28px; }
         .ml-title { font-size: 1.6rem; font-weight: 800; color: #162B30; margin: 0 0 4px; }
@@ -451,8 +493,30 @@ export default function MediaLibraryView() {
             const category = getFileCategory(item.type);
             const previewUrl = getPreviewUrl(item);
             const isImage = category === "image";
+            const isFb = Boolean(
+              (item.channels && item.channels.some((c: string) => String(c).toLowerCase() === 'facebook')) ||
+              socialPostsMap[item.url]?.facebook
+            );
+            const isIg = Boolean(
+              (item.channels && item.channels.some((c: string) => String(c).toLowerCase() === 'instagram')) ||
+              socialPostsMap[item.url]?.instagram
+            );
             return (
               <div key={item._id} className="ml-grid-card" onClick={() => setPreviewFile(item)}>
+                {(isFb || isIg) && (
+                  <div className="ml-social-head-tags">
+                    {isFb && (
+                      <span className="ml-head-tag ml-head-tag--fb" title="Broadcasting Live / Posted on Facebook">
+                        <FaFacebook size={10} /> Facebook Posted
+                      </span>
+                    )}
+                    {isIg && (
+                      <span className="ml-head-tag ml-head-tag--ig" title="Broadcasting Live / Posted on Instagram">
+                        <FaInstagram size={10} /> Instagram Posted
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="ml-grid-thumb">
                   {isImage ? (
                     <img src={previewUrl} alt={item.name} loading="lazy" />
@@ -508,7 +572,7 @@ export default function MediaLibraryView() {
         <div style={{ background: "#fff", borderRadius: "12px", border: "1.5px solid #E8ECEE", overflow: "hidden" }}>
           <div className="ml-list-header">
             <span>Name</span>
-            <span>Type</span>
+            <span>Type &amp; Social Status</span>
             <span>Source</span>
             <span>Date</span>
             <span style={{ textAlign: "right" }}>Actions</span>
@@ -584,6 +648,31 @@ export default function MediaLibraryView() {
                     <div className="ml-preview-audio">
                       <div className="ml-preview-audio-icon">🎵</div>
                       <div className="ml-preview-name">{previewFile.name}</div>
+              {(() => {
+                const isFb = Boolean(
+                  (previewFile.channels && previewFile.channels.some((c: string) => String(c).toLowerCase() === 'facebook')) ||
+                  socialPostsMap[previewFile.url]?.facebook
+                );
+                const isIg = Boolean(
+                  (previewFile.channels && previewFile.channels.some((c: string) => String(c).toLowerCase() === 'instagram')) ||
+                  socialPostsMap[previewFile.url]?.instagram
+                );
+                if (!isFb && !isIg) return null;
+                return (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px' }}>
+                    {isFb && (
+                      <span className="ml-head-tag ml-head-tag--fb" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                        <FaFacebook size={12} /> Posted on Facebook Live
+                      </span>
+                    )}
+                    {isIg && (
+                      <span className="ml-head-tag ml-head-tag--ig" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                        <FaInstagram size={12} /> Posted on Instagram Reel
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
                       <audio src={url} controls autoPlay style={{ width: "100%", maxWidth: "400px" }} />
                     </div>
                   );

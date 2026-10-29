@@ -47,9 +47,13 @@ export async function GET(req: NextRequest) {
       end.setHours(23, 59, 59, 999);
     }
 
+    const storeUserId = searchParams.get('storeUserId') || searchParams.get('userId');
     const filter: any = {
       scheduledAt: { $gte: start, $lte: end },
     };
+    if (storeUserId && storeUserId.trim()) {
+      filter.storeUserId = storeUserId.trim();
+    }
     if (channel && channel !== 'all') {
       filter.channel = channel.toLowerCase();
     }
