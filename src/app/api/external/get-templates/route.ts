@@ -121,24 +121,17 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     dbTemplates = await VideoTemplate.find(fallbackQuery).sort({ templateId: 1, createdAt: -1 }).lean();
   }
 
-  // If still 0, provide default template #1 formatted as requested
+  // If 0 templates, return empty array without dummy templates
   if (dbTemplates.length === 0) {
-    const defId = isAll ? "INDIVIDUAL_DISCOUNT" : rawOfferTypeId.trim();
-    dbTemplates = [
-      {
-        templateId: 1,
-        templateName: "test-template",
-        status: "approved",
-        videoDuration: 12,
-        fps: 30,
-        aspectRatio: "16:9",
-        offertypeId: defId,
-        offertypename: defId.replace(/_/g, " "),
-        thumbnail: "uploads/thumbnails/tpl_thumb_20260929034601_9285db.gif",
-        thumbnail_url: "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_20260929034601_9285db.gif",
-        createdAt: new Date(),
-      } as any,
-    ];
+    return {
+      success: true,
+      message: "OK",
+      data: {
+        templates: [],
+        count: 0,
+        offertypeId: (rawOfferTypeId || "ALL").toUpperCase(),
+      },
+    };
   }
 
   const formattedTemplates = dbTemplates.map((t, idx) => formatTemplateItem(t, idx));

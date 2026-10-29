@@ -275,8 +275,10 @@ const VideoTemplateSchema: Schema = new Schema(
 // Index for performance and ordering
 VideoTemplateSchema.index({ storeUserId: 1, createdAt: -1 });
 
-const VideoTemplate =
-  mongoose.models.VideoTemplate ||
-  mongoose.model<VideoTemplateDocument>('VideoTemplate', VideoTemplateSchema);
+if (mongoose.models.VideoTemplate) {
+  delete (mongoose.models as any).VideoTemplate;
+}
+
+const VideoTemplate = mongoose.model<VideoTemplateDocument>('VideoTemplate', VideoTemplateSchema);
 
 export default VideoTemplate;

@@ -1425,6 +1425,56 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [offerTypesList, setOfferTypesList] = useState<Array<{ offertypeId: string; offertypename: string }>>([]);
   const [selectedOfferTypeId, setSelectedOfferTypeId] = useState<string>("INDIVIDUAL_DISCOUNT");
   const [selectedOfferTypeName, setSelectedOfferTypeName] = useState<string>("Individual Discount");
+  const [showNewOfferTypeForm, setShowNewOfferTypeForm] = useState(false);
+  const [inlineOfferTypeName, setInlineOfferTypeName] = useState("");
+  const [inlineOfferTypeId, setInlineOfferTypeId] = useState("");
+  const [creatingOfferType, setCreatingOfferType] = useState(false);
+
+  const handleCreateOfferTypeInline = async (customName?: string, customId?: string) => {
+    const nameToUse = (customName || inlineOfferTypeName).trim();
+    let idToUse = (customId || inlineOfferTypeId).trim();
+    if (!nameToUse) return;
+    if (!idToUse) {
+      idToUse = nameToUse.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    }
+
+    setCreatingOfferType(true);
+    try {
+      const res = await fetch("/api/create-offer-type", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "offer",
+          offerTypes: [
+            {
+              offertypeId: idToUse,
+              offertypename: nameToUse,
+            },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newOt = { offertypeId: idToUse, offertypename: nameToUse };
+        setOfferTypesList((prev) => {
+          const filtered = prev.filter((o) => o.offertypeId !== idToUse);
+          return [newOt, ...filtered];
+        });
+        setSelectedOfferTypeId(idToUse);
+        setSelectedOfferTypeName(nameToUse);
+        setOfferType(nameToUse);
+        setNewTplOfferType(nameToUse);
+        setShowNewOfferTypeForm(false);
+        setInlineOfferTypeName("");
+        setInlineOfferTypeId("");
+      }
+    } catch (err) {
+      console.error("Error creating offer type:", err);
+    } finally {
+      setCreatingOfferType(false);
+    }
+  };
+
   const [aiStyle, setAiStyle] = useState<string>("Premium commercial");
   const [aiColorTheme, setAiColorTheme] = useState<string>("None (natural colors)");
   const [aiTransparentBg, setAiTransparentBg] = useState<boolean>(true);
@@ -3260,7 +3310,10 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     setNewTplName(`Custom Video Template ${nextId}`);
     setNewTplDuration(10);
     setNewTplRatio("9:16");
-    setNewTplOfferType("Flash Sale");
+    const initOt = offerTypesList[0] || { offertypeId: "INDIVIDUAL_DISCOUNT", offertypename: "Individual Discount" };
+    setSelectedOfferTypeId(initOt.offertypeId);
+    setSelectedOfferTypeName(initOt.offertypename);
+    setNewTplOfferType(initOt.offertypename);
     setShowCreateModal(true);
   };
 
@@ -3301,6 +3354,14 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           aspectRatio: newTplRatio,          // primary ratio
           videoDuration: newTplDuration,
           offerType: newTplOfferType,
+          offertypeId: selectedOfferTypeId,
+          offertypename: selectedOfferTypeName || newTplOfferType,
+          offer_type: {
+            id: selectedOfferTypeId,
+            name: selectedOfferTypeName || newTplOfferType,
+            offertypeId: selectedOfferTypeId,
+            offertypename: selectedOfferTypeName || newTplOfferType,
+          },
           animationStyle,
           animation: { enabled: animationStyle !== "static", style: animationStyle },
           layers: DEFAULT_LAYERS[newTplRatio], // active ratio layers
@@ -4079,34 +4140,103 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
               <div className="ste-field-group">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                   <label className="ste-label" style={{ margin: 0 }}>Offer Type</label>
-                  {selectedOfferTypeId && (
-                    <span style={{ fontSize: "0.68rem", color: "#11B5BB", background: "rgba(17,181,187,0.12)", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>
-                      {selectedOfferTypeId}
-                    </span>
-                  )}
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    {selectedOfferTypeId && (
+                      <span style={{ fontSize: "0.68rem", color: "#11B5BB", background: "rgba(17,181,187,0.12)", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>
+                        {selectedOfferTypeId}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowNewOfferTypeForm(!showNewOfferTypeForm)}
+                      style={{
+                        background: showNewOfferTypeForm ? "rgba(239, 68, 68, 0.2)" : "rgba(17, 181, 187, 0.15)",
+                        border: "1px solid " + (showNewOfferTypeForm ? "rgba(239, 68, 68, 0.4)" : "rgba(17, 181, 187, 0.4)"),
+                        color: showNewOfferTypeForm ? "#f87171" : "#11B5BB",
+                        fontSize: "0.68rem",
+                        padding: "2px 7px",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {showNewOfferTypeForm ? "✕ Cancel" : "+ New"}
+                    </button>
+                  </div>
                 </div>
-                <select
-                  value={selectedOfferTypeId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedOfferTypeId(val);
-                    const found = offerTypesList.find(o => o.offertypeId === val);
-                    const name = found ? found.offertypename : val;
-                    setSelectedOfferTypeName(name);
-                    setOfferType(name);
-                  }}
-                  className="ste-select"
-                >
-                  {offerTypesList.length > 0 ? (
-                    offerTypesList.map((ot) => (
-                      <option key={ot.offertypeId} value={ot.offertypeId}>
-                        {ot.offertypename} ({ot.offertypeId})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="INDIVIDUAL_DISCOUNT">Individual Discount (INDIVIDUAL_DISCOUNT)</option>
-                  )}
-                </select>
+
+                {showNewOfferTypeForm ? (
+                  <div style={{
+                    background: "rgba(15, 23, 42, 0.8)",
+                    border: "1px solid rgba(17, 181, 187, 0.3)",
+                    borderRadius: "6px",
+                    padding: "8px",
+                    marginBottom: "8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px"
+                  }}>
+                    <input
+                      type="text"
+                      placeholder="Offer Name (e.g. Spring Clearance)"
+                      className="ste-input"
+                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+                      value={inlineOfferTypeName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setInlineOfferTypeName(val);
+                        if (!inlineOfferTypeId || inlineOfferTypeId === inlineOfferTypeName.toUpperCase().replace(/[^A-Z0-9]/g, "_")) {
+                          setInlineOfferTypeId(val.toUpperCase().replace(/[^A-Z0-9]/g, "_"));
+                        }
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Offer ID (e.g. SPRING_CLEARANCE)"
+                      className="ste-input"
+                      style={{ fontSize: "0.75rem", padding: "4px 8px", textTransform: "uppercase" }}
+                      value={inlineOfferTypeId}
+                      onChange={(e) => setInlineOfferTypeId(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
+                    />
+                    <button
+                      type="button"
+                      className="ste-btn ste-btn--primary"
+                      style={{ fontSize: "0.72rem", padding: "4px 10px", alignSelf: "flex-end" }}
+                      disabled={creatingOfferType || !inlineOfferTypeName.trim()}
+                      onClick={() => handleCreateOfferTypeInline()}
+                    >
+                      {creatingOfferType ? "Creating..." : "Save Offer Type"}
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedOfferTypeId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__NEW__") {
+                        setShowNewOfferTypeForm(true);
+                        return;
+                      }
+                      setSelectedOfferTypeId(val);
+                      const found = offerTypesList.find(o => o.offertypeId === val);
+                      const name = found ? found.offertypename : val;
+                      setSelectedOfferTypeName(name);
+                      setOfferType(name);
+                    }}
+                    className="ste-select"
+                  >
+                    {offerTypesList.length > 0 ? (
+                      offerTypesList.map((ot) => (
+                        <option key={ot.offertypeId} value={ot.offertypeId}>
+                          {ot.offertypename} ({ot.offertypeId})
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>No offer types created yet. Click + New</option>
+                    )}
+                    <option value="__NEW__">+ Create New Offer Type...</option>
+                  </select>
+                )}
               </div>
 
               {/* AI Product Defaults Accordion */}
@@ -7085,6 +7215,14 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                     value={selectedOfferTypeId}
                     onChange={(e) => {
                       const val = e.target.value;
+                      if (val === "__NEW__") {
+                        const newName = window.prompt("Enter new Offer Type Name (e.g. Flash Sale):");
+                        if (newName && newName.trim()) {
+                          const newId = newName.trim().toUpperCase().replace(/[^A-Z0-9]/g, "_");
+                          handleCreateOfferTypeInline(newName.trim(), newId);
+                        }
+                        return;
+                      }
                       setSelectedOfferTypeId(val);
                       const found = offerTypesList.find(o => o.offertypeId === val);
                       const name = found ? found.offertypename : val;
@@ -7099,8 +7237,9 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                         </option>
                       ))
                     ) : (
-                      <option value="INDIVIDUAL_DISCOUNT">Individual Discount (INDIVIDUAL_DISCOUNT)</option>
+                      <option value="" disabled>No offer types created yet</option>
                     )}
+                    <option value="__NEW__">+ Create New Offer Type...</option>
                   </select>
                 </div>
 

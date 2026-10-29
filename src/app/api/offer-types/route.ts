@@ -4,20 +4,7 @@ import OfferType from "@/models/OfferType";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_OFFER_TYPES = [
-  { offertypeId: "INDIVIDUAL_DISCOUNT", offertypename: "Individual Discount" },
-  { offertypeId: "FLASH_SALE", offertypename: "Flash Sale" },
-  { offertypeId: "PERCENTAGE_DISCOUNT", offertypename: "Percentage Discount" },
-  { offertypeId: "FLAT_RATE_OFF", offertypename: "Flat Rate Off" },
-  { offertypeId: "BOGO", offertypename: "Buy 1 Get 1 (BOGO)" },
-  { offertypeId: "WEEKEND_SPECIAL", offertypename: "Weekend Special" },
-  { offertypeId: "CLEARANCE_SALE", offertypename: "Clearance Sale" },
-  { offertypeId: "FESTIVE_OFFER", offertypename: "Festive Offer" },
-  { offertypeId: "NEW_ARRIVAL", offertypename: "New Arrival Spotlight" },
-  { offertypeId: "MEMBER_EXCLUSIVE", offertypename: "Member Exclusive" },
-];
-
-// GET: Fetch all offer types (userId is optional)
+// GET: Fetch all real offer types from DB - NO dummy fields
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -28,44 +15,80 @@ export async function GET(req: NextRequest) {
     
     const query: any = {};
     if (userId && userId !== "all" && userId !== "ALL") {
-      query.userId = userId;
+      query.$or = [
+        { userId: userId },
+        { userId: { $exists: false } },
+        { userId: null },
+      ];
     }
     if (categoryId) {
       query.categoryId = categoryId;
     }
 
-    let offerTypes = await OfferType.find(query).sort({ createdAt: -1 }).lean();
-    
-    // If no user-specific offer types found, fetch all created offer types
-    if (offerTypes.length === 0 && userId) {
-      offerTypes = await OfferType.find({}).sort({ createdAt: -1 }).lean();
-    }
-
-    // Merge with defaults ensuring no duplicate offertypeId
-    const seen = new Set<string>();
-    const combined: any[] = [];
-
-    for (const ot of offerTypes) {
-      const id = String(ot.offertypeId).trim();
-      if (!seen.has(id)) {
-        seen.add(id);
-        combined.push(ot);
-      }
-    }
-
-    for (const def of DEFAULT_OFFER_TYPES) {
-      if (!seen.has(def.offertypeId)) {
-        seen.add(def.offertypeId);
-        combined.push(def);
-      }
-    }
+    // Only return actual documents stored in the database
+    const offerTypes = await OfferType.find(query).sort({ createdAt: -1 }).lean();
     
     return NextResponse.json({
       success: true,
-      data: combined
+      data: offerTypes
     });
   } catch (error: any) {
     console.error("[GET /api/offer-types] Error:", error);
+    return NextResponse.json(
+      { success: false, message: "Internal server error", error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: Proxy to create offer types
+export async function POST(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    
+    const body = await req.json();
+    const { userId, categoryId, category } = body;
+    const finalCategoryId = categoryId || category || "offer";
+
+    let rawList: any[] = [];
+    if (Array.isArray(body.offerTypes) && body.offerTypes.length > 0) {
+      rawList = body.offerTypes;
+    } else if (body.offertypeId && body.offertypename) {
+      rawList = [{ offertypeId: body.offertypeId, offertypename: body.offertypename }];
+    } else {
+      return NextResponse.json(
+        { success: false, message: "Missing required field: offerTypes array or offertypeId/offertypename" },
+        { status: 400 }
+      );
+    }
+
+    const processed = [];
+    for (const ot of rawList) {
+      const otId = String(ot.offertypeId || "").trim();
+      const otName = String(ot.offertypename || "").trim();
+      if (!otId || !otName) continue;
+
+      const record = await OfferType.findOneAndUpdate(
+        { offertypeId: otId },
+        {
+          $set: {
+            offertypename: otName,
+            categoryId: finalCategoryId,
+            ...(userId ? { userId } : {})
+          }
+        },
+        { upsert: true, new: true, runValidators: true }
+      );
+      processed.push(record);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Offer type(s) saved successfully",
+      data: processed
+    }, { status: 201 });
+  } catch (error: any) {
+    console.error("[POST /api/offer-types] Error:", error);
     return NextResponse.json(
       { success: false, message: "Internal server error", error: error.message },
       { status: 500 }
@@ -111,12 +134,6 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("[PUT /api/offer-types] Error:", error);
-    if (error.code === 11000) {
-      return NextResponse.json(
-        { success: false, message: "An offer type with this ID already exists." },
-        { status: 409 }
-      );
-    }
     return NextResponse.json(
       { success: false, message: "Internal server error", error: error.message },
       { status: 500 }

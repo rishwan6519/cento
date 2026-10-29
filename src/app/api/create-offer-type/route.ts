@@ -8,87 +8,64 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
     
-    const body = await req.json();
-    const { userId, categoryId, category, offerTypes } = body;
-    const finalCategoryId = categoryId || category;
-    
-    if (!userId) {
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
       return NextResponse.json(
-        { success: false, message: "Missing required field: userId" },
+        { success: false, message: "Invalid JSON body" },
         { status: 400 }
       );
     }
 
-    if (!Array.isArray(offerTypes) || offerTypes.length === 0) {
+    const { userId, categoryId, category } = body;
+    const finalCategoryId = categoryId || category || "offer";
+
+    // Support both { offerTypes: [...] } and single object { offertypeId, offertypename }
+    let rawList: any[] = [];
+    if (Array.isArray(body.offerTypes) && body.offerTypes.length > 0) {
+      rawList = body.offerTypes;
+    } else if (body.offertypeId && body.offertypename) {
+      rawList = [{ offertypeId: body.offertypeId, offertypename: body.offertypename }];
+    } else {
       return NextResponse.json(
-        { success: false, message: "Missing required field: offerTypes array" },
+        { success: false, message: "Missing required field: offerTypes array or offertypeId/offertypename" },
         { status: 400 }
       );
     }
 
-    const createdOfferTypes = [];
-    const errors = [];
+    const processedOfferTypes = [];
 
-    // Loop through each offer type in the array
-    for (const ot of offerTypes) {
-      const { offertypeId, offertypename } = ot;
+    for (const ot of rawList) {
+      const otId = String(ot.offertypeId || "").trim();
+      const otName = String(ot.offertypename || "").trim();
 
-      if (!offertypeId || !offertypename) {
-        errors.push({ offertypeId, message: "Missing offertypeId or offertypename" });
+      if (!otId || !otName) {
         continue;
       }
 
-      // Check for uniqueness
-      const existing = await OfferType.findOne({ offertypeId: String(offertypeId).trim() });
-      if (existing) {
-        errors.push({ offertypeId, message: `Offer type with ID '${offertypeId}' already exists.` });
-        continue;
-      }
-      
-      try {
-        const newOfferType = await OfferType.create({
-          userId,
-          categoryId: finalCategoryId ? String(finalCategoryId).trim() : undefined,
-          offertypeId: String(offertypeId).trim(),
-          offertypename: String(offertypename).trim()
-        });
-        createdOfferTypes.push(newOfferType);
-      } catch (err: any) {
-        errors.push({ offertypeId, message: err.message });
-      }
-    }
-    
-    if (offerTypes.length === 1 && errors.length === 1) {
-      return NextResponse.json(
-        { success: false, message: errors[0].message },
-        { status: 409 }
+      // Upsert: If exists update, otherwise create
+      const updated = await OfferType.findOneAndUpdate(
+        { offertypeId: otId },
+        {
+          $set: {
+            offertypename: otName,
+            categoryId: finalCategoryId,
+            ...(userId ? { userId } : {})
+          }
+        },
+        { upsert: true, new: true, runValidators: true }
       );
-    }
-    
-    let message = "All offer types created successfully";
-    if (errors.length > 0 && createdOfferTypes.length > 0) {
-      message = "Some offer types were created, but some failed or already exist.";
-    } else if (errors.length > 0 && createdOfferTypes.length === 0) {
-      message = "No offer types were created (all failed or already exist).";
+      processedOfferTypes.push(updated);
     }
 
     return NextResponse.json({
       success: true,
-      message: message,
-      data: createdOfferTypes,
-      errors: errors.length > 0 ? errors : undefined
+      message: "Offer type(s) processed successfully",
+      data: processedOfferTypes
     }, { status: 201 });
   } catch (error: any) {
     console.error("[POST /api/create-offer-type] Error:", error);
-    
-    // Handle MongoDB duplicate key error fallback
-    if (error.code === 11000) {
-      return NextResponse.json(
-        { success: false, message: "An offer type with this ID already exists." },
-        { status: 409 }
-      );
-    }
-
     return NextResponse.json(
       { success: false, message: "Internal server error", error: error.message },
       { status: 500 }

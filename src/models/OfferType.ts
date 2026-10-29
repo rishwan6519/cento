@@ -1,8 +1,8 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
 export interface IOfferType extends Document {
-  userId: mongoose.Types.ObjectId | string;
-  categoryId: string;
+  userId?: any;
+  categoryId?: string;
   offertypeId: string;
   offertypename: string;
   createdAt: Date;
@@ -11,15 +11,15 @@ export interface IOfferType extends Document {
 
 const offerTypeSchema = new Schema<IOfferType>({
   userId: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
+    type: Schema.Types.Mixed,
+    required: false,
     index: true,
   },
   categoryId: {
     type: String,
     required: false,
     trim: true,
+    default: 'offer',
   },
   offertypeId: {
     type: String,
@@ -36,7 +36,6 @@ const offerTypeSchema = new Schema<IOfferType>({
   timestamps: true
 });
 
-// Clear cached model in dev to pick up schema changes
 if (mongoose.models.OfferType) {
   delete (mongoose.models as any).OfferType;
 }
