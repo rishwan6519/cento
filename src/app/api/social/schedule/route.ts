@@ -93,6 +93,20 @@ function formatSocialMessage(caption?: string, hashtags?: string[] | string): st
   return text;
 }
 
+// Helper to auto-resolve Page Access Token if a User Token was provided
+async function resolvePageToken(pageId: string, token: string): Promise<string> {
+  try {
+    const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}?fields=access_token&access_token=${token}`);
+    const data = await res.json();
+    if (data.access_token) {
+      return data.access_token;
+    }
+  } catch (err) {
+    // ignore
+  }
+  return token;
+}
+
 // Live Publish to Facebook Graph API
 async function publishToFacebookLive(pageId: string, accessToken: string, videoUrl: string, message: string) {
   try {
@@ -100,18 +114,39 @@ async function publishToFacebookLive(pageId: string, accessToken: string, videoU
       return { success: false, error: 'Missing Facebook Page ID or Access Token in store configuration' };
     }
 
+    let tokenToUse = accessToken;
+
     if (videoUrl && videoUrl.startsWith('http')) {
       const fbUrl = `https://graph.facebook.com/v20.0/${pageId}/videos`;
-      const res = await fetch(fbUrl, {
+      let res = await fetch(fbUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           file_url: videoUrl,
           description: message,
-          access_token: accessToken,
+          access_token: tokenToUse,
         }),
       });
-      const data = await res.json();
+      let data = await res.json();
+
+      // If failed due to permission/token type, attempt auto-resolving Page Access Token
+      if (!data.id && (data.error?.code === 100 || data.error?.code === 200 || data.error?.message?.includes('permission'))) {
+        const resolved = await resolvePageToken(pageId, tokenToUse);
+        if (resolved && resolved !== tokenToUse) {
+          tokenToUse = resolved;
+          res = await fetch(fbUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              file_url: videoUrl,
+              description: message,
+              access_token: tokenToUse,
+            }),
+          });
+          data = await res.json();
+        }
+      }
+
       if (data.id) {
         return { success: true, postId: data.id };
       } else {
@@ -119,15 +154,32 @@ async function publishToFacebookLive(pageId: string, accessToken: string, videoU
       }
     } else {
       const fbUrl = `https://graph.facebook.com/v20.0/${pageId}/feed`;
-      const res = await fetch(fbUrl, {
+      let res = await fetch(fbUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: message,
-          access_token: accessToken,
+          access_token: tokenToUse,
         }),
       });
-      const data = await res.json();
+      let data = await res.json();
+
+      if (!data.id && (data.error?.code === 100 || data.error?.code === 200 || data.error?.message?.includes('permission'))) {
+        const resolved = await resolvePageToken(pageId, tokenToUse);
+        if (resolved && resolved !== tokenToUse) {
+          tokenToUse = resolved;
+          res = await fetch(fbUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: message,
+              access_token: tokenToUse,
+            }),
+          });
+          data = await res.json();
+        }
+      }
+
       if (data.id) {
         return { success: true, postId: data.id };
       } else {
