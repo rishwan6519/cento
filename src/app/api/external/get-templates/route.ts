@@ -61,10 +61,42 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
   if (userId && userId.trim()) {
     const cleanUid = userId.trim();
     if (mongoose.Types.ObjectId.isValid(cleanUid)) {
+      const User = (await import("@/models/User")).default;
+      const user = await User.findById(cleanUid).lean();
+      let permittedIds = [new mongoose.Types.ObjectId(cleanUid)];
+      if (user) {
+        if (user.role === 'account_admin' || user.role === 'admin') {
+          const subUsers = await User.find({
+            $or: [
+              { _id: user._id },
+              { controllerId: user._id },
+              ...(user.customerId ? [{ customerId: user.customerId }] : []),
+              { createdBy: user._id },
+            ],
+          }).select('_id').lean();
+          permittedIds = subUsers.map((u: any) => u._id);
+        } else {
+          const adminId = user.controllerId || user.createdBy;
+          if (adminId) {
+            const related = await User.find({
+              $or: [
+                { _id: user._id },
+                { _id: adminId },
+                { controllerId: adminId },
+                { createdBy: adminId },
+              ],
+            }).select('_id').lean();
+            permittedIds = related.map((u: any) => u._id);
+          }
+        }
+      }
+
+      const permittedStrIds = permittedIds.map((id) => String(id));
       query.$or = [
-        { storeUserId: new mongoose.Types.ObjectId(cleanUid) },
-        { storeUserId: cleanUid },
-        { userId: cleanUid },
+        { storeUserId: { $in: permittedIds } },
+        { storeUserId: { $in: permittedStrIds } },
+        { storeUserId: { $exists: false } },
+        { storeUserId: null },
       ];
     } else {
       query.$or = [
@@ -104,19 +136,30 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
 
   let dbTemplates = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
 
-  // If user-specific query returned 0 templates, fetch all active templates
+  // If user-specific query returned 0 templates, only fallback to global unassigned templates
   if (dbTemplates.length === 0 && userId) {
-    const fallbackQuery: any = { isDummy: { $ne: true } };
+    const fallbackQuery: any = {
+      isDummy: { $ne: true },
+      $or: [
+        { storeUserId: { $exists: false } },
+        { storeUserId: null },
+      ],
+    };
     if (!isAll) {
       const target = rawOfferTypeId.trim();
-    const regex = new RegExp("^" + escapeRegex(target) + "$", "i");
-      fallbackQuery.$or = [
+      const regex = new RegExp("^" + escapeRegex(target) + "$", "i");
+      const otClauses = [
         { offertypeId: target },
         { offertypeId: regex },
         { offerType: target },
         { "offer_type.id": target },
         { "offer_type.offertypeId": target },
       ];
+      fallbackQuery.$and = [
+        { $or: fallbackQuery.$or },
+        { $or: otClauses },
+      ];
+      delete fallbackQuery.$or;
     }
     dbTemplates = await VideoTemplate.find(fallbackQuery).sort({ templateId: 1, createdAt: -1 }).lean();
   }

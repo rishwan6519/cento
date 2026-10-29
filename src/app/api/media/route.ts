@@ -26,24 +26,37 @@ export async function GET(req: NextRequest) {
     let userIdsToFetch = [new mongoose.Types.ObjectId(userId)];
     
     if (requestingUser) {
-      const adminId = requestingUser.role === 'account_admin' ? requestingUser._id : requestingUser.controllerId;
-      if (adminId) {
-         const relatedUsers = await User.find({ 
+      if (requestingUser.role === 'account_admin' || requestingUser.role === 'admin') {
+        const relatedUsers = await User.find({ 
+          $or: [
+            { _id: requestingUser._id },
+            { controllerId: requestingUser._id },
+            ...(requestingUser.customerId ? [{ customerId: requestingUser.customerId }] : []),
+            { createdBy: requestingUser._id },
+          ] 
+        }).select('_id');
+        userIdsToFetch = relatedUsers.map(u => u._id);
+      } else {
+        const adminId = requestingUser.controllerId || requestingUser.createdBy;
+        if (adminId) {
+          const relatedUsers = await User.find({ 
             $or: [
-               { _id: adminId },
-               { controllerId: adminId }
+              { _id: requestingUser._id },
+              { _id: adminId },
+              { controllerId: adminId },
+              { createdBy: adminId },
             ] 
-         }).select('_id');
-         userIdsToFetch = relatedUsers.map(u => u._id);
+          }).select('_id');
+          userIdsToFetch = relatedUsers.map(u => u._id);
+        } else {
+          userIdsToFetch = [requestingUser._id];
+        }
       }
     }
 
+    // Strictly scope media to the user and their permitted hierarchy (admin + stores)
     const query = {
-      $or: [
-        { userId: { $in: userIdsToFetch } },
-        { templateId: { $exists: true, $ne: '' } },
-        { fileCategory: 'offer' },
-      ],
+      userId: { $in: userIdsToFetch },
     };
     const media = await MediaItemModel.find(query).sort({ createdAt: -1 });
     console.log("Media items fetched successfully:", media.length);

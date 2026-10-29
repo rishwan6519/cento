@@ -33,6 +33,7 @@ export interface MakeVideoModalProps {
   onSuccess?: () => void;
   onNavigate?: (view: any, extra?: any) => void;
   onSwitchToAdVideos?: () => void;
+  storeUserId?: string;
 }
 
 export default function MakeVideoFromTemplateModal({
@@ -42,6 +43,7 @@ export default function MakeVideoFromTemplateModal({
   onSuccess,
   onNavigate,
   onSwitchToAdVideos,
+  storeUserId,
 }: MakeVideoModalProps) {
   // ── Selected Template State ──
   const [selectedTemplate, setSelectedTemplate] = useState<VideoTemplate | null>(
@@ -390,7 +392,7 @@ export default function MakeVideoFromTemplateModal({
     setPrimaryVideoUrl(null);
 
     try {
-      const userId = typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
+      const userId = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "");
       const targetTplId = selectedTemplate?.templateId
         ? String(selectedTemplate.templateId)
         : (selectedTemplate?._id || "1");

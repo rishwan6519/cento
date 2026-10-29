@@ -165,6 +165,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || '';
     const sort = searchParams.get('sort') || 'createdAt';
     const order: SortOrder = searchParams.get('order') === 'asc' ? 1 : -1;
+    const requestedUserId = searchParams.get('userId') || searchParams.get('storeUserId') || searchParams.get('adminId') || auth?.userId;
 
     // Build flexible query so all created templates are retrieved reliably
     const andClauses: any[] = [];
@@ -173,6 +174,53 @@ export async function GET(req: NextRequest) {
     andClauses.push({
       isDummy: { $ne: true },
     });
+
+    // Tenant & Admin Isolation: Only show templates created by this admin or stores under this admin
+    if (requestedUserId && mongoose.Types.ObjectId.isValid(requestedUserId)) {
+      const User = (await import('@/models/User')).default;
+      const user = await User.findById(requestedUserId).lean();
+      if (user) {
+        let permittedUserIds: mongoose.Types.ObjectId[] = [];
+        if (user.role === 'account_admin' || user.role === 'admin') {
+          // Account Admin: sees templates created by themselves AND all stores/sub-users under this admin
+          const subUsers = await User.find({
+            $or: [
+              { _id: user._id },
+              { controllerId: user._id },
+              ...(user.customerId ? [{ customerId: user.customerId }] : []),
+              { createdBy: user._id },
+            ],
+          }).select('_id').lean();
+          permittedUserIds = subUsers.map((u: any) => u._id);
+        } else {
+          // Store user / sub-user: sees templates created by this store, their parent admin, and sibling stores
+          const adminId = user.controllerId || user.createdBy;
+          if (adminId) {
+            const related = await User.find({
+              $or: [
+                { _id: user._id },
+                { _id: adminId },
+                { controllerId: adminId },
+                { createdBy: adminId },
+              ],
+            }).select('_id').lean();
+            permittedUserIds = related.map((u: any) => u._id);
+          } else {
+            permittedUserIds = [user._id];
+          }
+        }
+
+        const permittedStrIds = permittedUserIds.map((id) => String(id));
+        andClauses.push({
+          $or: [
+            { storeUserId: { $in: permittedUserIds } },
+            { storeUserId: { $in: permittedStrIds } },
+            { storeUserId: { $exists: false } },
+            { storeUserId: null },
+          ],
+        });
+      }
+    }
 
     if (search.trim()) {
       andClauses.push({

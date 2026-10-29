@@ -115,7 +115,7 @@ async function handleGetVideo(jobIdInput: string) {
     const byJobId = await MediaItemModel.find({ jobId }).lean();
     if (byJobId && byJobId.length > 0) {
       for (const doc of byJobId) {
-        if (!mediaDocs.some((m) => m._id.toString() === doc._id.toString())) {
+        if (!mediaDocs.some((m) => m._id.toString() === String((doc as any)._id))) {
           mediaDocs.push(doc);
         }
       }

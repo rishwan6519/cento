@@ -600,7 +600,7 @@ const StoreDetailView = ({ store, setActiveView, onEdit }: { store: any, setActi
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [activeStoreTab, setActiveStoreTab] = useState<"devices" | "media" | "social">("devices");
+  const [activeStoreTab, setActiveStoreTab] = useState<"devices" | "templates" | "media" | "social">("devices");
 
   const fetchDevices = async () => {
     if (!store?._id) return;
@@ -2280,9 +2280,9 @@ export default function AccountAdminDashboard() {
         </div>
       );
       case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'account_admin'} isAccountAdminCreatingStoreStaff={true} />;
-      case "ai_video_templates": return <AIVideoTemplatesView onNavigate={setActiveView} />;
-      case "media_library": return <MediaLibraryView />;
-      case "social_scheduler": return <SocialSchedulerView onNavigate={setActiveView} />;
+      case "ai_video_templates": return <AIVideoTemplatesView onNavigate={setActiveView} storeUserId={userData?._id} />;
+      case "media_library": return <MediaLibraryView storeUserId={userData?._id} />;
+      case "social_scheduler": return <SocialSchedulerView onNavigate={setActiveView} storeUserId={userData?._id} />;
       case "templateEditor": return <TemplateEditorView onNavigate={setActiveView} />;
       case "audit_logs": return <AuditLogsView userId={userData?._id} />;
       case "profile": return <ProfileView userData={userData} />;

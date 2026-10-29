@@ -1100,9 +1100,14 @@ const DeleteModal: React.FC<{
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function AIVideoTemplatesView({
   onNavigate,
+  storeUserId,
+  storeName,
 }: {
   onNavigate?: (view: any, extra?: any) => void;
+  storeUserId?: string;
+  storeName?: string;
 }) {
+  const currentUserId = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "");
   // View mode: Grid vs Table
   const [layoutMode, setLayoutMode] = useState<"grid" | "table">("grid");
 
@@ -1156,10 +1161,16 @@ export default function AIVideoTemplatesView({
   const [adVideoRatioFilter, setAdVideoRatioFilter] = useState<string>("all");
   const [adVideoSearch, setAdVideoSearch] = useState<string>("");
 
+  const getAuthHeaders = useCallback((): HeadersInit => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+    return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+  }, []);
+
   const fetchAdVideos = useCallback(async () => {
     setLoadingAdVideos(true);
     try {
-      const res = await fetch("/api/video-template/ad-videos");
+      const url = currentUserId ? `/api/video-template/ad-videos?userId=${encodeURIComponent(currentUserId)}` : "/api/video-template/ad-videos";
+      const res = await fetch(url, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         setAdVideos(json.data);
@@ -1169,7 +1180,7 @@ export default function AIVideoTemplatesView({
     } finally {
       setLoadingAdVideos(false);
     }
-  }, []);
+  }, [currentUserId, getAuthHeaders]);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
@@ -1183,11 +1194,6 @@ export default function AIVideoTemplatesView({
     showToast(`Template ID copied: ${id}`);
     setTimeout(() => setCopiedId(null), 2000);
   };
-
-  const getAuthHeaders = useCallback((): HeadersInit => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-    return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-  }, []);
 
   // ── Fetch Templates ─────────────────────────────────────────────────────────
   const fetchTemplates = useCallback(async () => {
@@ -1318,6 +1324,7 @@ export default function AIVideoTemplatesView({
         language,
         aiModel,
         status,
+        storeUserId: currentUserId || undefined,
       };
 
       const isDummy = editingTemplate?.isDummy;
@@ -1407,6 +1414,7 @@ export default function AIVideoTemplatesView({
             setActiveViewTab("adVideos");
             fetchAdVideos();
           }}
+          storeUserId={currentUserId}
         />
       )}
 
