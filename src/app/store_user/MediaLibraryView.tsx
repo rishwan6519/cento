@@ -56,21 +56,31 @@ export default function MediaLibraryView({
       fetch(`/api/announcement/playlist?userId=${userId}`).then(r => r.json()).catch(() => []),
       fetch(`/api/social/posts?limit=300${userId ? `&userId=${userId}` : ''}`).then(r => r.json()).catch(() => ({})),
     ]).then(([mediaRes, playlistRes, announcementRes, socialRes]) => {
-      // Build social posts map
-      if (socialRes && socialRes.success && Array.isArray(socialRes.data)) {
-        const sMap: Record<string, { facebook: boolean; instagram: boolean; posts: any[] }> = {};
-        socialRes.data.forEach((p: any) => {
-          if (p.mediaUrl) {
-            const u = p.mediaUrl.trim();
-            if (!sMap[u]) sMap[u] = { facebook: false, instagram: false, posts: [] };
-            sMap[u].posts.push(p);
-            const ch = String(p.channel || '').toLowerCase();
-            if (ch === 'facebook') sMap[u].facebook = true;
-            if (ch === 'instagram') sMap[u].instagram = true;
+      // Build social posts map (strictly only for posts actually published to Facebook or Instagram)
+      const rawPosts: any[] = Array.isArray(socialRes?.data) ? socialRes.data : (Array.isArray(socialRes?.posts) ? socialRes.posts : []);
+      const sMap: Record<string, { facebook: boolean; instagram: boolean; posts: any[] }> = {};
+      rawPosts.forEach((p: any) => {
+        const isPublished = p.status === 'published' || Boolean(p.publishedAt) || Boolean(p.externalPostId);
+        if (!isPublished) return; // Do not tag media if post is scheduled, failed, or draft
+
+        const u = String(p.mediaUrl || '').trim();
+        if (u) {
+          const normU = u.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/');
+          if (!sMap[u]) sMap[u] = { facebook: false, instagram: false, posts: [] };
+          if (!sMap[normU]) sMap[normU] = sMap[u];
+          sMap[u].posts.push(p);
+          const ch = String(p.channel || '').toLowerCase();
+          if (ch === 'facebook') {
+            sMap[u].facebook = true;
+            sMap[normU].facebook = true;
           }
-        });
-        setSocialPostsMap(sMap);
-      }
+          if (ch === 'instagram') {
+            sMap[u].instagram = true;
+            sMap[normU].instagram = true;
+          }
+        }
+      });
+      setSocialPostsMap(sMap);
       // 1. Direct media uploads
       const media = mediaRes.media || mediaRes.mediaFiles || mediaRes.data || [];
       setMediaItems(media);
@@ -493,14 +503,12 @@ export default function MediaLibraryView({
             const category = getFileCategory(item.type);
             const previewUrl = getPreviewUrl(item);
             const isImage = category === "image";
-            const isFb = Boolean(
-              (item.channels && item.channels.some((c: string) => String(c).toLowerCase() === 'facebook')) ||
-              socialPostsMap[item.url]?.facebook
-            );
-            const isIg = Boolean(
-              (item.channels && item.channels.some((c: string) => String(c).toLowerCase() === 'instagram')) ||
-              socialPostsMap[item.url]?.instagram
-            );
+            const itemUrl = (item.url || '').trim();
+            const normItemUrl = itemUrl.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/');
+            const socialInfo = socialPostsMap[itemUrl] || socialPostsMap[normItemUrl];
+            // Only show Facebook / Instagram posted tags if actually published to those channels
+            const isFb = Boolean(socialInfo?.facebook);
+            const isIg = Boolean(socialInfo?.instagram);
             return (
               <div key={item._id} className="ml-grid-card" onClick={() => setPreviewFile(item)}>
                 {(isFb || isIg) && (
@@ -648,31 +656,6 @@ export default function MediaLibraryView({
                     <div className="ml-preview-audio">
                       <div className="ml-preview-audio-icon">🎵</div>
                       <div className="ml-preview-name">{previewFile.name}</div>
-              {(() => {
-                const isFb = Boolean(
-                  (previewFile.channels && previewFile.channels.some((c: string) => String(c).toLowerCase() === 'facebook')) ||
-                  socialPostsMap[previewFile.url]?.facebook
-                );
-                const isIg = Boolean(
-                  (previewFile.channels && previewFile.channels.some((c: string) => String(c).toLowerCase() === 'instagram')) ||
-                  socialPostsMap[previewFile.url]?.instagram
-                );
-                if (!isFb && !isIg) return null;
-                return (
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px' }}>
-                    {isFb && (
-                      <span className="ml-head-tag ml-head-tag--fb" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
-                        <FaFacebook size={12} /> Posted on Facebook Live
-                      </span>
-                    )}
-                    {isIg && (
-                      <span className="ml-head-tag ml-head-tag--ig" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
-                        <FaInstagram size={12} /> Posted on Instagram Reel
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
                       <audio src={url} controls autoPlay style={{ width: "100%", maxWidth: "400px" }} />
                     </div>
                   );
@@ -688,6 +671,28 @@ export default function MediaLibraryView({
             </div>
             <div className="ml-preview-name" style={{ marginTop: "16px", borderRadius: "10px" }}>
               {previewFile.name}
+              {(() => {
+                const pUrl = (previewFile.url || '').trim();
+                const normPUrl = pUrl.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/');
+                const sInfo = socialPostsMap[pUrl] || socialPostsMap[normPUrl];
+                const isFb = Boolean(sInfo?.facebook);
+                const isIg = Boolean(sInfo?.instagram);
+                if (!isFb && !isIg) return null;
+                return (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px' }}>
+                    {isFb && (
+                      <span className="ml-head-tag ml-head-tag--fb" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                        <FaFacebook size={12} /> Posted on Facebook
+                      </span>
+                    )}
+                    {isIg && (
+                      <span className="ml-head-tag ml-head-tag--ig" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                        <FaInstagram size={12} /> Posted on Instagram
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
