@@ -138,6 +138,11 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
     jobId,
     status: 'queued',
     videos: [],
+    templateId: fullOptions.templateId ? String(fullOptions.templateId) : undefined,
+    offerId: fullOptions.offerId,
+    userId: fullOptions.userId,
+    channels: fullOptions.channels || [],
+    voiceoverScript: fullOptions.voiceoverScript || fullOptions.text?.description || fullOptions.text?.tagline || fullOptions.text?.headline || '',
     message: 'Queued for rendering',
     createdAt: new Date().toISOString(),
   };
@@ -263,11 +268,18 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
             ? new mongoose.Types.ObjectId(String(targetUserId))
             : targetUserId;
 
+          finalResult.templateId = fullOptions.templateId ? String(fullOptions.templateId) : undefined;
+          finalResult.offerId = fullOptions.offerId;
+          finalResult.userId = targetUserId || fullOptions.userId;
+          finalResult.channels = fullOptions.channels || [];
+          finalResult.voiceoverScript = fullOptions.voiceoverScript || fullOptions.text?.description || fullOptions.text?.tagline || fullOptions.text?.headline || '';
+
           for (const vid of finalResult.videos) {
             try {
+              const videoName = `Generated Promo Video (${vid.ratio}) – ${new Date().toLocaleString()}`;
               const mediaItem = new MediaItemModel({
                 userId: validUserObjId,
-                name: `${fullOptions.title || 'Offer Video'} (${vid.ratio})`,
+                name: videoName,
                 type: 'video',
                 fileCategory: 'offer',
                 url: vid.url,
@@ -275,6 +287,8 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
                 templateId: fullOptions.templateId ? String(fullOptions.templateId) : undefined,
                 offerId: fullOptions.offerId,
                 channels: fullOptions.channels || [],
+                voiceoverScript: fullOptions.voiceoverScript || fullOptions.text?.description || fullOptions.text?.tagline || fullOptions.text?.headline || '',
+                tagline: fullOptions.text?.tagline || '',
                 ratio: vid.ratio,
                 width: vid.width,
                 height: vid.height,
@@ -283,11 +297,14 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
                 createdAt: new Date(),
               });
               await mediaItem.save();
-              console.log(`[renderService] Saved video (${vid.ratio}) to MediaItemModel: ${vid.url}`);
+              (vid as any).mediaId = mediaItem._id.toString();
+              (vid as any).name = videoName;
+              console.log(`[renderService] Saved video (${vid.ratio}) to MediaItemModel: ${vid.url} (mediaId: ${mediaItem._id})`);
             } catch (saveItemErr) {
               console.warn(`[renderService] Failed to save mediaItem for ratio ${vid.ratio}:`, saveItemErr);
             }
           }
+          await persistJobState(jobId, finalResult);
 
           // Update VideoTemplate with latest rendered video pack
           if (tplDoc && tplDoc._id && finalResult.videos && finalResult.videos.length > 0) {

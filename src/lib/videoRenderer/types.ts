@@ -144,10 +144,13 @@ export interface RenderOptions {
   userId?: string;
   offerId?: string;
   channels?: string[];
+  voiceoverScript?: string;
   batchSpawn?: boolean;
 }
 
 export interface SingleVideoOutput {
+  mediaId?: string;
+  name?: string;
   ratio: AspectRatio | string;
   width: number;
   height: number;
@@ -158,6 +161,11 @@ export interface SingleVideoOutput {
 }
 
 export interface RenderJobResult {
+  templateId?: string;
+  offerId?: string;
+  userId?: string;
+  channels?: string[];
+  voiceoverScript?: string;
   jobId: string;
   status: 'queued' | 'processing' | 'completed' | 'failed';
   primaryVideo?: SingleVideoOutput;

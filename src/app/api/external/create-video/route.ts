@@ -244,6 +244,34 @@ export async function POST(req: NextRequest) {
       body.disclaimer ||
       '*T&C Apply · StoreSparc';
 
+    const rawChannels = body.channels || body.socialMedia || body.share || body.shareTo || [];
+    let channelsList: string[] = [];
+    if (Array.isArray(rawChannels)) {
+      channelsList = rawChannels.map((c: any) => String(c).trim().toLowerCase()).filter(Boolean);
+    } else if (typeof rawChannels === 'string') {
+      try {
+        const parsed = JSON.parse(rawChannels);
+        if (Array.isArray(parsed)) {
+          channelsList = parsed.map((c: any) => String(c).trim().toLowerCase()).filter(Boolean);
+        } else {
+          channelsList = [String(rawChannels).trim().toLowerCase()].filter(Boolean);
+        }
+      } catch {
+        channelsList = rawChannels.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+      }
+    }
+
+    const offerId = body.offerId || body.offer_id || body.offerid || '';
+    const userId = body.userId || body.user_id || body.userid || body.storeUserId || '';
+    const voiceoverScript =
+      body.voiceoverScript ||
+      body.voiceover_script ||
+      body.script ||
+      body.voiceover ||
+      description ||
+      headline ||
+      '';
+
     const queued = await queueRenderJob({
       layers: body.layers || undefined,
       aspectStore: body.aspect_store || body.aspectStore || undefined,
@@ -268,10 +296,11 @@ export async function POST(req: NextRequest) {
         oldPrice: body.old_price || body.oldPrice || '',
         cta: body.cta || body.cta_text || '',
       },
-      title: body.title || headline || 'Offer Video',
-      userId: body.userId || body.user_id || '',
-      offerId: body.offerId || body.offer_id || '',
-      channels: body.channels || [],
+      title: body.title || headline || 'Generated Promo Video',
+      userId,
+      offerId,
+      channels: channelsList,
+      voiceoverScript,
       batchSpawn: body.batch_spawn !== '0' && body.batch_spawn !== 0,
     });
 
@@ -283,8 +312,13 @@ export async function POST(req: NextRequest) {
         async: true,
         status: 'queued',
         job_id: queued.jobId,
+        jobId: queued.jobId,
         status_url: queued.statusUrl,
         template_id: templateId,
+        templateId: templateId,
+        offerId,
+        channels: channelsList,
+        voiceoverScript,
         ratio,
         animation: {
           enabled: true,
@@ -302,10 +336,11 @@ export async function POST(req: NextRequest) {
           volume: musicVolume,
           available_presets: ['upbeat_retail', 'energetic_sale', 'modern_store', 'luxury_minimal', 'none'],
         },
-        message: 'Video queued - 4 animated aspect ratios generating with commercial background music (default 16:9). Poll status_url until completed',
+        message: `Video queued. Poll result at GET /api/external/get-video?jobId=${queued.jobId}`,
       },
       { status: 202 }
     );
+
   } catch (err: any) {
     console.error('[POST /api/external/video] Error:', err);
     return NextResponse.json(
