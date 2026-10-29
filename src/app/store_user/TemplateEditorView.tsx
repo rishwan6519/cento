@@ -1654,14 +1654,21 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     }
   };
 
-  // Helper to determine next available template ID starting with 1
+  // Helper to determine next available 5-digit template ID (10000 - 99999)
   const getNextTemplateId = useCallback(() => {
-    const validNumericIds = savedTemplatesList
-      .map((t) => Number(t.templateId))
-      .filter((n) => !isNaN(n) && n > 0);
-    return validNumericIds.length > 0
-      ? Math.max(...validNumericIds) + 1
-      : (savedTemplatesList.length + 1 || 1);
+    const existingIds = new Set(
+      savedTemplatesList
+        .map((t) => Number(t.templateId))
+        .filter((n) => !isNaN(n) && n > 0)
+    );
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const candidate = Math.floor(10000 + Math.random() * 90000);
+      if (!existingIds.has(candidate)) {
+        return candidate;
+      }
+    }
+    const max5 = Math.max(10000, ...Array.from(existingIds).filter((n) => n >= 10000));
+    return max5 + 1;
   }, [savedTemplatesList]);
 
   // Active loaded template's sequential display ID starting with 1
@@ -3750,7 +3757,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                       );
                     })
                     .map((tpl, idx) => {
-                      const displayId = tpl.templateId || (idx + 1);
+                      const displayId = tpl.templateId || (10000 + idx + 1);
                       const isCurrent = templateId === tpl._id || String(templateId) === String(displayId);
                       return (
                         <tr key={tpl._id} className={isCurrent ? "is-active-row" : ""}>
@@ -7473,7 +7480,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
               <p style={{ color: "#cbd5e1", margin: 0 }}>
                 Are you sure you want to permanently delete template{" "}
                 <strong style={{ color: "#fff" }}>
-                  "#{deletingTemplate.templateId || (savedTemplatesList.indexOf(deletingTemplate) + 1)} - {deletingTemplate.templateName}"
+                  "#{deletingTemplate.templateId || 10001} - {deletingTemplate.templateName}"
                 </strong>
                 ? This action cannot be undone.
               </p>
@@ -7518,7 +7525,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                 <div style={{ background: "rgba(17,181,187,0.12)", border: "1px solid rgba(17,181,187,0.3)", borderRadius: "8px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>Template ID:</span>
                   <span style={{ fontFamily: "monospace", fontWeight: 800, color: "#11B5BB", fontSize: "1rem" }}>
-                    #{renamingTemplate.templateId || (savedTemplatesList.indexOf(renamingTemplate) + 1)}
+                    #{renamingTemplate.templateId || 10001}
                   </span>
                 </div>
                 <div className="ste-field-group">

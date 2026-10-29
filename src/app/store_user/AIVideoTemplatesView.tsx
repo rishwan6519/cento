@@ -758,7 +758,7 @@ const ViewModal: React.FC<{
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <h3 className="aivt-modal__title">{template.templateName}</h3>
-              <span className="aivt-badge-id">Template #{template.templateId || 1}</span>
+              <span className="aivt-badge-id">Template #{template.templateId || 10001}</span>
               <span className="aivt-badge-4ratios">✨ All 4 Aspect Ratios Configured</span>
             </div>
             <p className="aivt-modal__subtitle">Multi-Screen Template Preview · All 4 aspect ratios rendered with saved coordinates</p>
@@ -771,11 +771,11 @@ const ViewModal: React.FC<{
           <div className="aivt-id-banner">
             <div className="aivt-id-banner__left">
               <span className="aivt-id-banner__label">Template Sequence ID</span>
-              <code className="aivt-id-banner__code">#{template.templateId || 1}</code>
+              <code className="aivt-id-banner__code">#{template.templateId || 10001}</code>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <button className="aivt-id-banner__copy-btn" onClick={handleCopyId}>
-                {copied ? <><FaCheck size={12} /> Copied!</> : <><FaCopy size={12} /> Copy ID (#{template.templateId || 1})</>}
+                {copied ? <><FaCheck size={12} /> Copied!</> : <><FaCopy size={12} /> Copy ID (#{template.templateId || 10001})</>}
               </button>
               {onOpenStudio && (
                 <button
@@ -1624,7 +1624,7 @@ export default function AIVideoTemplatesView({
                     title="Click to copy Template ID"
                   >
                     <span className="aivt-id-badge__prefix">ID:</span>
-                    <code className="aivt-id-badge__val">#{t.templateId || (templates.indexOf(t) + 1)}</code>
+                    <code className="aivt-id-badge__val">#{t.templateId || (10000 + templates.indexOf(t) + 1)}</code>
                     <span className="aivt-id-badge__icon">
                       {isCopied ? <FaCheck size={10} color="#16A34A" /> : <FaCopy size={10} />}
                     </span>
@@ -1772,7 +1772,7 @@ export default function AIVideoTemplatesView({
                           onClick={(e) => copyId(String(t.templateId || t._id), e)}
                           title="Click to copy Template ID"
                         >
-                          <code className="aivt-id-badge__val">#{t.templateId || (templates.indexOf(t) + 1)}</code>
+                          <code className="aivt-id-badge__val">#{t.templateId || (10000 + templates.indexOf(t) + 1)}</code>
                           <span className="aivt-id-badge__icon">
                             {isCopied ? <FaCheck size={10} color="#16A34A" /> : <FaCopy size={10} />}
                           </span>

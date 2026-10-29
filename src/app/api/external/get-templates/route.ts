@@ -9,7 +9,7 @@ import mongoose from "mongoose";
 export const dynamic = "force-dynamic";
 
 function formatTemplateItem(t: any, index: number) {
-  const tplId = Number(t.templateId) || (index + 1);
+  const tplId = Number(t.templateId) || (10000 + index + 1);
   const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   

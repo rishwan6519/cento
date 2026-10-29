@@ -1,3 +1,4 @@
+import { generateUniqueTemplateId } from '@/lib/generateTemplateId';
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import type { SortOrder } from 'mongoose';
@@ -57,20 +58,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Determine sequential templateId starting with 1
-    const allTemplates = await VideoTemplate.find({}, 'templateId').lean();
-    let maxId = 0;
-    for (const t of allTemplates) {
-      const num = Number((t as any).templateId);
-      if (!isNaN(num) && num > maxId) maxId = num;
-    }
-    const nextTemplateId = maxId + 1;
+    // Generate unique 5-digit templateId (10000 - 99999) so it is never 1 or overlapping across admins/stores
+    const next5DigitTemplateId = await generateUniqueTemplateId();
 
     let savedTemplate: any;
 
     if (clientId && mongoose.Types.ObjectId.isValid(String(clientId))) {
       const existing = await VideoTemplate.findById(String(clientId));
-      const targetTemplateId = existing?.templateId || nextTemplateId;
+      const targetTemplateId = existing?.templateId && Number(existing.templateId) >= 10000
+        ? Number(existing.templateId)
+        : next5DigitTemplateId;
 
       savedTemplate = await VideoTemplate.findOneAndUpdate(
         { _id: String(clientId) },
@@ -83,9 +80,9 @@ export async function POST(req: NextRequest) {
         { new: true, upsert: true, setDefaultsOnInsert: true }
       );
     } else {
-      const assignedTemplateId = (body.templateId && Number(body.templateId) > 0)
+      const assignedTemplateId = (body.templateId && Number(body.templateId) >= 10000)
         ? Number(body.templateId)
-        : nextTemplateId;
+        : next5DigitTemplateId;
 
       savedTemplate = await VideoTemplate.create({
         ...templateFields,
@@ -101,7 +98,7 @@ export async function POST(req: NextRequest) {
     const thumbRel = savedTemplate.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
 
     const formattedTemplateItem = {
-      id: savedTemplate.templateId || nextTemplateId,
+      id: savedTemplate.templateId || next5DigitTemplateId,
       name: savedTemplate.templateName,
       status: "approved",
       base_width: savedTemplate.aspectRatio === "9:16" ? 1080 : 1920,
@@ -140,7 +137,7 @@ export async function POST(req: NextRequest) {
           offertypeId: String(finalOtId || "ALL").toUpperCase(),
         },
         templateId: String(savedTemplate.templateId || savedTemplate._id),
-        id: savedTemplate.templateId || nextTemplateId,
+        id: savedTemplate.templateId || next5DigitTemplateId,
       },
       { status: 201 }
     );
@@ -237,11 +234,11 @@ export async function GET(req: NextRequest) {
     const sortField: { [key: string]: SortOrder } = { templateId: 1, createdAt: -1 };
     const dbTemplates: any[] = await VideoTemplate.find(query).sort(sortField).lean();
 
-    // Ensure every returned template has a clean numeric templateId starting from 1
-    const mappedTemplates = dbTemplates.map((t: any, idx: number) => ({
+    // Return templates with assigned 5-digit templateId
+    const mappedTemplates = dbTemplates.map((t: any) => ({
       ...t,
       _id: String(t._id),
-      templateId: t.templateId || (idx + 1),
+      templateId: t.templateId || 10001,
     }));
 
     return NextResponse.json({

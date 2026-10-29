@@ -62,7 +62,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       data: {
         ...template,
         _id: String(template._id),
-        templateId: template.templateId || 1,
+        templateId: template.templateId || 10001,
       },
     });
   } catch (error) {
@@ -126,7 +126,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       data: {
         ...updatedTemplate.toObject(),
         _id: String(updatedTemplate._id),
-        templateId: updatedTemplate.templateId || 1,
+        templateId: updatedTemplate.templateId || 10001,
       },
     });
   } catch (error) {
