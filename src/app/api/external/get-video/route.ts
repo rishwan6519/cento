@@ -1,3 +1,148 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getRenderJob } from '@/lib/videoRenderer/renderService';
+import { connectToDatabase } from '@/lib/db';
+import MediaItemModel from '@/models/MediaItems';
+import VideoJobModel from '@/models/VideoJob';
+import mongoose from 'mongoose';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+
+async function handleGetVideo(jobIdInput: string) {
+  const jobId = (jobIdInput || '').trim();
+  if (!jobId) {
+    return NextResponse.json(
+      { success: false, message: 'job_id or videoId is required' },
+      { status: 400 }
+    );
+  }
+
+  // 1. Check in-memory/rendered job from local video renderer
+  try {
+    const renderJob = await getRenderJob(jobId);
+    if (renderJob) {
+      const primary =
+        (renderJob.videos && renderJob.videos.find((v: any) => v.ratio === '16:9')) ||
+        renderJob.primaryVideo ||
+        (renderJob.videos && renderJob.videos[0]);
+
+      return NextResponse.json({
+        success: true,
+        status: renderJob.status,
+        job_id: jobId,
+        primaryVideo: primary?.url || '',
+        videos: renderJob.videos || [],
+        video: primary || null,
+        message: renderJob.status === 'completed' ? 'Video ready' : 'Video is processing',
+      });
+    }
+  } catch (e) {
+    console.warn('[get-video] renderService check error:', e);
+  }
+
+  // 2. Fallback to MongoDB MediaItemModel / VideoJobModel
+  try {
+    await connectToDatabase();
+    let mediaDoc: any = null;
+    if (mongoose.Types.ObjectId.isValid(jobId)) {
+      mediaDoc = await MediaItemModel.findById(jobId).lean();
+    }
+    if (!mediaDoc) {
+      mediaDoc = await MediaItemModel.findOne({
+        $or: [{ _id: jobId }, { jobId: jobId }, { url: jobId }],
+      }).lean();
+    }
+
+    if (mediaDoc) {
+      // Find all videos associated with same jobId if available
+      let siblingVideos: any[] = [];
+      if (mediaDoc.jobId) {
+        siblingVideos = await MediaItemModel.find({ jobId: mediaDoc.jobId }).lean();
+      }
+      const videoList = siblingVideos.length > 0 ? siblingVideos.map((m: any) => ({
+        url: m.url,
+        ratio: m.ratio,
+        resolution: m.resolution,
+        status: 'completed'
+      })) : [{
+        url: mediaDoc.url,
+        ratio: mediaDoc.ratio || '16:9',
+        resolution: mediaDoc.resolution || 720,
+        status: 'completed'
+      }];
+
+      return NextResponse.json({
+        success: true,
+        status: 'completed',
+        job_id: mediaDoc.jobId || jobId,
+        primaryVideo: mediaDoc.url,
+        videos: videoList,
+        video: { url: mediaDoc.url, ratio: mediaDoc.ratio || '16:9' },
+        message: 'Video ready',
+      });
+    }
+
+    // Check VideoJobModel
+    const videoJob = await VideoJobModel.findOne({
+      $or: [{ videoId: jobId }, { jobId: jobId }],
+    }).lean();
+
+    if (videoJob) {
+      return NextResponse.json({
+        success: true,
+        status: videoJob.status || 'completed',
+        job_id: videoJob.jobId || jobId,
+        primaryVideo: (videoJob as any).videoUrl || (videoJob as any).url || '',
+        videos: (videoJob as any).saved_videos || [],
+        message: videoJob.status === 'completed' ? 'Video ready' : 'Video is processing',
+      });
+    }
+  } catch (err: any) {
+    console.error('[get-video] DB lookup error:', err);
+  }
+
+  return NextResponse.json(
+    { success: false, message: `Could not find video for jobId / videoId '${jobId}'` },
+    { status: 404 }
+  );
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const jobId =
+      searchParams.get('job_id') ||
+      searchParams.get('jobId') ||
+      searchParams.get('videoId') ||
+      searchParams.get('id') ||
+      '';
+    return await handleGetVideo(jobId);
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message || 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const jobId =
+      body.job_id ||
+      body.jobId ||
+      body.videoId ||
+      body.id ||
+      '';
+    return await handleGetVideo(jobId);
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err?.message || 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+
+/*
+================================================================================
+PREVIOUS /api/external/get-video CODE (COMMENTED OUT AS REQUESTED)
+================================================================================
+
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
@@ -692,3 +837,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+*/
