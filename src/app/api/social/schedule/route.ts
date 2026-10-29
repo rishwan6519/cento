@@ -276,9 +276,12 @@ export async function POST(req: NextRequest) {
       startDate,
       scheduledAt: explicitScheduledAt,
       publishMode: explicitPublishMode,
+      storeId,
+      store_id,
+      storeUserId,
+      store_user_id,
       userId,
       user_id,
-      storeUserId,
       storeName,
       store_name,
       videoId,
@@ -305,16 +308,20 @@ export async function POST(req: NextRequest) {
       targetChannels = ['facebook', 'instagram'];
     }
 
-    // Resolve store user - Support both userId (ObjectId) and storeName (e.g. "store4")
-    const searchParam = userId || user_id || storeUserId || storeName || store_name || 'store4';
+    // Resolve store user - Support storeId, userId, storeUserId, and storeName individually or together
+    const idCandidate = storeId || store_id || storeUserId || store_user_id || userId || user_id;
+    const nameCandidate = storeName || store_name;
+
     let storeUserDoc: any = null;
 
     try {
-      if (mongoose.Types.ObjectId.isValid(String(searchParam))) {
-        storeUserDoc = await User.findById(searchParam).lean();
+      // 1. If store user ID provided and is valid ObjectId, search by ID
+      if (idCandidate && mongoose.Types.ObjectId.isValid(String(idCandidate).trim())) {
+        storeUserDoc = await User.findById(String(idCandidate).trim()).lean();
       }
-      if (!storeUserDoc) {
-        const queryStr = String(searchParam).trim();
+      // 2. If store name provided (or if ID not found), search by storeName
+      if (!storeUserDoc && nameCandidate) {
+        const queryStr = String(nameCandidate).trim();
         storeUserDoc = await User.findOne({
           $or: [
             { storeName: new RegExp(`^${queryStr}$`, 'i') },
@@ -323,19 +330,35 @@ export async function POST(req: NextRequest) {
           ]
         }).lean();
       }
-      // Fallback: Find any store with configured social credentials
+      // 3. If ID candidate was a string like "store4"
+      if (!storeUserDoc && idCandidate) {
+        const queryStr = String(idCandidate).trim();
+        storeUserDoc = await User.findOne({
+          $or: [
+            { storeName: new RegExp(`^${queryStr}$`, 'i') },
+            { name: new RegExp(`^${queryStr}$`, 'i') },
+            { email: new RegExp(`^${queryStr}$`, 'i') }
+          ]
+        }).lean();
+      }
+      // 4. Fallback: Find store4 or any store with configured social credentials
+      if (!storeUserDoc) {
+        storeUserDoc = await User.findOne({ storeName: new RegExp('^store4$', 'i') }).lean();
+      }
       if (!storeUserDoc) {
         storeUserDoc = await User.findOne({ 'socialCredentials.facebookPageId': { $exists: true, $ne: '' } }).lean();
       }
-    } catch {}
+    } catch (err) {
+      console.error('[Store Resolution Error]:', err);
+    }
 
-    const validUserObjId = storeUserDoc?._id || new mongoose.Types.ObjectId('69e9425426e6e857385b4fa6');
+    const validUserObjId = storeUserDoc?._id || (idCandidate && mongoose.Types.ObjectId.isValid(String(idCandidate).trim()) ? new mongoose.Types.ObjectId(String(idCandidate).trim()) : new mongoose.Types.ObjectId('69e9425426e6e857385b4fa6'));
     const storeSocial = storeUserDoc?.socialCredentials || {};
     const fbTargetId = storeSocial.facebookPageId || process.env.FACEBOOK_PAGE_ID || '';
-    const fbTargetName = storeSocial.facebookPageName || storeUserDoc?.storeName || 'Facebook Page';
+    const fbTargetName = storeSocial.facebookPageName || storeUserDoc?.storeName || (nameCandidate ? String(nameCandidate) : 'Facebook Page');
     const fbAccessToken = storeSocial.facebookPageAccessToken || '';
     const igTargetId = storeSocial.instagramBusinessId || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || '';
-    const igTargetName = storeSocial.instagramUsername || storeUserDoc?.storeName || 'Instagram Account';
+    const igTargetName = storeSocial.instagramUsername || storeUserDoc?.storeName || (nameCandidate ? String(nameCandidate) : 'Instagram Account');
 
     // Resolve media & video URLs
     let resolvedDefaultVideoUrl = (mediaUrl || '').trim();
