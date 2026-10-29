@@ -139,7 +139,7 @@ async function publishToFacebookLive(pageId: string, accessToken: string, videoU
   }
 }
 
-// Live Publish to Instagram Graph API
+// Live Publish to Instagram Graph API with async container processing
 async function publishToInstagramLive(igUserId: string, accessToken: string, videoUrl: string, caption: string) {
   try {
     if (!igUserId || !accessToken) {
@@ -149,7 +149,7 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       return { success: false, error: 'Instagram requires a public video URL' };
     }
 
-    // Step 1: Create media container
+    // Step 1: Create media container for Reels
     const containerUrl = `https://graph.facebook.com/v20.0/${igUserId}/media`;
     const containerRes = await fetch(containerUrl, {
       method: 'POST',
@@ -168,31 +168,41 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
 
     const creationId = containerData.id;
 
-    // Step 2: Poll and publish container
+    // Step 2: Poll container status until FINISHED
     let published = false;
     let publishData: any = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    let lastStatus = 'IN_PROGRESS';
+
+    for (let attempt = 0; attempt < 12; attempt++) {
       await new Promise((r) => setTimeout(r, 3000));
-      const publishUrl = `https://graph.facebook.com/v20.0/${igUserId}/media_publish`;
-      const pRes = await fetch(publishUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          creation_id: creationId,
-          access_token: accessToken,
-        }),
-      });
-      publishData = await pRes.json();
-      if (publishData.id) {
-        published = true;
-        break;
+      const stRes = await fetch(`https://graph.facebook.com/v20.0/${creationId}?fields=status_code,status&access_token=${accessToken}`);
+      const stData = await stRes.json();
+      lastStatus = stData.status_code || stData.status || lastStatus;
+
+      if (stData.status_code === 'FINISHED') {
+        const publishUrl = `https://graph.facebook.com/v20.0/${igUserId}/media_publish`;
+        const pRes = await fetch(publishUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            creation_id: creationId,
+            access_token: accessToken,
+          }),
+        });
+        publishData = await pRes.json();
+        if (publishData.id) {
+          published = true;
+          break;
+        }
+      } else if (stData.status_code === 'ERROR') {
+        return { success: false, error: stData.status || 'Instagram video encoding failed' };
       }
     }
 
-    if (published && publishData.id) {
+    if (published && publishData?.id) {
       return { success: true, postId: publishData.id };
     } else {
-      return { success: false, error: publishData?.error?.message || 'Instagram video processing timeout' };
+      return { success: false, error: publishData?.error?.message || `Instagram video is still processing (${lastStatus})` };
     }
   } catch (err: any) {
     return { success: false, error: err.message };
