@@ -14,6 +14,15 @@ export interface VideoTemplateDocument extends Document {
   offerDescription: string;
   ctaButtonText: string;
   offerLabel: string;
+  offerType?: string;
+  offertypeId?: string;
+  offertypename?: string;
+  offer_type?: {
+    id: string;
+    name: string;
+    offertypeId: string;
+    offertypename: string;
+  };
   priceLabel: string;
   discountLabel: string;
   footerText: string;
@@ -101,6 +110,23 @@ const VideoTemplateSchema: Schema = new Schema(
       type: String,
       default: 'Shop Now',
       trim: true,
+    },
+    offerType: {
+      type: String,
+      default: '',
+    },
+    offertypeId: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    offertypename: {
+      type: String,
+      default: '',
+    },
+    offer_type: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     offerLabel: {
       type: String,

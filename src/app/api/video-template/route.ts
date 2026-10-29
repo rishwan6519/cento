@@ -95,13 +95,52 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const finalOtId = savedTemplate.offertypeId || (savedTemplate.offer_type && savedTemplate.offer_type.offertypeId) || savedTemplate.offerType || "INDIVIDUAL_DISCOUNT";
+    const finalOtName = savedTemplate.offertypename || (savedTemplate.offer_type && savedTemplate.offer_type.name) || savedTemplate.offerType || "Individual Discount";
+    const thumbUrl = savedTemplate.thumbnail_url || savedTemplate.thumbnail || savedTemplate.backgroundUrl || "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
+    const thumbRel = savedTemplate.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
+
+    const formattedTemplateItem = {
+      id: savedTemplate.templateId || nextTemplateId,
+      name: savedTemplate.templateName,
+      status: "approved",
+      base_width: savedTemplate.aspectRatio === "9:16" ? 1080 : 1920,
+      base_height: savedTemplate.aspectRatio === "9:16" ? 1920 : 1080,
+      duration_seconds: savedTemplate.videoDuration || 10,
+      fps: savedTemplate.fps || 30,
+      engine: "custom",
+      is_custom_layout: true,
+      offer_type: {
+        id: finalOtId,
+        name: finalOtName,
+        offertypeId: finalOtId,
+        offertypename: finalOtName,
+      },
+      offertypeId: finalOtId,
+      offertypename: finalOtName,
+      thumbnail: thumbRel,
+      thumbnail_url: thumbUrl,
+      created_by: 1,
+      created_at: savedTemplate.createdAt ? new Date(savedTemplate.createdAt).toISOString().replace("T", " ").substring(0, 19) : "2026-09-29 03:46:02",
+      user: {
+        id: 1,
+        name: "StoreSparc Demo",
+        email: "demo@storesparc.local",
+        role: "admin",
+      },
+    };
+
     return NextResponse.json(
       {
         success: true,
-        message: 'Template saved successfully',
+        message: "OK",
+        data: {
+          templates: [formattedTemplateItem],
+          count: 1,
+          offertypeId: String(finalOtId || "ALL").toUpperCase(),
+        },
         templateId: String(savedTemplate.templateId || savedTemplate._id),
         id: savedTemplate.templateId || nextTemplateId,
-        data: savedTemplate,
       },
       { status: 201 }
     );

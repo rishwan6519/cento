@@ -1,166 +1,197 @@
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\$&");
+}
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoTemplate from "@/models/VideoTemplate";
-import { DUMMY_TEMPLATES } from "@/lib/dummyTemplates";
-import OfferType from "@/models/OfferType";
+import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
-// ─── NEW: Fetch templates from external API ────────────────────────────────
-// OLD code is preserved below in comments for reference
-async function getTemplatesFromExternalAPI(authHeader?: string | null, offerTypeId: string = "") {
-  const EXTERNAL_API_URL = `https://cloudbases.in/storesparc_video/index.php/api/external/templates?limit=50&all=1&offertypeId=${encodeURIComponent(offerTypeId)}`;
-  const apiKey = process.env.CLOUDBASES_API_KEY;
-  const headers: Record<string, string> = {
-    "User-Agent": "CentoPlatform/1.0",
-    "Accept": "application/json",
-  };
-  if (authHeader) headers["Authorization"] = authHeader;
-  if (apiKey) headers["X-API-Key"] = apiKey;
+function formatTemplateItem(t: any, index: number) {
+  const tplId = Number(t.templateId) || (index + 1);
+  const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
+  const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
+  
+  const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
+  const thumbRel = t.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
 
-  const fetchOptions: RequestInit = { headers };
-  const response = await fetch(EXTERNAL_API_URL, fetchOptions);
+  const durationSec = Number(t.videoDuration || t.duration_seconds || t.duration || 10);
+  const width = t.base_width || (t.aspectRatio === "9:16" ? 1080 : 1920);
+  const height = t.base_height || (t.aspectRatio === "9:16" ? 1920 : 1080);
 
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  }
-
-  const rawText = await response.text();
-  return NextResponse.json(
-    {
-      success: false,
-      message: `Upstream returned status ${response.status}`,
-      error: rawText.slice(0, 300),
+  return {
+    id: tplId,
+    name: t.templateName || `template-${tplId}`,
+    status: t.status === "Inactive" ? "inactive" : "approved",
+    base_width: width,
+    base_height: height,
+    duration_seconds: durationSec,
+    fps: t.fps || 30,
+    engine: t.engine || "custom",
+    is_custom_layout: true,
+    offer_type: {
+      id: otId,
+      name: otName,
+      offertypeId: otId,
+      offertypename: otName,
     },
-    { status: response.status }
-  );
+    offertypeId: otId,
+    offertypename: otName,
+    thumbnail: thumbRel,
+    thumbnail_url: thumbUrl,
+    created_by: 1,
+    created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : "2026-09-29 03:46:02",
+    user: {
+      id: 1,
+      name: "StoreSparc Demo",
+      email: "demo@storesparc.local",
+      role: "admin",
+    },
+  };
 }
 
-/*
-// ─── OLD: Shared helper to fetch templates using userId ────────────────────────────
-async function getTemplatesForUser(userId: string, templateId?: string, search?: string) {
-  try {
-    await connectToDatabase();
+async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string = "ALL") {
+  await connectToDatabase();
 
-    // If a specific templateId is requested
-    if (templateId && templateId.trim()) {
-      const targetId = templateId.trim();
+  const query: any = {
+    isDummy: { $ne: true },
+  };
 
-      // Check dummy templates first
-      const dummyMatch = DUMMY_TEMPLATES.find((d) => d._id === targetId);
-      if (dummyMatch) {
-        return NextResponse.json({ success: true, count: 1, "template 1": dummyMatch });
-      }
-
-      // Check MongoDB database
-      const template: any = await VideoTemplate.findOne({
-        _id: targetId,
-        storeUserId: userId.trim(),
-      }).lean();
-
-      if (!template) {
-        return NextResponse.json(
-          { success: false, message: `No template found with ID '${targetId}'` },
-          { status: 404 }
-        );
-      }
-
-      // Restrict output strictly to _id, templateName, description
-      const cleanTemplate = {
-        _id: template._id,
-        templateName: template.templateName,
-        description: template.templateDescription || template.offerDescription || template.offerTitle || "AI Video Template",
-      };
-
-      return NextResponse.json({ success: true, count: 1, "template 1": cleanTemplate });
+  if (userId && userId.trim()) {
+    const cleanUid = userId.trim();
+    if (mongoose.Types.ObjectId.isValid(cleanUid)) {
+      query.$or = [
+        { storeUserId: new mongoose.Types.ObjectId(cleanUid) },
+        { storeUserId: cleanUid },
+        { userId: cleanUid },
+      ];
+    } else {
+      query.$or = [
+        { storeUserId: cleanUid },
+        { userId: cleanUid },
+      ];
     }
-
-    // Otherwise list templates for userId
-    const query: Record<string, unknown> = {
-      storeUserId: userId.trim(),
-      status: "Active",
-    };
-
-    const dbTemplates: any[] = await VideoTemplate.find(query).sort({ createdAt: -1 }).lean();
-
-    // Map DB templates to strictly ONLY _id, templateName, description
-    const cleanDbTemplates = dbTemplates.map((t) => ({
-      _id: t._id,
-      templateName: t.templateName,
-      description: t.templateDescription || t.offerDescription || t.offerTitle || "AI Video Template",
-    }));
-
-    // Combine custom DB templates with the standard dummy templates
-    let combinedTemplates = [...cleanDbTemplates, ...DUMMY_TEMPLATES];
-
-    if (search && search.trim()) {
-      const keyword = search.trim().toLowerCase();
-      combinedTemplates = combinedTemplates.filter(
-        (t) =>
-          t.templateName.toLowerCase().includes(keyword) ||
-          t.description.toLowerCase().includes(keyword)
-      );
-    }
-
-    const responsePayload: Record<string, any> = {
-      success: true,
-      count: combinedTemplates.length,
-    };
-
-    combinedTemplates.forEach((tmpl, index) => {
-      responsePayload[`template ${index + 1}`] = {
-        ...tmpl,
-        description: tmpl.description ? String(tmpl.description).replace(/\r?\n+/g, " ").replace(/\s+/g, " ").trim() : "",
-      };
-    });
-
-    return NextResponse.json(responsePayload);
-  } catch (error) {
-    console.error("[external/get-templates] Error:", error);
-    return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : "Failed to fetch templates" },
-      { status: 500 }
-    );
   }
-}
-*/
 
-// ─── GET Handler ──────────────────────────────────────────────────────────────
+  // Filter by offertypeId if not "all"
+  const isAll = !rawOfferTypeId || rawOfferTypeId.toUpperCase() === "ALL";
+  if (!isAll) {
+    const target = rawOfferTypeId.trim();
+    const regex = new RegExp("^" + escapeRegex(target) + "$", "i");
+    const friendlyName = target.replace(/_/g, " ");
+    const friendlyRegex = new RegExp("^" + escapeRegex(friendlyName) + "$", "i");
+
+    const otClause = [
+      { offertypeId: target },
+      { offertypeId: regex },
+      { offerType: target },
+      { offerType: friendlyRegex },
+      { offertypename: friendlyRegex },
+      { "offer_type.id": target },
+      { "offer_type.offertypeId": target },
+      { "offer_type.name": friendlyRegex },
+      { "offer_type.offertypename": friendlyRegex },
+    ];
+
+    if (query.$or) {
+      query.$and = [{ $or: query.$or }, { $or: otClause }];
+      delete query.$or;
+    } else {
+      query.$or = otClause;
+    }
+  }
+
+  let dbTemplates = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
+
+  // If user-specific query returned 0 templates, fetch all active templates
+  if (dbTemplates.length === 0 && userId) {
+    const fallbackQuery: any = { isDummy: { $ne: true } };
+    if (!isAll) {
+      const target = rawOfferTypeId.trim();
+    const regex = new RegExp("^" + escapeRegex(target) + "$", "i");
+      fallbackQuery.$or = [
+        { offertypeId: target },
+        { offertypeId: regex },
+        { offerType: target },
+        { "offer_type.id": target },
+        { "offer_type.offertypeId": target },
+      ];
+    }
+    dbTemplates = await VideoTemplate.find(fallbackQuery).sort({ templateId: 1, createdAt: -1 }).lean();
+  }
+
+  // If still 0, provide default template #1 formatted as requested
+  if (dbTemplates.length === 0) {
+    const defId = isAll ? "INDIVIDUAL_DISCOUNT" : rawOfferTypeId.trim();
+    dbTemplates = [
+      {
+        templateId: 1,
+        templateName: "test-template",
+        status: "approved",
+        videoDuration: 12,
+        fps: 30,
+        aspectRatio: "16:9",
+        offertypeId: defId,
+        offertypename: defId.replace(/_/g, " "),
+        thumbnail: "uploads/thumbnails/tpl_thumb_20260929034601_9285db.gif",
+        thumbnail_url: "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_20260929034601_9285db.gif",
+        createdAt: new Date(),
+      } as any,
+    ];
+  }
+
+  const formattedTemplates = dbTemplates.map((t, idx) => formatTemplateItem(t, idx));
+
+  return {
+    success: true,
+    message: "OK",
+    data: {
+      templates: formattedTemplates,
+      count: formattedTemplates.length,
+      offertypeId: (rawOfferTypeId || "ALL").toUpperCase(),
+    },
+  };
+}
+
+// GET /api/external/get-templates?userId=...&offertypeId=...
 export async function GET(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-    return await getTemplatesFromExternalAPI(authHeader, "");
-  } catch (error) {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId") || undefined;
+    const rawOfferType = searchParams.get("offertypeId") || searchParams.get("offer_type") || searchParams.get("offertype") || "ALL";
+
+    const result = await fetchAndFormatTemplates(userId, rawOfferType);
+    return NextResponse.json(result);
+  } catch (error: any) {
+    console.error("[GET /api/external/get-templates] Error:", error);
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : "Server Error" },
+      { success: false, message: error?.message || "Server Error" },
       { status: 500 }
     );
   }
 }
 
-// ─── POST Handler ─────────────────────────────────────────────────────────────
+// POST /api/external/get-templates
+// Body: { "userId": "...", "offertypeId": "all" | "INDIVIDUAL_DISCOUNT" }
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("authorization");
-
-    let targetOfferTypeId = "";
+    let body: any = {};
     try {
-      const body = await req.json();
-      const rawOfferType = body.offertypeId !== undefined ? body.offertypeId : (body.offer_type || body.offertype || "");
-
-      if (rawOfferType && String(rawOfferType).trim() !== "") {
-        targetOfferTypeId = String(rawOfferType).trim();
-      }
-    } catch (e) {
-      // Ignore if body is empty or invalid
+      body = await req.json();
+    } catch {
+      body = {};
     }
 
-    return await getTemplatesFromExternalAPI(authHeader, targetOfferTypeId);
-  } catch (error) {
+    const userId = body.userId || body.user_id || body.storeUserId || undefined;
+    const rawOfferType = body.offertypeId !== undefined ? body.offertypeId : (body.offer_type || body.offertype || "ALL");
+
+    const result = await fetchAndFormatTemplates(userId, String(rawOfferType || "ALL"));
+    return NextResponse.json(result);
+  } catch (error: any) {
+    console.error("[POST /api/external/get-templates] Error:", error);
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : "Server Error" },
+      { success: false, message: error?.message || "Server Error" },
       { status: 500 }
     );
   }

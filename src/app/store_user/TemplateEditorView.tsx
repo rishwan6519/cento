@@ -129,6 +129,14 @@ export interface SavedTemplateItem {
   animationStyle?: string;
   animation?: any;
   offerType?: string;
+  offertypeId?: string;
+  offertypename?: string;
+  offer_type?: {
+    id?: string;
+    name?: string;
+    offertypeId?: string;
+    offertypename?: string;
+  };
   aiStyle?: string;
   aiColorTheme?: string;
   createdAt?: string;
@@ -1413,7 +1421,10 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [activeTemplateNumber, setActiveTemplateNumber] = useState<number | null>(
     initialTemplateId && !isNaN(Number(initialTemplateId)) ? Number(initialTemplateId) : null
   );
-  const [offerType, setOfferType] = useState<string>("Flash Sale");
+  const [offerType, setOfferType] = useState<string>("Individual Discount");
+  const [offerTypesList, setOfferTypesList] = useState<Array<{ offertypeId: string; offertypename: string }>>([]);
+  const [selectedOfferTypeId, setSelectedOfferTypeId] = useState<string>("INDIVIDUAL_DISCOUNT");
+  const [selectedOfferTypeName, setSelectedOfferTypeName] = useState<string>("Individual Discount");
   const [aiStyle, setAiStyle] = useState<string>("Premium commercial");
   const [aiColorTheme, setAiColorTheme] = useState<string>("None (natural colors)");
   const [aiTransparentBg, setAiTransparentBg] = useState<boolean>(true);
@@ -1752,6 +1763,31 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  // ── Fetch dynamic offer types from /api/offer-types ─────────────────────────
+  useEffect(() => {
+    const fetchOfferTypes = async () => {
+      try {
+        const userId = typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
+        const url = userId ? `/api/offer-types?userId=${userId}` : "/api/offer-types";
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          setOfferTypesList(data.data);
+          const first = data.data[0];
+          setSelectedOfferTypeId(first.offertypeId);
+          setSelectedOfferTypeName(first.offertypename);
+          setOfferType(first.offertypename);
+          setNewTplOfferType(first.offertypename);
+        }
+      } catch (err) {
+        console.warn("Could not fetch offer types:", err);
+      }
+    };
+    fetchOfferTypes();
+  }, []);
+
+
 
 
   // ── Animation Playback Loop ─────────────────────────────────────────────────
@@ -2984,7 +3020,15 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         bgGradIndex,
         logoUrl: logoImageUrl,
         productUrl: productImageUrl,
-        offerType,
+        offerType: selectedOfferTypeName || offerType,
+        offertypeId: selectedOfferTypeId || "INDIVIDUAL_DISCOUNT",
+        offertypename: selectedOfferTypeName || offerType,
+        offer_type: {
+          id: selectedOfferTypeId || "INDIVIDUAL_DISCOUNT",
+          name: selectedOfferTypeName || offerType,
+          offertypeId: selectedOfferTypeId || "INDIVIDUAL_DISCOUNT",
+          offertypename: selectedOfferTypeName || offerType,
+        },
         animationStyle,
         animation: { enabled: animationStyle !== "static", style: animationStyle },
         aiStyle,
@@ -3035,7 +3079,11 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     setTemplateId(tpl._id);
     setActiveTemplateNumber(tpl.templateId ? Number(tpl.templateId) : (savedTemplatesList.indexOf(tpl) + 1));
     setTemplateName(tpl.templateName);
-    if (tpl.offerType) setOfferType(tpl.offerType);
+    const tplOtId = tpl.offertypeId || (tpl.offer_type && (tpl.offer_type.id || tpl.offer_type.offertypeId)) || tpl.offerType || "INDIVIDUAL_DISCOUNT";
+    const tplOtName = tpl.offertypename || (tpl.offer_type && (tpl.offer_type.name || tpl.offer_type.offertypename)) || tpl.offerType || "Individual Discount";
+    setSelectedOfferTypeId(tplOtId);
+    setSelectedOfferTypeName(tplOtName);
+    setOfferType(tplOtName);
     if (tpl.decorations && Array.isArray(tpl.decorations)) setDecorations(tpl.decorations);
     else setDecorations([]);
     const tplDur = Number(tpl.videoDuration || (tpl as any).video_duration || (tpl as any).duration);
@@ -4027,17 +4075,37 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                 </button>
               </div>
 
-              {/* Offer Type */}
+              {/* Offer Type Dropdown from /api/offer-types */}
               <div className="ste-field-group">
-                <label className="ste-label">Offer Type</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <label className="ste-label" style={{ margin: 0 }}>Offer Type</label>
+                  {selectedOfferTypeId && (
+                    <span style={{ fontSize: "0.68rem", color: "#11B5BB", background: "rgba(17,181,187,0.12)", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>
+                      {selectedOfferTypeId}
+                    </span>
+                  )}
+                </div>
                 <select
-                  value={offerType}
-                  onChange={(e) => setOfferType(e.target.value)}
+                  value={selectedOfferTypeId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedOfferTypeId(val);
+                    const found = offerTypesList.find(o => o.offertypeId === val);
+                    const name = found ? found.offertypename : val;
+                    setSelectedOfferTypeName(name);
+                    setOfferType(name);
+                  }}
                   className="ste-select"
                 >
-                  {OFFER_TYPES.map((ot) => (
-                    <option key={ot} value={ot}>{ot}</option>
-                  ))}
+                  {offerTypesList.length > 0 ? (
+                    offerTypesList.map((ot) => (
+                      <option key={ot.offertypeId} value={ot.offertypeId}>
+                        {ot.offertypename} ({ot.offertypeId})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="INDIVIDUAL_DISCOUNT">Individual Discount (INDIVIDUAL_DISCOUNT)</option>
+                  )}
                 </select>
               </div>
 
@@ -7014,12 +7082,25 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                   <label className="ste-label">Offer Type</label>
                   <select
                     className="ste-select"
-                    value={newTplOfferType}
-                    onChange={(e) => setNewTplOfferType(e.target.value)}
+                    value={selectedOfferTypeId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedOfferTypeId(val);
+                      const found = offerTypesList.find(o => o.offertypeId === val);
+                      const name = found ? found.offertypename : val;
+                      setSelectedOfferTypeName(name);
+                      setNewTplOfferType(name);
+                    }}
                   >
-                    {OFFER_TYPES.map((ot) => (
-                      <option key={ot} value={ot}>{ot}</option>
-                    ))}
+                    {offerTypesList.length > 0 ? (
+                      offerTypesList.map((ot) => (
+                        <option key={ot.offertypeId} value={ot.offertypeId}>
+                          {ot.offertypename} ({ot.offertypeId})
+                        </option>
+                      ))
+                    ) : (
+                      <option value="INDIVIDUAL_DISCOUNT">Individual Discount (INDIVIDUAL_DISCOUNT)</option>
+                    )}
                   </select>
                 </div>
 
