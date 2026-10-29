@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { FaEye, FaTrash, FaSearch, FaTimes, FaPlay, FaFilter, FaThLarge, FaList, FaFacebook, FaInstagram } from "react-icons/fa";
+import { FaEye, FaTrash, FaSearch, FaTimes, FaPlay, FaFilter, FaThLarge, FaList, FaFacebook, FaInstagram, FaClock } from "react-icons/fa";
 
 type ViewMode = "grid" | "list";
 type FilterType = "all" | "image" | "video" | "audio" | "offer";
@@ -45,6 +45,52 @@ export default function MediaLibraryView({
   const [filter, setFilter] = useState<FilterType>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const userId = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "");
+  const resolveSocialInfo = (item: any) => {
+    if (!item) return { isFbPosted: false, isFbScheduled: false, isIgPosted: false, isIgScheduled: false };
+    const u = String(item.url || '').trim();
+    const normU = u.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/');
+    const filename = u.split('/').pop()?.split('?')[0] || '';
+    const baseName = filename.replace(/_(16x9|9x16|1x1|4x5)\.mp4$/, '');
+    const tplId = item.templateId ? String(item.templateId) : '';
+    const itemId = item._id ? String(item._id) : '';
+
+    const candidates = [
+      (socialPostsMap as any)[u],
+      (socialPostsMap as any)[normU],
+      filename ? (socialPostsMap as any)[filename] : undefined,
+      baseName ? (socialPostsMap as any)[baseName] : undefined,
+      tplId ? (socialPostsMap as any)[tplId] : undefined,
+      itemId ? (socialPostsMap as any)[itemId] : undefined,
+    ].filter(Boolean);
+
+    let isFbPosted = false;
+    let isFbScheduled = false;
+    let isIgPosted = false;
+    let isIgScheduled = false;
+
+    for (const c of candidates) {
+      if (c.facebookPosted || c.facebook) isFbPosted = true;
+      if (c.facebookScheduled) isFbScheduled = true;
+      if (c.instagramPosted || c.instagram) isIgPosted = true;
+      if (c.instagramScheduled) isIgScheduled = true;
+    }
+
+    if (!isFbPosted && !isFbScheduled && item.channels && Array.isArray(item.channels)) {
+      if (item.channels.some((ch: string) => String(ch).toLowerCase() === 'facebook')) {
+        if (item.approvalStatus === 'success') isFbPosted = true;
+        else isFbScheduled = true;
+      }
+    }
+    if (!isIgPosted && !isIgScheduled && item.channels && Array.isArray(item.channels)) {
+      if (item.channels.some((ch: string) => String(ch).toLowerCase() === 'instagram')) {
+        if (item.approvalStatus === 'success') isIgPosted = true;
+        else isIgScheduled = true;
+      }
+    }
+
+    return { isFbPosted, isFbScheduled, isIgPosted, isIgScheduled };
+  };
+
   const [socialPostsMap, setSocialPostsMap] = useState<Record<string, { facebook: boolean; instagram: boolean; posts: any[] }>>({});
 
   useEffect(() => {
@@ -56,31 +102,45 @@ export default function MediaLibraryView({
       fetch(`/api/announcement/playlist?userId=${userId}`).then(r => r.json()).catch(() => []),
       fetch(`/api/social/posts?limit=300${userId ? `&userId=${userId}` : ''}`).then(r => r.json()).catch(() => ({})),
     ]).then(([mediaRes, playlistRes, announcementRes, socialRes]) => {
-      // Build social posts map (strictly only for posts actually published to Facebook or Instagram)
+      // Build social posts map (matches published and scheduled posts across multiple identifiers)
       const rawPosts: any[] = Array.isArray(socialRes?.data) ? socialRes.data : (Array.isArray(socialRes?.posts) ? socialRes.posts : []);
-      const sMap: Record<string, { facebook: boolean; instagram: boolean; posts: any[] }> = {};
-      rawPosts.forEach((p: any) => {
-        const isPublished = p.status === 'published' || Boolean(p.publishedAt) || Boolean(p.externalPostId);
-        if (!isPublished) return; // Do not tag media if post is scheduled, failed, or draft
+      const sMap: Record<string, { facebookPosted: boolean; facebookScheduled: boolean; instagramPosted: boolean; instagramScheduled: boolean; posts: any[] }> = {};
+      
+      const registerKey = (k: string, post: any, channel: string, isPublished: boolean, isScheduled: boolean) => {
+        if (!k) return;
+        if (!sMap[k]) sMap[k] = { facebookPosted: false, facebookScheduled: false, instagramPosted: false, instagramScheduled: false, posts: [] };
+        sMap[k].posts.push(post);
+        if (channel === 'facebook') {
+          if (isPublished) sMap[k].facebookPosted = true;
+          else if (isScheduled) sMap[k].facebookScheduled = true;
+        }
+        if (channel === 'instagram') {
+          if (isPublished) sMap[k].instagramPosted = true;
+          else if (isScheduled) sMap[k].instagramScheduled = true;
+        }
+      };
 
+      rawPosts.forEach((p: any) => {
+        const isPublished = p.status === 'published' || Boolean(p.publishedAt) || (Boolean(p.externalPostId) && p.status !== 'failed');
+        const isScheduled = p.status === 'scheduled';
+        if (!isPublished && !isScheduled) return;
+
+        const ch = String(p.channel || '').toLowerCase();
         const u = String(p.mediaUrl || '').trim();
         if (u) {
           const normU = u.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/');
-          if (!sMap[u]) sMap[u] = { facebook: false, instagram: false, posts: [] };
-          if (!sMap[normU]) sMap[normU] = sMap[u];
-          sMap[u].posts.push(p);
-          const ch = String(p.channel || '').toLowerCase();
-          if (ch === 'facebook') {
-            sMap[u].facebook = true;
-            sMap[normU].facebook = true;
-          }
-          if (ch === 'instagram') {
-            sMap[u].instagram = true;
-            sMap[normU].instagram = true;
-          }
+          const filename = u.split('/').pop()?.split('?')[0] || '';
+          const baseName = filename.replace(/_(16x9|9x16|1x1|4x5)\.mp4$/, '');
+          registerKey(u, p, ch, isPublished, isScheduled);
+          registerKey(normU, p, ch, isPublished, isScheduled);
+          if (filename) registerKey(filename, p, ch, isPublished, isScheduled);
+          if (baseName) registerKey(baseName, p, ch, isPublished, isScheduled);
+        }
+        if (p.templateId) {
+          registerKey(String(p.templateId), p, ch, isPublished, isScheduled);
         }
       });
-      setSocialPostsMap(sMap);
+      setSocialPostsMap(sMap as any);
       // 1. Direct media uploads
       const media = mediaRes.media || mediaRes.mediaFiles || mediaRes.data || [];
       setMediaItems(media);
@@ -217,6 +277,12 @@ export default function MediaLibraryView({
         .ml-head-tag--ig {
           background: linear-gradient(45deg, #F58529, #DD2A7B, #8134AF);
           border: 1px solid rgba(255,255,255,0.4);
+        }
+        .ml-head-tag--fb-sched {
+          background: #475569; border: 1px solid rgba(255,255,255,0.4);
+        }
+        .ml-head-tag--ig-sched {
+          background: #7c3aed; border: 1px solid rgba(255,255,255,0.4);
         }
 
         /* ── Media Library Styles ── */
@@ -503,26 +569,30 @@ export default function MediaLibraryView({
             const category = getFileCategory(item.type);
             const previewUrl = getPreviewUrl(item);
             const isImage = category === "image";
-            const itemUrl = (item.url || '').trim();
-            const normItemUrl = itemUrl.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/');
-            const socialInfo = socialPostsMap[itemUrl] || socialPostsMap[normItemUrl];
-            // Only show Facebook / Instagram posted tags if actually published to those channels
-            const isFb = Boolean(socialInfo?.facebook);
-            const isIg = Boolean(socialInfo?.instagram);
+            const { isFbPosted, isFbScheduled, isIgPosted, isIgScheduled } = resolveSocialInfo(item);
+            const hasSocialTags = isFbPosted || isFbScheduled || isIgPosted || isIgScheduled;
             return (
               <div key={item._id} className="ml-grid-card" onClick={() => setPreviewFile(item)}>
-                {(isFb || isIg) && (
+                {hasSocialTags && (
                   <div className="ml-social-head-tags">
-                    {isFb && (
-                      <span className="ml-head-tag ml-head-tag--fb" title="Broadcasting Live / Posted on Facebook">
+                    {isFbPosted ? (
+                      <span className="ml-head-tag ml-head-tag--fb" title="Posted on Facebook">
                         <FaFacebook size={10} /> Facebook Posted
                       </span>
-                    )}
-                    {isIg && (
-                      <span className="ml-head-tag ml-head-tag--ig" title="Broadcasting Live / Posted on Instagram">
+                    ) : isFbScheduled ? (
+                      <span className="ml-head-tag ml-head-tag--fb-sched" title="Scheduled on Facebook">
+                        <FaClock size={10} /> Facebook Scheduled
+                      </span>
+                    ) : null}
+                    {isIgPosted ? (
+                      <span className="ml-head-tag ml-head-tag--ig" title="Posted on Instagram">
                         <FaInstagram size={10} /> Instagram Posted
                       </span>
-                    )}
+                    ) : isIgScheduled ? (
+                      <span className="ml-head-tag ml-head-tag--ig-sched" title="Scheduled on Instagram">
+                        <FaClock size={10} /> Instagram Scheduled
+                      </span>
+                    ) : null}
                   </div>
                 )}
                 <div className="ml-grid-thumb">
@@ -672,24 +742,28 @@ export default function MediaLibraryView({
             <div className="ml-preview-name" style={{ marginTop: "16px", borderRadius: "10px" }}>
               {previewFile.name}
               {(() => {
-                const pUrl = (previewFile.url || '').trim();
-                const normPUrl = pUrl.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/+/, '/');
-                const sInfo = socialPostsMap[pUrl] || socialPostsMap[normPUrl];
-                const isFb = Boolean(sInfo?.facebook);
-                const isIg = Boolean(sInfo?.instagram);
-                if (!isFb && !isIg) return null;
+                const { isFbPosted, isFbScheduled, isIgPosted, isIgScheduled } = resolveSocialInfo(previewFile);
+                if (!isFbPosted && !isFbScheduled && !isIgPosted && !isIgScheduled) return null;
                 return (
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px' }}>
-                    {isFb && (
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
+                    {isFbPosted ? (
                       <span className="ml-head-tag ml-head-tag--fb" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
-                        <FaFacebook size={12} /> Posted on Facebook
+                        <FaFacebook size={12} /> Facebook Posted
                       </span>
-                    )}
-                    {isIg && (
+                    ) : isFbScheduled ? (
+                      <span className="ml-head-tag ml-head-tag--fb-sched" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                        <FaClock size={12} /> Facebook Scheduled
+                      </span>
+                    ) : null}
+                    {isIgPosted ? (
                       <span className="ml-head-tag ml-head-tag--ig" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
-                        <FaInstagram size={12} /> Posted on Instagram
+                        <FaInstagram size={12} /> Instagram Posted
                       </span>
-                    )}
+                    ) : isIgScheduled ? (
+                      <span className="ml-head-tag ml-head-tag--ig-sched" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                        <FaClock size={12} /> Instagram Scheduled
+                      </span>
+                    ) : null}
                   </div>
                 );
               })()}

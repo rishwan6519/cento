@@ -29,7 +29,7 @@ function getAuthenticatedUser(req: NextRequest): { userId: string; role: string 
   }
 }
 
-// ─── GET /api/social/posts ────────────────────────────────────────────────────
+// ─── GET /api/social/posts ──────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -39,14 +39,56 @@ export async function GET(req: NextRequest) {
     const channel = searchParams.get('channel');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
-    const limit = Math.max(1, Math.min(200, parseInt(searchParams.get('limit') || '50', 10)));
+    const limit = Math.max(1, Math.min(300, parseInt(searchParams.get('limit') || '50', 10)));
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
 
     const filter: any = {};
-    const storeUserId = searchParams.get('storeUserId') || searchParams.get('userId');
+    const storeUserId = searchParams.get('storeUserId') || searchParams.get('userId') || auth?.userId;
     if (storeUserId && storeUserId.trim()) {
-      filter.storeUserId = storeUserId.trim();
+      const trimmedUid = storeUserId.trim();
+      let userIdsToFetch: any[] = [];
+      if (mongoose.Types.ObjectId.isValid(trimmedUid)) {
+        const targetObjId = new mongoose.Types.ObjectId(trimmedUid);
+        const userDoc = await User.findById(targetObjId).lean();
+        if (userDoc) {
+          if (userDoc.role === 'account_admin' || userDoc.role === 'admin') {
+            const managedStores = await User.find({
+              $or: [
+                { _id: targetObjId },
+                { controllerId: targetObjId },
+                ...(userDoc.customerId ? [{ customerId: userDoc.customerId }] : []),
+                { createdBy: targetObjId },
+              ],
+            }).select('_id').lean();
+            userIdsToFetch = managedStores.map((u: any) => u._id);
+          } else {
+            const parentId = userDoc.controllerId || userDoc.createdBy;
+            if (parentId) {
+              const familyStores = await User.find({
+                $or: [
+                  { _id: targetObjId },
+                  { _id: parentId },
+                  { controllerId: parentId },
+                  { createdBy: parentId },
+                ],
+              }).select('_id').lean();
+              userIdsToFetch = familyStores.map((u: any) => u._id);
+            } else {
+              userIdsToFetch = [targetObjId];
+            }
+          }
+        } else {
+          userIdsToFetch = [targetObjId];
+        }
+      }
+
+      if (userIdsToFetch.length > 0) {
+        filter.storeUserId = { $in: userIdsToFetch };
+      } else {
+        filter.storeUserId = trimmedUid;
+      }
     }
+
     if (channel && channel !== 'all') {
       filter.channel = channel.toLowerCase();
     }
@@ -59,7 +101,7 @@ export async function GET(req: NextRequest) {
 
     const total = await SocialPost.countDocuments(filter);
     const posts = await SocialPost.find(filter)
-      .sort({ scheduledAt: 1, createdAt: -1 })
+      .sort({ scheduledAt: -1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
@@ -80,7 +122,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ─── POST /api/social/posts ───────────────────────────────────────────────────
+// ─── POST /api/social/posts ─────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -95,6 +137,19 @@ export async function POST(req: NextRequest) {
     try {
       if (idCandidate && mongoose.Types.ObjectId.isValid(String(idCandidate).trim())) {
         storeUserDoc = await User.findById(String(idCandidate).trim()).lean();
+        // If candidate is account_admin, find their store with social credentials
+        if (storeUserDoc && (storeUserDoc.role === 'account_admin' || storeUserDoc.role === 'admin')) {
+          const storeWithSocial = await User.findOne({
+            controllerId: storeUserDoc._id,
+            $or: [
+              { 'socialCredentials.facebookPageId': { $exists: true, $ne: '' } },
+              { 'socialCredentials.instagramBusinessId': { $exists: true, $ne: '' } },
+            ],
+          }).lean();
+          if (storeWithSocial) {
+            storeUserDoc = storeWithSocial;
+          }
+        }
       }
       if (!storeUserDoc && nameCandidate) {
         const queryStr = String(nameCandidate).trim();
@@ -102,8 +157,8 @@ export async function POST(req: NextRequest) {
           $or: [
             { storeName: new RegExp(`^${queryStr}$`, 'i') },
             { name: new RegExp(`^${queryStr}$`, 'i') },
-            { email: new RegExp(`^${queryStr}$`, 'i') }
-          ]
+            { email: new RegExp(`^${queryStr}$`, 'i') },
+          ],
         }).lean();
       }
       if (!storeUserDoc && idCandidate) {
@@ -112,8 +167,8 @@ export async function POST(req: NextRequest) {
           $or: [
             { storeName: new RegExp(`^${queryStr}$`, 'i') },
             { name: new RegExp(`^${queryStr}$`, 'i') },
-            { email: new RegExp(`^${queryStr}$`, 'i') }
-          ]
+            { email: new RegExp(`^${queryStr}$`, 'i') },
+          ],
         }).lean();
       }
       if (!storeUserDoc) {

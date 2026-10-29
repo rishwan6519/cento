@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import SocialPost from '@/models/SocialPost';
+import User from '@/models/User';
 
-// ─── GET /api/social/planner ──────────────────────────────────────────────────
+// ─── GET /api/social/planner ────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -51,9 +53,52 @@ export async function GET(req: NextRequest) {
     const filter: any = {
       scheduledAt: { $gte: start, $lte: end },
     };
+
     if (storeUserId && storeUserId.trim()) {
-      filter.storeUserId = storeUserId.trim();
+      const trimmedUid = storeUserId.trim();
+      let userIdsToFetch: any[] = [];
+      if (mongoose.Types.ObjectId.isValid(trimmedUid)) {
+        const targetObjId = new mongoose.Types.ObjectId(trimmedUid);
+        const userDoc = await User.findById(targetObjId).lean();
+        if (userDoc) {
+          if (userDoc.role === 'account_admin' || userDoc.role === 'admin') {
+            const managedStores = await User.find({
+              $or: [
+                { _id: targetObjId },
+                { controllerId: targetObjId },
+                ...(userDoc.customerId ? [{ customerId: userDoc.customerId }] : []),
+                { createdBy: targetObjId },
+              ],
+            }).select('_id').lean();
+            userIdsToFetch = managedStores.map((u: any) => u._id);
+          } else {
+            const parentId = userDoc.controllerId || userDoc.createdBy;
+            if (parentId) {
+              const familyStores = await User.find({
+                $or: [
+                  { _id: targetObjId },
+                  { _id: parentId },
+                  { controllerId: parentId },
+                  { createdBy: parentId },
+                ],
+              }).select('_id').lean();
+              userIdsToFetch = familyStores.map((u: any) => u._id);
+            } else {
+              userIdsToFetch = [targetObjId];
+            }
+          }
+        } else {
+          userIdsToFetch = [targetObjId];
+        }
+      }
+
+      if (userIdsToFetch.length > 0) {
+        filter.storeUserId = { $in: userIdsToFetch };
+      } else {
+        filter.storeUserId = trimmedUid;
+      }
     }
+
     if (channel && channel !== 'all') {
       filter.channel = channel.toLowerCase();
     }

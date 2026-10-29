@@ -767,7 +767,7 @@ export default function StoreUserPage() {
       case "offerCreation":
         return <OfferCreation />;
       case "mediaLibrary":
-        return <MediaLibraryView />;
+        return <MediaLibraryView storeUserId={userData?._id} />;
       case "veo3TextVideo":
         return <Veo3TextVideoView />;
       case "timelineSchedules":
@@ -781,7 +781,7 @@ export default function StoreUserPage() {
       case "templateEditor":
         return <TemplateEditorView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} key={socialTemplateId || "new_template_studio"} />;
       case "socialScheduler":
-        return <SocialSchedulerView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} />;
+        return <SocialSchedulerView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} storeUserId={userData?._id} />;
       default:
         return (
           <div className="store-placeholder">

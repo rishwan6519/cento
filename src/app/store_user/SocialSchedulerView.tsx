@@ -65,6 +65,8 @@ export default function SocialSchedulerView({
   const [days, setDays] = useState<PlannerDay[]>([]);
   const [postsList, setPostsList] = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [managedStores, setManagedStores] = useState<any[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>("");
 
   // Connected Store Social Info
   const [storeSocial, setStoreSocial] = useState<{
@@ -74,23 +76,36 @@ export default function SocialSchedulerView({
     instagramBusinessId?: string;
   } | null>(null);
 
-  // Fetch store social config on mount
+  // Fetch store social config & managed stores
   useEffect(() => {
-    const uid = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
+    const uid = selectedStoreId || storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
     if (uid) {
       fetch(`/api/user?userId=${uid}`)
         .then((r) => r.json())
         .then((res) => {
           if (res.success && res.data) {
             const u = Array.isArray(res.data) ? res.data[0] : res.data;
-            if (u?.socialCredentials) {
+            if (u?.socialCredentials && (u.socialCredentials.facebookPageId || u.socialCredentials.instagramBusinessId)) {
               setStoreSocial(u.socialCredentials);
+            } else if (u?.role === 'account_admin' || u?.role === 'admin') {
+              fetch(`/api/user?controllerId=${uid}`)
+                .then((r2) => r2.json())
+                .then((res2) => {
+                  if (res2.success && Array.isArray(res2.data)) {
+                    setManagedStores(res2.data);
+                    const withCreds = res2.data.find((s: any) => s.socialCredentials?.facebookPageId || s.socialCredentials?.instagramBusinessId);
+                    if (withCreds?.socialCredentials) {
+                      setStoreSocial(withCreds.socialCredentials);
+                    }
+                  }
+                })
+                .catch(() => {});
             }
           }
         })
         .catch(() => {});
     }
-  }, []);
+  }, [storeUserId, selectedStoreId]);
 
   // Templates for dropdown selector
   const [templates, setTemplates] = useState<any[]>([]);
@@ -131,32 +146,35 @@ export default function SocialSchedulerView({
       .catch(() => {});
   }, []);
 
-  // Fetch Planner or List
+  // Fetch Planner and Posts List
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     try {
       const dateStr = anchorDate.toISOString().split("T")[0];
-      const uid = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : "");
-      const res = await fetch(
-        `/api/social/planner?view=${viewMode === "month" ? "month" : "week"}&channel=${channelFilter}&date=${dateStr}${uid ? `&userId=${uid}` : ""}`
-      );
-      const data = await res.json();
-      if (data.success && data.days) {
-        setDays(data.days);
+      const uid = selectedStoreId || storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : "");
+      const [plannerRes, postsRes] = await Promise.all([
+        fetch(`/api/social/planner?view=${viewMode === "month" ? "month" : "week"}&channel=${channelFilter}&date=${dateStr}${uid ? `&userId=${uid}` : ""}`).then(r => r.json()).catch(() => ({})),
+        fetch(`/api/social/posts?channel=${channelFilter}&limit=300${uid ? `&userId=${uid}` : ""}`).then(r => r.json()).catch(() => ({})),
+      ]);
+      if (plannerRes.success && plannerRes.days) {
+        setDays(plannerRes.days);
+      }
+      if (postsRes.success && Array.isArray(postsRes.data)) {
+        setPostsList(postsRes.data);
       }
     } catch {
       // fallback
     } finally {
       setLoading(false);
     }
-  }, [anchorDate, viewMode, channelFilter]);
+  }, [anchorDate, viewMode, channelFilter, storeUserId, selectedStoreId]);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
     try {
-      const uid = storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : "");
+      const uid = selectedStoreId || storeUserId || (typeof window !== "undefined" ? localStorage.getItem("userId") : "");
       const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
-      const res = await fetch(`/api/social/posts?channel=${channelFilter}${statusParam}&limit=100${uid ? `&userId=${uid}` : ""}`);
+      const res = await fetch(`/api/social/posts?channel=${channelFilter}${statusParam}&limit=200${uid ? `&userId=${uid}` : ""}`);
       const data = await res.json();
       if (data.success && data.data) {
         setPostsList(data.data);
@@ -166,7 +184,7 @@ export default function SocialSchedulerView({
     } finally {
       setLoading(false);
     }
-  }, [channelFilter, statusFilter, storeUserId]);
+  }, [channelFilter, statusFilter, storeUserId, selectedStoreId]);
 
   useEffect(() => {
     if (viewMode === "list") {
@@ -369,19 +387,19 @@ export default function SocialSchedulerView({
             className={`smp-status-tab ${statusFilter === "all" ? "active" : ""}`}
             onClick={() => setStatusFilter("all")}
           >
-            All Posts (${postsList.length})
+            All Posts ({postsList.length})
           </button>
           <button
             className={`smp-status-tab smp-status-tab--scheduled ${statusFilter === "scheduled" ? "active" : ""}`}
             onClick={() => setStatusFilter("scheduled")}
           >
-            <FaClock size={12} /> Scheduled Content (${postsList.filter(p => p.status === 'scheduled').length})
+            <FaClock size={12} /> Scheduled Content ({postsList.filter(p => p.status === 'scheduled').length})
           </button>
           <button
             className={`smp-status-tab smp-status-tab--posted ${statusFilter === "published" ? "active" : ""}`}
             onClick={() => setStatusFilter("published")}
           >
-            <FaCheckCircle size={12} /> Posted Content (${postsList.filter(p => p.status === 'published').length})
+            <FaCheckCircle size={12} /> Posted Content ({postsList.filter(p => p.status === 'published').length})
           </button>
         </div>
 
@@ -596,10 +614,16 @@ export default function SocialSchedulerView({
               </div>
 
               <div className="smp-day-body">
-                {day.posts.length === 0 ? (
-                  <div className="smp-day-empty">—</div>
-                ) : (
-                  day.posts.map((post) => {
+                {(() => {
+                  const visiblePosts = (day.posts || []).filter((p) => {
+                    if (statusFilter === "scheduled") return p.status === "scheduled";
+                    if (statusFilter === "published") return p.status === "published";
+                    return true;
+                  });
+                  if (visiblePosts.length === 0) {
+                    return <div className="smp-day-empty">─</div>;
+                  }
+                  return visiblePosts.map((post) => {
                     const ch = channelMeta(post.channel);
                     const Icon = ch.icon;
                     const timeStr = post.scheduledAt
@@ -636,9 +660,8 @@ export default function SocialSchedulerView({
                         </div>
                       </div>
                     );
-                  })
-                )}
-              </div>
+                  });
+                })()}</div>
             </div>
           ))}
         </div>
