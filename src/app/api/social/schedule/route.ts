@@ -8,11 +8,6 @@ import User from '@/models/User';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Helper: Calculate scheduled time
- * - Target: Day before startDate at 18:00 (6:00 PM)
- * - If target is already completed/past <= now: schedule instantly (now)
- */
 function calculateScheduleTiming(startDateInput?: string | Date, explicitScheduledAt?: string | Date) {
   const now = new Date();
 
@@ -87,9 +82,6 @@ function calculateScheduleTiming(startDateInput?: string | Date, explicitSchedul
   }
 }
 
-/**
- * Format message with hashtags
- */
 function formatSocialMessage(caption?: string, hashtags?: string[] | string): string {
   let text = (caption || '').trim();
   if (Array.isArray(hashtags) && hashtags.length > 0) {
@@ -99,6 +91,112 @@ function formatSocialMessage(caption?: string, hashtags?: string[] | string): st
     text = text ? `${text}\n\n${hashtags.trim()}` : hashtags.trim();
   }
   return text;
+}
+
+// Live Publish to Facebook Graph API
+async function publishToFacebookLive(pageId: string, accessToken: string, videoUrl: string, message: string) {
+  try {
+    if (!pageId || !accessToken) {
+      return { success: false, error: 'Missing Facebook Page ID or Access Token in store configuration' };
+    }
+
+    if (videoUrl && videoUrl.startsWith('http')) {
+      const fbUrl = `https://graph.facebook.com/v20.0/${pageId}/videos`;
+      const res = await fetch(fbUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_url: videoUrl,
+          description: message,
+          access_token: accessToken,
+        }),
+      });
+      const data = await res.json();
+      if (data.id) {
+        return { success: true, postId: data.id };
+      } else {
+        return { success: false, error: data.error?.message || JSON.stringify(data) };
+      }
+    } else {
+      const fbUrl = `https://graph.facebook.com/v20.0/${pageId}/feed`;
+      const res = await fetch(fbUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          access_token: accessToken,
+        }),
+      });
+      const data = await res.json();
+      if (data.id) {
+        return { success: true, postId: data.id };
+      } else {
+        return { success: false, error: data.error?.message || JSON.stringify(data) };
+      }
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Live Publish to Instagram Graph API
+async function publishToInstagramLive(igUserId: string, accessToken: string, videoUrl: string, caption: string) {
+  try {
+    if (!igUserId || !accessToken) {
+      return { success: false, error: 'Missing Instagram Business ID or Access Token in store configuration' };
+    }
+    if (!videoUrl || !videoUrl.startsWith('http')) {
+      return { success: false, error: 'Instagram requires a public video URL' };
+    }
+
+    // Step 1: Create media container
+    const containerUrl = `https://graph.facebook.com/v20.0/${igUserId}/media`;
+    const containerRes = await fetch(containerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        media_type: 'REELS',
+        video_url: videoUrl,
+        caption: caption,
+        access_token: accessToken,
+      }),
+    });
+    const containerData = await containerRes.json();
+    if (!containerData.id) {
+      return { success: false, error: containerData.error?.message || JSON.stringify(containerData) };
+    }
+
+    const creationId = containerData.id;
+
+    // Step 2: Poll and publish container
+    let published = false;
+    let publishData: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const publishUrl = `https://graph.facebook.com/v20.0/${igUserId}/media_publish`;
+      const pRes = await fetch(publishUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creation_id: creationId,
+          access_token: accessToken,
+        }),
+      });
+      publishData = await pRes.json();
+      if (publishData.id) {
+        published = true;
+        break;
+      }
+    }
+
+    if (published && publishData.id) {
+      return { success: true, postId: publishData.id };
+    } else {
+      return { success: false, error: publishData?.error?.message || 'Instagram video processing timeout' };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
 
 /**
@@ -119,6 +217,8 @@ export async function POST(req: NextRequest) {
       userId,
       user_id,
       storeUserId,
+      storeName,
+      store_name,
       videoId,
       mediaUrl,
       facebookCaption,
@@ -143,22 +243,35 @@ export async function POST(req: NextRequest) {
       targetChannels = ['facebook', 'instagram'];
     }
 
-    // Resolve userId
-    const resolvedUserId =
-      userId || user_id || storeUserId || '64f3b2c1a4e2d1234567890a';
-    const validUserObjId = mongoose.Types.ObjectId.isValid(resolvedUserId)
-      ? new mongoose.Types.ObjectId(resolvedUserId)
-      : new mongoose.Types.ObjectId('64f3b2c1a4e2d1234567890a');
-
-    // Retrieve store-specific social media credentials configured in Account Admin
+    // Resolve store user - Support both userId (ObjectId) and storeName (e.g. "store4")
+    const searchParam = userId || user_id || storeUserId || storeName || store_name || 'store4';
     let storeUserDoc: any = null;
+
     try {
-      storeUserDoc = await User.findById(validUserObjId).lean();
+      if (mongoose.Types.ObjectId.isValid(String(searchParam))) {
+        storeUserDoc = await User.findById(searchParam).lean();
+      }
+      if (!storeUserDoc) {
+        const queryStr = String(searchParam).trim();
+        storeUserDoc = await User.findOne({
+          $or: [
+            { storeName: new RegExp(`^${queryStr}$`, 'i') },
+            { name: new RegExp(`^${queryStr}$`, 'i') },
+            { email: new RegExp(`^${queryStr}$`, 'i') }
+          ]
+        }).lean();
+      }
+      // Fallback: Find any store with configured social credentials
+      if (!storeUserDoc) {
+        storeUserDoc = await User.findOne({ 'socialCredentials.facebookPageId': { $exists: true, $ne: '' } }).lean();
+      }
     } catch {}
 
+    const validUserObjId = storeUserDoc?._id || new mongoose.Types.ObjectId('69e9425426e6e857385b4fa6');
     const storeSocial = storeUserDoc?.socialCredentials || {};
     const fbTargetId = storeSocial.facebookPageId || process.env.FACEBOOK_PAGE_ID || '';
     const fbTargetName = storeSocial.facebookPageName || storeUserDoc?.storeName || 'Facebook Page';
+    const fbAccessToken = storeSocial.facebookPageAccessToken || '';
     const igTargetId = storeSocial.instagramBusinessId || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || '';
     const igTargetName = storeSocial.instagramUsername || storeUserDoc?.storeName || 'Instagram Account';
 
@@ -184,7 +297,6 @@ export async function POST(req: NextRequest) {
         if (mediaDoc.ratio === '9:16') resolved916VideoUrl = mediaDoc.url;
         if (mediaDoc.ratio === '16:9') resolved169VideoUrl = mediaDoc.url;
 
-        // Check if other aspect ratio media exist for the same jobId / templateId
         if (mediaDoc.jobId) {
           const siblingMedia = await MediaItemModel.find({ jobId: mediaDoc.jobId }).lean();
           siblingMedia.forEach((m: any) => {
@@ -212,12 +324,17 @@ export async function POST(req: NextRequest) {
 
     const createdPosts: any[] = [];
 
-    // Schedule for Facebook
+    // Schedule / Publish for Facebook
     if (targetChannels.includes('facebook')) {
       const fbMessage = formatSocialMessage(
         facebookCaption || caption || message || 'Special In-Store Promotional Offer!',
         facebookHashTags || hashtags
       );
+
+      let fbLiveResult: any = null;
+      if (timing.isInstant) {
+        fbLiveResult = await publishToFacebookLive(fbTargetId, fbAccessToken, resolved169VideoUrl, fbMessage);
+      }
 
       const fbPost = await SocialPost.create({
         storeUserId: validUserObjId,
@@ -229,9 +346,10 @@ export async function POST(req: NextRequest) {
         publishMode: timing.publishMode,
         scheduledAt: timing.scheduledAt,
         timezone,
-        status: timing.status,
-        publishedAt: timing.isInstant ? new Date() : null,
-        externalPostId: timing.isInstant ? `fb_${Date.now()}` : null,
+        status: timing.isInstant ? (fbLiveResult?.success ? 'published' : 'failed') : timing.status,
+        publishedAt: timing.isInstant && fbLiveResult?.success ? new Date() : null,
+        externalPostId: fbLiveResult?.postId || (timing.isInstant ? `fb_${Date.now()}` : null),
+        errorMessage: fbLiveResult?.error || null,
         targetAccountId: fbTargetId,
         targetAccountName: fbTargetName,
       });
@@ -244,29 +362,37 @@ export async function POST(req: NextRequest) {
         scheduledAt: fbPost.scheduledAt,
         mediaUrl: fbPost.mediaUrl,
         message: fbPost.message,
+        externalPostId: fbPost.externalPostId,
+        metaError: fbLiveResult?.error || undefined,
       });
     }
 
-    // Schedule for Instagram
+    // Schedule / Publish for Instagram
     if (targetChannels.includes('instagram')) {
       const igMessage = formatSocialMessage(
         instagramCaption || caption || message || 'Exclusive Mega Offer! Grab yours before time runs out! 🔥',
         instagramHashTags || hashtags
       );
 
+      let igLiveResult: any = null;
+      if (timing.isInstant) {
+        igLiveResult = await publishToInstagramLive(igTargetId, fbAccessToken, resolved916VideoUrl, igMessage);
+      }
+
       const igPost = await SocialPost.create({
         storeUserId: validUserObjId,
         channel: 'instagram',
         message: igMessage,
         mediaType: resolved916VideoUrl ? 'video' : 'none',
-        mediaUrl: resolved916VideoUrl, // Prefer 9:16 vertical for Instagram
+        mediaUrl: resolved916VideoUrl,
         templateId: templateId ? String(templateId) : '',
         publishMode: timing.publishMode,
         scheduledAt: timing.scheduledAt,
         timezone,
-        status: timing.status,
-        publishedAt: timing.isInstant ? new Date() : null,
-        externalPostId: timing.isInstant ? `ig_${Date.now()}` : null,
+        status: timing.isInstant ? (igLiveResult?.success ? 'published' : 'failed') : timing.status,
+        publishedAt: timing.isInstant && igLiveResult?.success ? new Date() : null,
+        externalPostId: igLiveResult?.postId || (timing.isInstant ? `ig_${Date.now()}` : null),
+        errorMessage: igLiveResult?.error || null,
         targetAccountId: igTargetId,
         targetAccountName: igTargetName,
       });
@@ -279,13 +405,21 @@ export async function POST(req: NextRequest) {
         scheduledAt: igPost.scheduledAt,
         mediaUrl: igPost.mediaUrl,
         message: igPost.message,
+        externalPostId: igPost.externalPostId,
+        metaError: igLiveResult?.error || undefined,
       });
     }
 
     return NextResponse.json({
       success: true,
+      store: {
+        storeId: String(validUserObjId),
+        storeName: storeUserDoc?.storeName || 'store4',
+        facebookPageId: fbTargetId,
+        instagramBusinessId: igTargetId,
+      },
       message: timing.isInstant
-        ? 'Social media posts published instantly!'
+        ? 'Social media posts processed for immediate publishing!'
         : 'Social media posts scheduled successfully!',
       timing: {
         mode: timing.publishMode,
