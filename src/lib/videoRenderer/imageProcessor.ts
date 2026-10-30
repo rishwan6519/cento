@@ -10,16 +10,21 @@ export function calculateDimensions(ratio: AspectRatio | string, baseResolution:
   const base = Math.max(360, Math.min(1080, Number(baseResolution) || 720));
   const norm = String(ratio).replace('x', ':').toLowerCase();
 
+  const makeEven = (n: number) => {
+    const r = Math.round(n);
+    return r % 2 !== 0 ? r + 1 : r;
+  };
+
   switch (norm) {
     case '9:16':
-      return { width: base, height: Math.round((base * 16) / 9) };
+      return { width: makeEven(base), height: makeEven((base * 16) / 9) };
     case '1:1':
-      return { width: base, height: base };
+      return { width: makeEven(base), height: makeEven(base) };
     case '4:5':
-      return { width: base, height: Math.round((base * 5) / 4) };
+      return { width: makeEven(base), height: makeEven((base * 5) / 4) };
     case '16:9':
     default:
-      return { width: Math.round((base * 16) / 9), height: base };
+      return { width: makeEven((base * 16) / 9), height: makeEven(base) };
   }
 }
 

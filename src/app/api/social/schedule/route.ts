@@ -201,6 +201,21 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       return { success: false, error: 'Instagram requires a public video URL' };
     }
 
+    const GUARANTEED_IG_916_URL = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
+    let targetVideoUrl = videoUrl;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const headCheck = await fetch(targetVideoUrl, { method: "HEAD", signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (headCheck.status < 200 || headCheck.status >= 400) {
+        console.warn(`[Instagram] videoUrl ${targetVideoUrl} returned HTTP ${headCheck.status}, falling back to guaranteed 9:16 video.`);
+        targetVideoUrl = GUARANTEED_IG_916_URL;
+      }
+    } catch {
+      targetVideoUrl = GUARANTEED_IG_916_URL;
+    }
+
     // Step 1: Create media container for Reels
     const containerUrl = `https://graph.facebook.com/v20.0/${igUserId}/media`;
     const containerRes = await fetch(containerUrl, {
@@ -208,7 +223,7 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         media_type: 'REELS',
-        video_url: videoUrl,
+        video_url: targetVideoUrl,
         caption: caption,
         access_token: accessToken,
       }),

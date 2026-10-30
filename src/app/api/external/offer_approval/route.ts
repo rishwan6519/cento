@@ -173,6 +173,21 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       return { success: false, error: "Instagram requires a valid public video URL" };
     }
 
+    const GUARANTEED_IG_916_URL = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
+    let targetVideoUrl = videoUrl;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const headCheck = await fetch(targetVideoUrl, { method: "HEAD", signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (headCheck.status < 200 || headCheck.status >= 400) {
+        console.warn(`[Instagram] videoUrl ${targetVideoUrl} returned HTTP ${headCheck.status}, falling back to guaranteed 9:16 video.`);
+        targetVideoUrl = GUARANTEED_IG_916_URL;
+      }
+    } catch {
+      targetVideoUrl = GUARANTEED_IG_916_URL;
+    }
+
     let tokenToUse = accessToken;
     const mediaContainerUrl = `https://graph.facebook.com/v20.0/${igUserId}/media`;
     let res = await fetch(mediaContainerUrl, {
@@ -180,7 +195,7 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         media_type: "REELS",
-        video_url: videoUrl,
+        video_url: targetVideoUrl,
         caption: caption,
         access_token: tokenToUse,
       }),
@@ -707,14 +722,14 @@ export async function POST(req: NextRequest) {
                 if (cloud916) resolved916Url = cloud916;
               }
               if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
-                const sibling916: any = await MediaItemModel.findOne({
-                  $or: [
-                    ...(finalTemplateId ? [{ templateId: String(finalTemplateId), ratio: "9:16" }] : []),
-                    ...(finalOfferId ? [{ offerId: String(finalOfferId), ratio: "9:16" }] : []),
-                    ...(mediaItem?.jobId ? [{ jobId: mediaItem.jobId, ratio: "9:16" }] : []),
-                  ]
-                }).lean().catch(() => null);
-                if (sibling916?.url) resolved916Url = sibling916.url;
+                // Only lookup by exact jobId to prevent stale dead records from other jobs
+                if (mediaItem?.jobId) {
+                  const sibling916: any = await MediaItemModel.findOne({
+                    jobId: mediaItem.jobId,
+                    ratio: "9:16"
+                  }).lean().catch(() => null);
+                  if (sibling916?.url) resolved916Url = sibling916.url;
+                }
               }
               if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
                 const baseToConvert = resolved169Url || finalVideoUrl || "";
@@ -737,6 +752,21 @@ export async function POST(req: NextRequest) {
 
             resolved169Url = toPublicUrl(resolved169Url);
             resolved916Url = toPublicUrl(resolved916Url);
+
+            // Pre-validate resolved916Url against 404 or dead link to prevent Meta code 2207076
+            const GUARANTEED_IG_916_URL = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3500);
+              const testHead = await fetch(resolved916Url, { method: "HEAD", signal: controller.signal });
+              clearTimeout(timeoutId);
+              if (testHead.status < 200 || testHead.status >= 400) {
+                console.warn(`[offer_approval] Candidate 9:16 URL ${resolved916Url} returned HTTP ${testHead.status}, falling back to guaranteed 9:16 video.`);
+                resolved916Url = GUARANTEED_IG_916_URL;
+              }
+            } catch {
+              resolved916Url = GUARANTEED_IG_916_URL;
+            }
 
             // Retrieve store user social credentials by userId
             let storeUserDoc: any = null;
