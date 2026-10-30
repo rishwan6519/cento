@@ -514,48 +514,87 @@ export async function compositeStillFrame(params: {
   const { backgroundBuffer, canvasW, canvasH, product, logo, textLayers, decors } = params;
   const overlays: sharp.OverlayOptions[] = [];
 
-  // 1. Product (Left Area Hero)
-  if (product) {
-    const left = Math.max(0, Math.min(canvasW - product.width, Math.round(product.cx - product.width / 2)));
-    const top = Math.max(0, Math.min(canvasH - product.height, Math.round(product.cy - product.height / 2)));
-    overlays.push({
-      input: product.buffer,
-      left,
-      top,
-    });
-  }
+  try {
+    // 1. Product (Hero area)
+    if (product) {
+      let pw = product.width;
+      let ph = product.height;
+      let pBuf = product.buffer;
 
-  // 2. Decorative elements
-  if (decors) {
-    for (const d of decors) {
-      const left = Math.max(0, Math.min(canvasW - d.width, Math.round(d.cx - d.width / 2)));
-      const top = Math.max(0, Math.min(canvasH - d.height, Math.round(d.cy - d.height / 2)));
-      overlays.push({ input: d.buffer, left, top });
+      // Ensure product never exceeds canvas bounds
+      if (pw > canvasW || ph > canvasH) {
+        const scale = Math.min((canvasW - 10) / pw, (canvasH - 10) / ph);
+        pw = Math.max(1, Math.round(pw * scale));
+        ph = Math.max(1, Math.round(ph * scale));
+        pBuf = await sharp(pBuf).resize(pw, ph).png().toBuffer();
+      }
+
+      const left = Math.max(0, Math.min(canvasW - pw, Math.round(product.cx - pw / 2)));
+      const top = Math.max(0, Math.min(canvasH - ph, Math.round(product.cy - ph / 2)));
+      overlays.push({
+        input: pBuf,
+        left,
+        top,
+      });
     }
-  }
 
-  // 3. Text overlays (Headline, discount badge, description, validity, footer)
-  for (const t of textLayers) {
-    let buf = t.buffer;
-    let w = t.width;
-    let h = t.height;
-    if (w > canvasW) {
-      const scale = (canvasW - 20) / w;
-      w = Math.round(w * scale);
-      h = Math.round(h * scale);
-      buf = await sharp(buf).resize(w, h).png().toBuffer();
+    // 2. Decorative elements
+    if (decors) {
+      for (const d of decors) {
+        let dw = d.width;
+        let dh = d.height;
+        let dBuf = d.buffer;
+
+        if (dw > canvasW || dh > canvasH) {
+          const scale = Math.min((canvasW - 10) / dw, (canvasH - 10) / dh);
+          dw = Math.max(1, Math.round(dw * scale));
+          dh = Math.max(1, Math.round(dh * scale));
+          dBuf = await sharp(dBuf).resize(dw, dh).png().toBuffer();
+        }
+
+        const left = Math.max(0, Math.min(canvasW - dw, Math.round(d.cx - dw / 2)));
+        const top = Math.max(0, Math.min(canvasH - dh, Math.round(d.cy - dh / 2)));
+        overlays.push({ input: dBuf, left, top });
+      }
     }
-    const left = Math.max(0, Math.min(canvasW - w, Math.round(t.cx - w / 2)));
-    const top = Math.max(0, Math.min(canvasH - h, Math.round(t.cy - h / 2)));
-    overlays.push({ input: buf, left, top });
-  }
 
-  // 4. Logo (Top-Left Layer)
-  if (logo) {
-    const left = Math.max(0, Math.min(canvasW - logo.width, Math.round(logo.cx - logo.width / 2)));
-    const top = Math.max(0, Math.min(canvasH - logo.height, Math.round(logo.cy - logo.height / 2)));
-    overlays.push({ input: logo.buffer, left, top });
-  }
+    // 3. Text overlays (Headline, discount badge, description, validity, footer)
+    for (const t of textLayers) {
+      let buf = t.buffer;
+      let w = t.width;
+      let h = t.height;
+      if (w > canvasW || h > canvasH) {
+        const scale = Math.min((canvasW - 10) / w, (canvasH - 10) / h);
+        w = Math.max(1, Math.round(w * scale));
+        h = Math.max(1, Math.round(h * scale));
+        buf = await sharp(buf).resize(w, h).png().toBuffer();
+      }
+      const left = Math.max(0, Math.min(canvasW - w, Math.round(t.cx - w / 2)));
+      const top = Math.max(0, Math.min(canvasH - h, Math.round(t.cy - h / 2)));
+      overlays.push({ input: buf, left, top });
+    }
 
-  return await sharp(backgroundBuffer).composite(overlays).png().toBuffer();
+    // 4. Logo (Top Layer)
+    if (logo) {
+      let lw = logo.width;
+      let lh = logo.height;
+      let lBuf = logo.buffer;
+
+      if (lw > canvasW || lh > canvasH) {
+        const scale = Math.min((canvasW - 10) / lw, (canvasH - 10) / lh);
+        lw = Math.max(1, Math.round(lw * scale));
+        lh = Math.max(1, Math.round(lh * scale));
+        lBuf = await sharp(lBuf).resize(lw, lh).png().toBuffer();
+      }
+
+      const left = Math.max(0, Math.min(canvasW - lw, Math.round(logo.cx - lw / 2)));
+      const top = Math.max(0, Math.min(canvasH - lh, Math.round(logo.cy - lh / 2)));
+      overlays.push({ input: lBuf, left, top });
+    }
+
+    return await sharp(backgroundBuffer).composite(overlays).png().toBuffer();
+  } catch (compErr) {
+    console.warn('[imageProcessor] compositeStillFrame error, falling back to background:', compErr);
+    return backgroundBuffer;
+  }
 }

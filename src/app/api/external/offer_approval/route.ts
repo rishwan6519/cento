@@ -205,7 +205,18 @@ async function ensureVertical916Video(inputUrl: string): Promise<string> {
     }
   }
 
-  // 2. Missing: Convert the 16:9 video on-the-fly to 9:16 so Instagram gets the EXACT SAME video
+  // 2. Check if a 9:16 MediaItem exists in MongoDB matching this jobId
+  try {
+    const matchJobId = fileCandidateName?.replace(/_9x16\.mp4$/i, "") || "";
+    if (matchJobId) {
+      const foundItem: any = await MediaItemModel.findOne({ jobId: matchJobId, ratio: "9:16" }).lean();
+      if (foundItem && foundItem.url) {
+        return toPublicUrl(foundItem.url);
+      }
+    }
+  } catch {}
+
+  // 3. Fallback: Clean full-frame vertical crop (NO BLUR, NO LETTERBOX)
   try {
     const clean169 = trimmed.replace(/^https?:\/\/[^\/]+\//i, "").replace(/^\/+/, "");
     let local169Path = join(process.cwd(), clean169);
@@ -239,11 +250,11 @@ async function ensureVertical916Video(inputUrl: string): Promise<string> {
       const safeFileName916 = fileName916.endsWith("_9x16.mp4") ? fileName916 : `${fileName916.replace(/\.mp4$/i, "")}_9x16.mp4`;
       const output916LocalPath = join(renderedDir, safeFileName916);
 
-      console.log(`[offer_approval] Converting 16:9 -> 9:16 for Instagram: ${local169Path} -> ${output916LocalPath}`);
+      console.log(`[offer_approval] Converting 16:9 -> 9:16 clean vertical crop for Instagram: ${local169Path} -> ${output916LocalPath}`);
       await runFfmpegCommand([
         "-y",
         "-i", local169Path,
-        "-vf", "split[orig][bg];[bg]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=25:5[blurred];[orig]scale=720:-2[fg];[blurred][fg]overlay=(W-w)/2:(H-h)/2",
+        "-vf", "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "23",
@@ -254,7 +265,7 @@ async function ensureVertical916Video(inputUrl: string): Promise<string> {
       ]);
 
       if (existsSync(output916LocalPath)) {
-        console.log(`[offer_approval] Successfully generated 9:16 companion video: ${output916LocalPath}`);
+        console.log(`[offer_approval] Successfully generated clean 9:16 companion video: ${output916LocalPath}`);
         return toPublicUrl(`/uploads/rendered/${safeFileName916}`);
       }
     }
@@ -275,20 +286,7 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       return { success: false, error: "Instagram requires a valid public video URL" };
     }
 
-    let targetVideoUrl = videoUrl;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-      const headCheck = await fetch(targetVideoUrl, { method: "HEAD", signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (headCheck.status < 200 || headCheck.status >= 400) {
-        console.warn(`[Instagram] videoUrl ${targetVideoUrl} returned HTTP ${headCheck.status}, generating 9:16 companion video.`);
-        targetVideoUrl = await ensureVertical916Video(targetVideoUrl);
-      }
-    } catch {
-      targetVideoUrl = await ensureVertical916Video(targetVideoUrl);
-    }
-
+    const targetVideoUrl = videoUrl;
     let tokenToUse = accessToken;
     const mediaContainerUrl = `https://graph.facebook.com/v20.0/${igUserId}/media`;
     let res = await fetch(mediaContainerUrl, {
@@ -809,18 +807,14 @@ export async function POST(req: NextRequest) {
         if (resolved11Url) resolved11Url = toPublicUrl(resolved11Url);
         if (resolved45Url) resolved45Url = toPublicUrl(resolved45Url);
 
-        // Pre-validate that resolved916Url actually exists; if not, generate from 16:9 companion
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500);
-          const testHead = await fetch(resolved916Url, { method: "HEAD", signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (testHead.status < 200 || testHead.status >= 400) {
-            console.warn(`[offer_approval] 9:16 URL ${resolved916Url} returned HTTP ${testHead.status}, generating from 16:9 companion`);
-            resolved916Url = await ensureVertical916Video(resolved169Url);
-            resolved916Url = toPublicUrl(resolved916Url);
-          }
-        } catch {
+        // Check if resolved916Url exists locally on disk; if not, ensure clean vertical 9:16 video
+        const clean916Path = resolved916Url.replace(/^https?:\/\/[^\/]+\//i, "").replace(/^\/+/, "");
+        const localCandidate916 = join(process.cwd(), clean916Path);
+        const fileName916 = clean916Path.split(/[\/\\]/).pop();
+        const altCandidate916 = fileName916 ? join(process.cwd(), "uploads", "rendered", fileName916) : "";
+
+        if (!existsSync(localCandidate916) && (!altCandidate916 || !existsSync(altCandidate916))) {
+          console.warn(`[offer_approval] 9:16 companion file not found on disk, resolving: ${resolved916Url}`);
           resolved916Url = await ensureVertical916Video(resolved169Url);
           resolved916Url = toPublicUrl(resolved916Url);
         }

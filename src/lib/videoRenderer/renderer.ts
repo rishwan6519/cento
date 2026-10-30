@@ -457,6 +457,10 @@ export async function renderSingleAspect(
       }
     }
 
+    // Strict boundary enforcement: product overlay must NEVER exceed canvas dimensions (prevents Sharp composite crash)
+    maxW = Math.max(10, Math.min(Math.round(width * 0.90), maxW));
+    maxH = Math.max(10, Math.min(Math.round(height * 0.90), maxH));
+
     const prep = await prepareProductImage(sharedAssets.productBuffer, maxW, maxH, {
       borderRadius: layers.product?.borderRadius,
       shape: layers.product?.shape,
@@ -806,41 +810,54 @@ export async function renderOfferVideo(options: RenderOptions): Promise<RenderJo
       }
     }
 
-    // Ensure 9:16 is ALWAYS generated: if not present in result.videos, generate vertical companion from 16:9
+    // Ensure 9:16 is ALWAYS generated: if not present in result.videos, render dedicated 9:16 template video
     const has916 = result.videos.some((v) => v.ratio === '9:16');
-    const v169Base = result.videos.find((v) => v.ratio === '16:9') || primaryVideo;
-    if (!has916 && v169Base?.localPath && existsSync(v169Base.localPath)) {
+    if (!has916) {
       try {
-        const renderedDir = join(process.cwd(), 'uploads', 'rendered');
-        const outFileName = `${options.jobId}_9x16.mp4`;
-        const outFilePath = join(renderedDir, outFileName);
-        await runFfmpegCommand([
-          '-y',
-          '-i', v169Base.localPath,
-          '-filter_complex',
-          '[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=20:20[bg];[0:v]scale=720:1280:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]',
-          '-map', '[v]',
-          '-map', '0:a?',
-          '-c:v', 'libx264',
-          '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac',
-          '-shortest',
-          outFilePath,
-        ]);
-        if (existsSync(outFilePath)) {
-          result.videos.push({
-            ratio: '9:16',
-            width: 720,
-            height: 1280,
-            duration: v169Base.duration,
-            file: outFileName,
-            url: `/uploads/rendered/${outFileName}`,
-            localPath: outFilePath,
-          });
-          console.log(`[videoRenderer] Guaranteed vertical companion 9:16 generated for ${options.jobId}`);
+        console.log(`[videoRenderer] 9:16 missing from sibling batch, rendering dedicated 9:16 layout video...`);
+        const sibLayers = resolveRatioLayers('9:16');
+        const sibOpts: RenderOptions = { ...options, layers: sibLayers };
+        const sibBg = await resolveBgForRatio('9:16');
+        const sibAssets = { ...sharedAssets, bgBuffer: sibBg };
+        const sibVideo = await renderSingleAspect('9:16', sibOpts, sibAssets);
+        result.videos.push(sibVideo);
+        console.log(`[videoRenderer] Dedicated 9:16 template video successfully rendered for ${options.jobId}`);
+      } catch (retryErr) {
+        console.warn(`[videoRenderer] Dedicated 9:16 render attempt failed, using clean full-frame vertical crop:`, retryErr);
+        const v169Base = result.videos.find((v) => v.ratio === '16:9') || primaryVideo;
+        if (v169Base?.localPath && existsSync(v169Base.localPath)) {
+          try {
+            const renderedDir = join(process.cwd(), 'uploads', 'rendered');
+            const outFileName = `${options.jobId}_9x16.mp4`;
+            const outFilePath = join(renderedDir, outFileName);
+            await runFfmpegCommand([
+              '-y',
+              '-i', v169Base.localPath,
+              '-vf', 'scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280',
+              '-c:v', 'libx264',
+              '-preset', 'ultrafast',
+              '-crf', '23',
+              '-pix_fmt', 'yuv420p',
+              '-c:a', 'copy',
+              '-shortest',
+              outFilePath,
+            ]);
+            if (existsSync(outFilePath)) {
+              result.videos.push({
+                ratio: '9:16',
+                width: 720,
+                height: 1280,
+                duration: v169Base.duration,
+                file: outFileName,
+                url: `/uploads/rendered/${outFileName}`,
+                localPath: outFilePath,
+              });
+              console.log(`[videoRenderer] Clean vertical 9:16 crop generated for ${options.jobId}`);
+            }
+          } catch (fbErr) {
+            console.warn(`[videoRenderer] Clean vertical 9:16 crop failed:`, fbErr);
+          }
         }
-      } catch (fbErr) {
-        console.warn(`[videoRenderer] Failed to generate guaranteed companion 9:16:`, fbErr);
       }
     }
 

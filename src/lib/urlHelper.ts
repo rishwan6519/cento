@@ -39,3 +39,4 @@ export function toAbsoluteUrl(urlStr: string | undefined | null, req?: NextReque
   const clean = trimmed.replace(/^\/+/, '');
   return `${baseUrl}/${clean}`;
 }
+
