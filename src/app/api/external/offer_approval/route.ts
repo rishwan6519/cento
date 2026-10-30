@@ -12,6 +12,7 @@ import { sendPushNotification } from "@/lib/firebase-admin";
 import mongoose from "mongoose";
 import OfferApprovalJobModel from "@/models/OfferApprovalJob";
 import SocialPost from "@/models/SocialPost";
+import VideoTemplate from "@/models/VideoTemplate";
 import { v4 as uuidv4 } from "uuid";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -198,7 +199,7 @@ async function ensureVertical916Video(inputUrl: string): Promise<string> {
     return public916Url;
   }
 
-  const fileCandidateName = cleanCandidate.split("/").pop();
+  const fileCandidateName = cleanCandidate.split(/[\/\\]/).pop();
   if (fileCandidateName) {
     const renderedCandidatePath = join(process.cwd(), "uploads", "rendered", fileCandidateName);
     if (existsSync(renderedCandidatePath)) {
@@ -664,53 +665,17 @@ export async function POST(req: NextRequest) {
           await videoJob.save().catch(() => { });
         }
 
-        // 3.5 Fetch additional videos from Cloudbases if we have a job_id
-        let fetchedCloudVideos: any[] = [];
-        const targetJobId = videoJob?.jobId || mediaItem?.jobId || (typeof rawId === "string" ? rawId.trim() : "");
+        // 3.5 Resolve all aspect ratio videos for this video pack / jobId
+        let siblingMedia: any[] = [];
+        const targetJobId = videoJob?.jobId || mediaItem?.jobId || (typeof rawId === "string" && rawId.startsWith("cr_") ? rawId.trim() : "");
         if (targetJobId) {
-          try {
-            const apiKey = process.env.CLOUDBASES_API_KEY || "";
-            const cloudRes = await fetch(`https://video-generator.storesparc.com/index.php/api/external/videos?job_id=${targetJobId}`, {
-              headers: { ...(apiKey ? { 'X-API-Key': apiKey } : {}) }
-            });
-            if (cloudRes.ok) {
-              const cloudData = await cloudRes.json();
-              if (cloudData?.success && cloudData?.data?.videos) {
-                fetchedCloudVideos = cloudData.data.videos;
-                for (const vid of fetchedCloudVideos) {
-                  if (vid.url) {
-                    const existingMedia = await MediaItemModel.findOne({ url: vid.url });
-                    if (!existingMedia) {
-                      await MediaItemModel.create({
-                        userId: targetUserId,
-                        name: `Generated Promo Video (${vid.ratio || "16:9"}) – ${new Date().toLocaleString()}`,
-                        type: 'video',
-                        url: vid.url,
-                        ratio: vid.ratio,
-                        suffix: vid.suffix,
-                        width: vid.width,
-                        height: vid.height,
-                        duration: vid.duration,
-                        templateId: vid.template_id ? String(vid.template_id) : undefined,
-                        offerId: newOfferId || undefined,
-                        jobId: targetJobId,
-                      });
-                    } else {
-                      existingMedia.ratio = vid.ratio;
-                      existingMedia.suffix = vid.suffix;
-                      existingMedia.width = vid.width;
-                      existingMedia.height = vid.height;
-                      existingMedia.duration = vid.duration;
-                      existingMedia.jobId = targetJobId;
-                      await existingMedia.save();
-                    }
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            console.warn("[offer_approval] Error fetching external videos:", err);
-          }
+          siblingMedia = await MediaItemModel.find({ jobId: targetJobId }).lean();
+        }
+        if (siblingMedia.length === 0 && mediaItem?.metadataId) {
+          siblingMedia = await MediaItemModel.find({ metadataId: mediaItem.metadataId }).lean();
+        }
+        if (siblingMedia.length === 0 && mediaItem?._id) {
+          siblingMedia = [mediaItem];
         }
 
         // 4. Return updated approved metadata in clean, logical ordering
@@ -784,7 +749,106 @@ export async function POST(req: NextRequest) {
           linkedOfferData = await Offer.findOne(query).lean().catch(() => null);
         }
 
-        // 3.6 Social Media Video Scheduling Integration (Live Meta Graph API & Australia/Sydney timing)
+        // 3.6 Resolve 16:9, 9:16, 1:1, and 4:5 video URLs across all sibling media & template
+        let resolved169Url = "";
+        let resolved916Url = "";
+        let resolved11Url = "";
+        let resolved45Url = "";
+
+        for (const m of siblingMedia) {
+          if (m.ratio === "16:9" && !resolved169Url) resolved169Url = m.url;
+          if (m.ratio === "9:16" && !resolved916Url) resolved916Url = m.url;
+          if (m.ratio === "1:1" && !resolved11Url) resolved11Url = m.url;
+          if (m.ratio === "4:5" && !resolved45Url) resolved45Url = m.url;
+        }
+
+        // Fallback check to VideoTemplate renderedVideos
+        if ((!resolved169Url || !resolved916Url) && finalTemplateId) {
+          try {
+            const tplDoc = await VideoTemplate.findOne({
+              $or: [
+                ...(!isNaN(Number(finalTemplateId)) ? [{ templateId: Number(finalTemplateId) }] : []),
+                ...(mongoose.Types.ObjectId.isValid(String(finalTemplateId)) ? [{ _id: String(finalTemplateId) }] : []),
+                { templateId: String(finalTemplateId) },
+              ]
+            }).lean();
+            if (tplDoc && Array.isArray(tplDoc.renderedVideos)) {
+              for (const rv of tplDoc.renderedVideos) {
+                if (rv.ratio === "16:9" && !resolved169Url) resolved169Url = rv.url;
+                if (rv.ratio === "9:16" && !resolved916Url) resolved916Url = rv.url;
+                if (rv.ratio === "1:1" && !resolved11Url) resolved11Url = rv.url;
+                if (rv.ratio === "4:5" && !resolved45Url) resolved45Url = rv.url;
+              }
+            }
+          } catch (tErr) {
+            console.warn("[offer_approval] VideoTemplate check warning:", tErr);
+          }
+        }
+
+        if (!resolved169Url) {
+          resolved169Url = (mediaItem?.ratio === "16:9" ? mediaItem.url : "") ||
+            finalVideoUrl ||
+            "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_16x9.mp4";
+        }
+
+        // Strictly guarantee 9:16 companion video for Instagram
+        if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
+          if (mediaItem?.ratio === "9:16" && mediaItem?.url) {
+            resolved916Url = mediaItem.url;
+          }
+          if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
+            resolved916Url = await ensureVertical916Video(resolved169Url || finalVideoUrl);
+          }
+        }
+
+        resolved169Url = toPublicUrl(resolved169Url);
+        resolved916Url = toPublicUrl(resolved916Url);
+        if (resolved11Url) resolved11Url = toPublicUrl(resolved11Url);
+        if (resolved45Url) resolved45Url = toPublicUrl(resolved45Url);
+
+        // Pre-validate that resolved916Url actually exists; if not, generate from 16:9 companion
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          const testHead = await fetch(resolved916Url, { method: "HEAD", signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (testHead.status < 200 || testHead.status >= 400) {
+            console.warn(`[offer_approval] 9:16 URL ${resolved916Url} returned HTTP ${testHead.status}, generating from 16:9 companion`);
+            resolved916Url = await ensureVertical916Video(resolved169Url);
+            resolved916Url = toPublicUrl(resolved916Url);
+          }
+        } catch {
+          resolved916Url = await ensureVertical916Video(resolved169Url);
+          resolved916Url = toPublicUrl(resolved916Url);
+        }
+
+        // Configurable channel-to-ratio mapping (defaults: Facebook -> 16:9, Instagram -> 9:16)
+        // Can be easily changed or extended in future via body.channelRatioMap or body.channelRatios
+        const defaultChannelRatioMap: Record<string, string> = {
+          facebook: "16:9",
+          instagram: "9:16",
+          tiktok: "9:16",
+          youtube: "16:9",
+          twitter: "16:9",
+          linkedin: "16:9",
+        };
+        const channelRatioMap: Record<string, string> = {
+          ...defaultChannelRatioMap,
+          ...(body.channelRatioMap || body.channelRatios || {}),
+        };
+
+        const getChannelMediaUrl = (ch: string) => {
+          const ratio = channelRatioMap[ch.toLowerCase()] || (ch.toLowerCase() === "instagram" ? "9:16" : "16:9");
+          if (ratio === "9:16") return resolved916Url;
+          if (ratio === "1:1") return resolved11Url || resolved169Url;
+          if (ratio === "4:5") return resolved45Url || resolved169Url;
+          return resolved169Url;
+        };
+
+        const fbMediaUrl = getChannelMediaUrl("facebook");
+        const igMediaUrl = getChannelMediaUrl("instagram");
+
+        // 3.7 Social Media Video Scheduling Integration (Live Meta Graph API & Australia/Sydney timing)
         let facebookSchedulingStatus = "Skipped (facebook not in channels)";
         let instagramSchedulingStatus = "Skipped (instagram not in channels)";
         let createdSocialPosts: any[] = [];
@@ -795,65 +859,6 @@ export async function POST(req: NextRequest) {
 
         if (shouldPostFb || shouldPostIg) {
           try {
-            // Resolve 16:9 (Facebook) and 9:16 (Instagram) video URLs
-            let resolved169Url = "";
-            let resolved916Url = "";
-
-            if (mediaItem?.jobId) {
-              const siblingMedia = await MediaItemModel.find({ jobId: mediaItem.jobId }).lean();
-              siblingMedia.forEach((m: any) => {
-                if (m.ratio === "16:9" && !resolved169Url) resolved169Url = m.url;
-                if (m.ratio === "9:16" && !resolved916Url) resolved916Url = m.url;
-              });
-            }
-
-            if (!resolved169Url) {
-              resolved169Url = (mediaItem?.ratio === "16:9" ? mediaItem.url : "") ||
-                fetchedCloudVideos.find((v: any) => v.ratio === "16:9" || v.ratio === "4:5")?.url ||
-                finalVideoUrl ||
-                "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_16x9.mp4";
-            }
-
-            // Strictly resolve 9:16 vertical video for Instagram upload/schedule
-            if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
-              if (mediaItem?.ratio === "9:16" && mediaItem?.url) {
-                resolved916Url = mediaItem.url;
-              }
-              if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
-                const cloud916 = fetchedCloudVideos.find((v: any) => v.ratio === "9:16")?.url;
-                if (cloud916) resolved916Url = cloud916;
-              }
-              if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
-                if (mediaItem?.jobId) {
-                  const sibling916: any = await MediaItemModel.findOne({
-                    jobId: mediaItem.jobId,
-                    ratio: "9:16"
-                  }).lean().catch(() => null);
-                  if (sibling916?.url) resolved916Url = sibling916.url;
-                }
-              }
-              // Always guarantee exact companion 9:16 video matching Facebook's video
-              if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
-                resolved916Url = await ensureVertical916Video(resolved169Url || finalVideoUrl);
-              }
-            }
-
-            resolved169Url = toPublicUrl(resolved169Url);
-            resolved916Url = toPublicUrl(resolved916Url);
-
-            // Pre-validate that resolved916Url actually exists; if not, generate from 16:9 companion
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 3500);
-              const testHead = await fetch(resolved916Url, { method: "HEAD", signal: controller.signal });
-              clearTimeout(timeoutId);
-              if (testHead.status < 200 || testHead.status >= 400) {
-                console.warn(`[offer_approval] 9:16 URL ${resolved916Url} returned HTTP ${testHead.status}, generating from 16:9 companion`);
-                resolved916Url = await ensureVertical916Video(resolved169Url);
-              }
-            } catch {
-              resolved916Url = await ensureVertical916Video(resolved169Url);
-            }
 
             // Retrieve store user social credentials by userId
             let storeUserDoc: any = null;
@@ -910,7 +915,7 @@ export async function POST(req: NextRequest) {
                 channel: 'facebook',
                 message: fbMessage,
                 mediaType: resolved169Url ? 'video' : 'none',
-                mediaUrl: resolved169Url,
+                mediaUrl: fbMediaUrl,
                 templateId: finalTemplateId ? String(finalTemplateId) : '',
                 publishMode: timing.publishMode,
                 scheduledAt: timing.scheduledAt,
@@ -948,7 +953,7 @@ export async function POST(req: NextRequest) {
             if (shouldPostIg) {
               let igLiveResult: any = null;
               if (timing.isInstant) {
-                igLiveResult = await publishToInstagramLive(igTargetId, fbAccessToken, resolved916Url, igMessage);
+                igLiveResult = await publishToInstagramLive(igTargetId, fbAccessToken, igMediaUrl, igMessage);
               }
 
               const igPost = await SocialPost.create({
@@ -956,7 +961,7 @@ export async function POST(req: NextRequest) {
                 channel: 'instagram',
                 message: igMessage,
                 mediaType: resolved916Url ? 'video' : 'none',
-                mediaUrl: resolved916Url,
+                mediaUrl: igMediaUrl,
                 templateId: finalTemplateId ? String(finalTemplateId) : '',
                 publishMode: timing.publishMode,
                 scheduledAt: timing.scheduledAt,
@@ -1000,6 +1005,37 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Build all 4 aspect ratio videos list for response
+        const packVideos: Array<{
+          ratio: string;
+          url: string;
+          mediaId?: string;
+          width?: number;
+          height?: number;
+        }> = [];
+
+        if (resolved169Url) packVideos.push({ ratio: "16:9", url: resolved169Url, width: 1280, height: 720 });
+        if (resolved916Url) packVideos.push({ ratio: "9:16", url: resolved916Url, width: 720, height: 1280 });
+        if (resolved11Url) packVideos.push({ ratio: "1:1", url: resolved11Url, width: 720, height: 720 });
+        if (resolved45Url) packVideos.push({ ratio: "4:5", url: resolved45Url, width: 720, height: 900 });
+
+        for (const sm of siblingMedia) {
+          const existing = packVideos.find((pv) => pv.ratio === sm.ratio);
+          if (existing) {
+            if (sm._id) existing.mediaId = sm._id.toString();
+            if (sm.width) existing.width = sm.width;
+            if (sm.height) existing.height = sm.height;
+          } else if (sm.url) {
+            packVideos.push({
+              ratio: sm.ratio || "16:9",
+              url: toPublicUrl(sm.url),
+              mediaId: sm._id ? sm._id.toString() : undefined,
+              width: sm.width,
+              height: sm.height,
+            });
+          }
+        }
+
         const response: Record<string, any> = {
           status: "success",
           videoId: mediaItem?._id ? mediaItem._id.toString() : videoJob?.videoId || "",
@@ -1007,6 +1043,12 @@ export async function POST(req: NextRequest) {
           instagramSchedulingStatus,
           socialTiming,
           posts: createdSocialPosts,
+          videos: packVideos,
+          channelRatioMap,
+          video_16x9: resolved169Url,
+          video_9x16: resolved916Url,
+          ...(resolved11Url ? { video_1x1: resolved11Url } : {}),
+          ...(resolved45Url ? { video_4x5: resolved45Url } : {}),
         };
 
         if (targetUserId) {
@@ -1034,7 +1076,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        response["video 1"] = finalVideoUrl;
+        response["video 1"] = resolved169Url || finalVideoUrl;
         if (tagline != null) {
           response.tagline = String(tagline).trim();
         } else {

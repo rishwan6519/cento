@@ -283,6 +283,8 @@ export async function POST(req: NextRequest) {
         async: true,
         status: 'queued',
         job_id: queued.jobId,
+        jobId: queued.jobId,
+        videoId: queued.jobId,
         status_url: queued.statusUrl,
         template_id: templateId,
         ratio,

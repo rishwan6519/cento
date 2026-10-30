@@ -203,15 +203,9 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
             if (tplDoc.aspectBackgrounds && !fullOptions.aspectBackgrounds) {
               fullOptions.aspectBackgrounds = tplDoc.aspectBackgrounds;
             }
-            const tplLayers = (tplDoc.aspectStore && tplDoc.aspectStore[targetRatio]) || tplDoc.layers;
-            if (tplLayers) {
-              const merged: Record<string, any> = { ...tplLayers };
-              if (fullOptions.layers) {
-                for (const k of Object.keys(fullOptions.layers)) {
-                  merged[k] = { ...(tplLayers[k] || {}), ...fullOptions.layers[k] };
-                }
-              }
-              fullOptions.layers = merged;
+            // If caller did not provide custom layers in request, use template default layers as fallback
+            if (!fullOptions.layers && tplDoc.layers) {
+              fullOptions.layers = tplDoc.layers;
             }
             const tplDur = Number(tplDoc.videoDuration || tplDoc.duration || tplDoc.video_duration);
             if (tplDur && (!fullOptions.duration || fullOptions.duration === 6)) {

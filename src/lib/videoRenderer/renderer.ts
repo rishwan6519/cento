@@ -764,17 +764,15 @@ export async function renderOfferVideo(options: RenderOptions): Promise<RenderJo
 
     const primaryRatio = (options.ratio as AspectRatio) || '16:9';
 
-    // Helper to resolve layers with deep custom overrides
+    // Helper to resolve layers for each aspect ratio
     const resolveRatioLayers = (r: AspectRatio | string) => {
-      const base = (options.aspectStore && options.aspectStore[r]) || options.layers || {};
-      if (options.layers && options.aspectStore && options.aspectStore[r]) {
-        const merged: Record<string, any> = { ...base };
-        for (const k of Object.keys(options.layers)) {
-          merged[k] = { ...(base[k] || {}), ...options.layers[k] };
-        }
-        return merged;
+      // 1. Ratio-specific layers from template aspectStore (e.g. 16:9, 9:16, 1:1, 4:5)
+      const ratioLayers = options.aspectStore && options.aspectStore[r];
+      if (ratioLayers && Object.keys(ratioLayers).length > 0) {
+        return ratioLayers;
       }
-      return base;
+      // 2. Default layers from options.layers
+      return options.layers || {};
     };
 
     // Resolve layers for primary ratio
