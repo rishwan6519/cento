@@ -393,7 +393,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!resolved169VideoUrl) resolved169VideoUrl = resolvedDefaultVideoUrl;
-    if (!resolved916VideoUrl) resolved916VideoUrl = resolvedDefaultVideoUrl;
+    if (!resolved916VideoUrl || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916VideoUrl)) {
+      const baseForReplace = resolved169VideoUrl || resolvedDefaultVideoUrl || "";
+      if (baseForReplace && /_(16x9|1x1|4x5)\.mp4/i.test(baseForReplace)) {
+        resolved916VideoUrl = baseForReplace.replace(/_(16x9|1x1|4x5)\.mp4/i, '_9x16.mp4');
+      } else {
+        resolved916VideoUrl = resolvedDefaultVideoUrl;
+      }
+    }
 
     // Calculate timing
     const timing =

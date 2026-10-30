@@ -697,11 +697,34 @@ export async function POST(req: NextRequest) {
                 "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_16x9.mp4";
             }
 
-            if (!resolved916Url) {
-              resolved916Url = (mediaItem?.ratio === "9:16" ? mediaItem.url : "") ||
-                fetchedCloudVideos.find((v: any) => v.ratio === "9:16")?.url ||
-                finalVideoUrl ||
-                "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_16x9.mp4";
+            // Strictly resolve 9:16 vertical video for Instagram upload/schedule
+            if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
+              if (mediaItem?.ratio === "9:16" && mediaItem?.url) {
+                resolved916Url = mediaItem.url;
+              }
+              if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
+                const cloud916 = fetchedCloudVideos.find((v: any) => v.ratio === "9:16")?.url;
+                if (cloud916) resolved916Url = cloud916;
+              }
+              if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
+                const sibling916: any = await MediaItemModel.findOne({
+                  $or: [
+                    ...(finalTemplateId ? [{ templateId: String(finalTemplateId), ratio: "9:16" }] : []),
+                    ...(finalOfferId ? [{ offerId: String(finalOfferId), ratio: "9:16" }] : []),
+                    ...(mediaItem?.jobId ? [{ jobId: mediaItem.jobId, ratio: "9:16" }] : []),
+                  ]
+                }).lean().catch(() => null);
+                if (sibling916?.url) resolved916Url = sibling916.url;
+              }
+              if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
+                const baseToConvert = resolved169Url || finalVideoUrl || "";
+                if (baseToConvert && /_(16x9|1x1|4x5)\.mp4/i.test(baseToConvert)) {
+                  resolved916Url = baseToConvert.replace(/_(16x9|1x1|4x5)\.mp4/i, '_9x16.mp4');
+                }
+              }
+              if (!resolved916Url) {
+                resolved916Url = resolved169Url || finalVideoUrl || "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_16x9.mp4";
+              }
             }
 
             // Retrieve store user social credentials by userId

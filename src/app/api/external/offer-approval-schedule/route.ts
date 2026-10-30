@@ -194,7 +194,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!resolved169Url) resolved169Url = resolvedVideoUrl;
-    if (!resolved916Url) resolved916Url = resolvedVideoUrl;
+    if (!resolved916Url || /_(16x9|1x1|4x5).mp4/i.test(resolved916Url)) {
+      const baseForReplace = resolved169Url || resolvedVideoUrl || "";
+      if (baseForReplace && /_(16x9|1x1|4x5).mp4/i.test(baseForReplace)) {
+        resolved916Url = baseForReplace.replace(/_(16x9|1x1|4x5).mp4/i, '_9x16.mp4');
+      } else {
+        resolved916Url = resolvedVideoUrl;
+      }
+    }
 
     // 2. Upsert Offer document
     let offerDoc: any = null;

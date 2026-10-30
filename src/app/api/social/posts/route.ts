@@ -212,7 +212,13 @@ export async function POST(req: NextRequest) {
       channel,
       message: body.message.trim(),
       mediaType: body.mediaType || (body.mediaUrl ? 'video' : 'none'),
-      mediaUrl: body.mediaUrl || body.videoUrl || '',
+      mediaUrl: (() => {
+        let u = body.mediaUrl || body.videoUrl || '';
+        if (channel === 'instagram' && u && /_(16x9|1x1|4x5)\.mp4/i.test(u)) {
+          return u.replace(/_(16x9|1x1|4x5)\.mp4/i, '_9x16.mp4');
+        }
+        return u;
+      })(),
       thumbnailUrl: body.thumbnailUrl || body.imageUrl || '',
       templateId: body.templateId || '',
       publishMode,
