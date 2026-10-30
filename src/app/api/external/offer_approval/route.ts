@@ -216,15 +216,15 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
 
     // Poll until ready
     let isReady = false;
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 25; i++) {
       await new Promise((r) => setTimeout(r, 4000));
-      const statusRes = await fetch(`https://graph.facebook.com/v20.0/${creationId}?fields=status_code&access_token=${tokenToUse}`);
+      const statusRes = await fetch(`https://graph.facebook.com/v20.0/${creationId}?fields=status_code,status&access_token=${tokenToUse}`);
       const statusData = await statusRes.json();
       if (statusData.status_code === "FINISHED") {
         isReady = true;
         break;
       } else if (statusData.status_code === "ERROR") {
-        return { success: false, error: "Instagram media container encoding failed" };
+        return { success: false, error: statusData.status || "Instagram media container encoding failed" };
       }
     }
 
