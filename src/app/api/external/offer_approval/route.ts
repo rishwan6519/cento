@@ -723,20 +723,20 @@ export async function POST(req: NextRequest) {
                 }
               }
               if (!resolved916Url) {
-                resolved916Url = resolved169Url || finalVideoUrl || "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_16x9.mp4";
+                resolved916Url = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
               }
-
-              const toPublicUrl = (urlStr?: any): string => {
-                if (!urlStr) return "";
-                const trimmed = String(urlStr).trim();
-                if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-                const clean = trimmed.replace(/^\/+/, "");
-                return `https://iot-test.metizstoresparc.com/${clean}`;
-              };
-
-              resolved169Url = toPublicUrl(resolved169Url);
-              resolved916Url = toPublicUrl(resolved916Url);
             }
+
+            const toPublicUrl = (urlStr?: any): string => {
+              if (!urlStr) return "";
+              const trimmed = String(urlStr).trim();
+              if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+              const clean = trimmed.replace(/^\/+/, "");
+              return `https://iot-test.metizstoresparc.com/${clean}`;
+            };
+
+            resolved169Url = toPublicUrl(resolved169Url);
+            resolved916Url = toPublicUrl(resolved916Url);
 
             // Retrieve store user social credentials by userId
             let storeUserDoc: any = null;
