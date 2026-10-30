@@ -114,6 +114,7 @@ export default function SocialSchedulerView({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [viewingPost, setViewingPost] = useState<SocialPost | null>(null);
   const [deletingPost, setDeletingPost] = useState<SocialPost | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Form State
   const [targetChannel, setTargetChannel] = useState<SocialChannel>("facebook");
@@ -286,11 +287,12 @@ export default function SocialSchedulerView({
   // Delete Post
   const handleDeletePost = async () => {
     if (!deletingPost) return;
+    setIsDeleting(true);
     try {
       const res = await fetch(`/api/social/posts/${deletingPost._id}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        showToast("Post schedule cancelled successfully!");
+        showToast(data.message || (deletingPost.status === 'published' ? "Post deleted successfully!" : "Post schedule cancelled successfully!"));
         setDeletingPost(null);
         if (viewingPost?._id === deletingPost._id) setViewingPost(null);
         if (viewMode === "list") fetchList();
@@ -300,6 +302,8 @@ export default function SocialSchedulerView({
       }
     } catch {
       showToast("Network error deleting post", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -585,7 +589,7 @@ export default function SocialSchedulerView({
                             </button>
                             <button
                               className="smp-action-btn smp-action-btn--danger"
-                              title="Delete Post Schedule"
+                              title={post.status === "published" ? "Delete Live Post" : "Cancel Post Schedule"}
                               onClick={() => setDeletingPost(post)}
                             >
                               <FaTrash size={12} />
@@ -639,9 +643,21 @@ export default function SocialSchedulerView({
                           <span className="smp-card-time">
                             <FaClock size={9} /> {timeStr}
                           </span>
-                          <span className="smp-card-channel" style={{ color: ch.color }}>
-                            <Icon size={12} />
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="smp-card-channel" style={{ color: ch.color }}>
+                              <Icon size={12} />
+                            </span>
+                            <button
+                              className="smp-card-del-btn"
+                              title={post.status === 'published' ? 'Delete live post' : 'Cancel schedule'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingPost(post);
+                              }}
+                            >
+                              <FaTrash size={10} />
+                            </button>
+                          </div>
                         </div>
 
                         <p className="smp-card-msg">{post.message}</p>
@@ -983,7 +999,7 @@ export default function SocialSchedulerView({
                   setDeletingPost(viewingPost);
                 }}
               >
-                <FaTrash size={12} /> Cancel &amp; Delete Schedule
+                <FaTrash size={12} /> {viewingPost.status === 'published' ? 'Delete Live Post' : 'Cancel & Delete Schedule'}
               </button>
               <button
                 className="smp-btn smp-btn--secondary"
@@ -998,23 +1014,43 @@ export default function SocialSchedulerView({
 
       {/* ── Confirm Delete Modal ── */}
       {deletingPost && (
-        <div className="smp-modal-overlay" onClick={() => setDeletingPost(null)}>
+        <div className="smp-modal-overlay" onClick={() => !isDeleting && setDeletingPost(null)}>
           <div className="smp-modal smp-modal--sm" onClick={(e) => e.stopPropagation()}>
             <div className="smp-modal-head">
-              <h3 className="smp-modal-title" style={{ color: "#DC2626" }}>Cancel Post Schedule?</h3>
-              <button className="smp-modal-close" onClick={() => setDeletingPost(null)}><FaTimes size={15} /></button>
+              <h3 className="smp-modal-title" style={{ color: "#DC2626" }}>
+                {deletingPost.status === 'published' ? 'Delete Published Post?' : 'Cancel Post Schedule?'}
+              </h3>
+              <button className="smp-modal-close" disabled={isDeleting} onClick={() => setDeletingPost(null)}><FaTimes size={15} /></button>
             </div>
             <div className="smp-modal-body">
-              <p style={{ color: "#475569", fontSize: "0.9rem", lineHeight: 1.6 }}>
-                Are you sure you want to cancel and remove this scheduled post for <strong>{channelMeta(deletingPost.channel).label}</strong>? This will remove the post from your content calendar.
-              </p>
+              {deletingPost.status === 'published' ? (
+                <div style={{ color: "#475569", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                  <p style={{ margin: "0 0 10px" }}>
+                    Are you sure you want to delete this live post for <strong>{channelMeta(deletingPost.channel).label}</strong>?
+                  </p>
+                  {deletingPost.channel === 'facebook' && (
+                    <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "8px", padding: "10px", fontSize: "0.82rem", color: "#1E40AF" }}>
+                      📘 <strong>Facebook Page Post Deletion:</strong> This action will send an API delete request to Facebook to remove the post from your live Page and clear it from your Storesparc planner and media library tags.
+                    </div>
+                  )}
+                  {deletingPost.channel === 'instagram' && (
+                    <div style={{ background: "#FDF2F8", border: "1px solid #FBCFE8", borderRadius: "8px", padding: "10px", fontSize: "0.82rem", color: "#9D174D" }}>
+                      📸 <strong>Instagram Post Note:</strong> This will remove the post from your Storesparc calendar and media library tags. <em>Note: Meta restricts 3rd party apps from deleting organic Instagram posts, so please also delete it directly within the Instagram app if needed.</em>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p style={{ color: "#475569", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                  Are you sure you want to cancel and remove this scheduled post for <strong>{channelMeta(deletingPost.channel).label}</strong>? This will remove the post from your content calendar.
+                </p>
+              )}
             </div>
             <div className="smp-modal-foot">
-              <button className="smp-btn smp-btn--secondary" onClick={() => setDeletingPost(null)}>
-                Keep Schedule
+              <button className="smp-btn smp-btn--secondary" disabled={isDeleting} onClick={() => setDeletingPost(null)}>
+                {deletingPost.status === 'published' ? 'Keep Post' : 'Keep Schedule'}
               </button>
-              <button className="smp-btn smp-btn--danger" onClick={handleDeletePost}>
-                Yes, Delete Schedule
+              <button className="smp-btn smp-btn--danger" disabled={isDeleting} onClick={handleDeletePost}>
+                <FaTrash size={12} /> {isDeleting ? 'Deleting...' : (deletingPost.status === 'published' ? 'Yes, Delete Post' : 'Yes, Delete Schedule')}
               </button>
             </div>
           </div>
@@ -1023,6 +1059,14 @@ export default function SocialSchedulerView({
 
       {/* ── CSS Styles ── */}
       <style>{`
+        .smp-card-del-btn {
+          background: transparent; border: none; color: #94A3B8; cursor: pointer;
+          padding: 2px 4px; border-radius: 4px; display: flex; align-items: center;
+          justify-content: center; transition: all 0.15s ease;
+        }
+        .smp-card-del-btn:hover {
+          background: #FEE2E2; color: #EF4444;
+        }
         /* Status Tabs */
         .smp-status-tabs {
           display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; width: 100%;
