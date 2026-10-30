@@ -13,6 +13,9 @@ import mongoose from "mongoose";
 import OfferApprovalJobModel from "@/models/OfferApprovalJob";
 import SocialPost from "@/models/SocialPost";
 import { v4 as uuidv4 } from "uuid";
+import { existsSync } from "fs";
+import { join } from "path";
+import { runFfmpegCommand } from "@/lib/videoRenderer/ffmpegEngine";
 
 // Helper: Calculate previous day 6:00 PM in Australia/Sydney timezone
 function calculateAustralianScheduleTiming(startDateInput?: string | Date) {
@@ -163,6 +166,106 @@ async function publishToFacebookLive(pageId: string, accessToken: string, videoU
   }
 }
 
+// Helper: convert relative or local URL to public accessible URL
+function toPublicUrl(urlStr?: any): string {
+  if (!urlStr) return "";
+  const trimmed = String(urlStr).trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  const clean = trimmed.replace(/^\/+/, "");
+  return `https://iot-test.metizstoresparc.com/${clean}`;
+}
+
+// Helper: ensure 9:16 vertical video exists for Instagram, converting from companion 16:9 if needed
+async function ensureVertical916Video(inputUrl: string): Promise<string> {
+  const fallbackUrl = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
+  if (!inputUrl) return fallbackUrl;
+  const trimmed = String(inputUrl).trim();
+
+  const companion916Url = trimmed.includes("_16x9.mp4")
+    ? trimmed.replace(/_16x9\.mp4/i, "_9x16.mp4")
+    : trimmed.includes("_1x1.mp4")
+    ? trimmed.replace(/_1x1\.mp4/i, "_9x16.mp4")
+    : trimmed.includes("_4x5.mp4")
+    ? trimmed.replace(/_4x5\.mp4/i, "_9x16.mp4")
+    : trimmed;
+
+  const public916Url = toPublicUrl(companion916Url);
+
+  // 1. Check if companion 9:16 file already exists locally
+  const cleanCandidate = companion916Url.replace(/^https?:\/\/[^\/]+\//i, "").replace(/^\/+/, "");
+  const localCandidatePath = join(process.cwd(), cleanCandidate);
+  if (existsSync(localCandidatePath)) {
+    return public916Url;
+  }
+
+  const fileCandidateName = cleanCandidate.split("/").pop();
+  if (fileCandidateName) {
+    const renderedCandidatePath = join(process.cwd(), "uploads", "rendered", fileCandidateName);
+    if (existsSync(renderedCandidatePath)) {
+      return toPublicUrl(`/uploads/rendered/${fileCandidateName}`);
+    }
+  }
+
+  // 2. Missing: Convert the 16:9 video on-the-fly to 9:16 so Instagram gets the EXACT SAME video
+  try {
+    const clean169 = trimmed.replace(/^https?:\/\/[^\/]+\//i, "").replace(/^\/+/, "");
+    let local169Path = join(process.cwd(), clean169);
+
+    if (!existsSync(local169Path)) {
+      const matchFile = clean169.split("/").pop();
+      if (matchFile) {
+        const altPath = join(process.cwd(), "uploads", "rendered", matchFile);
+        if (existsSync(altPath)) local169Path = altPath;
+      }
+    }
+
+    if (!existsSync(local169Path) && (trimmed.startsWith("http://") || trimmed.startsWith("https://"))) {
+      const resp = await fetch(trimmed);
+      if (resp.ok) {
+        const ab = await resp.arrayBuffer();
+        const tempDir = join(process.cwd(), "uploads", "temp");
+        if (!existsSync(tempDir)) await import("fs/promises").then(f => f.mkdir(tempDir, { recursive: true }));
+        const dlPath = join(tempDir, `dl_${Date.now()}_16x9.mp4`);
+        await import("fs/promises").then(f => f.writeFile(dlPath, Buffer.from(ab)));
+        local169Path = dlPath;
+      }
+    }
+
+    if (existsSync(local169Path)) {
+      const renderedDir = join(process.cwd(), "uploads", "rendered");
+      if (!existsSync(renderedDir)) await import("fs/promises").then(f => f.mkdir(renderedDir, { recursive: true }));
+
+      const fileName916 = (clean169.split("/").pop() || `auto_${Date.now()}_16x9.mp4`)
+        .replace(/_(16x9|1x1|4x5)\.mp4/i, "_9x16.mp4");
+      const safeFileName916 = fileName916.endsWith("_9x16.mp4") ? fileName916 : `${fileName916.replace(/\.mp4$/i, "")}_9x16.mp4`;
+      const output916LocalPath = join(renderedDir, safeFileName916);
+
+      console.log(`[offer_approval] Converting 16:9 -> 9:16 for Instagram: ${local169Path} -> ${output916LocalPath}`);
+      await runFfmpegCommand([
+        "-y",
+        "-i", local169Path,
+        "-vf", "split[orig][bg];[bg]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=25:5[blurred];[orig]scale=720:-2[fg];[blurred][fg]overlay=(W-w)/2:(H-h)/2",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        output916LocalPath
+      ]);
+
+      if (existsSync(output916LocalPath)) {
+        console.log(`[offer_approval] Successfully generated 9:16 companion video: ${output916LocalPath}`);
+        return toPublicUrl(`/uploads/rendered/${safeFileName916}`);
+      }
+    }
+  } catch (convErr) {
+    console.warn("[offer_approval] On-the-fly 9:16 conversion failed:", convErr);
+  }
+
+  return public916Url;
+}
+
 // Live Publish to Instagram Graph API
 async function publishToInstagramLive(igUserId: string, accessToken: string, videoUrl: string, caption: string) {
   try {
@@ -173,7 +276,6 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       return { success: false, error: "Instagram requires a valid public video URL" };
     }
 
-    const GUARANTEED_IG_916_URL = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
     let targetVideoUrl = videoUrl;
     try {
       const controller = new AbortController();
@@ -181,11 +283,11 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       const headCheck = await fetch(targetVideoUrl, { method: "HEAD", signal: controller.signal });
       clearTimeout(timeoutId);
       if (headCheck.status < 200 || headCheck.status >= 400) {
-        console.warn(`[Instagram] videoUrl ${targetVideoUrl} returned HTTP ${headCheck.status}, falling back to guaranteed 9:16 video.`);
-        targetVideoUrl = GUARANTEED_IG_916_URL;
+        console.warn(`[Instagram] videoUrl ${targetVideoUrl} returned HTTP ${headCheck.status}, generating 9:16 companion video.`);
+        targetVideoUrl = await ensureVertical916Video(targetVideoUrl);
       }
     } catch {
-      targetVideoUrl = GUARANTEED_IG_916_URL;
+      targetVideoUrl = await ensureVertical916Video(targetVideoUrl);
     }
 
     let tokenToUse = accessToken;
@@ -722,7 +824,6 @@ export async function POST(req: NextRequest) {
                 if (cloud916) resolved916Url = cloud916;
               }
               if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
-                // Only lookup by exact jobId to prevent stale dead records from other jobs
                 if (mediaItem?.jobId) {
                   const sibling916: any = await MediaItemModel.findOne({
                     jobId: mediaItem.jobId,
@@ -731,41 +832,27 @@ export async function POST(req: NextRequest) {
                   if (sibling916?.url) resolved916Url = sibling916.url;
                 }
               }
+              // Always guarantee exact companion 9:16 video matching Facebook's video
               if (!resolved916Url || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916Url)) {
-                const baseToConvert = resolved169Url || finalVideoUrl || "";
-                if (baseToConvert && /_(16x9|1x1|4x5)\.mp4/i.test(baseToConvert)) {
-                  resolved916Url = baseToConvert.replace(/_(16x9|1x1|4x5)\.mp4/i, '_9x16.mp4');
-                }
-              }
-              if (!resolved916Url) {
-                resolved916Url = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
+                resolved916Url = await ensureVertical916Video(resolved169Url || finalVideoUrl);
               }
             }
-
-            const toPublicUrl = (urlStr?: any): string => {
-              if (!urlStr) return "";
-              const trimmed = String(urlStr).trim();
-              if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-              const clean = trimmed.replace(/^\/+/, "");
-              return `https://iot-test.metizstoresparc.com/${clean}`;
-            };
 
             resolved169Url = toPublicUrl(resolved169Url);
             resolved916Url = toPublicUrl(resolved916Url);
 
-            // Pre-validate resolved916Url against 404 or dead link to prevent Meta code 2207076
-            const GUARANTEED_IG_916_URL = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
+            // Pre-validate that resolved916Url actually exists; if not, generate from 16:9 companion
             try {
               const controller = new AbortController();
               const timeoutId = setTimeout(() => controller.abort(), 3500);
               const testHead = await fetch(resolved916Url, { method: "HEAD", signal: controller.signal });
               clearTimeout(timeoutId);
               if (testHead.status < 200 || testHead.status >= 400) {
-                console.warn(`[offer_approval] Candidate 9:16 URL ${resolved916Url} returned HTTP ${testHead.status}, falling back to guaranteed 9:16 video.`);
-                resolved916Url = GUARANTEED_IG_916_URL;
+                console.warn(`[offer_approval] 9:16 URL ${resolved916Url} returned HTTP ${testHead.status}, generating from 16:9 companion`);
+                resolved916Url = await ensureVertical916Video(resolved169Url);
               }
             } catch {
-              resolved916Url = GUARANTEED_IG_916_URL;
+              resolved916Url = await ensureVertical916Video(resolved169Url);
             }
 
             // Retrieve store user social credentials by userId

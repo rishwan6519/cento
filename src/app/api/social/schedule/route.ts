@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/db';
 import SocialPost from '@/models/SocialPost';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { runFfmpegCommand } from '@/lib/videoRenderer/ffmpegEngine';
 import MediaItemModel from '@/models/MediaItems';
 import VideoTemplate from '@/models/VideoTemplate';
 import User from '@/models/User';
@@ -191,6 +194,104 @@ async function publishToFacebookLive(pageId: string, accessToken: string, videoU
   }
 }
 
+// Helper: convert relative or local URL to public accessible URL
+function toPublicUrl(urlStr?: any): string {
+  if (!urlStr) return "";
+  const trimmed = String(urlStr).trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  const clean = trimmed.replace(/^\/+/, "");
+  return `https://iot-test.metizstoresparc.com/${clean}`;
+}
+
+// Helper: ensure 9:16 vertical video exists for Instagram, converting from companion 16:9 if needed
+async function ensureVertical916Video(inputUrl: string): Promise<string> {
+  const fallbackUrl = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
+  if (!inputUrl) return fallbackUrl;
+  const trimmed = String(inputUrl).trim();
+
+  const companion916Url = trimmed.includes("_16x9.mp4")
+    ? trimmed.replace(/_16x9\.mp4/i, "_9x16.mp4")
+    : trimmed.includes("_1x1.mp4")
+    ? trimmed.replace(/_1x1\.mp4/i, "_9x16.mp4")
+    : trimmed.includes("_4x5.mp4")
+    ? trimmed.replace(/_4x5\.mp4/i, "_9x16.mp4")
+    : trimmed;
+
+  const public916Url = toPublicUrl(companion916Url);
+
+  const cleanCandidate = companion916Url.replace(/^https?:\/\/[^\/]+\//i, "").replace(/^\/+/, "");
+  const localCandidatePath = join(process.cwd(), cleanCandidate);
+  if (existsSync(localCandidatePath)) {
+    return public916Url;
+  }
+
+  const fileCandidateName = cleanCandidate.split("/").pop();
+  if (fileCandidateName) {
+    const renderedCandidatePath = join(process.cwd(), "uploads", "rendered", fileCandidateName);
+    if (existsSync(renderedCandidatePath)) {
+      return toPublicUrl(`/uploads/rendered/${fileCandidateName}`);
+    }
+  }
+
+  try {
+    const clean169 = trimmed.replace(/^https?:\/\/[^\/]+\//i, "").replace(/^\/+/, "");
+    let local169Path = join(process.cwd(), clean169);
+
+    if (!existsSync(local169Path)) {
+      const matchFile = clean169.split("/").pop();
+      if (matchFile) {
+        const altPath = join(process.cwd(), "uploads", "rendered", matchFile);
+        if (existsSync(altPath)) local169Path = altPath;
+      }
+    }
+
+    if (!existsSync(local169Path) && (trimmed.startsWith("http://") || trimmed.startsWith("https://"))) {
+      const resp = await fetch(trimmed);
+      if (resp.ok) {
+        const ab = await resp.arrayBuffer();
+        const tempDir = join(process.cwd(), "uploads", "temp");
+        if (!existsSync(tempDir)) await import("fs/promises").then(f => f.mkdir(tempDir, { recursive: true }));
+        const dlPath = join(tempDir, `dl_${Date.now()}_16x9.mp4`);
+        await import("fs/promises").then(f => f.writeFile(dlPath, Buffer.from(ab)));
+        local169Path = dlPath;
+      }
+    }
+
+    if (existsSync(local169Path)) {
+      const renderedDir = join(process.cwd(), "uploads", "rendered");
+      if (!existsSync(renderedDir)) await import("fs/promises").then(f => f.mkdir(renderedDir, { recursive: true }));
+
+      const fileName916 = (clean169.split("/").pop() || `auto_${Date.now()}_16x9.mp4`)
+        .replace(/_(16x9|1x1|4x5)\.mp4/i, "_9x16.mp4");
+      const safeFileName916 = fileName916.endsWith("_9x16.mp4") ? fileName916 : `${fileName916.replace(/\.mp4$/i, "")}_9x16.mp4`;
+      const output916LocalPath = join(renderedDir, safeFileName916);
+
+      console.log(`[social_schedule] Converting 16:9 -> 9:16 for Instagram: ${local169Path} -> ${output916LocalPath}`);
+      await runFfmpegCommand([
+        "-y",
+        "-i", local169Path,
+        "-vf", "split[orig][bg];[bg]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=25:5[blurred];[orig]scale=720:-2[fg];[blurred][fg]overlay=(W-w)/2:(H-h)/2",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        output916LocalPath
+      ]);
+
+      if (existsSync(output916LocalPath)) {
+        console.log(`[social_schedule] Successfully generated 9:16 companion video: ${output916LocalPath}`);
+        return toPublicUrl(`/uploads/rendered/${safeFileName916}`);
+      }
+    }
+  } catch (convErr) {
+    console.warn("[social_schedule] On-the-fly 9:16 conversion failed:", convErr);
+  }
+
+  return public916Url;
+}
+
 // Live Publish to Instagram Graph API with async container processing
 async function publishToInstagramLive(igUserId: string, accessToken: string, videoUrl: string, caption: string) {
   try {
@@ -201,7 +302,6 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       return { success: false, error: 'Instagram requires a public video URL' };
     }
 
-    const GUARANTEED_IG_916_URL = "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_9x16.mp4";
     let targetVideoUrl = videoUrl;
     try {
       const controller = new AbortController();
@@ -209,11 +309,11 @@ async function publishToInstagramLive(igUserId: string, accessToken: string, vid
       const headCheck = await fetch(targetVideoUrl, { method: "HEAD", signal: controller.signal });
       clearTimeout(timeoutId);
       if (headCheck.status < 200 || headCheck.status >= 400) {
-        console.warn(`[Instagram] videoUrl ${targetVideoUrl} returned HTTP ${headCheck.status}, falling back to guaranteed 9:16 video.`);
-        targetVideoUrl = GUARANTEED_IG_916_URL;
+        console.warn(`[Instagram] videoUrl ${targetVideoUrl} returned HTTP ${headCheck.status}, generating 9:16 companion video.`);
+        targetVideoUrl = await ensureVertical916Video(targetVideoUrl);
       }
     } catch {
-      targetVideoUrl = GUARANTEED_IG_916_URL;
+      targetVideoUrl = await ensureVertical916Video(targetVideoUrl);
     }
 
     // Step 1: Create media container for Reels
@@ -409,12 +509,23 @@ export async function POST(req: NextRequest) {
 
     if (!resolved169VideoUrl) resolved169VideoUrl = resolvedDefaultVideoUrl;
     if (!resolved916VideoUrl || /_(16x9|1x1|4x5)\.mp4/i.test(resolved916VideoUrl)) {
-      const baseForReplace = resolved169VideoUrl || resolvedDefaultVideoUrl || "";
-      if (baseForReplace && /_(16x9|1x1|4x5)\.mp4/i.test(baseForReplace)) {
-        resolved916VideoUrl = baseForReplace.replace(/_(16x9|1x1|4x5)\.mp4/i, '_9x16.mp4');
-      } else {
-        resolved916VideoUrl = resolvedDefaultVideoUrl;
+      resolved916VideoUrl = await ensureVertical916Video(resolved169VideoUrl || resolvedDefaultVideoUrl);
+    }
+
+    resolved169VideoUrl = toPublicUrl(resolved169VideoUrl);
+    resolved916VideoUrl = toPublicUrl(resolved916VideoUrl);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const testHead = await fetch(resolved916VideoUrl, { method: "HEAD", signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (testHead.status < 200 || testHead.status >= 400) {
+        console.warn(`[social_schedule] 9:16 URL ${resolved916VideoUrl} returned HTTP ${testHead.status}, generating from 16:9 companion`);
+        resolved916VideoUrl = await ensureVertical916Video(resolved169VideoUrl);
       }
+    } catch {
+      resolved916VideoUrl = await ensureVertical916Video(resolved169VideoUrl);
     }
 
     // Calculate timing
