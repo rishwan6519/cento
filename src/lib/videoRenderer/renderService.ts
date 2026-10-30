@@ -10,6 +10,7 @@ import CloudbasesJob from '@/models/CloudbasesJob';
 import MediaItemModel from '@/models/MediaItems';
 import User from '@/models/User';
 import mongoose from 'mongoose';
+import { cleanupExpiredUnapprovedVideos } from '@/lib/videoCleanup';
 
 // In-memory job state cache
 const inMemoryJobs = new Map<string, RenderJobResult>();
@@ -148,6 +149,8 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
   };
 
   await persistJobState(jobId, initialResult);
+  // Automatically clean up expired unapproved videos older than 30 days in background
+  cleanupExpiredUnapprovedVideos(30).catch(() => {});
 
   // Background execution without blocking HTTP caller
   (async () => {
@@ -277,7 +280,7 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
                 type: 'video',
                 fileCategory: 'offer',
                 url: vid.url,
-                approvalStatus: 'approved',
+                approvalStatus: 'pending',
                 templateId: fullOptions.templateId ? String(fullOptions.templateId) : undefined,
                 offerId: fullOptions.offerId,
                 channels: fullOptions.channels || [],

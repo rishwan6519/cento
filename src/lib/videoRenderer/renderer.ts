@@ -23,6 +23,7 @@ import {
   encodeStillVideo,
   resolveMusicTrack,
   AnimatedLayerItem,
+  runFfmpegCommand,
 } from './ffmpegEngine';
 
 /**
@@ -802,6 +803,44 @@ export async function renderOfferVideo(options: RenderOptions): Promise<RenderJo
         } catch (sibErr) {
           console.warn(`[videoRenderer] Sibling render failed for ratio ${sibRatio}:`, sibErr);
         }
+      }
+    }
+
+    // Ensure 9:16 is ALWAYS generated: if not present in result.videos, generate vertical companion from 16:9
+    const has916 = result.videos.some((v) => v.ratio === '9:16');
+    const v169Base = result.videos.find((v) => v.ratio === '16:9') || primaryVideo;
+    if (!has916 && v169Base?.localPath && existsSync(v169Base.localPath)) {
+      try {
+        const renderedDir = join(process.cwd(), 'uploads', 'rendered');
+        const outFileName = `${options.jobId}_9x16.mp4`;
+        const outFilePath = join(renderedDir, outFileName);
+        await runFfmpegCommand([
+          '-y',
+          '-i', v169Base.localPath,
+          '-filter_complex',
+          '[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=20:20[bg];[0:v]scale=720:1280:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2[v]',
+          '-map', '[v]',
+          '-map', '0:a?',
+          '-c:v', 'libx264',
+          '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac',
+          '-shortest',
+          outFilePath,
+        ]);
+        if (existsSync(outFilePath)) {
+          result.videos.push({
+            ratio: '9:16',
+            width: 720,
+            height: 1280,
+            duration: v169Base.duration,
+            file: outFileName,
+            url: `/uploads/rendered/${outFileName}`,
+            localPath: outFilePath,
+          });
+          console.log(`[videoRenderer] Guaranteed vertical companion 9:16 generated for ${options.jobId}`);
+        }
+      } catch (fbErr) {
+        console.warn(`[videoRenderer] Failed to generate guaranteed companion 9:16:`, fbErr);
       }
     }
 

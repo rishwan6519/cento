@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import MediaItemModel from '@/models/MediaItems';
 import VideoJobModel from '@/models/VideoJob';
 import mongoose from 'mongoose';
+import { cleanupExpiredUnapprovedVideos } from '@/lib/videoCleanup';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -268,27 +269,25 @@ async function handleGetVideo(jobIdInput: string) {
     }
   }
 
-  const video16x9 = formattedVideos.find((v) => v.ratio === '16:9')?.url || '';
-  const video916 = formattedVideos.find((v) => v.ratio === '9:16')?.url || '';
-  const video11 = formattedVideos.find((v) => v.ratio === '1:1')?.url || '';
-  const video45 = formattedVideos.find((v) => v.ratio === '4:5')?.url || '';
-  const primaryVideo = formattedVideos.find((v) => v.ratio === '16:9') || formattedVideos[0];
+  // User requirement: In get-video, show only ONE preview video (16:9) with its mediaId/videoId.
+  // Sibling aspect ratios (9:16, 1:1, 4:5) are saved in the backend library under this jobId for offer_approval.
+  const preview169 = formattedVideos.find((v) => v.ratio === '16:9') || formattedVideos[0];
+  const previewList = preview169 ? [preview169] : formattedVideos.slice(0, 1);
+
+  // Trigger non-blocking cleanup of any unapproved videos older than 30 days
+  cleanupExpiredUnapprovedVideos(30).catch(() => {});
 
   const responsePayload: Record<string, any> = {
     success: true,
     status: 'completed',
     jobId,
-    videoId: primaryVideo?.mediaId || jobId,
-    primaryVideoId: primaryVideo?.mediaId || jobId,
+    videoId: preview169?.mediaId || jobId,
+    primaryVideoId: preview169?.mediaId || jobId,
     offerId: offerId || '',
     templateId: templateId || '14',
     message: 'OK',
-    videos: formattedVideos,
-    video_16x9: video16x9,
-    video_9x16: video916,
-    video_1x1: video11,
-    video_4x5: video45,
-    "video 1": video16x9 || primaryVideo?.url,
+    videos: previewList,
+    "video 1": preview169?.url || '',
     voiceoverScript: voiceoverScript || '',
     channels: channels,
   };

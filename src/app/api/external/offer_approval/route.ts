@@ -13,6 +13,7 @@ import mongoose from "mongoose";
 import OfferApprovalJobModel from "@/models/OfferApprovalJob";
 import SocialPost from "@/models/SocialPost";
 import VideoTemplate from "@/models/VideoTemplate";
+import { cleanupExpiredUnapprovedVideos } from "@/lib/videoCleanup";
 import { v4 as uuidv4 } from "uuid";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -645,8 +646,13 @@ export async function POST(req: NextRequest) {
           if (newOfferId !== undefined) mediaItem.offerId = newOfferId;
           if (newTemplateId !== undefined) mediaItem.templateId = newTemplateId;
           if (tagline != null) mediaItem.tagline = String(tagline).trim();
-          mediaItem.approvalStatus = "success";
+          mediaItem.approvalStatus = "approved";
           if (mediaItem && typeof mediaItem.save === "function") await mediaItem.save();
+          if (mediaItem.jobId) {
+            await MediaItemModel.updateMany({ jobId: mediaItem.jobId }, { $set: { approvalStatus: "approved" } }).catch(() => {});
+          }
+          // Non-blocking cleanup of any unapproved videos older than 30 days
+          cleanupExpiredUnapprovedVideos(30).catch(() => {});
         }
 
         // Apply updates to VideoJob or GoogleFlowJob
