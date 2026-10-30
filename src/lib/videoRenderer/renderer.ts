@@ -736,6 +736,24 @@ export async function renderOfferVideo(options: RenderOptions): Promise<RenderJo
     } else if (options.files.productUrl) {
       productBuffer = await fetchUrlToBuffer(options.files.productUrl);
     }
+    if (!productBuffer && (options.layers?.product as any)?.url) {
+      productBuffer = await fetchUrlToBuffer((options.layers?.product as any).url);
+    }
+    if (!productBuffer) {
+      const defaultProdPaths = [
+        join(process.cwd(), 'uploads', 'products', 'ai_openai_1793077865909_b35ca0c0.png'),
+        join(process.cwd(), 'uploads', 'products', 'ai_openai_1792999641981_213ba36b.png'),
+        join(process.cwd(), 'uploads', 'products', 'default_product.png'),
+      ];
+      for (const p of defaultProdPaths) {
+        if (existsSync(p)) {
+          try {
+            productBuffer = await readFile(p);
+            break;
+          } catch {}
+        }
+      }
+    }
 
     // 2. Resolve background asset
     let bgBuffer: Buffer | null = null;

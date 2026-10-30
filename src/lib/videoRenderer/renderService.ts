@@ -221,6 +221,10 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
             if (targetBg && !fullOptions.files.backgroundUrl && !fullOptions.files.backgroundBuffer) {
               fullOptions.files.backgroundUrl = targetBg;
             }
+            const targetProd = tplDoc.productUrl || (tplDoc.layers as any)?.product?.url || (tplDoc.layers as any)?.product?.image;
+            if (targetProd && !fullOptions.files.productUrl && !fullOptions.files.productBuffer) {
+              fullOptions.files.productUrl = targetProd;
+            }
             if (tplDoc.logoUrl && !fullOptions.files.logoUrl && !fullOptions.files.logoBuffer) {
               fullOptions.files.logoUrl = tplDoc.logoUrl;
             }

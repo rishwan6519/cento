@@ -75,42 +75,54 @@ export async function POST(req: NextRequest) {
 
       for (const [key, value] of formData.entries()) {
         const lowerKey = key.toLowerCase();
-        if (value instanceof File && value.name && value.size > 0) {
-          const ab = await value.arrayBuffer();
+        const isFileLike = value && typeof (value as any).arrayBuffer === 'function';
+        if (isFileLike) {
+          const fileObj: any = value;
+          const ab = await fileObj.arrayBuffer();
           const buf = Buffer.from(ab);
+          if (buf.length > 0) {
+            const fileName = fileObj.name || ('upload_' + Date.now() + '.png');
+            const lowerFileName = fileName.toLowerCase();
+            const isBg = lowerKey.includes('bg') || lowerKey.includes('background') || lowerFileName.includes('background');
+            const isLogo = lowerKey.includes('logo') || lowerFileName.includes('logo');
+            const isMusic = lowerKey.includes('music') || lowerKey.includes('audio') || lowerKey.includes('sound') || lowerFileName.endsWith('.mp3') || lowerFileName.endsWith('.wav');
+            const isDecor = lowerKey.includes('decor');
 
-          const safeSubdir = (lowerKey === 'background' || lowerKey.includes('background') || lowerKey.includes('bg'))
-            ? 'backgrounds'
-            : (lowerKey === 'logo' || lowerKey.includes('logo'))
-            ? 'logo'
-            : (lowerKey === 'music' || lowerKey.includes('music') || lowerKey === 'audio' || lowerKey.includes('audio'))
-            ? 'music'
-            : 'products';
+            const safeSubdir = isBg
+              ? 'backgrounds'
+              : isLogo
+              ? 'logo'
+              : isMusic
+              ? 'music'
+              : 'products';
 
-          const targetUploadDir = join(process.cwd(), 'uploads', safeSubdir);
-          if (!existsSync(targetUploadDir)) {
-            await mkdir(targetUploadDir, { recursive: true });
-          }
-          const sanitizedFilename = `${Date.now()}_${value.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-          const savedFilePath = join(targetUploadDir, sanitizedFilename);
-          await writeFile(savedFilePath, buf);
-          const localSavedUrl = `/uploads/${safeSubdir}/${sanitizedFilename}`;
+            const targetUploadDir = join(process.cwd(), 'uploads', safeSubdir);
+            if (!existsSync(targetUploadDir)) {
+              await mkdir(targetUploadDir, { recursive: true });
+            }
+            const sanitizedFilename = Date.now() + '_' + fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const savedFilePath = join(targetUploadDir, sanitizedFilename);
+            await writeFile(savedFilePath, buf);
+            const localSavedUrl = '/uploads/' + safeSubdir + '/' + sanitizedFilename;
 
-          if (lowerKey === 'background' || lowerKey.includes('background') || lowerKey.includes('bg')) {
-            inputFiles.backgroundBuffer = buf;
-            inputFiles.backgroundUrl = localSavedUrl;
-          } else if (lowerKey === 'product' || lowerKey.includes('product') || lowerKey === 'image' || lowerKey.includes('image')) {
-            inputFiles.productBuffer = buf;
-            inputFiles.productUrl = localSavedUrl;
-          } else if (lowerKey === 'logo' || lowerKey.includes('logo')) {
-            inputFiles.logoBuffer = buf;
-            inputFiles.logoUrl = localSavedUrl;
-          } else if (lowerKey === 'music' || lowerKey.includes('music') || lowerKey === 'audio' || lowerKey.includes('audio')) {
-            inputFiles.musicBuffer = buf;
-            inputFiles.musicUrl = localSavedUrl;
-          } else if (lowerKey.includes('decor')) {
-            if (!inputFiles.decorations) inputFiles.decorations = [];
-            inputFiles.decorations.push({ buffer: buf });
+            if (isBg) {
+              inputFiles.backgroundBuffer = buf;
+              inputFiles.backgroundUrl = localSavedUrl;
+            } else if (isLogo) {
+              inputFiles.logoBuffer = buf;
+              inputFiles.logoUrl = localSavedUrl;
+            } else if (isMusic) {
+              inputFiles.musicBuffer = buf;
+              inputFiles.musicUrl = localSavedUrl;
+            } else if (isDecor) {
+              if (!inputFiles.decorations) inputFiles.decorations = [];
+              inputFiles.decorations.push({ buffer: buf });
+            } else {
+              // Manual local file upload for product image (keys: product, file, image, photo, upload, etc.)
+              inputFiles.productBuffer = buf;
+              inputFiles.productUrl = localSavedUrl;
+              console.log('[create-video] Manually selected local product file received: ' + fileName + ' (' + buf.length + ' bytes) -> ' + localSavedUrl);
+            }
           }
         } else if (typeof value === 'string') {
           body[key] = value;
@@ -183,6 +195,49 @@ export async function POST(req: NextRequest) {
 
     if (rawMusicVal && !inputFiles.musicBuffer) {
       resolveImageBufferOrUrl(rawMusicVal, inputFiles, 'music');
+    }
+
+    // 3rd Priority: Template constant/saved product image fallback
+    if (!inputFiles.productBuffer && !inputFiles.productUrl && templateId) {
+      try {
+        const { connectToDatabase } = await import('@/lib/db');
+        await connectToDatabase();
+        const VideoTemplate = (await import('@/models/VideoTemplate')).default;
+        const numId = Number(templateId);
+        const tplDoc = await VideoTemplate.findOne({
+          $or: [
+            ...(!isNaN(numId) ? [{ templateId: numId }] : []),
+            { templateId: String(templateId) },
+          ]
+        }).lean();
+        const tplProd = (tplDoc as any)?.productUrl || (tplDoc?.layers as any)?.product?.url || (tplDoc?.layers as any)?.product?.image;
+        if (tplProd) {
+          console.log('[create-video] Using template ' + templateId + ' constant product image: ' + tplProd);
+          resolveImageBufferOrUrl(tplProd, inputFiles, 'product');
+        }
+      } catch (tErr) {
+        console.warn('[create-video] Could not load template product image:', tErr);
+      }
+    }
+
+    // 4th Priority: Default sample product fallback from uploads/products or public/images
+    if (!inputFiles.productBuffer && !inputFiles.productUrl) {
+      const defaultProdCandidates = [
+        join(process.cwd(), 'uploads', 'products', 'ai_openai_1793077865909_b35ca0c0.png'),
+        join(process.cwd(), 'uploads', 'products', 'ai_openai_1792999641981_213ba36b.png'),
+        join(process.cwd(), 'uploads', 'products', 'default_product.png'),
+        join(process.cwd(), 'public', 'images', 'default_product.png'),
+      ];
+      for (const cand of defaultProdCandidates) {
+        if (existsSync(cand)) {
+          try {
+            inputFiles.productBuffer = readFileSync(cand);
+            inputFiles.productUrl = '/uploads/products/' + cand.split(/[\\/]/).pop();
+            console.log('[create-video] Using fallback sample product image: ' + cand);
+            break;
+          } catch {}
+        }
+      }
     }
 
     if (!inputFiles.productBuffer && !inputFiles.productUrl) {
