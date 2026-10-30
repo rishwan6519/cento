@@ -726,7 +726,7 @@ export async function POST(req: NextRequest) {
                 resolved916Url = resolved169Url || finalVideoUrl || "https://iot-test.metizstoresparc.com/uploads/rendered/cr_789258dae1224162_16x9.mp4";
               }
 
-              const toPublicUrl = (urlStr) => {
+              const toPublicUrl = (urlStr?: any): string => {
                 if (!urlStr) return "";
                 const trimmed = String(urlStr).trim();
                 if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
