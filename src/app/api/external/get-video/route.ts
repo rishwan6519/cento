@@ -5,6 +5,7 @@ import MediaItemModel from '@/models/MediaItems';
 import VideoJobModel from '@/models/VideoJob';
 import mongoose from 'mongoose';
 import { cleanupExpiredUnapprovedVideos } from '@/lib/videoCleanup';
+import { toAbsoluteUrl } from '@/lib/urlHelper';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -67,7 +68,7 @@ function injectSocialCaptions(payload: Record<string, any>, channels: string[], 
   }
 }
 
-async function handleGetVideo(jobIdInput: string) {
+async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
   const jobId = (jobIdInput || '').trim();
   if (!jobId) {
     return NextResponse.json(
@@ -272,7 +273,18 @@ async function handleGetVideo(jobIdInput: string) {
   // User requirement: In get-video, show only ONE preview video (16:9) with its mediaId/videoId.
   // Sibling aspect ratios (9:16, 1:1, 4:5) are saved in the backend library under this jobId for offer_approval.
   const preview169 = formattedVideos.find((v) => v.ratio === '16:9') || formattedVideos[0];
-  const previewList = preview169 ? [preview169] : formattedVideos.slice(0, 1);
+  const fullPreviewUrl = preview169 ? toAbsoluteUrl(preview169.url, req) : '';
+
+  const previewItem = preview169
+    ? {
+        mediaId: preview169.mediaId,
+        url: fullPreviewUrl,
+        name: preview169.name,
+        ratio: preview169.ratio || '16:9',
+      }
+    : null;
+
+  const previewList = previewItem ? [previewItem] : [];
 
   // Trigger non-blocking cleanup of any unapproved videos older than 30 days
   cleanupExpiredUnapprovedVideos(30).catch(() => {});
@@ -287,7 +299,7 @@ async function handleGetVideo(jobIdInput: string) {
     templateId: templateId || '14',
     message: 'OK',
     videos: previewList,
-    "video 1": preview169?.url || '',
+    "video 1": fullPreviewUrl,
     voiceoverScript: voiceoverScript || '',
     channels: channels,
   };
@@ -307,7 +319,7 @@ export async function GET(req: NextRequest) {
       searchParams.get('videoId') ||
       searchParams.get('id') ||
       '';
-    return await handleGetVideo(jobId);
+    return await handleGetVideo(jobId, req);
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message || 'Internal Server Error' }, { status: 500 });
   }
@@ -322,7 +334,7 @@ export async function POST(req: NextRequest) {
       body.videoId ||
       body.id ||
       '';
-    return await handleGetVideo(jobId);
+    return await handleGetVideo(jobId, req);
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message || 'Internal Server Error' }, { status: 500 });
   }

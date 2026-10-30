@@ -4,6 +4,7 @@ import { queueRenderJob } from '@/lib/videoRenderer/renderService';
 import { RenderInputFiles } from '@/lib/videoRenderer/types';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { toAbsoluteUrl } from '@/lib/urlHelper';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -285,7 +286,7 @@ export async function POST(req: NextRequest) {
         job_id: queued.jobId,
         jobId: queued.jobId,
         videoId: queued.jobId,
-        status_url: queued.statusUrl,
+        status_url: toAbsoluteUrl(queued.statusUrl, req),
         template_id: templateId,
         ratio,
         animation: {

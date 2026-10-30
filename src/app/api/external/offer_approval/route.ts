@@ -14,6 +14,7 @@ import OfferApprovalJobModel from "@/models/OfferApprovalJob";
 import SocialPost from "@/models/SocialPost";
 import VideoTemplate from "@/models/VideoTemplate";
 import { cleanupExpiredUnapprovedVideos } from "@/lib/videoCleanup";
+import { toAbsoluteUrl } from "@/lib/urlHelper";
 import { v4 as uuidv4 } from "uuid";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -168,13 +169,9 @@ async function publishToFacebookLive(pageId: string, accessToken: string, videoU
   }
 }
 
-// Helper: convert relative or local URL to public accessible URL
-function toPublicUrl(urlStr?: any): string {
-  if (!urlStr) return "";
-  const trimmed = String(urlStr).trim();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-  const clean = trimmed.replace(/^\/+/, "");
-  return `https://iot-test.metizstoresparc.com/${clean}`;
+// Helper: convert relative or local URL to public accessible URL (dynamic origin)
+function toPublicUrl(urlStr?: any, req?: NextRequest): string {
+  return toAbsoluteUrl(urlStr, req);
 }
 
 // Helper: ensure 9:16 vertical video exists for Instagram, converting from companion 16:9 if needed
