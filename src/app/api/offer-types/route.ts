@@ -25,8 +25,30 @@ export async function GET(req: NextRequest) {
       query.categoryId = categoryId;
     }
 
-    // Only return actual documents stored in the database
-    const offerTypes = await OfferType.find(query).sort({ createdAt: -1 }).lean();
+    // Fetch actual documents stored in the database
+    let offerTypes = await OfferType.find(query).sort({ createdAt: -1 }).lean();
+    
+    // If no offer types exist in the database, automatically seed standard commercial types
+    if (offerTypes.length === 0) {
+      const defaultTypes = [
+        { offertypeId: "INDIVIDUAL_DISCOUNT", offertypename: "Individual Discount", categoryId: "offer" },
+        { offertypeId: "PERCENTAGE_DISCOUNT", offertypename: "Percentage Discount", categoryId: "offer" },
+        { offertypeId: "BUY_X_GET_Y", offertypename: "Buy X Get Y", categoryId: "offer" },
+        { offertypeId: "BUNDLE_OFFER", offertypename: "Bundle Offer", categoryId: "offer" },
+        { offertypeId: "FLAT_OFF", offertypename: "Flat Off", categoryId: "offer" },
+        { offertypeId: "FLASH_SALE", offertypename: "Flash Sale", categoryId: "offer" },
+      ];
+
+      for (const item of defaultTypes) {
+        await OfferType.findOneAndUpdate(
+          { offertypeId: item.offertypeId },
+          { $set: item },
+          { upsert: true, new: true }
+        );
+      }
+
+      offerTypes = await OfferType.find(query).sort({ createdAt: -1 }).lean();
+    }
     
     return NextResponse.json({
       success: true,

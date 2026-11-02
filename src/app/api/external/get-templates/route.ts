@@ -8,19 +8,24 @@ import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
-function formatTemplateItem(t: any, index: number) {
+function formatTemplateItem(t: any, index: number, creator?: any) {
   const tplId = Number(t.templateId) || (10000 + index + 1);
   const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   
-  const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
+  const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || "";
   const thumbRel = t.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
 
   const durationSec = Number(t.videoDuration || t.duration_seconds || t.duration || 10);
   const width = t.base_width || (t.aspectRatio === "9:16" ? 1080 : 1920);
   const height = t.base_height || (t.aspectRatio === "9:16" ? 1920 : 1080);
 
-  return {
+  const actualUserId = creator?._id ? String(creator._id) : (t.storeUserId ? String(t.storeUserId) : (t.userId ? String(t.userId) : undefined));
+  const actualUserName = creator?.storeName || creator?.username || creator?.operatorName || undefined;
+  const actualUserEmail = creator?.email || undefined;
+  const actualUserRole = creator?.role || undefined;
+
+  const item: any = {
     id: tplId,
     name: t.templateName || `template-${tplId}`,
     status: t.status === "Inactive" ? "inactive" : "approved",
@@ -40,19 +45,27 @@ function formatTemplateItem(t: any, index: number) {
     offertypename: otName,
     thumbnail: thumbRel,
     thumbnail_url: thumbUrl,
-    created_by: 1,
-    created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : "2026-09-29 03:46:02",
-    user: {
-      id: 1,
-      name: "StoreSparc Demo",
-      email: "demo@storesparc.local",
-      role: "admin",
-    },
+    created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : undefined,
   };
+
+  if (actualUserId) {
+    item.created_by = actualUserId;
+    if (actualUserName || actualUserEmail) {
+      item.user = {
+        id: actualUserId,
+        name: actualUserName,
+        email: actualUserEmail,
+        role: actualUserRole,
+      };
+    }
+  }
+
+  return item;
 }
 
 async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string = "ALL") {
   await connectToDatabase();
+  const User = (await import("@/models/User")).default;
 
   const query: any = {
     isDummy: { $ne: true },
@@ -61,42 +74,48 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
   if (userId && userId.trim()) {
     const cleanUid = userId.trim();
     if (mongoose.Types.ObjectId.isValid(cleanUid)) {
-      const User = (await import("@/models/User")).default;
       const user = await User.findById(cleanUid).lean();
-      let permittedIds = [new mongoose.Types.ObjectId(cleanUid)];
+      const permittedIdsSet = new Set<string>();
+      permittedIdsSet.add(cleanUid);
+
       if (user) {
-        if (user.role === 'account_admin' || user.role === 'admin') {
+        if (user.role === 'account_admin' || user.role === 'admin' || user.role === 'superUser') {
+          // Account Admin: include their ID and all store accounts under them
           const subUsers = await User.find({
             $or: [
               { _id: user._id },
               { controllerId: user._id },
+              { customerId: user._id },
               ...(user.customerId ? [{ customerId: user.customerId }] : []),
               { createdBy: user._id },
             ],
           }).select('_id').lean();
-          permittedIds = subUsers.map((u: any) => u._id);
+          subUsers.forEach((u: any) => permittedIdsSet.add(String(u._id)));
         } else {
-          const adminId = user.controllerId || user.createdBy;
+          // Store User: include this store and its controlling account admin + sibling stores
+          const adminId = user.controllerId || user.createdBy || user.customerId;
           if (adminId) {
+            permittedIdsSet.add(String(adminId));
             const related = await User.find({
               $or: [
-                { _id: user._id },
-                { _id: adminId },
                 { controllerId: adminId },
+                { customerId: adminId },
                 { createdBy: adminId },
               ],
             }).select('_id').lean();
-            permittedIds = related.map((u: any) => u._id);
+            related.forEach((u: any) => permittedIdsSet.add(String(u._id)));
           }
         }
       }
 
-      const permittedStrIds = permittedIds.map((id) => String(id));
+      const permittedObjIds = Array.from(permittedIdsSet).map((id) => new mongoose.Types.ObjectId(id));
+      const permittedStrIds = Array.from(permittedIdsSet);
+
       query.$or = [
-        { storeUserId: { $in: permittedIds } },
+        { storeUserId: { $in: permittedObjIds } },
         { storeUserId: { $in: permittedStrIds } },
-        { storeUserId: { $exists: false } },
-        { storeUserId: null },
+        { userId: { $in: permittedStrIds } },
+        { userId: { $in: permittedObjIds } },
       ];
     } else {
       query.$or = [
@@ -106,7 +125,7 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     }
   }
 
-  // Filter by offertypeId if not "all"
+  // Filter by offertypeId if not "ALL"
   const isAll = !rawOfferTypeId || rawOfferTypeId.toUpperCase() === "ALL";
   if (!isAll) {
     const target = rawOfferTypeId.trim();
@@ -134,37 +153,8 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     }
   }
 
-  let dbTemplates = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
+  const dbTemplates = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
 
-  // If user-specific query returned 0 templates, only fallback to global unassigned templates
-  if (dbTemplates.length === 0 && userId) {
-    const fallbackQuery: any = {
-      isDummy: { $ne: true },
-      $or: [
-        { storeUserId: { $exists: false } },
-        { storeUserId: null },
-      ],
-    };
-    if (!isAll) {
-      const target = rawOfferTypeId.trim();
-      const regex = new RegExp("^" + escapeRegex(target) + "$", "i");
-      const otClauses = [
-        { offertypeId: target },
-        { offertypeId: regex },
-        { offerType: target },
-        { "offer_type.id": target },
-        { "offer_type.offertypeId": target },
-      ];
-      fallbackQuery.$and = [
-        { $or: fallbackQuery.$or },
-        { $or: otClauses },
-      ];
-      delete fallbackQuery.$or;
-    }
-    dbTemplates = await VideoTemplate.find(fallbackQuery).sort({ templateId: 1, createdAt: -1 }).lean();
-  }
-
-  // If 0 templates, return empty array without dummy templates
   if (dbTemplates.length === 0) {
     return {
       success: true,
@@ -177,7 +167,18 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     };
   }
 
-  const formattedTemplates = dbTemplates.map((t, idx) => formatTemplateItem(t, idx));
+  // Fetch real creators to avoid any dummy user data
+  const creatorIds = dbTemplates
+    .map((t: any) => t.storeUserId || t.userId)
+    .filter((id: any) => id && mongoose.Types.ObjectId.isValid(String(id)))
+    .map((id: any) => new mongoose.Types.ObjectId(String(id)));
+
+  const creators = await User.find({ _id: { $in: creatorIds } }).lean();
+  const creatorMap = new Map(creators.map((c: any) => [String(c._id), c]));
+
+  const formattedTemplates = dbTemplates.map((t, idx) =>
+    formatTemplateItem(t, idx, creatorMap.get(String(t.storeUserId || t.userId)))
+  );
 
   return {
     success: true,

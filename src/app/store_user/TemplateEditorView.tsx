@@ -1440,10 +1440,23 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
     setCreatingOfferType(true);
     try {
+      let currentUserId = "";
+      try {
+        currentUserId = localStorage.getItem("userId") || "";
+        if (!currentUserId) {
+          const u = localStorage.getItem("user");
+          if (u) {
+            const parsed = JSON.parse(u);
+            currentUserId = parsed._id || parsed.id || parsed.userId || "";
+          }
+        }
+      } catch {}
+
       const res = await fetch("/api/create-offer-type", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: currentUserId || undefined,
           category: "offer",
           offerTypes: [
             {
@@ -1831,11 +1844,11 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         const data = await res.json();
         if (data.success && Array.isArray(data.data) && data.data.length > 0) {
           setOfferTypesList(data.data);
-          const first = data.data[0];
-          setSelectedOfferTypeId(first.offertypeId);
-          setSelectedOfferTypeName(first.offertypename);
-          setOfferType(first.offertypename);
-          setNewTplOfferType(first.offertypename);
+          const defaultOt = data.data.find((o: any) => o.offertypeId === "INDIVIDUAL_DISCOUNT") || data.data[0];
+          setSelectedOfferTypeId(defaultOt.offertypeId);
+          setSelectedOfferTypeName(defaultOt.offertypename);
+          setOfferType(defaultOt.offertypename);
+          setNewTplOfferType(defaultOt.offertypename);
         }
       } catch (err) {
         console.warn("Could not fetch offer types:", err);

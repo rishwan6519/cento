@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   try {
     const auth = getAuthenticatedUser(req);
     const body = await req.json();
-    const resolvedUserId = auth?.userId || body.storeUserId || body.userId || '64f3b2c1a4e2d1234567890a';
+    const resolvedUserId = auth?.userId || body.storeUserId || body.userId || undefined;
 
     await connectToDatabase();
 
@@ -97,7 +97,18 @@ export async function POST(req: NextRequest) {
     const thumbUrl = savedTemplate.thumbnail_url || savedTemplate.thumbnail || savedTemplate.backgroundUrl || "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
     const thumbRel = savedTemplate.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
 
-    const formattedTemplateItem = {
+    let creator: any = null;
+    if (resolvedUserId && mongoose.Types.ObjectId.isValid(String(resolvedUserId))) {
+      const User = (await import('@/models/User')).default;
+      creator = await User.findById(String(resolvedUserId)).lean();
+    }
+
+    const actualUserId = creator?._id ? String(creator._id) : (resolvedUserId ? String(resolvedUserId) : undefined);
+    const actualUserName = creator?.storeName || creator?.username || creator?.operatorName || undefined;
+    const actualUserEmail = creator?.email || undefined;
+    const actualUserRole = creator?.role || undefined;
+
+    const formattedTemplateItem: any = {
       id: savedTemplate.templateId || next5DigitTemplateId,
       name: savedTemplate.templateName,
       status: "approved",
@@ -117,15 +128,20 @@ export async function POST(req: NextRequest) {
       offertypename: finalOtName,
       thumbnail: thumbRel,
       thumbnail_url: thumbUrl,
-      created_by: 1,
-      created_at: savedTemplate.createdAt ? new Date(savedTemplate.createdAt).toISOString().replace("T", " ").substring(0, 19) : "2026-09-29 03:46:02",
-      user: {
-        id: 1,
-        name: "StoreSparc Demo",
-        email: "demo@storesparc.local",
-        role: "admin",
-      },
+      created_at: savedTemplate.createdAt ? new Date(savedTemplate.createdAt).toISOString().replace("T", " ").substring(0, 19) : new Date().toISOString().replace("T", " ").substring(0, 19),
     };
+
+    if (actualUserId) {
+      formattedTemplateItem.created_by = actualUserId;
+      if (actualUserName || actualUserEmail) {
+        formattedTemplateItem.user = {
+          id: actualUserId,
+          name: actualUserName,
+          email: actualUserEmail,
+          role: actualUserRole,
+        };
+      }
+    }
 
     return NextResponse.json(
       {
@@ -212,8 +228,8 @@ export async function GET(req: NextRequest) {
           $or: [
             { storeUserId: { $in: permittedUserIds } },
             { storeUserId: { $in: permittedStrIds } },
-            { storeUserId: { $exists: false } },
-            { storeUserId: null },
+            { userId: { $in: permittedUserIds } },
+            { userId: { $in: permittedStrIds } },
           ],
         });
       }
