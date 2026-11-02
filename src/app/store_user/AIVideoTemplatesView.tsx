@@ -32,6 +32,11 @@ export interface VideoTemplate {
   layers?: Record<string, any>;
   aspectStore?: Record<string, Record<string, any>>;
   backgroundUrl?: string;
+  thumbnail_url?: string;
+  thumbnail?: string;
+  preview_url?: string;
+  previewUrl?: string;
+  aspectBackgrounds?: Record<string, string>;
   productUrl?: string;
   logoUrl?: string;
   createdAt: string;
@@ -174,7 +179,8 @@ export const TemplateCanvasPreview: React.FC<{
   // Load background image if available
   React.useEffect(() => {
     const ratio = overrideRatio || template.aspectRatio || "16:9";
-    const bgUrl = ((template as any).aspectBackgrounds && ((template as any).aspectBackgrounds as any)[ratio]) || template.backgroundUrl || template.thumbnail_url || template.thumbnail || (template as any).preview_url || (template as any).previewUrl;
+    const t = template as any;
+    const bgUrl = (t.aspectBackgrounds && t.aspectBackgrounds[ratio]) || t.backgroundUrl || t.thumbnail_url || t.thumbnail || t.preview_url || t.previewUrl;
     if (!bgUrl) { setBgImg(null); return; }
     const img = new Image();
     img.crossOrigin = "anonymous";
