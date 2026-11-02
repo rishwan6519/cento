@@ -182,7 +182,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const openAiKey = process.env.OPENAI_API_KEY;
+    const rawOpenAiKey = process.env.OPENAI_API_KEY || "";
+    const openAiKey = rawOpenAiKey.replace(/[<>'"\r\n\s]/g, "").trim();
     if (!openAiKey) {
       return NextResponse.json(
         { success: false, message: "Server configuration error: OPENAI_API_KEY not set in .env.local" },
