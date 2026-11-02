@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
     let body: Record<string, any> = {};
     const inputFiles: RenderInputFiles = {};
 
+    let emptyProductFile = false;
+
     if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
       const formData = await req.formData().catch(() => new FormData());
 
@@ -122,6 +124,12 @@ export async function POST(req: NextRequest) {
               inputFiles.productBuffer = buf;
               inputFiles.productUrl = localSavedUrl;
               console.log('[create-video] Manually selected local product file received: ' + fileName + ' (' + buf.length + ' bytes) -> ' + localSavedUrl);
+            }
+          } else {
+            const isNonProduct = lowerKey.includes('bg') || lowerKey.includes('background') || lowerKey.includes('logo') || lowerKey.includes('music') || lowerKey.includes('audio') || lowerKey.includes('decor');
+            if (!isNonProduct) {
+              emptyProductFile = true;
+              console.warn(`[create-video] Uploaded product file "${fileObj?.name || key}" has 0 bytes (empty file or invalid Postman reference)`);
             }
           }
         } else if (typeof value === 'string') {
@@ -220,31 +228,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4th Priority: Default sample product fallback from uploads/products or public/images
     if (!inputFiles.productBuffer && !inputFiles.productUrl) {
-      const defaultProdCandidates = [
-        join(process.cwd(), 'uploads', 'products', 'ai_openai_1793077865909_b35ca0c0.png'),
-        join(process.cwd(), 'uploads', 'products', 'ai_openai_1792999641981_213ba36b.png'),
-        join(process.cwd(), 'uploads', 'products', 'default_product.png'),
-        join(process.cwd(), 'public', 'images', 'default_product.png'),
-      ];
-      for (const cand of defaultProdCandidates) {
-        if (existsSync(cand)) {
-          try {
-            inputFiles.productBuffer = readFileSync(cand);
-            inputFiles.productUrl = '/uploads/products/' + cand.split(/[\\/]/).pop();
-            console.log('[create-video] Using fallback sample product image: ' + cand);
-            break;
-          } catch {}
-        }
+      if (emptyProductFile) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'The uploaded product image file is empty (0 bytes). In Postman, if there is a yellow warning triangle ⚠️ next to the selected file, please click it to re-select the image from your local system.',
+          },
+          { status: 400 }
+        );
       }
-    }
-
-    if (!inputFiles.productBuffer && !inputFiles.productUrl) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Product image is required. Provide product_url, product_image_url, image_url, or upload as "product" file in form-data.',
+          message: 'Product image is mandatory. Please upload an image file from your computer (key "product") or provide a valid "product_url".',
         },
         { status: 422 }
       );
@@ -265,6 +262,8 @@ export async function POST(req: NextRequest) {
       body.productTitle ||
       body.title ||
       body.tagline ||
+      body.offerName ||
+      body.offer_name ||
       '';
 
     const discount =
@@ -283,6 +282,8 @@ export async function POST(req: NextRequest) {
       body.productDescription ||
       body.subtitle ||
       body.text ||
+      body.offerDescription ||
+      body.offer_description ||
       '';
 
     const validity =
@@ -294,11 +295,9 @@ export async function POST(req: NextRequest) {
       '';
 
     const footer =
-      body.footer ||
-      body.footer_text ||
-      body.terms ||
-      body.disclaimer ||
-      '*T&C Apply · StoreSparc';
+      body.footer !== undefined
+        ? body.footer
+        : (body.footer_text || body.terms || body.disclaimer || '*T&C Apply · StoreSparc');
 
     const rawChannels = body.channels || body.socialMedia || body.share || body.shareTo || [];
     let channelsList: string[] = [];
@@ -352,7 +351,7 @@ export async function POST(req: NextRequest) {
         oldPrice: body.old_price || body.oldPrice || '',
         cta: body.cta || body.cta_text || '',
       },
-      title: body.title || headline || 'Generated Promo Video',
+      title: body.title || headline || body.offerName || '',
       userId,
       offerId,
       channels: channelsList,

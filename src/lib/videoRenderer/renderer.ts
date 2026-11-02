@@ -121,7 +121,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         animation: 'slide_up',
       },
       discount: {
-        text: '30% off',
+        text: '',
         x: 0.50,
         y: 0.46,
         size: 7.5,
@@ -132,7 +132,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         borderColor: '#000000',
       },
       headline: {
-        text: 'Unleash your freedom — shop Stayfree Ultra Thin today!',
+        text: '',
         x: 0.50,
         y: 0.58,
         size: 4.2,
@@ -140,7 +140,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       description: {
-        text: 'Stayfree Ultra Thin Super Wing 12',
+        text: '',
         x: 0.50,
         y: 0.70,
         size: 2.6,
@@ -148,7 +148,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       validity: {
-        text: 'Valid till stock last',
+        text: '',
         x: 0.50,
         y: 0.80,
         size: 2.2,
@@ -157,7 +157,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: 'Terms & Conditions Apply · StoreSparc Video',
+        text: '',
         x: 0.50,
         y: 0.95,
         size: 1.5,
@@ -179,7 +179,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         animation: 'slide_up',
       },
       discount: {
-        text: '30% off',
+        text: '',
         x: 0.45,
         y: 0.54,
         size: 7.0,
@@ -190,7 +190,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         borderColor: '#000000',
       },
       headline: {
-        text: 'Unleash your freedom — shop Stayfree Ultra Thin today!',
+        text: '',
         x: 0.72,
         y: 0.26,
         size: 3.8,
@@ -198,7 +198,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       description: {
-        text: 'Stayfree Ultra Thin Super Wing 12',
+        text: '',
         x: 0.72,
         y: 0.48,
         size: 2.6,
@@ -206,7 +206,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       validity: {
-        text: 'Valid till stock last',
+        text: '',
         x: 0.72,
         y: 0.68,
         size: 2.2,
@@ -215,7 +215,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: 'Terms & Conditions Apply · StoreSparc Video',
+        text: '',
         x: 0.75,
         y: 0.94,
         size: 1.4,
@@ -237,7 +237,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         animation: 'slide_up',
       },
       discount: {
-        text: '30% off',
+        text: '',
         x: 0.45,
         y: 0.54,
         size: 7.2,
@@ -248,7 +248,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         borderColor: '#000000',
       },
       headline: {
-        text: 'Unleash your freedom — shop Stayfree Ultra Thin today!',
+        text: '',
         x: 0.72,
         y: 0.26,
         size: 3.8,
@@ -256,7 +256,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       description: {
-        text: 'Stayfree Ultra Thin Super Wing 12',
+        text: '',
         x: 0.72,
         y: 0.48,
         size: 2.6,
@@ -264,7 +264,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       validity: {
-        text: 'Valid till stock last',
+        text: '',
         x: 0.72,
         y: 0.68,
         size: 2.2,
@@ -273,7 +273,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: 'Terms & Conditions Apply · StoreSparc Video',
+        text: '',
         x: 0.75,
         y: 0.94,
         size: 1.4,
@@ -296,7 +296,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         animation: 'slide_up',
       },
       discount: {
-        text: '30% off',
+        text: '',
         x: 0.44,
         y: 0.52,
         size: 7.0,
@@ -307,7 +307,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         borderColor: '#000000',
       },
       headline: {
-        text: 'Unleash your freedom — shop Stayfree Ultra Thin today!',
+        text: '',
         x: 0.74,
         y: 0.28,
         size: 4.2,
@@ -315,7 +315,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       description: {
-        text: 'Stayfree Ultra Thin Super Wing 12',
+        text: '',
         x: 0.74,
         y: 0.50,
         size: 3.0,
@@ -323,7 +323,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         fontColor: '#ffffff',
       },
       validity: {
-        text: 'Valid till stock last',
+        text: '',
         x: 0.74,
         y: 0.72,
         size: 2.5,
@@ -332,7 +332,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: 'Terms & Conditions Apply · StoreSparc Video',
+        text: '',
         x: 0.78,
         y: 0.94,
         size: 1.5,
@@ -378,15 +378,21 @@ export async function renderSingleAspect(
   const { width, height } = calculateDimensions(ratio, options.resolution || 720);
   const layers = getDefaultLayers(ratio, options.layers);
 
-  // Apply explicit text overrides from options.text
-  if (options.text.discount && layers.discount) layers.discount.text = options.text.discount;
-  if (options.text.headline && layers.headline) layers.headline.text = options.text.headline;
-  if (options.text.description && layers.description) layers.description.text = options.text.description;
-  if (options.text.validity && layers.validity) layers.validity.text = options.text.validity;
-  if (options.text.footer && layers.footer) layers.footer.text = options.text.footer;
-  if (options.text.price && layers.price) layers.price.text = options.text.price;
-  if (options.text.oldPrice && layers.oldPrice) layers.oldPrice.text = options.text.oldPrice;
-  if (options.text.cta && layers.cta) layers.cta.text = options.text.cta;
+  // Apply explicit text overrides from options.text strictly.
+  // Unprovided fields are cleared so no template dummy text leaks through.
+  if (options.text) {
+    if (layers.discount) layers.discount.text = options.text.discount || '';
+    if (layers.headline) {
+      const explicitHeadline = options.text.headline || (options.title && options.title !== 'Generated Promo Video' ? options.title : '');
+      layers.headline.text = explicitHeadline || '';
+    }
+    if (layers.description) layers.description.text = options.text.description || '';
+    if (layers.validity) layers.validity.text = options.text.validity || '';
+    if (layers.footer) layers.footer.text = options.text.footer !== undefined ? options.text.footer : '';
+    if (layers.price) layers.price.text = options.text.price || '';
+    if (layers.oldPrice) layers.oldPrice.text = options.text.oldPrice || '';
+    if (layers.cta) layers.cta.text = options.text.cta || '';
+  }
 
   // 1. Prepare Background
   let effectiveBg = sharedAssets.bgBuffer;
