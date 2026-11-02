@@ -137,6 +137,17 @@ export interface SavedTemplateItem {
     offertypeId?: string;
     offertypename?: string;
   };
+  offerTitle?: string;
+  offerDescription?: string;
+  ctaButtonText?: string;
+  discountLabel?: string;
+  priceLabel?: string;
+  footerText?: string;
+  thumbnail?: string;
+  thumbnail_url?: string;
+  preview_url?: string;
+  previewUrl?: string;
+  [key: string]: any;
   aiStyle?: string;
   aiColorTheme?: string;
   createdAt?: string;
@@ -3315,27 +3326,28 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       }
 
       // Fallback top-level fields from template into layers if present
-      if (tpl.offerTitle && merged.headline) {
+      const tplAny = tpl as any;
+      if (tplAny.offerTitle && merged.headline) {
         if (!merged.headline.text || merged.headline.text.includes("Grab the crunch")) {
-          merged.headline.text = tpl.offerTitle;
+          merged.headline.text = tplAny.offerTitle;
         }
       }
-      if (tpl.offerDescription && merged.description) {
+      if (tplAny.offerDescription && merged.description) {
         if (!merged.description.text || merged.description.text.includes("Ritz Crackers")) {
-          merged.description.text = tpl.offerDescription;
+          merged.description.text = tplAny.offerDescription;
         }
       }
-      if (tpl.ctaButtonText && merged.cta) {
-        merged.cta.text = tpl.ctaButtonText;
+      if (tplAny.ctaButtonText && merged.cta) {
+        merged.cta.text = tplAny.ctaButtonText;
       }
-      if (tpl.discountLabel && merged.discount) {
-        merged.discount.text = tpl.discountLabel;
+      if (tplAny.discountLabel && merged.discount) {
+        merged.discount.text = tplAny.discountLabel;
       }
-      if (tpl.priceLabel && merged.price) {
-        merged.price.text = tpl.priceLabel;
+      if (tplAny.priceLabel && merged.price) {
+        merged.price.text = tplAny.priceLabel;
       }
-      if (tpl.footerText && merged.footer) {
-        merged.footer.text = tpl.footerText;
+      if (tplAny.footerText && merged.footer) {
+        merged.footer.text = tplAny.footerText;
       }
 
       return merged as LayersConfig;
