@@ -2,6 +2,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import { queueRenderJob } from '@/lib/videoRenderer/renderService';
 import { RenderInputFiles } from '@/lib/videoRenderer/types';
+import { removeProductBackground } from '@/lib/videoRenderer/imageProcessor';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { toAbsoluteUrl } from '@/lib/urlHelper';
@@ -121,9 +122,16 @@ export async function POST(req: NextRequest) {
               inputFiles.decorations.push({ buffer: buf });
             } else {
               // Manual local file upload for product image (keys: product, file, image, photo, upload, etc.)
-              inputFiles.productBuffer = buf;
+              let finalProductBuf = buf;
+              try {
+                finalProductBuf = await removeProductBackground(buf);
+                await writeFile(savedFilePath, finalProductBuf);
+              } catch (e) {
+                console.warn('[create-video] Failed to remove product background:', e);
+              }
+              inputFiles.productBuffer = finalProductBuf;
               inputFiles.productUrl = localSavedUrl;
-              console.log('[create-video] Manually selected local product file received: ' + fileName + ' (' + buf.length + ' bytes) -> ' + localSavedUrl);
+              console.log('[create-video] Manually selected local product file received: ' + fileName + ' (' + finalProductBuf.length + ' bytes) -> ' + localSavedUrl);
             }
           } else {
             const isNonProduct = lowerKey.includes('bg') || lowerKey.includes('background') || lowerKey.includes('logo') || lowerKey.includes('music') || lowerKey.includes('audio') || lowerKey.includes('decor');

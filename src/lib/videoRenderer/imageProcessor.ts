@@ -99,7 +99,7 @@ export async function prepareBackground(
   if (resolvedInput) {
     try {
       return await sharp(resolvedInput)
-        .resize(width, height, { fit: 'fill' })
+        .resize(width, height, { fit: 'cover' })
         .png()
         .toBuffer();
     } catch (err) {
@@ -107,7 +107,7 @@ export async function prepareBackground(
     }
   }
 
-    const svg = `
+  const svg = `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="cleanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -129,6 +129,73 @@ export async function prepareBackground(
 }
 
 /**
+ * Automatically remove solid / studio / light background from product image to create a clean cutout.
+ */
+export async function removeProductBackground(input: Buffer): Promise<Buffer> {
+  try {
+    const img = sharp(input).ensureAlpha();
+    const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+    const { width, height, channels } = info;
+    if (channels < 4) return input;
+
+    // If the image already has significant transparent pixels, it's already a transparent cutout
+    let transparentCount = 0;
+    const step = Math.max(1, Math.floor(data.length / (4 * 500)));
+    let samples = 0;
+    for (let i = 3; i < data.length; i += 4 * step) {
+      samples++;
+      if (data[i] < 50) transparentCount++;
+    }
+    if (transparentCount / samples > 0.05) {
+      return input;
+    }
+
+    // Sample the four corner pixels to detect the background color
+    const corners = [
+      0, // top-left
+      (width - 1) * 4, // top-right
+      (height - 1) * width * 4, // bottom-left
+      ((height - 1) * width + (width - 1)) * 4, // bottom-right
+    ];
+
+    let bgR = 0, bgG = 0, bgB = 0;
+    for (const c of corners) {
+      bgR += data[c];
+      bgG += data[c + 1];
+      bgB += data[c + 2];
+    }
+    bgR = Math.round(bgR / 4);
+    bgG = Math.round(bgG / 4);
+    bgB = Math.round(bgB / 4);
+
+    const isLightBg = bgR > 220 && bgG > 220 && bgB > 220;
+    const tolerance = isLightBg ? 40 : 25;
+
+    let modified = false;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      const diff = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+      if (diff < tolerance || (isLightBg && r > 235 && g > 235 && b > 235)) {
+        data[i + 3] = 0; // Make transparent
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      return await sharp(data, { raw: { width, height, channels: 4 } })
+        .png()
+        .toBuffer();
+    }
+  } catch (err) {
+    console.warn('[removeProductBackground] Skipped:', err);
+  }
+  return input;
+}
+
+/**
  * Fit product cutout inside maxW x maxH box, preserving alpha transparency.
  */
 export async function prepareProductImage(
@@ -143,7 +210,12 @@ export async function prepareProductImage(
     borderWidth?: number;
   }
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const img = sharp(input);
+  let rawInput = input;
+  if (Buffer.isBuffer(input)) {
+    rawInput = await removeProductBackground(input);
+  }
+
+  const img = sharp(rawInput);
   const meta = await img.metadata();
   const origW = meta.width || maxW;
   const origH = meta.height || maxH;
