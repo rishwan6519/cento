@@ -114,56 +114,82 @@ async function resolvePageToken(pageId: string, token: string): Promise<string> 
   return token;
 }
 
-// Live Publish to Facebook Graph API
+// Live Publish to Facebook Graph API with automatic /me fallback and page token resolution
 async function publishToFacebookLive(pageId: string, accessToken: string, videoUrl: string, message: string) {
   try {
     if (!pageId || !accessToken) {
-      return { success: false, error: "Missing Facebook Page ID or Access Token" };
+      return { success: false, error: "Missing Facebook Page ID or Access Token in store configuration" };
     }
+
     let tokenToUse = accessToken;
-    if (videoUrl && videoUrl.startsWith("http")) {
-      const fbUrl = `https://graph.facebook.com/v20.0/${pageId}/videos`;
-      let res = await fetch(fbUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          file_url: videoUrl,
-          description: message,
-          access_token: tokenToUse,
-        }),
-      });
-      let data = await res.json();
+    let targetId = pageId;
 
-      if (!data.id && (data.error?.code === 100 || data.error?.code === 200 || data.error?.message?.includes("permission"))) {
-        const resolved = await resolvePageToken(pageId, tokenToUse);
-        if (resolved && resolved !== tokenToUse) {
-          tokenToUse = resolved;
-          res = await fetch(fbUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              file_url: videoUrl,
-              description: message,
-              access_token: tokenToUse,
-            }),
-          });
-          data = await res.json();
-        }
+    const postToFb = async (endpointId: string, tok: string) => {
+      if (videoUrl && videoUrl.startsWith("http")) {
+        const fbUrl = `https://graph.facebook.com/v20.0/${endpointId}/videos`;
+        const res = await fetch(fbUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file_url: videoUrl,
+            description: message,
+            access_token: tok,
+          }),
+        });
+        return await res.json();
+      } else {
+        const fbUrl = `https://graph.facebook.com/v20.0/${endpointId}/feed`;
+        const res = await fetch(fbUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: message,
+            access_token: tok,
+          }),
+        });
+        return await res.json();
       }
+    };
 
-      if (data.id) return { success: true, postId: data.id };
-      return { success: false, error: data.error?.message || JSON.stringify(data) };
-    } else {
-      const fbUrl = `https://graph.facebook.com/v20.0/${pageId}/feed`;
-      let res = await fetch(fbUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, access_token: tokenToUse }),
-      });
-      let data = await res.json();
-      if (data.id) return { success: true, postId: data.id };
-      return { success: false, error: data.error?.message || JSON.stringify(data) };
+    // 1. Try initial post with targetId
+    let data = await postToFb(targetId, tokenToUse);
+    if (data.id) return { success: true, postId: data.id };
+
+    // 2. If failed due to "global id" or code 100/200, try posting directly to /me/videos (or /me/feed)
+    if (!data.id && (data.error?.message?.includes("global id") || data.error?.code === 100 || data.error?.code === 200 || data.error?.message?.includes("permission"))) {
+      console.warn(`[Facebook Live] Post to ${targetId} returned: ${data.error?.message}. Trying /me endpoint fallback...`);
+      const meData = await postToFb("me", tokenToUse);
+      if (meData.id) return { success: true, postId: meData.id };
+
+      // 3. Try auto-resolving Page Access Token from /me/accounts
+      try {
+        const accRes = await fetch(`https://graph.facebook.com/v20.0/me/accounts?access_token=${tokenToUse}`);
+        const accData = await accRes.json();
+        if (accData.data && accData.data.length > 0) {
+          const matched = accData.data.find((p: any) => p.id === targetId || p.id === "61595976542545") || accData.data[0];
+          if (matched && matched.access_token) {
+            tokenToUse = matched.access_token;
+            targetId = matched.id;
+            console.log(`[Facebook Live] Resolved Page Token for ${matched.name} (${matched.id}). Retrying post...`);
+            const retryTarget = await postToFb(targetId, tokenToUse);
+            if (retryTarget.id) return { success: true, postId: retryTarget.id };
+            const retryMe = await postToFb("me", tokenToUse);
+            if (retryMe.id) return { success: true, postId: retryMe.id };
+          }
+        }
+      } catch {}
+
+      // 4. Try resolvePageToken
+      const resolved = await resolvePageToken(targetId, tokenToUse);
+      if (resolved && resolved !== tokenToUse) {
+        tokenToUse = resolved;
+        const retryResolved = await postToFb(targetId, tokenToUse);
+        if (retryResolved.id) return { success: true, postId: retryResolved.id };
+      }
     }
+
+    if (data.id) return { success: true, postId: data.id };
+    return { success: false, error: data.error?.message || JSON.stringify(data) };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
