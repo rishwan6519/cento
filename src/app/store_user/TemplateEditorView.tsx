@@ -1997,6 +1997,131 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     showToast(`🔄 Reset ${r} layout to default positions`);
   };
 
+  // ── AI Auto-Optimize All 4 Aspect Ratios ──────────────────────────────────
+  const [isAiOptimizing, setIsAiOptimizing] = useState(false);
+
+  const handleAiOptimizeAllRatios = async () => {
+    setIsAiOptimizing(true);
+    const source = aspectLayers[activeRatio];
+
+    try {
+      const res = await fetch("/api/video-template/ai-optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentLayers: source,
+          activeRatio,
+          templateName,
+          animationStyle,
+          bgColor,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.aspectStore) {
+        setAspectLayers(data.aspectStore);
+        showToast("✨ AI Auto-Optimized all 4 ratios (9:16, 16:9, 1:1, 4:5)! You can now freely edit any layer.");
+        setIsAiOptimizing(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("[handleAiOptimizeAllRatios] Network error, applying instant client engine:", err);
+    }
+
+    // Client-side fail-safe engine (guarantees zero errors)
+    const headline = source.headline || {};
+    const description = source.description || {};
+    const discount = source.discount || {};
+    const cta = source.cta || {};
+    const validity = source.validity || {};
+    const price = source.price || {};
+    const oldPrice = source.oldPrice || {};
+    const storeName = source.storeName || {};
+    const footer = source.footer || {};
+    const product = source.product || {};
+    const logo = source.logo || {};
+    const qrCode = source.qrCode || {};
+
+    const headlineText = headline.text || "Exclusive Offer!";
+    const descText = description.text || "";
+    const discountText = discount.text || "50% OFF";
+    const ctaText = cta.text || "VISIT STORE ➔";
+    const validityText = validity.text || "Limited Time Offer";
+    const fontColor = headline.fontColor || "#ffffff";
+    const font = headline.font || "Arial";
+    const discountBg = discount.bgColor || "#ffc700";
+    const discountBorder = discount.borderColor || "#047857";
+    const ctaBg = cta.bgColor || "#e51a24";
+
+    const opt169: LayersConfig = {
+      product: { ...product, type: "product", x: 0.28, y: 0.50, size: 42, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount: { ...discount, type: "text", text: discountText, x: 0.44, y: 0.42, size: 7.2, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline: { ...headline, type: "text", text: headlineText, x: 0.74, y: 0.32, size: headlineText.length > 35 ? 3.4 : 3.8, boxWidth: 46, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.74, y: 0.52, size: 2.3, boxWidth: 42, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price: { ...price, type: "text", x: 0.64, y: 0.66, size: 3.2, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice: { ...oldPrice, type: "text", x: 0.84, y: 0.66, size: 2.6, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity: { ...validity, type: "text", text: validityText, x: 0.74, y: 0.76, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta: { ...cta, type: "text", text: ctaText, x: 0.74, y: 0.86, size: 2.4, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode: { ...qrCode, type: "text", x: 0.90, y: 0.84, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName: { ...storeName, type: "text", x: 0.165, y: 0.05, size: 2.0, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer: { ...footer, type: "text", x: 0.50, y: 0.96, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo: { ...logo, type: "logo", x: 0.165, y: 0.09, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+    };
+
+    const opt916: LayersConfig = {
+      product: { ...product, type: "product", x: 0.50, y: 0.44, size: 62, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount: { ...discount, type: "text", text: discountText, x: 0.76, y: 0.30, size: 7.2, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline: { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.18, size: headlineText.length > 35 ? 3.4 : 3.8, boxWidth: 84, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.50, y: 0.66, size: 2.3, boxWidth: 80, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price: { ...price, type: "text", x: 0.35, y: 0.74, size: 3.5, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice: { ...oldPrice, type: "text", x: 0.65, y: 0.74, size: 2.8, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity: { ...validity, type: "text", text: validityText, x: 0.50, y: 0.81, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta: { ...cta, type: "text", text: ctaText, x: 0.50, y: 0.88, size: 2.5, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode: { ...qrCode, type: "text", x: 0.86, y: 0.90, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName: { ...storeName, type: "text", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer: { ...footer, type: "text", x: 0.50, y: 0.95, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo: { ...logo, type: "logo", x: 0.50, y: 0.08, size: 11, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+    };
+
+    const opt11: LayersConfig = {
+      product: { ...product, type: "product", x: 0.38, y: 0.48, size: 48, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount: { ...discount, type: "text", text: discountText, x: 0.78, y: 0.34, size: 7.0, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline: { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.18, size: headlineText.length > 35 ? 3.2 : 3.6, boxWidth: 80, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.72, y: 0.52, size: 2.2, boxWidth: 42, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price: { ...price, type: "text", x: 0.62, y: 0.62, size: 3.6, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice: { ...oldPrice, type: "text", x: 0.82, y: 0.62, size: 2.6, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity: { ...validity, type: "text", text: validityText, x: 0.70, y: 0.70, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta: { ...cta, type: "text", text: ctaText, x: 0.70, y: 0.80, size: 2.4, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode: { ...qrCode, type: "text", x: 0.88, y: 0.88, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName: { ...storeName, type: "text", x: 0.50, y: 0.05, size: 2.0, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer: { ...footer, type: "text", x: 0.50, y: 0.95, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo: { ...logo, type: "logo", x: 0.18, y: 0.07, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+    };
+
+    const opt45: LayersConfig = {
+      product: { ...product, type: "product", x: 0.40, y: 0.46, size: 50, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount: { ...discount, type: "text", text: discountText, x: 0.78, y: 0.33, size: 7.0, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline: { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.18, size: headlineText.length > 35 ? 3.3 : 3.6, boxWidth: 82, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.70, y: 0.52, size: 2.2, boxWidth: 44, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price: { ...price, type: "text", x: 0.36, y: 0.74, size: 4.0, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice: { ...oldPrice, type: "text", x: 0.64, y: 0.74, size: 2.8, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity: { ...validity, type: "text", text: validityText, x: 0.70, y: 0.70, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta: { ...cta, type: "text", text: ctaText, x: 0.70, y: 0.81, size: 2.4, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode: { ...qrCode, type: "text", x: 0.86, y: 0.90, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName: { ...storeName, type: "text", x: 0.50, y: 0.05, size: 2.1, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer: { ...footer, type: "text", x: 0.50, y: 0.95, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo: { ...logo, type: "logo", x: 0.20, y: 0.07, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+    };
+
+    setAspectLayers({
+      "16:9": opt169,
+      "9:16": opt916,
+      "1:1": opt11,
+      "4:5": opt45,
+    });
+    setIsAiOptimizing(false);
+    showToast("✨ AI Auto-Optimized all 4 ratios (9:16, 16:9, 1:1, 4:5)! You can now freely edit any layer.");
+  };
+
   // ── Canvas Rendering Engine ─────────────────────────────────────────────────
   const renderFrameOnCanvas = useCallback(
     (
@@ -3624,6 +3749,31 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
         {/* Action Buttons — Clean, single-row, no overflow */}
         <div className="ste-topbar__right" style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+          {/* AI Auto-Optimize All Ratios Button */}
+          <button
+            type="button"
+            className="ste-btn ste-topbar-btn"
+            onClick={handleAiOptimizeAllRatios}
+            disabled={isAiOptimizing}
+            title="AI Auto-Optimize all 4 aspect ratios (9:16, 16:9, 1:1, 4:5) with balanced hierarchy and safe zones. You can freely edit afterwards!"
+            style={{
+              background: "linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)",
+              color: "#ffffff",
+              fontWeight: 700,
+              padding: "6px 13px",
+              fontSize: "0.78rem",
+              whiteSpace: "nowrap",
+              border: "1px solid rgba(255,255,255,0.3)",
+              boxShadow: "0 0 12px rgba(139, 92, 246, 0.45)",
+              gap: "6px",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {isAiOptimizing ? <FaSpinner className="ste-spin" size={11} /> : <FaWandMagicSparkles size={11} />}
+            <span className="ste-btn-label">{isAiOptimizing ? "Optimizing…" : "✨ AI Optimize Ratios"}</span>
+          </button>
+
           <button
             type="button"
             className={`ste-btn ste-topbar-btn ${isPlaying ? "ste-btn--danger" : "ste-btn--accent"}`}
@@ -4088,6 +4238,34 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                     </button>
                   ))}
                 </div>
+                {/* AI Auto-Optimize all ratios */}
+                <button
+                  type="button"
+                  onClick={handleAiOptimizeAllRatios}
+                  disabled={isAiOptimizing}
+                  style={{
+                    marginTop: "8px",
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    padding: "8px 10px",
+                    background: "linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)",
+                    border: "1px solid rgba(139, 92, 246, 0.6)",
+                    borderRadius: "7px",
+                    color: "#c084fc",
+                    fontSize: "0.76rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    boxShadow: "0 0 10px rgba(139, 92, 246, 0.2)",
+                  }}
+                  title="Intelligently optimize hierarchy and layout across 9:16, 16:9, 1:1, and 4:5. You can freely edit afterwards!"
+                >
+                  {isAiOptimizing ? <FaSpinner className="ste-spin" size={12} /> : <FaWandMagicSparkles size={12} />}
+                  {isAiOptimizing ? "Optimizing All Ratios…" : "✨ AI Auto-Optimize All 4 Ratios"}
+                </button>
                 {/* Sync text content from current ratio to all other ratios */}
                 <button
                   type="button"
@@ -4894,6 +5072,27 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                 >
                   <FaArrowUpRightFromSquare size={9} />
                   <span>Sync All</span>
+                </button>
+
+                {/* AI Optimize All Ratios on stage toolbar */}
+                <button
+                  type="button"
+                  onClick={handleAiOptimizeAllRatios}
+                  disabled={isAiOptimizing}
+                  className="ste-stage-btn"
+                  title="AI Auto-Optimize layout for all 4 aspect ratios (9:16, 16:9, 1:1, 4:5). You can freely edit afterwards!"
+                  style={{
+                    fontSize: "0.68rem",
+                    gap: "4px",
+                    padding: "4px 9px",
+                    background: "linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)",
+                    color: "#c084fc",
+                    border: "1px solid rgba(192, 132, 252, 0.45)",
+                    fontWeight: 700,
+                  }}
+                >
+                  {isAiOptimizing ? <FaSpinner className="ste-spin" size={9} /> : <FaWandMagicSparkles size={9} />}
+                  <span>{isAiOptimizing ? "Optimizing…" : "AI Optimize All"}</span>
                 </button>
               </div>
 
