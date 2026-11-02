@@ -8,15 +8,27 @@ import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
-function formatTemplateItem(t: any, index: number, creator?: any) {
+function toFullUrl(path?: string, baseUrl: string = "https://iot-test.metizstoresparc.com"): string {
+  if (!path || !path.trim()) return "";
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${cleanPath}`;
+}
+
+function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: string = "https://iot-test.metizstoresparc.com") {
   const tplId = Number(t.templateId) || (10000 + index + 1);
   const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   
   const defaultFallbackPreview = "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
-  const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || defaultFallbackPreview;
-  const thumbRel = t.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
-  const previewUrl = t.preview_url || t.previewUrl || t.lastRenderedVideoUrl || thumbUrl;
+  const rawThumb = t.thumbnail_url || t.thumbnail || t.backgroundUrl || defaultFallbackPreview;
+  const thumbUrl = toFullUrl(rawThumb, baseUrl);
+  const thumbRel = t.thumbnail || (rawThumb.startsWith("http") ? rawThumb.replace(/^https?:\/\/[^\/]+\//, "") : rawThumb);
+  const rawVideo = t.lastRenderedVideoUrl || "";
+  const videoUrl = rawVideo ? toFullUrl(rawVideo, baseUrl) : "";
+  const rawPreview = t.preview_url || t.previewUrl || rawVideo || rawThumb;
+  const previewUrl = toFullUrl(rawPreview, baseUrl);
+  const bgUrl = toFullUrl(t.backgroundUrl || rawThumb, baseUrl);
 
   const durationSec = Number(t.videoDuration || t.duration_seconds || t.duration || 10);
   const width = t.base_width || (t.aspectRatio === "9:16" ? 1080 : 1920);
@@ -49,8 +61,8 @@ function formatTemplateItem(t: any, index: number, creator?: any) {
     thumbnail_url: thumbUrl,
     preview_url: previewUrl,
     previewUrl: previewUrl,
-    video_url: t.lastRenderedVideoUrl || "",
-    background_url: t.backgroundUrl || thumbUrl,
+    video_url: videoUrl,
+    background_url: bgUrl,
     aspectBackgrounds: t.aspectBackgrounds || {},
     created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : undefined,
   };
@@ -70,7 +82,7 @@ function formatTemplateItem(t: any, index: number, creator?: any) {
   return item;
 }
 
-async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string = "ALL") {
+async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string = "ALL", baseUrl: string = "https://iot-test.metizstoresparc.com") {
   await connectToDatabase();
   const User = (await import("@/models/User")).default;
 
@@ -184,7 +196,7 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
   const creatorMap = new Map(creators.map((c: any) => [String(c._id), c]));
 
   const formattedTemplates = dbTemplates.map((t: any, idx: number) =>
-    formatTemplateItem(t, idx, creatorMap.get(String(t.storeUserId || t.userId)))
+    formatTemplateItem(t, idx, creatorMap.get(String(t.storeUserId || t.userId)), baseUrl)
   );
 
   return {
@@ -198,6 +210,12 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
   };
 }
 
+function resolveRequestBaseUrl(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "iot-test.metizstoresparc.com";
+  const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
 // GET /api/external/get-templates?userId=...&offertypeId=...
 export async function GET(req: NextRequest) {
   try {
@@ -205,7 +223,8 @@ export async function GET(req: NextRequest) {
     const userId = searchParams.get("userId") || undefined;
     const rawOfferType = searchParams.get("offertypeId") || searchParams.get("offer_type") || searchParams.get("offertype") || "ALL";
 
-    const result = await fetchAndFormatTemplates(userId, rawOfferType);
+    const baseUrl = resolveRequestBaseUrl(req);
+    const result = await fetchAndFormatTemplates(userId, rawOfferType, baseUrl);
     return NextResponse.json(result);
   } catch (error: any) {
     console.error("[GET /api/external/get-templates] Error:", error);
@@ -230,7 +249,8 @@ export async function POST(req: NextRequest) {
     const userId = body.userId || body.user_id || body.storeUserId || undefined;
     const rawOfferType = body.offertypeId !== undefined ? body.offertypeId : (body.offer_type || body.offertype || "ALL");
 
-    const result = await fetchAndFormatTemplates(userId, String(rawOfferType || "ALL"));
+    const baseUrl = resolveRequestBaseUrl(req);
+    const result = await fetchAndFormatTemplates(userId, String(rawOfferType || "ALL"), baseUrl);
     return NextResponse.json(result);
   } catch (error: any) {
     console.error("[POST /api/external/get-templates] Error:", error);
