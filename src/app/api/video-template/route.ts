@@ -128,6 +128,9 @@ export async function POST(req: NextRequest) {
       offertypename: finalOtName,
       thumbnail: thumbRel,
       thumbnail_url: thumbUrl,
+      preview_url: savedTemplate.preview_url || savedTemplate.previewUrl || savedTemplate.lastRenderedVideoUrl || thumbUrl,
+      previewUrl: savedTemplate.previewUrl || savedTemplate.preview_url || savedTemplate.lastRenderedVideoUrl || thumbUrl,
+      video_url: savedTemplate.lastRenderedVideoUrl || "",
       created_at: savedTemplate.createdAt ? new Date(savedTemplate.createdAt).toISOString().replace("T", " ").substring(0, 19) : new Date().toISOString().replace("T", " ").substring(0, 19),
     };
 
@@ -250,12 +253,21 @@ export async function GET(req: NextRequest) {
     const sortField: { [key: string]: SortOrder } = { templateId: 1, createdAt: -1 };
     const dbTemplates: any[] = await VideoTemplate.find(query).sort(sortField).lean();
 
-    // Return templates with assigned 5-digit templateId
-    const mappedTemplates = dbTemplates.map((t: any) => ({
-      ...t,
-      _id: String(t._id),
-      templateId: t.templateId || 10001,
-    }));
+    // Return templates with assigned 5-digit templateId and preview_url
+    const mappedTemplates = dbTemplates.map((t: any) => {
+      const defaultFallbackPreview = "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
+      const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || defaultFallbackPreview;
+      const previewUrl = t.preview_url || t.previewUrl || t.lastRenderedVideoUrl || thumbUrl;
+      return {
+        ...t,
+        _id: String(t._id),
+        templateId: t.templateId || 10001,
+        thumbnail_url: thumbUrl,
+        preview_url: previewUrl,
+        previewUrl: previewUrl,
+        video_url: t.lastRenderedVideoUrl || "",
+      };
+    });
 
     return NextResponse.json({
       success: true,

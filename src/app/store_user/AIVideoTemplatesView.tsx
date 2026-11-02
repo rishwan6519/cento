@@ -174,7 +174,7 @@ export const TemplateCanvasPreview: React.FC<{
   // Load background image if available
   React.useEffect(() => {
     const ratio = overrideRatio || template.aspectRatio || "16:9";
-    const bgUrl = ((template as any).aspectBackgrounds && ((template as any).aspectBackgrounds as any)[ratio]) || template.backgroundUrl;
+    const bgUrl = ((template as any).aspectBackgrounds && ((template as any).aspectBackgrounds as any)[ratio]) || template.backgroundUrl || template.thumbnail_url || template.thumbnail || (template as any).preview_url || (template as any).previewUrl;
     if (!bgUrl) { setBgImg(null); return; }
     const img = new Image();
     img.crossOrigin = "anonymous";

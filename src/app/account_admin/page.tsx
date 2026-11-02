@@ -2122,6 +2122,19 @@ export default function AccountAdminDashboard() {
   const router = useRouter();
   const [expandedMenu, setExpandedMenu] = useState<string>("stores");
   const [activeView, setActiveView] = useState("dashboard"); // Default
+  const [editorTemplateId, setEditorTemplateId] = useState<string | undefined>(undefined);
+  const [editorRatio, setEditorRatio] = useState<any>(undefined);
+
+  const handleNavigate = (view: string, extra?: any) => {
+    if (extra?.templateId) {
+      setEditorTemplateId(extra.templateId);
+      if (extra?.ratio) setEditorRatio(extra.ratio);
+    } else if (extra?.createNew || view === "templateEditor") {
+      setEditorTemplateId(undefined);
+      setEditorRatio(undefined);
+    }
+    setActiveView(view);
+  };
   const [selectedStore, setSelectedStore] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -2280,10 +2293,10 @@ export default function AccountAdminDashboard() {
         </div>
       );
       case "sub_users": return <SubUsersView creatorId={userData?._id} role={userData?.role || 'account_admin'} isAccountAdminCreatingStoreStaff={true} />;
-      case "ai_video_templates": return <AIVideoTemplatesView onNavigate={setActiveView} storeUserId={userData?._id} />;
+      case "ai_video_templates": return <AIVideoTemplatesView onNavigate={handleNavigate} storeUserId={userData?._id} />;
       case "media_library": return <MediaLibraryView storeUserId={userData?._id} />;
-      case "social_scheduler": return <SocialSchedulerView onNavigate={setActiveView} storeUserId={userData?._id} />;
-      case "templateEditor": return <TemplateEditorView onNavigate={setActiveView} />;
+      case "social_scheduler": return <SocialSchedulerView onNavigate={handleNavigate} storeUserId={userData?._id} />;
+      case "templateEditor": return <TemplateEditorView onNavigate={handleNavigate} initialTemplateId={editorTemplateId} initialRatio={editorRatio} key={editorTemplateId || "account_admin_editor"} />;
       case "audit_logs": return <AuditLogsView userId={userData?._id} />;
       case "profile": return <ProfileView userData={userData} />;
       default: return <div className="text-gray-500 font-medium">This module is under development.</div>;

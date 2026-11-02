@@ -13,8 +13,10 @@ function formatTemplateItem(t: any, index: number, creator?: any) {
   const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   
-  const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || "";
+  const defaultFallbackPreview = "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
+  const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || defaultFallbackPreview;
   const thumbRel = t.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
+  const previewUrl = t.preview_url || t.previewUrl || t.lastRenderedVideoUrl || thumbUrl;
 
   const durationSec = Number(t.videoDuration || t.duration_seconds || t.duration || 10);
   const width = t.base_width || (t.aspectRatio === "9:16" ? 1080 : 1920);
@@ -45,6 +47,11 @@ function formatTemplateItem(t: any, index: number, creator?: any) {
     offertypename: otName,
     thumbnail: thumbRel,
     thumbnail_url: thumbUrl,
+    preview_url: previewUrl,
+    previewUrl: previewUrl,
+    video_url: t.lastRenderedVideoUrl || "",
+    background_url: t.backgroundUrl || thumbUrl,
+    aspectBackgrounds: t.aspectBackgrounds || {},
     created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : undefined,
   };
 

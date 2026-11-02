@@ -45,6 +45,14 @@ export interface VideoTemplateDocument extends Document {
   aspectStore?: any;
   configJson?: any;
   backgroundUrl?: string;
+  aspectBackgrounds?: any;
+  productUrl?: string;
+  bgType?: string;
+  bgGradIndex?: number;
+  thumbnail?: string;
+  thumbnail_url?: string;
+  preview_url?: string;
+  previewUrl?: string;
   logoUrl?: string;
   musicUrl?: string;
   fps?: number;
@@ -237,6 +245,38 @@ const VideoTemplateSchema: Schema = new Schema(
       type: String,
       default: '',
     },
+    aspectBackgrounds: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    productUrl: {
+      type: String,
+      default: '',
+    },
+    bgType: {
+      type: String,
+      default: 'image',
+    },
+    bgGradIndex: {
+      type: Number,
+      default: 0,
+    },
+    thumbnail: {
+      type: String,
+      default: '',
+    },
+    thumbnail_url: {
+      type: String,
+      default: '',
+    },
+    preview_url: {
+      type: String,
+      default: '',
+    },
+    previewUrl: {
+      type: String,
+      default: '',
+    },
     logoUrl: {
       type: String,
       default: '',
@@ -269,6 +309,7 @@ const VideoTemplateSchema: Schema = new Schema(
   {
     timestamps: true,
     collection: 'video_templates',
+    strict: false,
   }
 );
 

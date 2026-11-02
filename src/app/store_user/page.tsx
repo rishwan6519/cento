@@ -573,6 +573,7 @@ const StoreDashboard: React.FC<DashboardViewProps> = ({ userName, devices, onNav
 export default function StoreUserPage() {
   const [activeView, setActiveView] = useState<ViewKey>("dashboard");
   const [socialTemplateId, setSocialTemplateId] = useState<string | undefined>(undefined);
+  const [editorRatio, setEditorRatio] = useState<any>(undefined);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -650,8 +651,10 @@ export default function StoreUserPage() {
   const handleNavigate = (view: ViewKey, extra?: any) => {
     if (extra?.templateId) {
       setSocialTemplateId(extra.templateId);
+      if (extra?.ratio) setEditorRatio(extra.ratio);
     } else if (extra?.createNew || view === "templateEditor") {
       setSocialTemplateId(undefined);
+      setEditorRatio(undefined);
     }
     // Clear editingPlaylist when going to any creation view directly
     // (the Edit flow sets editingPlaylist BEFORE calling handleNavigate, so it's safe)
@@ -779,7 +782,7 @@ export default function StoreUserPage() {
       case "settings":
         return <SettingsView />;
       case "templateEditor":
-        return <TemplateEditorView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} key={socialTemplateId || "new_template_studio"} />;
+        return <TemplateEditorView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} initialRatio={editorRatio} key={socialTemplateId || "new_template_studio"} />;
       case "socialScheduler":
         return <SocialSchedulerView onNavigate={handleNavigate} initialTemplateId={socialTemplateId} storeUserId={userData?._id} />;
       default:

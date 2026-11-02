@@ -3290,28 +3290,54 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     // Helper to deeply sanitize and merge layers ensuring type: "text" is never missing
     const sanitizeLayers = (layersObj: any, ratio: AspectRatio): LayersConfig => {
       const base = { ...DEFAULT_LAYERS[ratio] };
-      if (!layersObj || typeof layersObj !== "object") return base;
       const merged: any = { ...base };
-      for (const [key, val] of Object.entries(layersObj)) {
-        if (val && typeof val === "object") {
-          const def = (base as any)[key] || {};
-          const layerType = (val as any).type || def.type || (key === "product" ? "product" : key === "logo" ? "logo" : "text");
-          const cleanedVal: any = { ...val };
-          if (key === "product") {
-            // Strip legacy white card background on product so product photo is clean and unboxed
-            if (cleanedVal.bgColor === "#ffffff" || cleanedVal.shape === "rounded") {
-              cleanedVal.shape = "none";
-              cleanedVal.bgMode = "transparent";
-              cleanedVal.bgColor = "transparent";
+      if (layersObj && typeof layersObj === "object") {
+        for (const [key, val] of Object.entries(layersObj)) {
+          if (val && typeof val === "object") {
+            const def = (base as any)[key] || {};
+            const layerType = (val as any).type || def.type || (key === "product" ? "product" : key === "logo" ? "logo" : "text");
+            const cleanedVal: any = { ...val };
+            if (key === "product") {
+              // Strip legacy white card background on product so product photo is clean and unboxed
+              if (cleanedVal.bgColor === "#ffffff" || cleanedVal.shape === "rounded") {
+                cleanedVal.shape = "none";
+                cleanedVal.bgMode = "transparent";
+                cleanedVal.bgColor = "transparent";
+              }
             }
+            merged[key] = {
+              ...def,
+              ...cleanedVal,
+              type: layerType,
+            };
           }
-          merged[key] = {
-            ...def,
-            ...cleanedVal,
-            type: layerType,
-          };
         }
       }
+
+      // Fallback top-level fields from template into layers if present
+      if (tpl.offerTitle && merged.headline) {
+        if (!merged.headline.text || merged.headline.text.includes("Grab the crunch")) {
+          merged.headline.text = tpl.offerTitle;
+        }
+      }
+      if (tpl.offerDescription && merged.description) {
+        if (!merged.description.text || merged.description.text.includes("Ritz Crackers")) {
+          merged.description.text = tpl.offerDescription;
+        }
+      }
+      if (tpl.ctaButtonText && merged.cta) {
+        merged.cta.text = tpl.ctaButtonText;
+      }
+      if (tpl.discountLabel && merged.discount) {
+        merged.discount.text = tpl.discountLabel;
+      }
+      if (tpl.priceLabel && merged.price) {
+        merged.price.text = tpl.priceLabel;
+      }
+      if (tpl.footerText && merged.footer) {
+        merged.footer.text = tpl.footerText;
+      }
+
       return merged as LayersConfig;
     };
 
@@ -3329,30 +3355,44 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         ...prev,
         [targetRatio]: sanitizeLayers({ ...prev[targetRatio], ...tpl.layers }, targetRatio),
       }));
+    } else {
+      const merged: Record<AspectRatio, LayersConfig> = {
+        "9:16": sanitizeLayers({}, "9:16"),
+        "16:9": sanitizeLayers({}, "16:9"),
+        "1:1":  sanitizeLayers({},  "1:1"),
+        "4:5":  sanitizeLayers({},  "4:5"),
+      };
+      setAspectLayers(merged);
     }
 
     if ((tpl as any).bgType) setBgType((tpl as any).bgType);
     if ((tpl as any).bgColor) setBgColor((tpl as any).bgColor);
     if (typeof (tpl as any).bgGradIndex === "number") setBgGradIndex((tpl as any).bgGradIndex);
 
-    if (tpl.aspectBackgrounds && typeof tpl.aspectBackgrounds === "object") {
-      setAspectBackgrounds(tpl.aspectBackgrounds);
-      if (tpl.aspectBackgrounds[targetRatio]) {
-        setBgImageUrl(tpl.aspectBackgrounds[targetRatio]);
-      }
+    const rawBg = tpl.backgroundUrl || (tpl as any).thumbnail_url || (tpl as any).thumbnail || (tpl as any).preview_url || (tpl as any).previewUrl || (tpl as any).bgImage || "";
+    const aspectBgs = (tpl.aspectBackgrounds && typeof tpl.aspectBackgrounds === "object") ? { ...tpl.aspectBackgrounds } : null;
+
+    const resolvedAspectBgs: Record<AspectRatio, string> = {
+      "9:16": aspectBgs?.["9:16"] || rawBg || "",
+      "16:9": aspectBgs?.["16:9"] || rawBg || "",
+      "1:1":  aspectBgs?.["1:1"]  || rawBg || "",
+      "4:5":  aspectBgs?.["4:5"]  || rawBg || "",
+    };
+
+    const currentRatioBg = resolvedAspectBgs[targetRatio] || rawBg || "";
+    setAspectBackgrounds(resolvedAspectBgs);
+    setBgImageUrl(currentRatioBg);
+    if (currentRatioBg) {
       setBgType("image");
-    } else if (tpl.backgroundUrl) {
-      setBgImageUrl(tpl.backgroundUrl);
-      setAspectBackgrounds({
-        "9:16": tpl.backgroundUrl,
-        "16:9": tpl.backgroundUrl,
-        "1:1": tpl.backgroundUrl,
-        "4:5": tpl.backgroundUrl,
-      });
-      setBgType("image");
+    } else if ((tpl as any).bgType) {
+      setBgType((tpl as any).bgType);
     }
-    if (tpl.logoUrl) setLogoImageUrl(tpl.logoUrl);
-    if (tpl.productUrl) setProductImageUrl(tpl.productUrl);
+
+    const rawLogo = tpl.logoUrl || (tpl as any).logoImageUrl || (tpl as any).logo_url || "";
+    if (rawLogo) setLogoImageUrl(rawLogo);
+
+    const rawProduct = tpl.productUrl || (tpl as any).productImageUrl || (tpl as any).product_image || "";
+    if (rawProduct) setProductImageUrl(rawProduct);
     const tplMusic = tpl.musicUrl || (tpl as any).music_url || "";
     if (tplMusic) {
       setMusicUrl(tplMusic);
@@ -3383,16 +3423,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
     if (!targetId) return;
 
-    if (savedTemplatesList.length > 0) {
-      const match = savedTemplatesList.find(
-        (x) => x._id === targetId || String(x.templateId) === String(targetId)
-      );
-      if (match) {
-        handleEditTemplate(match, targetRatio);
-        return;
-      }
-    }
-    // Fetch directly by ID or numeric templateId if not in memory
+    // Fetch directly by ID or numeric templateId to ensure full fresh data from DB is loaded
     const fetchDirect = async () => {
       try {
         const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
@@ -3402,13 +3433,23 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         const data = await res.json();
         if (data.success && data.data) {
           handleEditTemplate(data.data, targetRatio);
+          return;
         }
       } catch {
         // ignore
       }
+
+      if (savedTemplatesList.length > 0) {
+        const match = savedTemplatesList.find(
+          (x) => x._id === targetId || String(x.templateId) === String(targetId)
+        );
+        if (match) {
+          handleEditTemplate(match, targetRatio);
+        }
+      }
     };
     fetchDirect();
-  }, [initialTemplateId, initialRatio, savedTemplatesList]);
+  }, [initialTemplateId, initialRatio]);
 
   // ── Delete Template ─────────────────────────────────────────────────────────
   const handleDeleteTemplate = async (tpl: SavedTemplateItem) => {
