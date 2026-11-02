@@ -1432,8 +1432,17 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [activeTemplateNumber, setActiveTemplateNumber] = useState<number | null>(
     initialTemplateId && !isNaN(Number(initialTemplateId)) ? Number(initialTemplateId) : null
   );
+  const DEFAULT_COMMERCIAL_OFFER_TYPES: Array<{ offertypeId: string; offertypename: string }> = [
+    { offertypeId: "INDIVIDUAL_DISCOUNT", offertypename: "Individual Discount" },
+    { offertypeId: "PERCENTAGE_DISCOUNT", offertypename: "Percentage Discount" },
+    { offertypeId: "BUY_X_GET_Y", offertypename: "Buy X Get Y" },
+    { offertypeId: "BUNDLE_OFFER", offertypename: "Bundle Offer" },
+    { offertypeId: "FLAT_OFF", offertypename: "Flat Off" },
+    { offertypeId: "FLASH_SALE", offertypename: "Flash Sale" },
+  ];
+
   const [offerType, setOfferType] = useState<string>("Individual Discount");
-  const [offerTypesList, setOfferTypesList] = useState<Array<{ offertypeId: string; offertypename: string }>>([]);
+  const [offerTypesList, setOfferTypesList] = useState<Array<{ offertypeId: string; offertypename: string }>>(DEFAULT_COMMERCIAL_OFFER_TYPES);
   const [selectedOfferTypeId, setSelectedOfferTypeId] = useState<string>("INDIVIDUAL_DISCOUNT");
   const [selectedOfferTypeName, setSelectedOfferTypeName] = useState<string>("Individual Discount");
   const [showNewOfferTypeForm, setShowNewOfferTypeForm] = useState(false);
@@ -1854,12 +1863,25 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         const res = await fetch(url);
         const data = await res.json();
         if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-          setOfferTypesList(data.data);
-          const defaultOt = data.data.find((o: any) => o.offertypeId === "INDIVIDUAL_DISCOUNT") || data.data[0];
-          setSelectedOfferTypeId(defaultOt.offertypeId);
-          setSelectedOfferTypeName(defaultOt.offertypename);
-          setOfferType(defaultOt.offertypename);
-          setNewTplOfferType(defaultOt.offertypename);
+          const map = new Map<string, { offertypeId: string; offertypename: string }>();
+          DEFAULT_COMMERCIAL_OFFER_TYPES.forEach((ot) => map.set(ot.offertypeId, ot));
+          data.data.forEach((ot: any) => {
+            if (ot && ot.offertypeId) {
+              map.set(ot.offertypeId, {
+                offertypeId: ot.offertypeId,
+                offertypename: ot.offertypename || ot.offertypeId,
+              });
+            }
+          });
+          const merged = Array.from(map.values());
+          setOfferTypesList(merged);
+
+          // If no offer type is currently selected, select the first commercial one
+          setSelectedOfferTypeId((current) => {
+            if (current && map.has(current)) return current;
+            if (current) return current;
+            return "INDIVIDUAL_DISCOUNT";
+          });
         }
       } catch (err) {
         console.warn("Could not fetch offer types:", err);
@@ -4476,6 +4498,12 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                     }}
                     className="ste-select"
                   >
+                    {/* Fallback option if current selectedOfferTypeId is not yet in offerTypesList */}
+                    {selectedOfferTypeId && !offerTypesList.some(o => o.offertypeId === selectedOfferTypeId) && (
+                      <option value={selectedOfferTypeId}>
+                        {selectedOfferTypeName || selectedOfferTypeId} ({selectedOfferTypeId})
+                      </option>
+                    )}
                     {offerTypesList.length > 0 ? (
                       offerTypesList.map((ot) => (
                         <option key={ot.offertypeId} value={ot.offertypeId}>
@@ -7502,6 +7530,12 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                       setNewTplOfferType(name);
                     }}
                   >
+                    {/* Fallback option if current selectedOfferTypeId is not yet in offerTypesList */}
+                    {selectedOfferTypeId && !offerTypesList.some(o => o.offertypeId === selectedOfferTypeId) && (
+                      <option value={selectedOfferTypeId}>
+                        {selectedOfferTypeName || selectedOfferTypeId} ({selectedOfferTypeId})
+                      </option>
+                    )}
                     {offerTypesList.length > 0 ? (
                       offerTypesList.map((ot) => (
                         <option key={ot.offertypeId} value={ot.offertypeId}>

@@ -20,15 +20,9 @@ function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: strin
   const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   
-  const defaultFallbackPreview = "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
-  const rawThumb = t.thumbnail_url || t.thumbnail || t.backgroundUrl || defaultFallbackPreview;
-  const thumbUrl = toFullUrl(rawThumb, baseUrl);
-  const thumbRel = t.thumbnail || (rawThumb.startsWith("http") ? rawThumb.replace(/^https?:\/\/[^\/]+\//, "") : rawThumb);
-  const rawVideo = t.lastRenderedVideoUrl || "";
-  const videoUrl = rawVideo ? toFullUrl(rawVideo, baseUrl) : "";
-  const rawPreview = t.preview_url || t.previewUrl || rawVideo || rawThumb;
-  const previewUrl = toFullUrl(rawPreview, baseUrl);
-  const bgUrl = toFullUrl(t.backgroundUrl || rawThumb, baseUrl);
+  // Full URLs with domain address for 16:9 and 9:16 animated GIF previews
+  const preview169 = `${baseUrl}/api/external/template-preview?templateId=${tplId}&ratio=16:9`;
+  const preview916 = `${baseUrl}/api/external/template-preview?templateId=${tplId}&ratio=9:16`;
 
   const durationSec = Number(t.videoDuration || t.duration_seconds || t.duration || 10);
   const width = t.base_width || (t.aspectRatio === "9:16" ? 1080 : 1920);
@@ -57,12 +51,10 @@ function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: strin
     },
     offertypeId: otId,
     offertypename: otName,
-    thumbnail: thumbRel,
-    thumbnail_url: thumbUrl,
-    preview_url: previewUrl,
-    previewUrl: previewUrl,
-    video_url: videoUrl,
-    background_url: bgUrl,
+    preview_16_9: preview169,
+    preview_9_16: preview916,
+    preview_url: preview169,
+    thumbnail: preview169,
     aspectBackgrounds: t.aspectBackgrounds || {},
     created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : undefined,
   };
