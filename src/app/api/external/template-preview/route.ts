@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     if (fs.existsSync(diskPath)) {
       gifBuffer = fs.readFileSync(diskPath);
     } else {
-      gifBuffer = generateTemplatePreviewGif(template, ratio);
+      gifBuffer = await generateTemplatePreviewGif(template, ratio);
       try {
         if (!fs.existsSync(previewsDir)) fs.mkdirSync(previewsDir, { recursive: true });
         fs.writeFileSync(diskPath, gifBuffer);
