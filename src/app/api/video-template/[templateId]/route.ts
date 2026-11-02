@@ -95,22 +95,27 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       );
     }
 
-    let filter: any = null;
+    const conditions: any[] = [];
     if (mongoose.Types.ObjectId.isValid(templateId)) {
-      filter = { _id: templateId };
-    } else if (!isNaN(Number(templateId))) {
-      filter = { templateId: Number(templateId) };
-    } else {
-      filter = { _id: templateId };
+      conditions.push({ _id: new mongoose.Types.ObjectId(templateId) });
+      conditions.push({ _id: templateId });
     }
+    const num = Number(templateId);
+    if (!isNaN(num)) {
+      conditions.push({ templateId: num });
+      conditions.push({ templateId: String(templateId) });
+    }
+    conditions.push({ _id: templateId });
+    const filter = { $or: conditions };
 
     const updatedTemplate = await VideoTemplate.findOneAndUpdate(
       filter,
       {
         ...updateData,
+        ...((!isNaN(num) && num > 0) ? { templateId: num } : {}),
         storeUserId: resolvedUserId,
       },
-      { new: true, setDefaultsOnInsert: true }
+      { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
     if (!updatedTemplate) {

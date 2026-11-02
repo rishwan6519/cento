@@ -3751,7 +3751,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       {toastMessage && <div className="ste-toast">{toastMessage}</div>}
       {/* ── Header Topbar ── */}
       <header className="ste-topbar">
-        <div className="ste-topbar__left" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, minWidth: 0 }}>
+        <div className="ste-topbar__left" style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 auto", minWidth: 0, flexWrap: "wrap" }}>
           {onNavigate && (
             <button
               className="ste-back-btn"
@@ -3763,7 +3763,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             </button>
           )}
 
-          <div className="ste-title-group" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "nowrap", flexShrink: 0 }}>
+          <div className="ste-title-group" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", flexShrink: 1, minWidth: 0 }}>
             <span className="ste-badge" style={{ whiteSpace: "nowrap", flexShrink: 0, padding: "4px 8px", fontSize: "0.70rem" }}>
               STORESPARC STUDIO
             </span>
@@ -3790,7 +3790,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
               Template #{currentDisplayId}
             </span>
 
-            <div className="ste-topbar-name-block" style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
+            <div className="ste-topbar-name-block" style={{ display: "flex", alignItems: "center", gap: "5px", flex: "1 1 auto", minWidth: "120px" }}>
               <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#11B5BB", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "3px" }}>
                 <FaPen size={9} /> Name:
               </span>
@@ -3799,7 +3799,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 className="ste-template-name-input"
-                style={{ height: "28px", padding: "3px 8px", fontSize: "0.80rem", width: "160px", borderRadius: "6px" }}
+                style={{ height: "28px", padding: "3px 8px", fontSize: "0.80rem", width: "150px", maxWidth: "200px", borderRadius: "6px" }}
                 placeholder="Enter template name..."
                 title="Click to edit template name"
               />
@@ -3807,19 +3807,19 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           </div>
         </div>
 
-        {/* Studio Tabs — Clean single-line pills */}
+        {/* Studio Tabs — Clean pills */}
         <div className="ste-mode-tabs" style={{ display: "flex", alignItems: "center", gap: "3px", padding: "3px", borderRadius: "8px", flexShrink: 0 }}>
           <button
             className={`ste-mode-tab ${activeTab === "studio" ? "active" : ""}`}
             onClick={() => setActiveTab("studio")}
-            style={{ whiteSpace: "nowrap", padding: "5px 12px", fontSize: "0.78rem" }}
+            style={{ whiteSpace: "nowrap", padding: "5px 10px", fontSize: "0.76rem" }}
           >
             <FaPen size={11} /> <span>Canvas Editor</span>
           </button>
           <button
             className={`ste-mode-tab ${activeTab === "grid" ? "active" : ""}`}
             onClick={() => { syncTextToAllRatios(); setActiveTab("grid"); }}
-            style={{ whiteSpace: "nowrap", padding: "5px 12px", fontSize: "0.78rem" }}
+            style={{ whiteSpace: "nowrap", padding: "5px 10px", fontSize: "0.76rem" }}
           >
             <FaTableCells size={11} /> <span>4 Ratios Grid</span>
           </button>
@@ -3829,39 +3829,40 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
               setActiveTab("library");
               fetchTemplates();
             }}
-            style={{ whiteSpace: "nowrap", padding: "5px 12px", fontSize: "0.78rem" }}
+            style={{ whiteSpace: "nowrap", padding: "5px 10px", fontSize: "0.76rem" }}
           >
             <FaBookOpen size={11} /> <span>Library ({savedTemplatesList.length})</span>
           </button>
         </div>
 
-        {/* Action Buttons — Clean, single-row, no overflow */}
-        <div className="ste-topbar__right" style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-          {/* AI Auto-Optimize All Ratios Button */}
+        {/* Action Buttons — Fully responsive, Save button prominent & NEVER framed out */}
+        <div className="ste-topbar__right" style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 1, flexWrap: "wrap", marginLeft: "auto" }}>
+          {/* AI Auto-Optimize Button */}
           <button
             type="button"
             className="ste-btn ste-topbar-btn"
             onClick={handleAiOptimizeAllRatios}
             disabled={isAiOptimizing}
-            title="AI Auto-Optimize all 4 aspect ratios (9:16, 16:9, 1:1, 4:5) with balanced hierarchy and safe zones. You can freely edit afterwards!"
+            title="AI Auto-Optimize all 4 aspect ratios (9:16, 16:9, 1:1, 4:5)"
             style={{
               background: "linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)",
               color: "#ffffff",
               fontWeight: 700,
-              padding: "6px 13px",
-              fontSize: "0.78rem",
+              padding: "5px 10px",
+              fontSize: "0.76rem",
               whiteSpace: "nowrap",
               border: "1px solid rgba(255,255,255,0.3)",
-              boxShadow: "0 0 12px rgba(139, 92, 246, 0.45)",
-              gap: "6px",
+              boxShadow: "0 0 10px rgba(139, 92, 246, 0.4)",
+              gap: "5px",
               display: "flex",
               alignItems: "center",
             }}
           >
             {isAiOptimizing ? <FaSpinner className="ste-spin" size={11} /> : <FaWandMagicSparkles size={11} />}
-            <span className="ste-btn-label">{isAiOptimizing ? "Optimizing…" : "✨ AI Optimize Ratios"}</span>
+            <span className="ste-btn-label">{isAiOptimizing ? "Optimizing…" : "AI Optimize"}</span>
           </button>
 
+          {/* Preview Play/Pause Button */}
           <button
             type="button"
             className={`ste-btn ste-topbar-btn ${isPlaying ? "ste-btn--danger" : "ste-btn--accent"}`}
@@ -3870,8 +3871,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             style={{
               fontWeight: 700,
               gap: "5px",
-              padding: "6px 12px",
-              fontSize: "0.78rem",
+              padding: "5px 11px",
+              fontSize: "0.76rem",
               whiteSpace: "nowrap",
               boxShadow: isPlaying ? "0 0 10px rgba(239, 68, 68, 0.4)" : "0 0 10px rgba(240, 90, 40, 0.35)",
             }}
@@ -3880,34 +3881,53 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             <span className="ste-btn-label">{isPlaying ? "Pause" : "Preview"}</span>
           </button>
 
+          {/* PRIMARY SAVE / UPDATE BUTTON ── High-visibility, prominent, never framed out */}
           <button
-            className="ste-btn ste-topbar-btn ste-btn--secondary"
+            type="button"
+            className="ste-btn ste-topbar-btn ste-btn--save-hero"
             onClick={() => handleSaveTemplate(false)}
             disabled={saving}
             title={templateId ? `Update Template #${currentDisplayId} with all changes` : `Save as Template #${currentDisplayId}`}
-            style={{ padding: "6px 12px", fontSize: "0.78rem", whiteSpace: "nowrap" }}
+            style={{
+              background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+              color: "#ffffff",
+              fontWeight: 800,
+              padding: "5px 13px",
+              fontSize: "0.78rem",
+              whiteSpace: "nowrap",
+              border: "1px solid rgba(16, 185, 129, 0.5)",
+              boxShadow: "0 0 12px rgba(16, 185, 129, 0.45)",
+              gap: "6px",
+              display: "flex",
+              alignItems: "center",
+              cursor: "pointer",
+            }}
           >
-            {saving ? <FaSpinner className="ste-spin" size={10} /> : <FaFloppyDisk size={10} />}
-            <span className="ste-btn-label">{saving ? "Saving..." : (templateId ? `Update #${currentDisplayId}` : `Save Template #${currentDisplayId}`)}</span>
+            {saving ? <FaSpinner className="ste-spin" size={11} /> : <FaFloppyDisk size={11} />}
+            <span className="ste-btn-label">{saving ? "Saving..." : (templateId ? `Update #${currentDisplayId}` : `Save #${currentDisplayId}`)}</span>
           </button>
 
+          {/* Save As Copy Button */}
           <button
+            type="button"
             className="ste-btn ste-topbar-btn ste-btn--primary"
             onClick={() => handleSaveTemplate(true)}
             disabled={saving}
             title={`Save as a brand new template copy with ID #${getNextTemplateId()}`}
-            style={{ fontWeight: 700, padding: "6px 12px", fontSize: "0.78rem", whiteSpace: "nowrap" }}
+            style={{ fontWeight: 600, padding: "5px 10px", fontSize: "0.76rem", whiteSpace: "nowrap" }}
           >
             <FaCopy size={10} />
-            <span className="ste-btn-label">Save As Copy</span>
+            <span className="ste-btn-label">Save Copy</span>
           </button>
 
+          {/* Generate MP4 Video Button */}
           <button
+            type="button"
             className="ste-btn ste-topbar-btn ste-btn--accent"
             onClick={() => handleRenderVideo(false)}
             disabled={rendering}
-            title="Generate &amp; Render MP4 Video"
-            style={{ padding: "6px 14px", fontSize: "0.78rem", whiteSpace: "nowrap" }}
+            title="Generate & Render MP4 Video"
+            style={{ padding: "5px 11px", fontSize: "0.76rem", whiteSpace: "nowrap" }}
           >
             {rendering ? <FaSpinner className="ste-spin" size={10} /> : <FaVideo size={10} />}
             <span className="ste-btn-label">{rendering ? renderProgress : "Generate MP4"}</span>
@@ -6410,6 +6430,33 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                     </button>
                   ))}
                 </div>
+
+                {/* Quick Save Action in Bottom Player Bar */}
+                <button
+                  type="button"
+                  onClick={() => handleSaveTemplate(false)}
+                  disabled={saving}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                    color: "#ffffff",
+                    border: "1px solid rgba(16, 185, 129, 0.4)",
+                    boxShadow: "0 0 10px rgba(16, 185, 129, 0.35)",
+                    borderRadius: "6px",
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    marginLeft: "4px",
+                  }}
+                  title={templateId ? `Update Template #${currentDisplayId}` : "Save Template"}
+                >
+                  {saving ? <FaSpinner className="ste-spin" size={10} /> : <FaFloppyDisk size={10} />}
+                  <span>{saving ? "Saving..." : (templateId ? `Save #${currentDisplayId}` : "Save")}</span>
+                </button>
               </div>
             </div>
 
@@ -7929,18 +7976,24 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 8px 18px;
+          padding: 6px 16px;
           background: #0b2830;
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          gap: 12px;
+          gap: 10px;
           flex-shrink: 0;
-          height: 52px;
+          min-height: 52px;
+          height: auto;
           box-sizing: border-box;
+          flex-wrap: wrap;
+          z-index: 50;
         }
         .ste-topbar__left {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
+          flex: 1 1 auto;
+          min-width: 0;
+          flex-wrap: wrap;
         }
         .ste-back-btn {
           background: rgba(255, 255, 255, 0.08);
@@ -9212,13 +9265,29 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           }
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 1600px) {
           .ste-topbar {
-            height: auto;
-            min-height: 48px;
             padding: 6px 12px;
-            flex-wrap: wrap;
             gap: 8px;
+          }
+          .ste-topbar-btn {
+            padding: 5px 9px !important;
+            font-size: 0.74rem !important;
+          }
+          .ste-template-name-input {
+            max-width: 140px;
+          }
+        }
+
+        @media (max-width: 1400px) {
+          .ste-panel {
+            width: 235px;
+            min-width: 235px;
+            max-width: 235px;
+          }
+          .ste-topbar {
+            padding: 6px 10px;
+            gap: 6px;
           }
           .ste-topbar__left {
             flex-wrap: wrap;
@@ -9226,7 +9295,33 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           }
           .ste-topbar__right {
             flex-wrap: wrap;
+            gap: 5px;
+          }
+          .ste-template-name-input {
+            max-width: 130px;
+          }
+        }
+
+        @media (max-width: 1200px) {
+          .ste-panel {
+            width: 215px;
+            min-width: 215px;
+            max-width: 215px;
+          }
+          .ste-topbar {
+            height: auto;
+            min-height: 48px;
+            padding: 6px 10px;
+            flex-wrap: wrap;
             gap: 6px;
+          }
+          .ste-topbar__left {
+            flex-wrap: wrap;
+            gap: 6px;
+          }
+          .ste-topbar__right {
+            flex-wrap: wrap;
+            gap: 5px;
           }
           .ste-workspace {
             position: relative;
@@ -9259,29 +9354,6 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           }
         }
 
-        @media (max-width: 1400px) {
-          .ste-panel {
-            width: 235px;
-            min-width: 235px;
-            max-width: 235px;
-          }
-          .ste-topbar {
-            padding: 6px 12px;
-            gap: 8px;
-          }
-          .ste-template-name-input {
-            max-width: 160px;
-          }
-        }
-
-        @media (max-width: 1200px) {
-          .ste-panel {
-            width: 215px;
-            min-width: 215px;
-            max-width: 215px;
-          }
-        }
-
         @media (max-width: 1024px) {
           .ste-panel {
             position: absolute;
@@ -9306,16 +9378,34 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             padding: 0 10px;
             gap: 8px;
           }
+          .ste-mode-tabs {
+            padding: 2px;
+          }
+          .ste-mode-tab {
+            padding: 4px 8px !important;
+            font-size: 0.72rem !important;
+          }
         }
 
         @media (max-width: 768px) {
           .ste-topbar {
-            padding: 4px 8px;
+            padding: 6px 8px;
+            flex-direction: column;
+            align-items: stretch;
+            height: auto;
+          }
+          .ste-topbar__left {
+            justify-content: space-between;
+            width: 100%;
+          }
+          .ste-topbar__right {
+            justify-content: flex-end;
+            width: 100%;
           }
           .ste-template-name-input {
-            width: 140px;
-            min-width: 120px;
-            font-size: 0.82rem;
+            width: 130px;
+            min-width: 110px;
+            font-size: 0.80rem;
           }
           .ste-panel {
             width: 280px;
