@@ -107,6 +107,9 @@ export default function MakeVideoFromTemplateModal({
   const [aiPrompt, setAiPrompt] = useState("");
   const [generatingAiImg, setGeneratingAiImg] = useState(false);
   const [showAiInput, setShowAiInput] = useState(false);
+  const [aiGeneratedPrompt, setAiGeneratedPrompt] = useState<string>("");
+  const [aiCreatedImageUrl, setAiCreatedImageUrl] = useState<string>("");
+  const [aiStatusMessage, setAiStatusMessage] = useState<string>("");
 
   // ── Rendering & Job Progress ──
   const [rendering, setRendering] = useState(false);
@@ -339,6 +342,10 @@ export default function MakeVideoFromTemplateModal({
   const handleGenerateAiProductImage = async () => {
     if (!aiPrompt.trim()) return;
     setGeneratingAiImg(true);
+    setAiStatusMessage("Writing commercial photo prompt...");
+    setAiGeneratedPrompt("");
+    setAiCreatedImageUrl("");
+
     try {
       const res = await fetch("/api/external/ai-product-image", {
         method: "POST",
@@ -354,25 +361,42 @@ export default function MakeVideoFromTemplateModal({
         let checks = 0;
         const pInt = setInterval(async () => {
           checks++;
-          const chk = await fetch("/api/external/ai-product-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jobId: data.jobId }),
-          });
-          const cData = await chk.json();
-          if (cData.status === "completed" && cData.data?.url) {
-            clearInterval(pInt);
-            setProductImageUrl(cData.data.url);
-            setGeneratingAiImg(false);
-            setShowAiInput(false);
-          } else if (cData.status === "failed" || checks > 30) {
-            clearInterval(pInt);
-            setGeneratingAiImg(false);
+          try {
+            const chk = await fetch("/api/external/ai-product-image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jobId: data.jobId }),
+            });
+            const cData = await chk.json();
+
+            if (cData.prompt) {
+              setAiGeneratedPrompt(cData.prompt);
+              setAiStatusMessage("Creating photo with AI (gpt-image-2.5-flare)...");
+            }
+
+            if (cData.status === "completed" && cData.data?.url) {
+              clearInterval(pInt);
+              if (cData.data.prompt) setAiGeneratedPrompt(cData.data.prompt);
+              setAiCreatedImageUrl(cData.data.url);
+              setProductImageUrl(cData.data.url);
+              setGeneratingAiImg(false);
+              setAiStatusMessage("✓ Image created successfully!");
+            } else if (cData.status === "failed" || checks > 40) {
+              clearInterval(pInt);
+              setGeneratingAiImg(false);
+              setAiStatusMessage(cData.message || "Image generation timed out or failed.");
+            }
+          } catch {
+            // keep polling
           }
         }, 2000);
+      } else {
+        setGeneratingAiImg(false);
+        setAiStatusMessage(data.message || "Failed to start image generation.");
       }
     } catch {
       setGeneratingAiImg(false);
+      setAiStatusMessage("Error contacting image service.");
     }
   };
 
@@ -685,6 +709,39 @@ export default function MakeVideoFromTemplateModal({
                     ))}
                   </div>
 
+                  {/* Active Product Photo Preview */}
+                  {productImageUrl && (
+                    <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", backgroundColor: "#f8fafc", borderRadius: 6, border: "1px solid #e2e8f0" }}>
+                      <img
+                        src={productImageUrl}
+                        alt="Product preview"
+                        style={{
+                          width: 44,
+                          height: 44,
+                          objectFit: "contain",
+                          borderRadius: 4,
+                          backgroundColor: "#ffffff",
+                          border: "1px solid #cbd5e1",
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>
+                          Active Product Photo
+                        </div>
+                        <div style={{ fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {productImageUrl}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        style={{ fontSize: 11, color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}
+                        onClick={() => setProductImageUrl("")}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+
                   {/* AI Generate Assistant */}
                   <div style={{ marginTop: 8 }}>
                     {!showAiInput ? (
@@ -697,6 +754,9 @@ export default function MakeVideoFromTemplateModal({
                       </button>
                     ) : (
                       <div className="mkv-ai-box">
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "#475569", marginBottom: 4, display: "block" }}>
+                          AI Commercial Product Photo (gpt-image-2.5-flare)
+                        </label>
                         <input
                           type="text"
                           className="mkv-input"
@@ -704,7 +764,45 @@ export default function MakeVideoFromTemplateModal({
                           value={aiPrompt}
                           onChange={(e) => setAiPrompt(e.target.value)}
                         />
-                        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                        {aiStatusMessage && (
+                          <div style={{ marginTop: 6, fontSize: 11, color: "#475569", display: "flex", alignItems: "center", gap: 5 }}>
+                            {generatingAiImg && <FaSpinner className="mkv-spin" size={10} />}
+                            <span>{aiStatusMessage}</span>
+                          </div>
+                        )}
+                        {aiGeneratedPrompt && (
+                          <div style={{ marginTop: 6, padding: "6px 8px", backgroundColor: "#f1f5f9", borderRadius: 4, fontSize: 11, color: "#334155", borderLeft: "3px solid #3b82f6" }}>
+                            <strong>Prompt:</strong> {aiGeneratedPrompt}
+                          </div>
+                        )}
+                        {aiCreatedImageUrl && (
+                          <div
+                            style={{
+                              marginTop: 8,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "6px 8px",
+                              backgroundColor: "#f0fdf4",
+                              border: "1px solid #86efac",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                            }}
+                            onClick={() => setProductImageUrl(aiCreatedImageUrl)}
+                            title="Click to apply image"
+                          >
+                            <img
+                              src={aiCreatedImageUrl}
+                              alt="Generated Product"
+                              style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 4, backgroundColor: "#ffffff", border: "1px solid #bbf7d0" }}
+                            />
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>✓ Image created & selected!</div>
+                              <div style={{ fontSize: 11, color: "#64748b" }}>Click to view or re-apply</div>
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                           <button
                             type="button"
                             className="mkv-btn-sm mkv-btn-sm--primary"
@@ -719,7 +817,7 @@ export default function MakeVideoFromTemplateModal({
                             className="mkv-btn-sm"
                             onClick={() => setShowAiInput(false)}
                           >
-                            Cancel
+                            Close
                           </button>
                         </div>
                       </div>
