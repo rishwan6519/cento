@@ -153,7 +153,7 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     }
   }
 
-  const dbTemplates = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
+  const dbTemplates: any[] = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
 
   if (dbTemplates.length === 0) {
     return {
@@ -176,7 +176,7 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
   const creators = await User.find({ _id: { $in: creatorIds } }).lean();
   const creatorMap = new Map(creators.map((c: any) => [String(c._id), c]));
 
-  const formattedTemplates = dbTemplates.map((t, idx) =>
+  const formattedTemplates = dbTemplates.map((t: any, idx: number) =>
     formatTemplateItem(t, idx, creatorMap.get(String(t.storeUserId || t.userId)))
   );
 
