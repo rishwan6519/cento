@@ -105,8 +105,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       conditions.push({ templateId: num });
       conditions.push({ templateId: String(templateId) });
     }
-    conditions.push({ _id: templateId });
-    const filter = { $or: conditions };
+    const filter = conditions.length > 0 ? { $or: conditions } : { templateId: templateId };
 
     const updatedTemplate = await VideoTemplate.findOneAndUpdate(
       filter,
@@ -123,6 +122,15 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         { success: false, message: 'Template not found to update' },
         { status: 404 }
       );
+    }
+
+    if (updatedTemplate) {
+      try {
+        const { ensureTemplatePreviewGifs } = await import('@/lib/templatePreviewGif');
+        ensureTemplatePreviewGifs(updatedTemplate.toObject ? updatedTemplate.toObject() : updatedTemplate, true);
+      } catch (err) {
+        console.warn('[PUT /api/video-template/:templateId] Could not regenerate preview GIF:', err);
+      }
     }
 
     return NextResponse.json({

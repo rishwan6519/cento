@@ -3,6 +3,8 @@ import { connectToDatabase } from "@/lib/db";
 import VideoTemplate from "@/models/VideoTemplate";
 import { generateTemplatePreviewGif } from "@/lib/templatePreviewGif";
 import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +29,10 @@ export async function GET(req: NextRequest) {
       if (mongoose.Types.ObjectId.isValid(cleanId)) {
         conditions.push({ _id: new mongoose.Types.ObjectId(cleanId) });
       }
-      conditions.push({ _id: cleanId });
 
-      template = await VideoTemplate.findOne({ $or: conditions }).lean();
+      if (conditions.length > 0) {
+        template = await VideoTemplate.findOne({ $or: conditions }).lean();
+      }
     }
 
     if (!template) {
@@ -46,14 +49,30 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const gifBuffer = generateTemplatePreviewGif(template, ratio);
+    const tplId = Number(template.templateId || template.id) || 1;
+    const safeRatio = ratio === "9:16" ? "9x16" : "16x9";
+    const previewsDir = path.join(process.cwd(), "uploads", "previews");
+    const diskPath = path.join(previewsDir, `preview_${tplId}_${safeRatio}.gif`);
+
+    let gifBuffer: Buffer;
+    if (fs.existsSync(diskPath)) {
+      gifBuffer = fs.readFileSync(diskPath);
+    } else {
+      gifBuffer = generateTemplatePreviewGif(template, ratio);
+      try {
+        if (!fs.existsSync(previewsDir)) fs.mkdirSync(previewsDir, { recursive: true });
+        fs.writeFileSync(diskPath, gifBuffer);
+      } catch (err) {
+        console.warn("[template-preview] Could not cache to disk:", err);
+      }
+    }
 
     return new NextResponse(new Uint8Array(gifBuffer), {
       status: 200,
       headers: {
         "Content-Type": "image/gif",
         "Content-Length": String(gifBuffer.length),
-        "Cache-Control": "public, max-age=1800, s-maxage=1800",
+        "Cache-Control": "public, max-age=3600, s-maxage=3600",
       },
     });
   } catch (error: any) {

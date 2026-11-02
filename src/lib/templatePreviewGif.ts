@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+
 // 5x7 ASCII bitmap font definitions for uppercase letters, digits, and retail symbols
 const FONT: Record<string, number[]> = {
   " ": [0, 0, 0, 0, 0],
@@ -349,4 +352,50 @@ export function generateTemplatePreviewGif(template: any, ratio: "16:9" | "9:16"
 
   const totalBytes = gifWriter.end();
   return outBuf.subarray(0, totalBytes);
+}
+
+/**
+ * Ensures preview GIF files exist on disk for this template (16:9 and 9:16).
+ * If they do not exist, or if forceRefresh is true, they are generated and written to disk.
+ * Returns the relative file paths (/uploads/previews/preview_{tplId}_16x9.gif, etc.)
+ */
+export function ensureTemplatePreviewGifs(template: any, forceRefresh = false): {
+  preview_16_9: string;
+  preview_9_16: string;
+} {
+  const tplId = Number(template.templateId || template.id) || 1;
+  const previewsDir = path.join(process.cwd(), "uploads", "previews");
+  if (!fs.existsSync(previewsDir)) {
+    try {
+      fs.mkdirSync(previewsDir, { recursive: true });
+    } catch {}
+  }
+
+  const rel169 = `/uploads/previews/preview_${tplId}_16x9.gif`;
+  const rel916 = `/uploads/previews/preview_${tplId}_9x16.gif`;
+  const file169 = path.join(previewsDir, `preview_${tplId}_16x9.gif`);
+  const file916 = path.join(previewsDir, `preview_${tplId}_9x16.gif`);
+
+  if (forceRefresh || !fs.existsSync(file169)) {
+    try {
+      const buf = generateTemplatePreviewGif(template, "16:9");
+      fs.writeFileSync(file169, buf);
+    } catch (e) {
+      console.error(`[ensureTemplatePreviewGifs] Error writing 16:9 for tpl ${tplId}:`, e);
+    }
+  }
+
+  if (forceRefresh || !fs.existsSync(file916)) {
+    try {
+      const buf = generateTemplatePreviewGif(template, "9:16");
+      fs.writeFileSync(file916, buf);
+    } catch (e) {
+      console.error(`[ensureTemplatePreviewGifs] Error writing 9:16 for tpl ${tplId}:`, e);
+    }
+  }
+
+  return {
+    preview_16_9: rel169,
+    preview_9_16: rel916,
+  };
 }

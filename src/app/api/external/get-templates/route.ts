@@ -4,25 +4,20 @@ function escapeRegex(str: string): string {
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import VideoTemplate from "@/models/VideoTemplate";
+import { ensureTemplatePreviewGifs } from "@/lib/templatePreviewGif";
 import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
-
-function toFullUrl(path?: string, baseUrl: string = "https://iot-test.metizstoresparc.com"): string {
-  if (!path || !path.trim()) return "";
-  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  return `${baseUrl}${cleanPath}`;
-}
 
 function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: string = "https://iot-test.metizstoresparc.com") {
   const tplId = Number(t.templateId) || (10000 + index + 1);
   const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   
-  // Full URLs with domain address for 16:9 and 9:16 animated GIF previews
-  const preview169 = `${baseUrl}/api/external/template-preview?templateId=${tplId}&ratio=16:9`;
-  const preview916 = `${baseUrl}/api/external/template-preview?templateId=${tplId}&ratio=9:16`;
+  // Ensure animated GIF preview files exist on disk and get direct URLs with current domain
+  const { preview_16_9: rel169, preview_9_16: rel916 } = ensureTemplatePreviewGifs({ ...t, templateId: tplId });
+  const preview169 = `${baseUrl}${rel169}`;
+  const preview916 = `${baseUrl}${rel916}`;
 
   const durationSec = Number(t.videoDuration || t.duration_seconds || t.duration || 10);
   const width = t.base_width || (t.aspectRatio === "9:16" ? 1080 : 1920);

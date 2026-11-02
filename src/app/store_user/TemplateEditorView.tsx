@@ -4458,17 +4458,64 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                   </div>
                 </div>
 
-                {showNewOfferTypeForm ? (
+                {/* Select Dropdown always visible */}
+                <select
+                  value={selectedOfferTypeId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__NEW__") {
+                      setShowNewOfferTypeForm(true);
+                      return;
+                    }
+                    setSelectedOfferTypeId(val);
+                    const found = offerTypesList.find(o => o.offertypeId === val);
+                    const name = found ? found.offertypename : val;
+                    setSelectedOfferTypeName(name);
+                    setOfferType(name);
+                  }}
+                  className="ste-select"
+                  style={{ marginBottom: showNewOfferTypeForm ? "6px" : "0" }}
+                >
+                  {/* Fallback option if current selectedOfferTypeId is not yet in offerTypesList */}
+                  {selectedOfferTypeId && !offerTypesList.some(o => o.offertypeId === selectedOfferTypeId) && (
+                    <option value={selectedOfferTypeId}>
+                      {selectedOfferTypeName || selectedOfferTypeId} ({selectedOfferTypeId})
+                    </option>
+                  )}
+                  {offerTypesList.length > 0 ? (
+                    offerTypesList.map((ot) => (
+                      <option key={ot.offertypeId} value={ot.offertypeId}>
+                        {ot.offertypename} ({ot.offertypeId})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No offer types created yet. Click + New</option>
+                  )}
+                  <option value="__NEW__">+ Create New Offer Type...</option>
+                </select>
+
+                {/* Inline Creation Box if + New or + Create New Offer Type is selected */}
+                {showNewOfferTypeForm && (
                   <div style={{
-                    background: "rgba(15, 23, 42, 0.8)",
-                    border: "1px solid rgba(17, 181, 187, 0.3)",
+                    background: "rgba(11, 40, 48, 0.95)",
+                    border: "1px solid rgba(17, 181, 187, 0.45)",
                     borderRadius: "6px",
                     padding: "8px",
-                    marginBottom: "8px",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "6px"
+                    gap: "6px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
                   }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.72rem", color: "#11B5BB", fontWeight: 700 }}>+ Create New Offer Type</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewOfferTypeForm(false)}
+                        style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "0.75rem" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
                     <input
                       type="text"
                       placeholder="Offer Name (e.g. Spring Clearance)"
@@ -4491,50 +4538,26 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                       value={inlineOfferTypeId}
                       onChange={(e) => setInlineOfferTypeId(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
                     />
-                    <button
-                      type="button"
-                      className="ste-btn ste-btn--primary"
-                      style={{ fontSize: "0.72rem", padding: "4px 10px", alignSelf: "flex-end" }}
-                      disabled={creatingOfferType || !inlineOfferTypeName.trim()}
-                      onClick={() => handleCreateOfferTypeInline()}
-                    >
-                      {creatingOfferType ? "Creating..." : "Save Offer Type"}
-                    </button>
+                    <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", marginTop: "2px" }}>
+                      <button
+                        type="button"
+                        className="ste-btn ste-btn--secondary"
+                        style={{ fontSize: "0.70rem", padding: "3px 8px" }}
+                        onClick={() => setShowNewOfferTypeForm(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="ste-btn ste-btn--primary"
+                        style={{ fontSize: "0.70rem", padding: "3px 10px" }}
+                        disabled={creatingOfferType || !inlineOfferTypeName.trim()}
+                        onClick={() => handleCreateOfferTypeInline()}
+                      >
+                        {creatingOfferType ? "Saving..." : "Save Offer Type"}
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <select
-                    value={selectedOfferTypeId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === "__NEW__") {
-                        setShowNewOfferTypeForm(true);
-                        return;
-                      }
-                      setSelectedOfferTypeId(val);
-                      const found = offerTypesList.find(o => o.offertypeId === val);
-                      const name = found ? found.offertypename : val;
-                      setSelectedOfferTypeName(name);
-                      setOfferType(name);
-                    }}
-                    className="ste-select"
-                  >
-                    {/* Fallback option if current selectedOfferTypeId is not yet in offerTypesList */}
-                    {selectedOfferTypeId && !offerTypesList.some(o => o.offertypeId === selectedOfferTypeId) && (
-                      <option value={selectedOfferTypeId}>
-                        {selectedOfferTypeName || selectedOfferTypeId} ({selectedOfferTypeId})
-                      </option>
-                    )}
-                    {offerTypesList.length > 0 ? (
-                      offerTypesList.map((ot) => (
-                        <option key={ot.offertypeId} value={ot.offertypeId}>
-                          {ot.offertypename} ({ot.offertypeId})
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>No offer types created yet. Click + New</option>
-                    )}
-                    <option value="__NEW__">+ Create New Offer Type...</option>
-                  </select>
                 )}
               </div>
 

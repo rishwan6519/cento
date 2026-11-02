@@ -97,6 +97,20 @@ export async function POST(req: NextRequest) {
     const thumbUrl = savedTemplate.thumbnail_url || savedTemplate.thumbnail || savedTemplate.backgroundUrl || "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
     const thumbRel = savedTemplate.thumbnail || (thumbUrl.startsWith("http") ? thumbUrl.replace(/^https?:\/\/[^\/]+\//, "") : thumbUrl);
 
+    let preview169 = "";
+    let preview916 = "";
+    try {
+      const { ensureTemplatePreviewGifs } = await import('@/lib/templatePreviewGif');
+      const gifs = ensureTemplatePreviewGifs(savedTemplate.toObject ? savedTemplate.toObject() : savedTemplate, true);
+      const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "iot-test.metizstoresparc.com";
+      const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+      const baseUrl = `${proto}://${host}`;
+      preview169 = `${baseUrl}${gifs.preview_16_9}`;
+      preview916 = `${baseUrl}${gifs.preview_9_16}`;
+    } catch (err) {
+      console.warn('[POST /api/video-template] Could not generate preview GIF:', err);
+    }
+
     let creator: any = null;
     if (resolvedUserId && mongoose.Types.ObjectId.isValid(String(resolvedUserId))) {
       const User = (await import('@/models/User')).default;
@@ -126,10 +140,12 @@ export async function POST(req: NextRequest) {
       },
       offertypeId: finalOtId,
       offertypename: finalOtName,
-      thumbnail: thumbRel,
-      thumbnail_url: thumbUrl,
-      preview_url: savedTemplate.preview_url || savedTemplate.previewUrl || savedTemplate.lastRenderedVideoUrl || thumbUrl,
-      previewUrl: savedTemplate.previewUrl || savedTemplate.preview_url || savedTemplate.lastRenderedVideoUrl || thumbUrl,
+      preview_16_9: preview169 || thumbUrl,
+      preview_9_16: preview916 || thumbUrl,
+      preview_url: preview169 || savedTemplate.preview_url || savedTemplate.previewUrl || thumbUrl,
+      previewUrl: preview169 || savedTemplate.previewUrl || savedTemplate.preview_url || thumbUrl,
+      thumbnail: preview169 || thumbRel,
+      thumbnail_url: preview169 || thumbUrl,
       video_url: savedTemplate.lastRenderedVideoUrl || "",
       created_at: savedTemplate.createdAt ? new Date(savedTemplate.createdAt).toISOString().replace("T", " ").substring(0, 19) : new Date().toISOString().replace("T", " ").substring(0, 19),
     };
