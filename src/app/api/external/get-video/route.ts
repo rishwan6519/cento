@@ -79,6 +79,7 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
 
   await connectToDatabase();
 
+  let jobFound = false;
   let status = 'processing';
   let offerId = '';
   let templateId = '';
@@ -91,6 +92,7 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
   try {
     const renderJob = await getRenderJob(jobId);
     if (renderJob) {
+      jobFound = true;
       status = renderJob.status;
       if (renderJob.offerId) offerId = renderJob.offerId;
       if (renderJob.templateId) templateId = String(renderJob.templateId);
@@ -127,6 +129,7 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
   }
 
   if (mediaDocs.length > 0) {
+    jobFound = true;
     status = 'completed';
     const primaryDoc = mediaDocs[0];
     if (!offerId && primaryDoc.offerId) offerId = primaryDoc.offerId;
@@ -143,6 +146,7 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
       const CloudbasesJobModel = (await import('@/models/CloudbasesJob')).default;
       const cloudJob = await CloudbasesJobModel.findOne({ jobId }).lean();
       if (cloudJob) {
+        jobFound = true;
         if (!offerId && cloudJob.offerId) offerId = cloudJob.offerId;
         if (!templateId && cloudJob.templateId) templateId = String(cloudJob.templateId);
         if (!voiceoverScript && cloudJob.voiceoverScript) voiceoverScript = cloudJob.voiceoverScript;
@@ -175,6 +179,7 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
     try {
       const videoJob: any = await VideoJobModel.findOne({ $or: [{ videoId: jobId }, { jobId }] }).lean();
       if (videoJob) {
+        jobFound = true;
         if (!offerId && videoJob.offerId) offerId = videoJob.offerId;
         if (!templateId && videoJob.templateId) templateId = String(videoJob.templateId);
         if (!voiceoverScript && videoJob.voiceoverScript) voiceoverScript = videoJob.voiceoverScript;
@@ -187,7 +192,7 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
   }
 
   // 5. If not found in any source
-  if (!rawVideos.length && mediaDocs.length === 0 && !offerId && !templateId && status !== 'completed' && status !== 'processing') {
+  if (!jobFound) {
     return NextResponse.json(
       { success: false, message: `No video generation job found with jobId '${jobId}'` },
       { status: 404 }
