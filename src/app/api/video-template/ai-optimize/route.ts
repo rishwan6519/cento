@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
+type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
 /**
  * Intelligent deterministic & AI layout optimizer for all 4 aspect ratios.
  * Respects safe margins, visual hierarchy, and preserves all user text, colors, and media.
  */
-export function generateOptimizedLayouts(
+function generateOptimizedLayouts(
   baseLayers: Record<string, any>,
   options?: {
     templateName?: string;
@@ -764,3 +764,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
