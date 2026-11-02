@@ -1709,11 +1709,11 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     (t) => String(t._id) === String(templateId) || (templateId && String(t.templateId) === String(templateId)) || (activeTemplateNumber !== null && Number(t.templateId) === Number(activeTemplateNumber))
   );
   const currentDisplayId =
-    activeTemplateNumber ??
-    activeTplMatch?.templateId ??
-    (templateId && !isNaN(Number(templateId))
-      ? Number(templateId)
-      : (templateId ? (savedTemplatesList.findIndex((t) => t._id === templateId) + 1 || 1) : (savedTemplatesList.length > 0 ? getNextTemplateId() : 1)));
+    (activeTemplateNumber !== null && activeTemplateNumber >= 10000 ? activeTemplateNumber : null) ??
+    (activeTplMatch?.templateId && Number(activeTplMatch.templateId) >= 10000 ? Number(activeTplMatch.templateId) : null) ??
+    (templateId && !isNaN(Number(templateId)) && Number(templateId) >= 10000 ? Number(templateId) : null) ??
+    (activeTplMatch?.templateId && Number(activeTplMatch.templateId) > 0 ? (10000 + Number(activeTplMatch.templateId)) : null) ??
+    getNextTemplateId();
 
   // UI status
   const [saving, setSaving] = useState(false);
@@ -3225,7 +3225,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       const nameToSave = isSaveAsNew ? `${templateName} (Copy)` : templateName;
       const targetNumericId: number = isSaveAsNew
         ? getNextTemplateId()
-        : (typeof currentDisplayId === "number" ? currentDisplayId : Number(currentDisplayId) || getNextTemplateId());
+        : (typeof currentDisplayId === "number" && currentDisplayId >= 10000 ? currentDisplayId : Number(currentDisplayId) || getNextTemplateId());
       if (isSaveAsNew) {
         setActiveTemplateNumber(targetNumericId);
       }

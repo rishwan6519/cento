@@ -1,5 +1,5 @@
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\$&");
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
@@ -10,7 +10,16 @@ import mongoose from "mongoose";
 export const dynamic = "force-dynamic";
 
 function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: string = "https://iot-test.metizstoresparc.com") {
-  const tplId = Number(t.templateId) || (10000 + index + 1);
+  // Use actual templateId from DB if present and valid (>= 1000); otherwise upgrade legacy sequential ID (like 1, 2)
+  let tplId = Number(t.templateId);
+  if (!tplId || isNaN(tplId) || tplId < 1000) {
+    if (tplId && tplId > 0 && tplId < 1000) {
+      tplId = 10000 + tplId;
+    } else {
+      tplId = 10000 + index + 1;
+    }
+  }
+
   const otId = t.offertypeId || (t.offer_type && (t.offer_type.id || t.offer_type.offertypeId)) || t.offerType || "INDIVIDUAL_DISCOUNT";
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   
@@ -30,6 +39,7 @@ function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: strin
 
   const item: any = {
     id: tplId,
+    template_id: tplId,
     name: t.templateName || `template-${tplId}`,
     status: t.status === "Inactive" ? "inactive" : "approved",
     base_width: width,
@@ -50,6 +60,7 @@ function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: strin
     preview_9_16: preview916,
     preview_url: preview169,
     thumbnail: preview169,
+    thumbnail_url: preview169,
     aspectBackgrounds: t.aspectBackgrounds || {},
     created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : undefined,
   };
@@ -77,58 +88,82 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     isDummy: { $ne: true },
   };
 
-  if (userId && userId.trim()) {
+  if (userId && userId.trim() && userId.trim().toUpperCase() !== "ALL") {
     const cleanUid = userId.trim();
-    if (mongoose.Types.ObjectId.isValid(cleanUid)) {
-      const user = await User.findById(cleanUid).lean();
-      const permittedIdsSet = new Set<string>();
-      permittedIdsSet.add(cleanUid);
+    const permittedIdsSet = new Set<string>();
+    permittedIdsSet.add(cleanUid);
 
-      if (user) {
-        if (user.role === 'account_admin' || user.role === 'admin' || user.role === 'superUser') {
-          // Account Admin: include their ID and all store accounts under them
-          const subUsers = await User.find({
-            $or: [
-              { _id: user._id },
-              { controllerId: user._id },
-              { customerId: user._id },
-              ...(user.customerId ? [{ customerId: user.customerId }] : []),
-              { createdBy: user._id },
-            ],
-          }).select('_id').lean();
-          subUsers.forEach((u: any) => permittedIdsSet.add(String(u._id)));
-        } else {
-          // Store User: include this store and its controlling account admin + sibling stores
-          const adminId = user.controllerId || user.createdBy || user.customerId;
-          if (adminId) {
-            permittedIdsSet.add(String(adminId));
-            const related = await User.find({
-              $or: [
-                { controllerId: adminId },
-                { customerId: adminId },
-                { createdBy: adminId },
-              ],
-            }).select('_id').lean();
-            related.forEach((u: any) => permittedIdsSet.add(String(u._id)));
-          }
+    // Look up the requested user (support both ObjectId and string ID)
+    let user: any = null;
+    if (mongoose.Types.ObjectId.isValid(cleanUid)) {
+      user = await User.findById(cleanUid).lean();
+    }
+    if (!user) {
+      user = await User.findOne({ $or: [{ _id: cleanUid }, { username: cleanUid }, { email: cleanUid }] }).lean();
+    }
+
+    if (user) {
+      permittedIdsSet.add(String(user._id));
+      const uidObj = mongoose.Types.ObjectId.isValid(String(user._id)) ? new mongoose.Types.ObjectId(String(user._id)) : null;
+      const uidStr = String(user._id);
+
+      // Robust hierarchy search across account admin, store, and customer IDs (both ObjectId & String)
+      const userConditions: any[] = [
+        { _id: uidStr },
+        { controllerId: uidStr },
+        { createdBy: uidStr },
+      ];
+      if (uidObj) {
+        userConditions.push(
+          { _id: uidObj },
+          { controllerId: uidObj },
+          { createdBy: uidObj }
+        );
+      }
+      if (user.customerId) {
+        userConditions.push({ customerId: user.customerId }, { customerId: String(user.customerId) });
+        if (mongoose.Types.ObjectId.isValid(String(user.customerId))) {
+          userConditions.push({ customerId: new mongoose.Types.ObjectId(String(user.customerId)) });
         }
       }
+      if (user.controllerId) {
+        userConditions.push(
+          { _id: user.controllerId },
+          { _id: String(user.controllerId) },
+          { controllerId: user.controllerId },
+          { controllerId: String(user.controllerId) }
+        );
+        if (mongoose.Types.ObjectId.isValid(String(user.controllerId))) {
+          const parentAdminObj = new mongoose.Types.ObjectId(String(user.controllerId));
+          userConditions.push({ _id: parentAdminObj }, { controllerId: parentAdminObj });
+        }
+      }
+      if (user.createdBy) {
+        userConditions.push({ _id: user.createdBy }, { _id: String(user.createdBy) });
+        userConditions.push({ createdBy: user.createdBy }, { createdBy: String(user.createdBy) });
+      }
 
-      const permittedObjIds = Array.from(permittedIdsSet).map((id) => new mongoose.Types.ObjectId(id));
-      const permittedStrIds = Array.from(permittedIdsSet);
-
-      query.$or = [
-        { storeUserId: { $in: permittedObjIds } },
-        { storeUserId: { $in: permittedStrIds } },
-        { userId: { $in: permittedStrIds } },
-        { userId: { $in: permittedObjIds } },
-      ];
-    } else {
-      query.$or = [
-        { storeUserId: cleanUid },
-        { userId: cleanUid },
-      ];
+      const linkedUsers = await User.find({ $or: userConditions }).select("_id customerId controllerId createdBy").lean();
+      linkedUsers.forEach((u: any) => {
+        permittedIdsSet.add(String(u._id));
+        if (u.controllerId) permittedIdsSet.add(String(u.controllerId));
+        if (u.createdBy) permittedIdsSet.add(String(u.createdBy));
+      });
     }
+
+    const permittedObjIds = Array.from(permittedIdsSet)
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+    const permittedStrIds = Array.from(permittedIdsSet);
+
+    query.$or = [
+      { storeUserId: { $in: permittedObjIds } },
+      { storeUserId: { $in: permittedStrIds } },
+      { userId: { $in: permittedStrIds } },
+      { userId: { $in: permittedObjIds } },
+      { createdBy: { $in: permittedStrIds } },
+      { createdBy: { $in: permittedObjIds } },
+    ];
   }
 
   // Filter by offertypeId if not "ALL"
@@ -138,16 +173,25 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     const regex = new RegExp("^" + escapeRegex(target) + "$", "i");
     const friendlyName = target.replace(/_/g, " ");
     const friendlyRegex = new RegExp("^" + escapeRegex(friendlyName) + "$", "i");
+    const looseRegex = new RegExp(escapeRegex(target).replace(/_/g, "[_\\s]"), "i");
 
     const otClause = [
       { offertypeId: target },
       { offertypeId: regex },
+      { offertypeId: looseRegex },
       { offerType: target },
+      { offerType: regex },
       { offerType: friendlyRegex },
+      { offerType: looseRegex },
+      { offertypename: regex },
       { offertypename: friendlyRegex },
       { "offer_type.id": target },
+      { "offer_type.id": regex },
       { "offer_type.offertypeId": target },
+      { "offer_type.offertypeId": regex },
+      { "offer_type.name": regex },
       { "offer_type.name": friendlyRegex },
+      { "offer_type.offertypename": regex },
       { "offer_type.offertypename": friendlyRegex },
     ];
 
@@ -159,7 +203,34 @@ async function fetchAndFormatTemplates(userId?: string, rawOfferTypeId: string =
     }
   }
 
-  const dbTemplates: any[] = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
+  let dbTemplates: any[] = await VideoTemplate.find(query).sort({ templateId: 1, createdAt: -1 }).lean();
+
+  // If user-scoped query returned 0 templates, fallback to query without user restriction
+  // so valid offer type templates are always surfaced
+  if (dbTemplates.length === 0 && userId && userId.trim().toUpperCase() !== "ALL") {
+    const fallbackQuery: any = { isDummy: { $ne: true } };
+    if (!isAll) {
+      const target = rawOfferTypeId.trim();
+      const regex = new RegExp("^" + escapeRegex(target) + "$", "i");
+      const friendlyName = target.replace(/_/g, " ");
+      const friendlyRegex = new RegExp("^" + escapeRegex(friendlyName) + "$", "i");
+      const looseRegex = new RegExp(escapeRegex(target).replace(/_/g, "[_\\s]"), "i");
+      fallbackQuery.$or = [
+        { offertypeId: target },
+        { offertypeId: regex },
+        { offertypeId: looseRegex },
+        { offerType: target },
+        { offerType: regex },
+        { offerType: friendlyRegex },
+        { offerType: looseRegex },
+        { "offer_type.id": target },
+        { "offer_type.offertypeId": target },
+        { "offer_type.name": friendlyRegex },
+        { "offer_type.offertypename": friendlyRegex },
+      ];
+    }
+    dbTemplates = await VideoTemplate.find(fallbackQuery).sort({ templateId: 1, createdAt: -1 }).lean();
+  }
 
   if (dbTemplates.length === 0) {
     return {

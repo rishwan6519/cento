@@ -107,11 +107,15 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     }
     const filter = conditions.length > 0 ? { $or: conditions } : { templateId: templateId };
 
+    const target5DigitId = (updateData.templateId && Number(updateData.templateId) >= 10000)
+      ? Number(updateData.templateId)
+      : ((!isNaN(num) && num >= 10000) ? num : undefined);
+
     const updatedTemplate = await VideoTemplate.findOneAndUpdate(
       filter,
       {
         ...updateData,
-        ...((!isNaN(num) && num > 0) ? { templateId: num } : {}),
+        ...(target5DigitId ? { templateId: target5DigitId } : {}),
         storeUserId: resolvedUserId,
       },
       { new: true, upsert: true, setDefaultsOnInsert: true }
