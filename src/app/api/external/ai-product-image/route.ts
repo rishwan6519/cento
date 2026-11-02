@@ -7,6 +7,7 @@ import { toAbsoluteUrl } from "@/lib/urlHelper";
 import { removeProductBackground } from "@/lib/videoRenderer/imageProcessor";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 /**
  * Step 1: Write a single detailed image-generation prompt for a commercial product photo.
@@ -63,7 +64,6 @@ async function buildProductImagePrompt(
     console.warn("[ai-product-image] OpenAI chat prompt generation failed, using direct template:", err);
   }
 
-  // Fallback prompt template strictly following the user's specification
   return `${params.style} commercial product photograph of ${params.productName}: ${params.description}. Color theme: ${params.colorTheme}. ${bgLine} Ultra-realistic, professional lighting, front-facing, high resolution, no people, no text, no logos, no watermark.`;
 }
 
@@ -106,7 +106,7 @@ async function generateImageFromPrompt(
 
   let json = await res.json().catch(() => null);
 
-  // If primary model (e.g. gpt-image-2.5-flare) is rejected by current OpenAI tier/account, automatically retry with dall-e-3
+  // If primary model (e.g. gpt-image-2.5-flare) is not available on standard public API tier, fallback to dall-e-3
   if (!res.ok && primaryModel === "gpt-image-2.5-flare") {
     console.warn(`[ai-product-image] ${primaryModel} failed (${res.status} ${json?.error?.message || ""}), retrying with dall-e-3...`);
     modelUsed = "dall-e-3";
@@ -165,14 +165,16 @@ export async function POST(req: NextRequest) {
       style,
       transparent_bg,
       model,
+      async: isAsyncMode,
     } = body;
 
-    // 1. If checking job status via POST
-    if (jobId) {
+    // 1. Only check existing job status if jobId is provided WITHOUT new product creation parameters
+    const isExplicitStatusCheck = jobId && !product_name && !description;
+    if (isExplicitStatusCheck) {
       return await checkJobStatus(jobId);
     }
 
-    // 2. Otherwise start a new background job
+    // 2. Validate required creation parameters
     if (!template_id || !product_name || !description) {
       return NextResponse.json(
         { success: false, message: "Missing required fields: template_id, product_name, description (or jobId to check status)" },
@@ -212,7 +214,7 @@ export async function POST(req: NextRequest) {
       resolvedColorTheme = "natural product colors (no forced color theme)";
     }
 
-    // Save initial job state
+    // Save initial job record in MongoDB
     await CloudbasesJobModel.create({
       jobId: cloudJobId,
       userId: userId ? String(userId) : "",
@@ -223,108 +225,108 @@ export async function POST(req: NextRequest) {
       resultData: { status: "generating_prompt" },
     });
 
-    // Background async task: Direct OpenAI Two-Stage Generation
-    (async () => {
-      /*
-      // --- PREVIOUS CLOUDBASES API CALL (COMMENTED OUT AS REQUESTED) ---
-      // const apiKey = process.env.CLOUDBASES_API_KEY;
-      // const externalResponse = await fetch("https://cloudbases.in/storesparc_video/index.php/api/external/product-image", {
-      //   method: "POST",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //     "User-Agent": "CentoPlatform/1.0",
-      //     "Accept": "application/json",
-      //     "X-API-Key": apiKey || "",
-      //   },
-      //   body: JSON.stringify({
-      //     template_id: String(template_id),
-      //     product_name: String(product_name),
-      //     description: String(description),
-      //     ...(userId && { userId: String(userId) })
-      //   }),
-      // });
-      */
+    // Core worker function: Direct OpenAI generation on OUR server
+    const executeGeneration = async () => {
+      // Step 1: Write specialized commercial product photo prompt
+      const detailedPrompt = await buildProductImagePrompt(openAiKey, {
+        productName: String(product_name),
+        description: String(description),
+        colorTheme: resolvedColorTheme,
+        style: resolvedStyle,
+        transparentBg,
+      });
 
-      try {
-        // Step 1: Write single detailed commercial image-generation prompt
-        const detailedPrompt = await buildProductImagePrompt(openAiKey, {
-          productName: String(product_name),
-          description: String(description),
-          colorTheme: resolvedColorTheme,
-          style: resolvedStyle,
-          transparentBg,
-        });
+      console.log(`[ai-product-image] Generated prompt for job ${cloudJobId}: "${detailedPrompt}"`);
 
-        console.log(`[ai-product-image] Generated prompt for job ${cloudJobId}: "${detailedPrompt}"`);
-
-        // Store generated prompt in DB so polling client can display it immediately
-        await connectToDatabase();
-        await CloudbasesJobModel.findOneAndUpdate(
-          { jobId: cloudJobId },
-          {
-            $set: {
-              "resultData.prompt": detailedPrompt,
-              "resultData.status": "generating_image",
-            },
-          }
-        );
-
-        // Step 2: Generate image with OpenAI (model: gpt-image-2.5-flare / fallback)
-        const { buffer: fileBuffer, modelUsed } = await generateImageFromPrompt(
-          openAiKey,
-          detailedPrompt,
-          { model, transparentBg }
-        );
-
-        // Step 3: Save clean PNG cutout in uploads/products/ (root uploads directory)
-        const uploadDir = path.join(process.cwd(), "uploads", "products");
-        if (!fs.existsSync(uploadDir)) {
-          await fs.promises.mkdir(uploadDir, { recursive: true });
-        }
-
-        const fileName = `ai_openai_${Date.now()}_${cloudJobId.slice(0, 8)}.png`;
-        const filePath = path.join(uploadDir, fileName);
-        await fs.promises.writeFile(filePath, fileBuffer);
-
-        const relativeUrl = `/uploads/products/${fileName}`;
-        const fullUrl = toAbsoluteUrl(relativeUrl);
-
-        const resultData = {
-          success: true,
-          message: "Product image created",
-          data: {
-            template_id: String(template_id),
-            url: fullUrl,
-            relative_url: relativeUrl,
-            path: relativeUrl,
-            prompt: detailedPrompt,
-            model: modelUsed,
+      await connectToDatabase();
+      await CloudbasesJobModel.findOneAndUpdate(
+        { jobId: cloudJobId },
+        {
+          $set: {
+            "resultData.prompt": detailedPrompt,
+            "resultData.status": "generating_image",
           },
-        };
+        }
+      );
 
-        await CloudbasesJobModel.findOneAndUpdate(
-          { jobId: cloudJobId },
-          { status: "completed", resultData, completedAt: new Date() }
-        );
-      } catch (err: any) {
-        console.error("[ai-product-image] Direct OpenAI generation error:", err);
-        try {
-          await connectToDatabase();
-          await CloudbasesJobModel.findOneAndUpdate(
-            { jobId: cloudJobId },
-            { status: "failed", errorMessage: err?.message || "Unknown image generation error" }
-          );
-        } catch (_) {}
+      // Step 2: Generate image with OpenAI (model: gpt-image-2.5-flare / fallback)
+      const { buffer: fileBuffer, modelUsed } = await generateImageFromPrompt(
+        openAiKey,
+        detailedPrompt,
+        { model, transparentBg }
+      );
+
+      // Step 3: Save clean PNG cutout in uploads/products/ (on our local server)
+      const uploadDir = path.join(process.cwd(), "uploads", "products");
+      if (!fs.existsSync(uploadDir)) {
+        await fs.promises.mkdir(uploadDir, { recursive: true });
       }
-    })();
 
-    // Return jobId immediately
-    return NextResponse.json({
-      success: true,
-      status: "processing",
-      jobId: cloudJobId,
-      message: `Image generation started. Poll for result at GET /api/external/ai-product-image?jobId=${cloudJobId}`,
-    });
+      const fileName = `ai_openai_${Date.now()}_${cloudJobId.slice(0, 8)}.png`;
+      const filePath = path.join(uploadDir, fileName);
+      await fs.promises.writeFile(filePath, fileBuffer);
+
+      const relativeUrl = `/uploads/products/${fileName}`;
+      const fullUrl = toAbsoluteUrl(relativeUrl, req);
+
+      const resultData = {
+        template_id: String(template_id),
+        url: fullUrl,
+        relative_url: relativeUrl,
+        path: relativeUrl,
+        prompt: detailedPrompt,
+        model: modelUsed,
+      };
+
+      await CloudbasesJobModel.findOneAndUpdate(
+        { jobId: cloudJobId },
+        { status: "completed", resultData, completedAt: new Date() }
+      );
+
+      return resultData;
+    };
+
+    // If caller explicitly requested async mode, run in background
+    if (isAsyncMode) {
+      executeGeneration().catch((err) => {
+        console.error("[ai-product-image] Background execution error:", err);
+        CloudbasesJobModel.findOneAndUpdate(
+          { jobId: cloudJobId },
+          { status: "failed", errorMessage: err?.message || "Generation error" }
+        ).catch(() => {});
+      });
+
+      return NextResponse.json({
+        success: true,
+        status: "processing",
+        jobId: cloudJobId,
+        message: `Image generation started. Poll for result at GET /api/external/ai-product-image?jobId=${cloudJobId}`,
+      });
+    }
+
+    // Default synchronous execution: await and return the completed image directly!
+    try {
+      const resultData = await executeGeneration();
+
+      return NextResponse.json({
+        success: true,
+        status: "completed",
+        jobId: cloudJobId,
+        message: "Product image created",
+        data: resultData,
+      });
+    } catch (err: any) {
+      console.error("[ai-product-image] Generation error:", err);
+      await CloudbasesJobModel.findOneAndUpdate(
+        { jobId: cloudJobId },
+        { status: "failed", errorMessage: err?.message || "Failed to generate image" }
+      ).catch(() => {});
+
+      return NextResponse.json(
+        { success: false, status: "failed", jobId: cloudJobId, message: err?.message || "Failed to generate AI product image" },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("[POST /api/external/ai-product-image] Error:", error);
     return NextResponse.json(
