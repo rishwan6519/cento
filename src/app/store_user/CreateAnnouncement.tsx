@@ -382,7 +382,8 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
           return;
         }
         
-        onNavigate("dashboard");
+        alert(editingPlaylist ? "Announcement playlist updated and connected successfully!" : "Announcement playlist created and connected successfully!");
+        onNavigate(editingPlaylist ? "viewAllCampaigns" : "dashboard");
       } else {
         alert(data.error || "Failed to save announcement");
       }
@@ -487,12 +488,24 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
   return (
     <div className="su-ca-view">
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
-        <button onClick={() => onNavigate("mediaManagement")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+        <button 
+          onClick={() => onNavigate(editingPlaylist ? "viewAllCampaigns" : "mediaManagement")} 
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}
+          title={editingPlaylist ? "Back to All Campaigns" : "Back to Media Management"}
+        >
           <FaArrowLeft size={18} />
         </button>
-        <h1 className="su-ca-title" style={{ margin: 0 }}>{isInstant ? "Create Instant Announcement" : "Create announcement"}</h1>
+        <h1 className="su-ca-title" style={{ margin: 0 }}>
+          {editingPlaylist 
+            ? `Edit Announcement: ${playlistName || editingPlaylist.name || "Campaign"}` 
+            : (isInstant ? "Create Instant Announcement" : "Create announcement")}
+        </h1>
       </div>
-      <p className="su-ca-subtitle" style={{ marginLeft: "30px" }}>{isInstant ? "Mission control for immediate broadcast announcements" : "Create new announcement campaign"}</p>
+      <p className="su-ca-subtitle" style={{ marginLeft: "30px" }}>
+        {editingPlaylist 
+          ? "Update announcement details and connected stores" 
+          : (isInstant ? "Mission control for immediate broadcast announcements" : "Create new announcement campaign")}
+      </p>
 
       <div className="su-ca-main-grid">
         {/* Left Column */}
@@ -610,7 +623,7 @@ export default function CreateAnnouncement({ onNavigate, isInstant = false, edit
       <div className="su-ca-bottom-actions">
         <button className="su-ca-reset-btn" onClick={() => { setPlaylistName(""); setSelectedDeviceIds([]); setSelectedFiles([]); }}>Reset</button>
         <button className="su-ca-connect-btn" onClick={handleSubmit} disabled={submitting}>
-          <FaUpload size={12} /> {submitting ? "Broadcasting..." : isInstant ? "Broadcast Now" : "Connect announcement to stores"}
+          <FaUpload size={12} /> {submitting ? (editingPlaylist ? "Updating & Connecting..." : "Broadcasting...") : editingPlaylist ? "Update & connect announcement" : isInstant ? "Broadcast Now" : "Connect announcement to stores"}
         </button>
       </div>
 

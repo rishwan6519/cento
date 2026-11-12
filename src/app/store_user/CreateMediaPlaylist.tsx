@@ -332,7 +332,14 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   };
 
   const handleSubmit = async () => {
-    if (!playlistName.trim() || selectedDeviceIds.length === 0) return;
+    if (!playlistName.trim()) {
+      alert("Please enter a playlist name.");
+      return;
+    }
+    if (selectedDeviceIds.length === 0) {
+      alert("Please select at least one store device.");
+      return;
+    }
     setSubmitting(true);
     try {
       let filesPayload: any[] = [];
@@ -355,8 +362,12 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               backgroundImage: bg.imageId
             };
           });
+        } else {
+          alert("Upload failed: " + (d.error || "Unknown error"));
+          setSubmitting(false);
+          return;
         }
-      } else {
+      } else if (selectedMediaIds.length > 0) {
         filesPayload = selectedMediaIds.map(id => {
           const bg = bgSettings[id] || { enabled: false, imageId: null };
           return {
@@ -365,6 +376,23 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
             backgroundImage: bg.imageId
           };
         });
+      } else if (editingPlaylist && editingPlaylist.files && editingPlaylist.files.length > 0) {
+        filesPayload = editingPlaylist.files.map((f: any) => {
+          const fid = (f.fileId && typeof f.fileId === 'object') ? (f.fileId._id || f.fileId.id) : (f.fileId || f.mediaId?._id || f.mediaId || f._id);
+          const idStr = String(fid || "");
+          const bg = bgSettings[idStr] || { enabled: !!f.backgroundImageEnabled, imageId: f.backgroundImage || null };
+          return {
+            fileId: idStr,
+            backgroundImageEnabled: bg.enabled,
+            backgroundImage: bg.imageId
+          };
+        }).filter((f: any) => Boolean(f.fileId));
+      }
+
+      if (filesPayload.length === 0) {
+        alert("Please select or upload at least one media file for this playlist.");
+        setSubmitting(false);
+        return;
       }
 
       const body = {
@@ -389,16 +417,32 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (data.success) onNavigate("dashboard");
-    } catch { } finally { setSubmitting(false); }
+      if (res.ok && data.success) {
+        alert(editingPlaylist ? "Playlist updated and connected successfully!" : "Playlist created and connected to stores successfully!");
+        onNavigate("viewAllCampaigns");
+      } else {
+        alert(data.error || data.message || "Failed to connect playlist to stores.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error connecting playlist. Please check your connection and try again.");
+    } finally { 
+      setSubmitting(false); 
+    }
   };
   return (
     <div className="store-create-playlist-view">
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
-        <button onClick={() => onNavigate("mediaManagement")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+        <button 
+          onClick={() => onNavigate(editingPlaylist ? "viewAllCampaigns" : "mediaManagement")} 
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}
+          title={editingPlaylist ? "Back to All Campaigns" : "Back to Media Management"}
+        >
           <FaArrowLeft size={18} />
         </button>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#162B30", margin: 0 }}>Create New Media Playlist</h1>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#162B30", margin: 0 }}>
+          {editingPlaylist ? `Edit Media Playlist: ${playlistName || editingPlaylist.name || "Campaign"}` : "Create New Media Playlist"}
+        </h1>
       </div>
       {/* Step 1: Select Media */}
       <div className="store-step-card">
@@ -778,7 +822,9 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
           <div className="store-form-actions">
             <button className="store-btn-outline-grey" onClick={() => { setPlaylistName(''); setSelectedDeviceIds([]); setSelectedMediaIds([]); setSelectedFiles([]) }}>Reset</button>
             <button className="store-btn-solid-orange store-btn-solid-orange--icon" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Creating…' : 'Connect playlist to stores'}
+              {submitting 
+                ? (editingPlaylist ? 'Updating & Connecting…' : 'Connecting to stores…') 
+                : (editingPlaylist ? 'Update & connect playlist' : 'Connect playlist to stores')}
             </button>
           </div>
         </div>

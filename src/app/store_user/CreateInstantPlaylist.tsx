@@ -171,9 +171,18 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
   };
 
   const handleSubmit = async () => {
-    if (!name.trim()) return;
-    if (playlistItems.length === 0) return;
-    if (selectedDevices.length === 0) return;
+    if (!name.trim()) {
+      alert("Please enter a playlist name.");
+      return;
+    }
+    if (playlistItems.length === 0) {
+      alert("Please add at least one media item to this playlist.");
+      return;
+    }
+    if (selectedDevices.length === 0) {
+      alert("Please select at least one device.");
+      return;
+    }
     setSubmitting(true);
     try {
       const body = {
@@ -189,20 +198,36 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (data.success) onNavigate("dashboard");
-    } catch { }
-    finally { setSubmitting(false); }
+      if (res.ok && data.success) {
+        alert(editingPlaylist ? "Instant playlist updated and connected successfully!" : "Instant playlist created and connected successfully!");
+        onNavigate(editingPlaylist ? "viewAllCampaigns" : "dashboard");
+      } else {
+        alert(data.error || data.message || "Failed to save instant playlist");
+      }
+    } catch {
+      alert("Network error saving instant playlist. Please check your connection and try again.");
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (
     <div className="su-instant-playlist-view">
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
-        <button onClick={() => onNavigate("mediaManagement")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+        <button 
+          onClick={() => onNavigate(editingPlaylist ? "viewAllCampaigns" : "mediaManagement")} 
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}
+          title={editingPlaylist ? "Back to All Campaigns" : "Back to Media Management"}
+        >
           <FaArrowLeft size={18} />
         </button>
-        <h1 className="su-ip-title" style={{ margin: 0 }}>Create New Instant Playlist</h1>
+        <h1 className="su-ip-title" style={{ margin: 0 }}>
+          {editingPlaylist ? `Edit Instant Playlist: ${name || editingPlaylist.name || "Campaign"}` : "Create New Instant Playlist"}
+        </h1>
       </div>
-      <p className="su-ip-subtitle" style={{ marginLeft: "30px" }}>Build instant playlist by selecting and ordering media files</p>
+      <p className="su-ip-subtitle" style={{ marginLeft: "30px" }}>
+        {editingPlaylist ? "Update playlist items and connected devices" : "Build instant playlist by selecting and ordering media files"}
+      </p>
 
       {/* Instant Playlist Information */}
       <div className="su-ip-card">
@@ -395,7 +420,9 @@ export default function CreateInstantPlaylist({ onNavigate, editingPlaylist }: P
           onClick={handleSubmit}
           disabled={submitting}
         >
-          {submitting ? "Creating…" : "Create instant playlist"}
+          {submitting 
+            ? (editingPlaylist ? "Updating & Connecting…" : "Creating…") 
+            : (editingPlaylist ? "Update & connect playlist" : "Create instant playlist")}
         </button>
       </div>
 
