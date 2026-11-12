@@ -186,7 +186,7 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
           await connectToDatabase();
           const numId = Number(fullOptions.templateId);
           if (!isNaN(numId)) {
-            tplDoc = await VideoTemplate.findOne({ templateId: numId }).lean();
+            tplDoc = await VideoTemplate.findOne({ templateId: numId }).sort({ updatedAt: -1 }).lean();
           }
           if (!tplDoc && mongoose.Types.ObjectId.isValid(fullOptions.templateId)) {
             tplDoc = await VideoTemplate.findById(fullOptions.templateId).lean();
@@ -194,7 +194,7 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
           if (!tplDoc) {
             tplDoc = await VideoTemplate.findOne({
               $or: [{ _id: fullOptions.templateId }, { templateId: fullOptions.templateId }],
-            }).lean();
+            }).sort({ updatedAt: -1 }).lean();
           }
 
           if (tplDoc) {

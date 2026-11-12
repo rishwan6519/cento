@@ -76,7 +76,13 @@ export default function MakeVideoFromTemplateModal({
     typeof (selectedTemplate as any)?.bgGradIndex === "number" ? (selectedTemplate as any).bgGradIndex : 0
   );
   const [bgImageUrl, setBgImageUrl] = useState<string>(selectedTemplate?.backgroundUrl || "");
-  const [logoUrl, setLogoUrl] = useState<string>(selectedTemplate?.logoUrl || "");
+  const [logoUrl, setLogoUrl] = useState<string>(
+    selectedTemplate?.logoUrl ||
+      (selectedTemplate as any)?.logo_url ||
+      (selectedTemplate as any)?.layers?.logo?.url ||
+      (selectedTemplate as any)?.layers?.logo?.image ||
+      ""
+  );
 
   // ── Editable Fields: Offer & Texts ──
   const initLayers = (selectedTemplate?.aspectStore && selectedTemplate.aspectStore[aspectRatio]) || selectedTemplate?.layers || {};
@@ -170,7 +176,13 @@ export default function MakeVideoFromTemplateModal({
       setBgType("gradient");
       setBgGradIndex(typeof (t as any).bgGradIndex === "number" ? (t as any).bgGradIndex : 0);
     }
-    if (t.logoUrl) setLogoUrl(t.logoUrl);
+    setLogoUrl(
+      t.logoUrl ||
+        (t as any).logo_url ||
+        lyr?.logo?.url ||
+        lyr?.logo?.image ||
+        ""
+    );
     const tDur = Number(
       t.videoDuration ||
       (t as any)?.video_duration ||
@@ -421,11 +433,23 @@ export default function MakeVideoFromTemplateModal({
         ? String(selectedTemplate.templateId)
         : (selectedTemplate?._id || "1");
 
+      const effectiveLogo =
+        logoUrl ||
+        selectedTemplate?.logoUrl ||
+        (selectedTemplate as any)?.logo_url ||
+        (dynamicPreviewTemplate.layers as any)?.logo?.url ||
+        (dynamicPreviewTemplate.layers as any)?.logo?.image ||
+        "";
+
       const payload = {
         template_id: targetTplId,
         userId,
         product_url: productImageUrl || selectedTemplate?.productUrl || "",
         background_url: bgType === "custom" ? bgImageUrl : "",
+        logo_url: effectiveLogo,
+        aspect_backgrounds: dynamicPreviewTemplate.aspectBackgrounds,
+        aspect_store: dynamicPreviewTemplate.aspectStore,
+        decorations: (selectedTemplate as any)?.decorations,
         headline,
         discount,
         description,

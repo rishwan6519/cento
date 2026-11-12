@@ -16,14 +16,20 @@ function resolveImageBufferOrUrl(val: any, inputFiles: RenderInputFiles, field: 
   if (!str) return;
 
   if (str.startsWith('data:image/') || str.startsWith('data:audio/')) {
-    const base64Data = str.split(',')[1];
-    if (base64Data) {
-      const buf = Buffer.from(base64Data, 'base64');
-      if (field === 'product') inputFiles.productBuffer = buf;
-      if (field === 'background') inputFiles.backgroundBuffer = buf;
-      if (field === 'logo') inputFiles.logoBuffer = buf;
-      if (field === 'music') inputFiles.musicBuffer = buf;
-      return;
+    const commaIdx = str.indexOf(',');
+    if (commaIdx !== -1) {
+      const meta = str.slice(0, commaIdx);
+      const payload = str.slice(commaIdx + 1);
+      if (payload) {
+        const buf = meta.includes(';base64')
+          ? Buffer.from(payload, 'base64')
+          : Buffer.from(decodeURIComponent(payload), 'utf8');
+        if (field === 'product') inputFiles.productBuffer = buf;
+        if (field === 'background') inputFiles.backgroundBuffer = buf;
+        if (field === 'logo') inputFiles.logoBuffer = buf;
+        if (field === 'music') inputFiles.musicBuffer = buf;
+        return;
+      }
     }
   }
 
@@ -233,7 +239,7 @@ export async function POST(req: NextRequest) {
         if (/^[0-9a-fA-F]{24}$/.test(tplIdStr) && mongoose.Types.ObjectId.isValid(tplIdStr)) {
           orClauses.push({ _id: new mongoose.Types.ObjectId(tplIdStr) });
         }
-        const tplDoc = await VideoTemplate.findOne({ $or: orClauses }).lean();
+        const tplDoc = await VideoTemplate.findOne({ $or: orClauses }).sort({ updatedAt: -1 }).lean();
 
         if (!inputFiles.productBuffer && !inputFiles.productUrl) {
           const tplProd = (tplDoc as any)?.productUrl || (tplDoc?.layers as any)?.product?.url || (tplDoc?.layers as any)?.product?.image;
@@ -244,10 +250,14 @@ export async function POST(req: NextRequest) {
         }
 
         if (!inputFiles.logoBuffer && !inputFiles.logoUrl) {
+          const reqRatio = body.ratio || body.aspect_ratio || body.aspectRatio || (tplDoc as any)?.aspectRatio || '16:9';
+          const aspectStore = (tplDoc as any)?.aspectStore || {};
           const tplLogo =
             (tplDoc as any)?.logoUrl ||
             (tplDoc as any)?.logo_url ||
             (tplDoc as any)?.logoImageUrl ||
+            aspectStore?.[reqRatio]?.logo?.url ||
+            aspectStore?.[reqRatio]?.logo?.image ||
             (tplDoc?.layers as any)?.logo?.url ||
             (tplDoc?.layers as any)?.logo?.image;
           if (tplLogo) {

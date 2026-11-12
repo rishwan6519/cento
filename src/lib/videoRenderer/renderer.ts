@@ -57,13 +57,17 @@ export async function resolveAssetBuffer(urlOrPath: string): Promise<Buffer | nu
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     try {
       const parsed = new URL(trimmed);
-      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-        const clean = parsed.pathname.replace(/^\/+/, '');
+      const cleanPathname = parsed.pathname.replace(/^\/+/, '');
+      if (
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        cleanPathname.startsWith('uploads/')
+      ) {
         const localCandidates = [
-          join(process.cwd(), clean),
-          join(process.cwd(), 'uploads', clean.replace(/^uploads[\/\\]/, '')),
-          join(process.cwd(), 'public', clean),
-          join(process.cwd(), 'public', 'uploads', clean.replace(/^uploads[\/\\]/, '')),
+          join(process.cwd(), cleanPathname),
+          join(process.cwd(), 'uploads', cleanPathname.replace(/^uploads[\/\\]/, '')),
+          join(process.cwd(), 'public', cleanPathname),
+          join(process.cwd(), 'public', 'uploads', cleanPathname.replace(/^uploads[\/\\]/, '')),
         ];
         for (const cand of localCandidates) {
           if (existsSync(cand)) {

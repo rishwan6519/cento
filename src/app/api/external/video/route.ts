@@ -15,14 +15,20 @@ function resolveImageBufferOrUrl(val: any, inputFiles: RenderInputFiles, field: 
   if (!str) return;
 
   if (str.startsWith('data:image/') || str.startsWith('data:audio/')) {
-    const base64Data = str.split(',')[1];
-    if (base64Data) {
-      const buf = Buffer.from(base64Data, 'base64');
-      if (field === 'product') inputFiles.productBuffer = buf;
-      if (field === 'background') inputFiles.backgroundBuffer = buf;
-      if (field === 'logo') inputFiles.logoBuffer = buf;
-      if (field === 'music') inputFiles.musicBuffer = buf;
-      return;
+    const commaIdx = str.indexOf(',');
+    if (commaIdx !== -1) {
+      const meta = str.slice(0, commaIdx);
+      const payload = str.slice(commaIdx + 1);
+      if (payload) {
+        const buf = meta.includes(';base64')
+          ? Buffer.from(payload, 'base64')
+          : Buffer.from(decodeURIComponent(payload), 'utf8');
+        if (field === 'product') inputFiles.productBuffer = buf;
+        if (field === 'background') inputFiles.backgroundBuffer = buf;
+        if (field === 'logo') inputFiles.logoBuffer = buf;
+        if (field === 'music') inputFiles.musicBuffer = buf;
+        return;
+      }
     }
   }
 

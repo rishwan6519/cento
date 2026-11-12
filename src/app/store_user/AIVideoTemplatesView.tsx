@@ -141,14 +141,20 @@ export const TemplateCanvasPreview: React.FC<{
 
   // Load logo image if available
   React.useEffect(() => {
-    const url = template.logoUrl;
+    const curRatio = overrideRatio || template.aspectRatio || "16:9";
+    const ratioLayers = (template.aspectStore && template.aspectStore[curRatio]) || template.layers || {};
+    const url =
+      template.logoUrl ||
+      (template as any).logo_url ||
+      ratioLayers?.logo?.url ||
+      ratioLayers?.logo?.image;
     if (!url) { setLogoImg(null); return; }
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => setLogoImg(img);
     img.onerror = () => setLogoImg(null);
     img.src = url;
-  }, [template.logoUrl]);
+  }, [template.logoUrl, (template as any).logo_url, template.aspectStore, template.layers, overrideRatio, template.aspectRatio]);
 
   // Load decoration/sticker images if available
   React.useEffect(() => {
@@ -612,12 +618,14 @@ export const TemplateCanvasPreview: React.FC<{
 
     // Draw Logo
     const logoL = layers["logo"];
-    if (logoL && logoImg) {
+    if (logoL && !logoL.hidden && logoImg) {
       const minSide = Math.min(CW, CH);
-      const lSize = Math.round(minSide * ((logoL.size || 12) / 100));
+      const lW = Math.round(minSide * ((logoL.size || 12) / 100));
+      const lAspect = logoImg.naturalWidth && logoImg.naturalHeight ? logoImg.naturalWidth / logoImg.naturalHeight : 1;
+      const lH = Math.round(lW / (lAspect || 1));
       const lCx = Math.round((logoL.x ?? 0.1) * CW);
       const lCy = Math.round((logoL.y ?? 0.08) * CH);
-      ctx.drawImage(logoImg, lCx - lSize / 2, lCy - lSize / 2, lSize, lSize);
+      ctx.drawImage(logoImg, lCx - lW / 2, lCy - lH / 2, lW, lH);
     }
 
     // Draw text layers
