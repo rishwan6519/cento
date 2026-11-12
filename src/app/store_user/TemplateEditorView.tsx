@@ -1795,6 +1795,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       loadImg(productImageUrl)
         .then(setProductImgObj)
         .catch(() => setProductImgObj(null));
+    } else {
+      setProductImgObj(null);
     }
   }, [productImageUrl]);
 
@@ -1803,6 +1805,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       loadImg(logoImageUrl)
         .then(setLogoImgObj)
         .catch(() => setLogoImgObj(null));
+    } else {
+      setLogoImgObj(null);
     }
   }, [logoImageUrl]);
 
@@ -2450,10 +2454,53 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         const cy = Math.round(lL.y * H);
 
         if (logoImgObj) {
+          const lLogo = (currentLayers as any).logo || {};
           const lAspect = logoImgObj.width / logoImgObj.height;
           let lw = logoSize;
           let lh = logoSize / lAspect;
-          ctx.drawImage(logoImgObj, cx - lw / 2, cy - lh / 2, lw, lh);
+          const lx = cx - lw / 2;
+          const ly = cy - lh / 2;
+          const rad =
+            lLogo.shape === "circle"
+              ? Math.min(lw, lh) / 2
+              : lLogo.borderRadius && Number(lLogo.borderRadius) > 0
+              ? Math.min(lw, lh) * (Number(lLogo.borderRadius) / 100)
+              : 0;
+          ctx.save();
+          if (lLogo.bgMode === "color" || (lLogo.bgColor && lLogo.bgColor !== "transparent")) {
+            ctx.fillStyle = lLogo.bgColor || "#ffffff";
+            const pad = Math.round(Math.min(lw, lh) * 0.08);
+            const bx = lx - pad;
+            const by = ly - pad;
+            const bw = lw + pad * 2;
+            const bh = lh + pad * 2;
+            const bRad =
+              lLogo.shape === "circle"
+                ? Math.min(bw, bh) / 2
+                : lLogo.borderRadius !== undefined
+                ? Math.min(bw, bh) * (Number(lLogo.borderRadius) / 100)
+                : Math.min(bw, bh) * 0.12;
+            ctx.beginPath();
+            ctx.roundRect(bx, by, bw, bh, bRad);
+            ctx.fill();
+          }
+          if (rad > 0) {
+            ctx.beginPath();
+            ctx.roundRect(lx, ly, lw, lh, rad);
+            ctx.clip();
+          }
+          ctx.drawImage(logoImgObj, lx, ly, lw, lh);
+          ctx.restore();
+          const bWidth = Number(lLogo.borderWidth || (typeof lLogo.border === "number" ? lLogo.border : 0)) || 0;
+          if (bWidth > 0) {
+            ctx.save();
+            ctx.strokeStyle = lLogo.borderColor || "#ffffff";
+            ctx.lineWidth = bWidth;
+            ctx.beginPath();
+            ctx.roundRect(lx, ly, lw, lh, rad);
+            ctx.stroke();
+            ctx.restore();
+          }
         } else {
           ctx.fillStyle = "rgba(17, 181, 187, 0.85)";
           ctx.beginPath();
@@ -3422,11 +3469,23 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       setBgType((tpl as any).bgType);
     }
 
-    const rawLogo = tpl.logoUrl || (tpl as any).logoImageUrl || (tpl as any).logo_url || "";
-    if (rawLogo) setLogoImageUrl(rawLogo);
+    const rawLogo =
+      tpl.logoUrl ||
+      (tpl as any).logoImageUrl ||
+      (tpl as any).logo_url ||
+      (tpl as any).layers?.logo?.url ||
+      (tpl as any).layers?.logo?.image ||
+      "";
+    setLogoImageUrl(rawLogo);
 
-    const rawProduct = tpl.productUrl || (tpl as any).productImageUrl || (tpl as any).product_image || "";
-    if (rawProduct) setProductImageUrl(rawProduct);
+    const rawProduct =
+      tpl.productUrl ||
+      (tpl as any).productImageUrl ||
+      (tpl as any).product_image ||
+      (tpl as any).layers?.product?.url ||
+      (tpl as any).layers?.product?.image ||
+      "";
+    setProductImageUrl(rawProduct);
     const tplMusic = tpl.musicUrl || (tpl as any).music_url || "";
     if (tplMusic) {
       setMusicUrl(tplMusic);
@@ -3620,6 +3679,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         template_id: templateId || (activeTemplateNumber ? String(activeTemplateNumber) : "1"),
         userId,
         product_url: productImageUrl,
+        logo_url: logoImageUrl,
+        music_url: musicMode === "none" ? "" : musicUrl,
         background_url: currentBg,
         aspect_backgrounds: aspectBackgrounds,
         aspect_store: aspectLayers,
@@ -3705,7 +3766,16 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       const data = await res.json();
       if (data.success && data.url) {
         if (type === "product") setProductImageUrl(data.url);
-        if (type === "logo") setLogoImageUrl(data.url);
+        if (type === "logo") {
+          setLogoImageUrl(data.url);
+          setAspectLayers((prev) => ({
+            ...prev,
+            [activeRatio]: {
+              ...prev[activeRatio],
+              logo: { ...(prev[activeRatio]?.logo || {}), hidden: false },
+            },
+          }));
+        }
         if (type === "background") {
           setBgImageUrl(data.url);
           setAspectBackgrounds((prev) => ({
@@ -4885,8 +4955,30 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                     <FaImage /> Upload Brand Logo
                   </label>
                   {logoImageUrl && (
-                    <div className="ste-asset-preview">
+                    <div className="ste-asset-preview" style={{ position: "relative" }}>
                       <img src={logoImageUrl} alt="Logo" />
+                      <button
+                        type="button"
+                        title="Remove Brand Logo"
+                        onClick={() => {
+                          setLogoImageUrl("");
+                          setLogoImgObj(null);
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          background: "rgba(0,0,0,0.65)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 4,
+                          padding: "2px 6px",
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✕
+                      </button>
                     </div>
                   )}
                 </div>

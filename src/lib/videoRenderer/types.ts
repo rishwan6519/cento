@@ -57,9 +57,21 @@ export interface ProductLayer {
 
 export interface LogoLayer {
   type?: 'logo';
+  url?: string;
+  image?: string;
   x?: number;
   y?: number;
   size?: number;
+  hidden?: boolean;
+  shape?: 'none' | 'rect' | 'rounded' | 'circle' | 'pill' | string;
+  borderRadius?: number;
+  border?: string | number;
+  borderColor?: string;
+  borderWidth?: number;
+  shadow?: boolean;
+  bgMode?: 'color' | 'transparent' | string;
+  bgColor?: string;
+  cropInset?: { top: number; right: number; bottom: number; left: number };
   animation?: string;
   animStart?: number;
   animEnd?: number;

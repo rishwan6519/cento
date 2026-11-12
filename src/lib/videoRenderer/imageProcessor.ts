@@ -198,38 +198,24 @@ export async function removeProductBackground(input: Buffer): Promise<Buffer> {
 /**
  * Fit product cutout inside maxW x maxH box, preserving alpha transparency.
  */
-export async function prepareProductImage(
-  input: Buffer | string,
-  maxW: number,
-  maxH: number,
-  options?: {
-    borderRadius?: number;
-    shape?: string;
-    border?: string | number;
-    borderColor?: string;
-    borderWidth?: number;
-  }
-): Promise<{ buffer: Buffer; width: number; height: number }> {
-  let rawInput = input;
-  if (Buffer.isBuffer(input)) {
-    rawInput = await removeProductBackground(input);
-  }
+interface ImageShapeOptions {
+  borderRadius?: number;
+  shape?: string;
+  border?: string | number;
+  borderColor?: string;
+  borderWidth?: number;
+  bgMode?: string;
+  bgColor?: string;
+  shadow?: boolean;
+}
 
-  const img = sharp(rawInput);
-  const meta = await img.metadata();
-  const origW = meta.width || maxW;
-  const origH = meta.height || maxH;
-
-  const scale = Math.min(maxW / origW, maxH / origH);
-  const targetW = Math.max(1, Math.round(origW * scale));
-  const targetH = Math.max(1, Math.round(origH * scale));
-
-  let buffer = await img
-    .resize(targetW, targetH, { fit: 'inside' })
-    .png()
-    .toBuffer();
-
-  // Apply corner curvature / border-radius / shape clipping
+async function applyImageShapeAndBorder(
+  inputBuffer: Buffer,
+  targetW: number,
+  targetH: number,
+  options?: ImageShapeOptions
+): Promise<Buffer> {
+  let buffer = inputBuffer;
   const shape = options?.shape || 'none';
   const minDim = Math.min(targetW, targetH);
   let radius = 0;
@@ -257,52 +243,105 @@ export async function prepareProductImage(
       .composite([{ input: maskSvg, blend: 'dest-in' }])
       .png()
       .toBuffer();
-
-    const strokeWidth = options?.border === '1' ? (Number(options?.borderWidth) || 4) : (Number(options?.borderWidth) || 0);
-    if (strokeWidth > 0) {
-      const strokeColor = options?.borderColor || '#ffffff';
-      const borderSvg = Buffer.from(`
-        <svg width="${targetW}" height="${targetH}" xmlns="http://www.w3.org/2000/svg">
-          <rect x="${strokeWidth / 2}" y="${strokeWidth / 2}" width="${targetW - strokeWidth}" height="${targetH - strokeWidth}" rx="${radius}" ry="${radius}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
-        </svg>
-      `);
-      buffer = await sharp(buffer)
-        .composite([{ input: borderSvg, blend: 'over' }])
-        .png()
-        .toBuffer();
-    }
   }
 
-  return { buffer, width: targetW, height: targetH };
+  const strokeWidth = options?.border === '1'
+    ? (Number(options?.borderWidth) || 4)
+    : (Number(options?.borderWidth) || 0);
+  if (strokeWidth > 0) {
+    const strokeColor = options?.borderColor || '#ffffff';
+    const half = strokeWidth / 2;
+    const borderSvg = Buffer.from(`
+      <svg width="${targetW}" height="${targetH}" xmlns="http://www.w3.org/2000/svg">
+        <rect x="${half}" y="${half}" width="${Math.max(1, targetW - strokeWidth)}" height="${Math.max(1, targetH - strokeWidth)}" rx="${radius}" ry="${radius}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
+      </svg>
+    `);
+    buffer = await sharp(buffer)
+      .composite([{ input: borderSvg, blend: 'over' }])
+      .png()
+      .toBuffer();
+  }
+
+  return buffer;
 }
 
 /**
- * Fit brand logo inside white card container (like Urban Rain style).
+ * Resize and cleanly mask product image with optional curvature and border stroke.
  */
-export async function prepareLogoImage(
+export async function prepareProductImage(
   input: Buffer | string,
   maxW: number,
-  maxH: number
+  maxH: number,
+  options?: ImageShapeOptions
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const img = sharp(input);
+  let rawInput = input;
+  if (Buffer.isBuffer(input)) {
+    rawInput = await removeProductBackground(input);
+  }
+
+  const img = sharp(rawInput);
   const meta = await img.metadata();
   const origW = meta.width || maxW;
   const origH = meta.height || maxH;
 
-  const cardW = Math.max(140, Math.round(maxW * 1.3));
-  const cardH = Math.max(50, Math.round(maxH * 0.85));
-
-  const fitLogoW = Math.round(cardW * 0.82);
-  const fitLogoH = Math.round(cardH * 0.72);
-  const scale = Math.min(fitLogoW / origW, fitLogoH / origH, 1.0);
+  const scale = Math.min(maxW / origW, maxH / origH);
   const targetW = Math.max(1, Math.round(origW * scale));
   const targetH = Math.max(1, Math.round(origH * scale));
 
-  const resizedLogo = await img
-    .resize(targetW, targetH, { fit: 'inside', withoutEnlargement: true })
+  const resized = await img
+    .resize(targetW, targetH, { fit: 'inside' })
     .png()
     .toBuffer();
 
+  const buffer = await applyImageShapeAndBorder(resized, targetW, targetH, options);
+  return { buffer, width: targetW, height: targetH };
+}
+
+/**
+ * Prepare brand logo preserving transparency by default (matching Template Studio),
+ * or inside a styled card container when bgMode/bgColor is specified.
+ */
+export async function prepareLogoImage(
+  input: Buffer | string,
+  maxW: number,
+  maxH: number,
+  options?: ImageShapeOptions
+): Promise<{ buffer: Buffer; width: number; height: number }> {
+  const img = sharp(input, { density: 200 }).ensureAlpha();
+  const meta = await img.metadata();
+  const origW = meta.width || maxW;
+  const origH = meta.height || maxH;
+  const aspect = origW / origH || 1;
+
+  // Match Template Studio canvas sizing: width = maxW, height = maxW / aspect (clamped for extreme tall logos)
+  let fitW = Math.max(12, Math.round(maxW));
+  let fitH = Math.max(12, Math.round(fitW / aspect));
+  const maxAllowedH = Math.max(12, Math.round((maxH || maxW) * 1.4));
+  if (fitH > maxAllowedH) {
+    fitH = maxAllowedH;
+    fitW = Math.max(12, Math.round(fitH * aspect));
+  }
+
+  const resizedLogo = await img
+    .resize(fitW, fitH, { fit: 'inside' })
+    .png()
+    .toBuffer();
+  const rMeta = await sharp(resizedLogo).metadata();
+  const actualW = rMeta.width || fitW;
+  const actualH = rMeta.height || fitH;
+
+  const hasBgCard =
+    options?.bgMode === 'color' ||
+    (Boolean(options?.bgColor) && options?.bgColor !== 'transparent' && options?.bgColor !== 'none');
+
+  if (!hasBgCard) {
+    const styled = await applyImageShapeAndBorder(resizedLogo, actualW, actualH, options);
+    return { buffer: styled, width: actualW, height: actualH };
+  }
+
+  const cardW = Math.max(actualW + 20, Math.round(actualW * 1.25));
+  const cardH = Math.max(actualH + 14, Math.round(actualH * 1.25));
+  const bgFill = options?.bgColor && options.bgColor !== 'transparent' ? options.bgColor : '#ffffff';
   const cardSvg = `
     <svg width="${cardW}" height="${cardH}" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -310,19 +349,20 @@ export async function prepareLogoImage(
           <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.25)" />
         </filter>
       </defs>
-      <rect width="${cardW}" height="${cardH}" rx="8" fill="#ffffff" filter="url(#logoShadow)" />
+      <rect width="${cardW}" height="${cardH}" rx="8" fill="${bgFill}" filter="url(#logoShadow)" />
     </svg>
   `;
   const cardBg = await sharp(Buffer.from(cardSvg)).png().toBuffer();
-  const logoLeft = Math.round((cardW - targetW) / 2);
-  const logoTop = Math.round((cardH - targetH) / 2);
+  const logoLeft = Math.round((cardW - actualW) / 2);
+  const logoTop = Math.round((cardH - actualH) / 2);
 
   const finalCard = await sharp(cardBg)
     .composite([{ input: resizedLogo, left: logoLeft, top: logoTop }])
     .png()
     .toBuffer();
 
-  return { buffer: finalCard, width: cardW, height: cardH };
+  const styledCard = await applyImageShapeAndBorder(finalCard, cardW, cardH, options);
+  return { buffer: styledCard, width: cardW, height: cardH };
 }
 
 /**

@@ -200,7 +200,7 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
           if (tplDoc) {
             const targetRatio = fullOptions.ratio || tplDoc.aspectRatio || '16:9';
             fullOptions.ratio = targetRatio;
-            if (tplDoc.aspectStore) {
+            if (tplDoc.aspectStore && !fullOptions.aspectStore) {
               fullOptions.aspectStore = tplDoc.aspectStore;
             }
             if (tplDoc.aspectBackgrounds && !fullOptions.aspectBackgrounds) {
@@ -225,8 +225,17 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
             if (targetProd && !fullOptions.files.productUrl && !fullOptions.files.productBuffer) {
               fullOptions.files.productUrl = targetProd;
             }
-            if (tplDoc.logoUrl && !fullOptions.files.logoUrl && !fullOptions.files.logoBuffer) {
-              fullOptions.files.logoUrl = tplDoc.logoUrl;
+            const tplAspectStore = (tplDoc.aspectStore as any) || {};
+            const targetLogo =
+              tplDoc.logoUrl ||
+              (tplDoc as any).logo_url ||
+              (tplDoc as any).logoImageUrl ||
+              tplAspectStore[targetRatio]?.logo?.url ||
+              tplAspectStore[targetRatio]?.logo?.image ||
+              (tplDoc.layers as any)?.logo?.url ||
+              (tplDoc.layers as any)?.logo?.image;
+            if (targetLogo && !fullOptions.files.logoUrl && !fullOptions.files.logoBuffer) {
+              fullOptions.files.logoUrl = targetLogo;
             }
             if (tplDoc.musicUrl && !fullOptions.files.musicPath) {
               fullOptions.files.musicPath = tplDoc.musicUrl;

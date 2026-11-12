@@ -3,6 +3,7 @@ import path from "path";
 import sharp from "sharp";
 import { spawn } from "child_process";
 import { getFfmpegPath } from "./videoRenderer/ffmpegEngine";
+import { prepareLogoImage } from "./videoRenderer/imageProcessor";
 
 function escapeXml(text: string): string {
   return String(text || "")
@@ -210,6 +211,41 @@ async function renderTemplateFrame(template: any, ratio: "16:9" | "9:16", pulse 
   const valLeft = is169 ? Math.round(width * 0.55) : Math.round((width - valW) / 2);
   const valTop = is169 ? Math.round(height * 0.78) : Math.round(height * 0.80);
   overlays.push({ input: valBuf, left: valLeft, top: valTop });
+
+  // Brand Logo Overlay
+  const logoLayer = layers.logo || {};
+  const logoUrl =
+    template.logoUrl ||
+    template.logo_url ||
+    template.logoImageUrl ||
+    logoLayer.url ||
+    logoLayer.image;
+  if (logoUrl && !logoLayer.hidden) {
+    const logoBuf = await resolveAssetBuffer(logoUrl);
+    if (logoBuf) {
+      try {
+        const minSide = Math.min(width, height);
+        const logoSize = Math.max(18, Math.min(Math.round(minSide * ((logoLayer.size || 12) / 100)), Math.round(minSide * 0.8)));
+        const prep = await prepareLogoImage(logoBuf, logoSize, logoSize, {
+          borderRadius: logoLayer.borderRadius,
+          shape: logoLayer.shape,
+          border: logoLayer.border,
+          borderColor: logoLayer.borderColor,
+          borderWidth: logoLayer.borderWidth,
+          bgMode: logoLayer.bgMode,
+          bgColor: logoLayer.bgColor,
+          shadow: logoLayer.shadow,
+        });
+        const lw = Math.min(width, prep.width);
+        const lh = Math.min(height, prep.height);
+        const cx = Math.round((logoLayer.x ?? (is169 ? 0.165 : 0.5)) * width);
+        const cy = Math.round((logoLayer.y ?? (is169 ? 0.09 : 0.06)) * height);
+        const left = Math.max(0, Math.min(width - lw, Math.round(cx - lw / 2)));
+        const top = Math.max(0, Math.min(height - lh, Math.round(cy - lh / 2)));
+        overlays.push({ input: prep.buffer, left, top });
+      } catch {}
+    }
+  }
 
   return sharp(backgroundBuffer).composite(overlays).png().toBuffer();
 }

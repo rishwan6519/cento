@@ -36,12 +36,19 @@ export async function resolveAssetBuffer(urlOrPath: string): Promise<Buffer | nu
 
   // 1. Data URLs
   if (trimmed.startsWith('data:image/') || trimmed.startsWith('data:audio/')) {
-    const parts = trimmed.split(',');
-    if (parts[1]) {
-      try {
-        return Buffer.from(parts[1], 'base64');
-      } catch (err) {
-        console.warn('[videoRenderer] Failed to decode base64 data URL', err);
+    const commaIdx = trimmed.indexOf(',');
+    if (commaIdx !== -1) {
+      const meta = trimmed.slice(0, commaIdx);
+      const payload = trimmed.slice(commaIdx + 1);
+      if (payload) {
+        try {
+          if (meta.includes(';base64')) {
+            return Buffer.from(payload, 'base64');
+          }
+          return Buffer.from(decodeURIComponent(payload), 'utf8');
+        } catch (err) {
+          console.warn('[videoRenderer] Failed to decode data URL', err);
+        }
       }
     }
   }
@@ -482,10 +489,25 @@ export async function renderSingleAspect(
 
   // 3. Prepare Logo
   let logoLayerData: { buffer: Buffer; width: number; height: number; cx: number; cy: number } | undefined;
-  if (sharedAssets.logoBuffer && layers.logo) {
+  const logoLayer = layers.logo as any;
+  let effectiveLogoBuffer: Buffer | null | undefined = sharedAssets.logoBuffer;
+  const layerLogoSrc = logoLayer?.url || logoLayer?.image;
+  if (layerLogoSrc && !effectiveLogoBuffer) {
+    effectiveLogoBuffer = await resolveAssetBuffer(layerLogoSrc);
+  }
+  if (effectiveLogoBuffer && layers.logo && !logoLayer?.hidden) {
     const minSide = Math.min(width, height);
     const logoSize = Math.round(minSide * ((layers.logo.size || 12) / 100));
-    const prep = await prepareLogoImage(sharedAssets.logoBuffer, logoSize, logoSize);
+    const prep = await prepareLogoImage(effectiveLogoBuffer, logoSize, logoSize, {
+      borderRadius: logoLayer.borderRadius,
+      shape: logoLayer.shape,
+      border: logoLayer.border,
+      borderColor: logoLayer.borderColor,
+      borderWidth: logoLayer.borderWidth,
+      bgMode: logoLayer.bgMode,
+      bgColor: logoLayer.bgColor,
+      shadow: logoLayer.shadow,
+    });
     const cx = Math.round((layers.logo.x ?? 0.1) * width);
     const cy = Math.round((layers.logo.y ?? 0.08) * height);
     logoLayerData = { ...prep, cx, cy };
@@ -525,25 +547,6 @@ export async function renderSingleAspect(
       targetX,
       targetY,
       type: 'product',
-    });
-  }
-
-  // Add Logo Layer
-  if (logoLayerData) {
-    const logoFile = join(tempWorkDir, `logo_${safeRatioSlug}.png`);
-    await writeFile(logoFile, logoLayerData.buffer);
-    filesToCleanup.push(logoFile);
-
-    const targetX = Math.max(0, Math.min(width - logoLayerData.width, Math.round(logoLayerData.cx - logoLayerData.width / 2)));
-    const targetY = Math.max(0, Math.min(height - logoLayerData.height, Math.round(logoLayerData.cy - logoLayerData.height / 2)));
-    animLayers.push({
-      id: 'logo',
-      imagePath: logoFile,
-      width: logoLayerData.width,
-      height: logoLayerData.height,
-      targetX,
-      targetY,
-      type: 'logo',
     });
   }
 
@@ -653,6 +656,25 @@ export async function renderSingleAspect(
         console.warn(`[renderer] Failed to render decor item ${i}:`, decErr);
       }
     }
+  }
+
+  // Add Logo Layer (Top Layer, matching compositeStillFrame z-order)
+  if (logoLayerData) {
+    const logoFile = join(tempWorkDir, `logo_${safeRatioSlug}.png`);
+    await writeFile(logoFile, logoLayerData.buffer);
+    filesToCleanup.push(logoFile);
+
+    const targetX = Math.max(0, Math.min(width - logoLayerData.width, Math.round(logoLayerData.cx - logoLayerData.width / 2)));
+    const targetY = Math.max(0, Math.min(height - logoLayerData.height, Math.round(logoLayerData.cy - logoLayerData.height / 2)));
+    animLayers.push({
+      id: 'logo',
+      imagePath: logoFile,
+      width: logoLayerData.width,
+      height: logoLayerData.height,
+      targetX,
+      targetY,
+      type: 'logo',
+    });
   }
 
   // Prepare fallback composite frame
@@ -780,8 +802,24 @@ export async function renderOfferVideo(options: RenderOptions): Promise<RenderJo
 
     // 3. Resolve logo asset
     let logoBuffer: Buffer | null = null;
+    let logoSource =
+      options.files.logoUrl ||
+      options.files.logoPath ||
+      (options.layers?.logo as any)?.url ||
+      (options.layers?.logo as any)?.image;
+    if (!logoSource && options.aspectStore) {
+      for (const rKey of Object.keys(options.aspectStore)) {
+        const lObj = (options.aspectStore[rKey] as any)?.logo;
+        if (lObj?.url || lObj?.image) {
+          logoSource = lObj.url || lObj.image;
+          break;
+        }
+      }
+    }
     if (options.files.logoBuffer) {
       logoBuffer = options.files.logoBuffer;
+    } else if (logoSource) {
+      logoBuffer = await resolveAssetBuffer(logoSource);
     }
 
     const sharedAssets = {

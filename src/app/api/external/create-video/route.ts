@@ -213,26 +213,50 @@ export async function POST(req: NextRequest) {
       resolveImageBufferOrUrl(rawMusicVal, inputFiles, 'music');
     }
 
-    // 3rd Priority: Template constant/saved product image fallback
-    if (!inputFiles.productBuffer && !inputFiles.productUrl && templateId) {
+    // 3rd Priority: Template constant/saved product & brand logo fallback
+    if (
+      templateId &&
+      ((!inputFiles.productBuffer && !inputFiles.productUrl) ||
+        (!inputFiles.logoBuffer && !inputFiles.logoUrl))
+    ) {
       try {
         const { connectToDatabase } = await import('@/lib/db');
         await connectToDatabase();
+        const mongoose = (await import('mongoose')).default;
         const VideoTemplate = (await import('@/models/VideoTemplate')).default;
-        const numId = Number(templateId);
-        const tplDoc = await VideoTemplate.findOne({
-          $or: [
-            ...(!isNaN(numId) ? [{ templateId: numId }] : []),
-            { templateId: String(templateId) },
-          ]
-        }).lean();
-        const tplProd = (tplDoc as any)?.productUrl || (tplDoc?.layers as any)?.product?.url || (tplDoc?.layers as any)?.product?.image;
-        if (tplProd) {
-          console.log('[create-video] Using template ' + templateId + ' constant product image: ' + tplProd);
-          resolveImageBufferOrUrl(tplProd, inputFiles, 'product');
+        const tplIdStr = String(templateId).trim();
+        const numId = Number(tplIdStr);
+        const orClauses: any[] = [
+          ...(!isNaN(numId) && tplIdStr !== '' ? [{ templateId: numId }] : []),
+          { templateId: tplIdStr },
+        ];
+        if (/^[0-9a-fA-F]{24}$/.test(tplIdStr) && mongoose.Types.ObjectId.isValid(tplIdStr)) {
+          orClauses.push({ _id: new mongoose.Types.ObjectId(tplIdStr) });
+        }
+        const tplDoc = await VideoTemplate.findOne({ $or: orClauses }).lean();
+
+        if (!inputFiles.productBuffer && !inputFiles.productUrl) {
+          const tplProd = (tplDoc as any)?.productUrl || (tplDoc?.layers as any)?.product?.url || (tplDoc?.layers as any)?.product?.image;
+          if (tplProd) {
+            console.log('[create-video] Using template ' + templateId + ' constant product image: ' + tplProd);
+            resolveImageBufferOrUrl(tplProd, inputFiles, 'product');
+          }
+        }
+
+        if (!inputFiles.logoBuffer && !inputFiles.logoUrl) {
+          const tplLogo =
+            (tplDoc as any)?.logoUrl ||
+            (tplDoc as any)?.logo_url ||
+            (tplDoc as any)?.logoImageUrl ||
+            (tplDoc?.layers as any)?.logo?.url ||
+            (tplDoc?.layers as any)?.logo?.image;
+          if (tplLogo) {
+            console.log('[create-video] Using template ' + templateId + ' brand logo: ' + tplLogo);
+            resolveImageBufferOrUrl(tplLogo, inputFiles, 'logo');
+          }
         }
       } catch (tErr) {
-        console.warn('[create-video] Could not load template product image:', tErr);
+        console.warn('[create-video] Could not load template asset fallback:', tErr);
       }
     }
 
