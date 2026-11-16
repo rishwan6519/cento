@@ -2261,7 +2261,16 @@ export default function AccountAdminDashboard() {
       return;
     }
     if (hasSubItems) {
-      setExpandedMenu(expandedMenu === linkId ? "" : linkId);
+      const isAlreadyExpanded = expandedMenu === linkId;
+      setExpandedMenu(isAlreadyExpanded ? "" : linkId);
+      const targetLink = rawSidebarLinks.find(l => l.id === linkId);
+      if (targetLink?.subItems && targetLink.subItems.length > 0) {
+        const isCurrentSubActive = targetLink.subItems.some(sub => sub.id === activeView);
+        if (!isCurrentSubActive) {
+          const defaultSub = linkId === "stores" ? "all_stores" : linkId === "users" ? "all_users" : targetLink.subItems[0].id;
+          setActiveView(defaultSub);
+        }
+      }
     } else {
       setActiveView(linkId);
       setExpandedMenu("");
@@ -2319,46 +2328,87 @@ export default function AccountAdminDashboard() {
 
         <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
           {sidebarLinks.map((link) => {
-             const isExpanded = expandedMenu === link.id;
+             const isParentOfActive = !!link.subItems?.some(sub => sub.id === activeView);
+             const isExpanded = expandedMenu === link.id || isParentOfActive;
              const isDirectlyActive = activeView === link.id;
-             const isParentOfActive = link.subItems?.some(sub => sub.id === activeView);
              
              return (
                <div key={link.id} className="mb-1">
                  <button
+                   type="button"
                    onClick={() => handleMenuClick(link.id, !!link.subItems)}
-                   className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 ${
+                   className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 cursor-pointer select-none ${
                      isDirectlyActive
-                       ? "bg-[#FF5722] text-white shadow-lg shadow-[#FF5722]/20"
+                       ? "bg-[#FF5722] text-white shadow-lg shadow-[#FF5722]/20 font-semibold"
+                       : isParentOfActive
+                       ? "bg-white/10 text-white font-semibold"
                        : "hover:bg-white/5 text-white/70 hover:text-white"
                    }`}
                  >
                    <div className="flex items-center gap-3">
-                     <link.icon size={20} className={(isDirectlyActive || isParentOfActive) && !isDirectlyActive ? "text-[#00BCD4]" : (isDirectlyActive ? "text-white" : "text-[#00BCD4]")} />
+                     <link.icon
+                       size={20}
+                       className={
+                         isDirectlyActive
+                           ? "text-white"
+                           : isParentOfActive
+                           ? "text-[#00BCD4]"
+                           : "text-[#00BCD4]"
+                       }
+                     />
                      <span className="text-sm font-medium pr-2">{link.label}</span>
                    </div>
                    {link.subItems && (
-                     <ChevronDown size={16} className={`opacity-60 transition-transform ${isExpanded ? "rotate-180" : ""} ${isDirectlyActive ? "text-white" : ""}`} />
+                     <div
+                       role="button"
+                       tabIndex={0}
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         setExpandedMenu(isExpanded ? "" : link.id);
+                       }}
+                       className="p-1 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                       title={isExpanded ? "Collapse" : "Expand"}
+                     >
+                       <ChevronDown
+                         size={16}
+                         className={`opacity-60 transition-transform duration-200 ${
+                           isExpanded ? "rotate-180" : ""
+                         } ${isDirectlyActive || isParentOfActive ? "text-white" : ""}`}
+                       />
+                     </div>
                    )}
                  </button>
 
                  {/* Expanded Sub-items */}
                  {link.subItems && isExpanded && (
-                   <div className="mt-2 space-y-1 ml-4 pl-4 border-l border-white/10">
-                     {link.subItems.map(subItem => (
-                       <button
-                         key={subItem.id}
-                         onClick={() => setActiveView(subItem.id)}
-                         className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
-                           activeView === subItem.id
-                             ? "bg-[#FF5722] text-white shadow-sm"
-                             : "text-white/60 hover:text-white hover:bg-white/5"
-                         }`}
-                       >
-                         {activeView === subItem.id ? <subItem.icon size={16} className="text-white opacity-100 shrink-0" /> : <ListIcon size={16} className="opacity-60 shrink-0"/>}
-                         <span className="text-left whitespace-normal leading-tight">{subItem.label}</span>
-                       </button>
-                     ))}
+                   <div className="mt-1 space-y-1 ml-4 pl-4 border-l border-white/10">
+                     {link.subItems.map(subItem => {
+                       const isSubActive = activeView === subItem.id;
+                       return (
+                         <button
+                           type="button"
+                           key={subItem.id}
+                           onClick={(e) => {
+                             e.preventDefault();
+                             e.stopPropagation();
+                             setActiveView(subItem.id);
+                             setExpandedMenu(link.id);
+                           }}
+                           className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm font-medium cursor-pointer select-none ${
+                             isSubActive
+                               ? "bg-[#FF5722] text-white shadow-md shadow-[#FF5722]/30 font-bold"
+                               : "text-white/70 hover:text-white hover:bg-white/10"
+                           }`}
+                         >
+                           {isSubActive ? (
+                             <subItem.icon size={16} className="text-white opacity-100 shrink-0" />
+                           ) : (
+                             <ListIcon size={16} className="text-[#00BCD4] opacity-75 shrink-0" />
+                           )}
+                           <span className="text-left whitespace-normal leading-tight">{subItem.label}</span>
+                         </button>
+                       );
+                     })}
                    </div>
                  )}
                </div>
@@ -2366,7 +2416,11 @@ export default function AccountAdminDashboard() {
           })}
 
           <div className="mt-4 pt-4 border-t border-white/10">
-            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 hover:bg-white/5 text-white/70 hover:text-white">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 hover:bg-white/5 text-white/70 hover:text-white cursor-pointer select-none"
+            >
               <LogOut size={20} className="text-[#00BCD4]" />
               <span className="text-sm font-medium">Logout</span>
             </button>
