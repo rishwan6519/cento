@@ -57,12 +57,15 @@ export async function GET(req: NextRequest, context: RouteContext) {
       );
     }
 
+    const targetDefRatio = template.defaultAspectRatio || template.aspectRatio || '16:9';
     return NextResponse.json({
       success: true,
       data: {
         ...template,
         _id: String(template._id),
         templateId: template.templateId || 10001,
+        defaultAspectRatio: targetDefRatio,
+        default_aspect_ratio: targetDefRatio,
       },
     });
   } catch (error) {

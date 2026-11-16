@@ -638,7 +638,9 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
   onEdit,
 }) => {
   const [activeRatio, setActiveRatio] = useState<AspectRatio>(
-    (template.aspectRatio as AspectRatio) && ["16:9", "9:16", "1:1", "4:5"].includes(template.aspectRatio as AspectRatio)
+    (template.defaultAspectRatio as AspectRatio) && ["16:9", "9:16", "1:1", "4:5"].includes(template.defaultAspectRatio as AspectRatio)
+      ? (template.defaultAspectRatio as AspectRatio)
+      : (template.aspectRatio as AspectRatio) && ["16:9", "9:16", "1:1", "4:5"].includes(template.aspectRatio as AspectRatio)
       ? (template.aspectRatio as AspectRatio)
       : "16:9"
   );
@@ -1515,6 +1517,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
   // Aspect settings
   const [activeRatio, setActiveRatio] = useState<AspectRatio>(initialRatio || "16:9");
+  const [defaultRatio, setDefaultRatio] = useState<AspectRatio>(initialRatio || "16:9");
   const [duration, setDuration] = useState(10);
   const [fps, setFps] = useState(30);
   const [resolution, setResolution] = useState(720);
@@ -3281,7 +3284,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       const payload = {
         templateName: nameToSave,
         templateId: targetNumericId,
-        aspectRatio: activeRatio,       // primary/active ratio
+        aspectRatio: defaultRatio || activeRatio,       // primary/default ratio
+        defaultAspectRatio: defaultRatio || activeRatio, // explicit default aspect ratio for preview GIF & video creation
         videoDuration: duration || 10,
         musicUrl: musicMode === "none" ? "" : (musicUrl || `/audio/presets/${selectedPresetId}.mp3`),
         fps,
@@ -3364,7 +3368,9 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     const tplDur = Number(tpl.videoDuration || (tpl as any).video_duration || (tpl as any).duration);
     if (tplDur && !isNaN(tplDur)) setDuration(tplDur);
 
-    const targetRatio: AspectRatio = preferRatio || initialRatio || (tpl.aspectRatio && ["9:16", "16:9", "1:1", "4:5"].includes(tpl.aspectRatio) ? tpl.aspectRatio as AspectRatio : "16:9");
+    const tplDefRatio: AspectRatio = ((tpl as any).defaultAspectRatio || (tpl.aspectRatio && ["9:16", "16:9", "1:1", "4:5"].includes(tpl.aspectRatio) ? tpl.aspectRatio as AspectRatio : "16:9"));
+    setDefaultRatio(tplDefRatio);
+    const targetRatio: AspectRatio = preferRatio || initialRatio || tplDefRatio;
     setActiveRatio(targetRatio);
 
     // Helper to deeply sanitize and merge layers ensuring type: "text" is never missing
@@ -3609,6 +3615,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     setTemplateName(finalName);
     setDuration(newTplDuration);
     setActiveRatio(newTplRatio);
+    setDefaultRatio(newTplRatio);
     setOfferType(newTplOfferType);
     setAspectLayers(DEFAULT_LAYERS);
     setBgImageUrl("");
@@ -3631,6 +3638,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           templateName: finalName,
           templateId: nextId,
           aspectRatio: newTplRatio,          // primary ratio
+          defaultAspectRatio: newTplRatio,
           videoDuration: newTplDuration,
           offerType: newTplOfferType,
           offertypeId: selectedOfferTypeId,
@@ -4410,11 +4418,50 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                       key={r}
                       className={`ste-ratio-chip ${activeRatio === r ? "ste-ratio-chip--active" : ""}`}
                       onClick={() => setActiveRatio(r)}
-                      title={`Edit ${r} layout — ${ASPECT_SPECS[r].label}`}
+                      title={`Edit ${r} layout — ${ASPECT_SPECS[r].label}${defaultRatio === r ? " (Default Aspect Ratio)" : ""}`}
                     >
-                      {r}
+                      {defaultRatio === r ? `★ ${r}` : r}
                     </button>
                   ))}
+                </div>
+
+                {/* Default Aspect Ratio Selection */}
+                <div style={{ marginTop: "8px", padding: "8px 10px", background: "rgba(255, 255, 255, 0.04)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "0.72rem", color: "#A4B6B9", fontWeight: 700 }}>
+                      ⭐ Default Aspect Ratio
+                    </span>
+                    <span style={{ fontSize: "0.65rem", color: "#F59E0B", fontWeight: 800 }}>
+                      {defaultRatio} (Default Preview &amp; Output)
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {(["16:9", "9:16", "1:1", "4:5"] as AspectRatio[]).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setDefaultRatio(r);
+                          showToast(`⭐ Set ${r} as Default Aspect Ratio for preview GIF & video output`);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "5px 4px",
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          borderRadius: "6px",
+                          border: defaultRatio === r ? "1px solid #F59E0B" : "1px solid rgba(255, 255, 255, 0.12)",
+                          background: defaultRatio === r ? "rgba(245, 158, 11, 0.2)" : "rgba(255, 255, 255, 0.03)",
+                          color: defaultRatio === r ? "#FBBF24" : "#94A3B8",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                        title={`Make ${r} the default aspect ratio for preview GIF and primary video creation`}
+                      >
+                        {defaultRatio === r ? `★ ${r}` : r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 {/* AI Auto-Optimize all ratios */}
                 <button

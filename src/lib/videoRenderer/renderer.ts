@@ -927,12 +927,15 @@ export async function renderOfferVideo(options: RenderOptions): Promise<RenderJo
       }
     }
 
-    // Default primaryVideo to 16:9 if present and user did not explicitly override ratio
-    if (!options.ratio || options.ratio === '16:9') {
-      const v169 = result.videos.find((v) => v.ratio === '16:9');
-      if (v169) {
-        result.primaryVideo = v169;
-      }
+    // Ensure primaryVideo matches options.ratio (or primaryRatio) and is at index 0 of result.videos
+    const targetPrimaryRatio = (options.ratio as AspectRatio) || primaryRatio || '16:9';
+    const foundPrimary = result.videos.find((v) => v.ratio === targetPrimaryRatio) || primaryVideo || result.videos[0];
+    if (foundPrimary) {
+      result.primaryVideo = foundPrimary;
+      result.videos = [
+        foundPrimary,
+        ...result.videos.filter((v) => v !== foundPrimary),
+      ];
     }
 
     result.status = 'completed';

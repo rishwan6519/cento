@@ -220,11 +220,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 3rd Priority: Template constant/saved product & brand logo fallback
-    if (
-      templateId &&
-      ((!inputFiles.productBuffer && !inputFiles.productUrl) ||
-        (!inputFiles.logoBuffer && !inputFiles.logoUrl))
-    ) {
+    let tplDoc: any = null;
+    if (templateId) {
       try {
         const { connectToDatabase } = await import('@/lib/db');
         await connectToDatabase();
@@ -239,9 +236,9 @@ export async function POST(req: NextRequest) {
         if (/^[0-9a-fA-F]{24}$/.test(tplIdStr) && mongoose.Types.ObjectId.isValid(tplIdStr)) {
           orClauses.push({ _id: new mongoose.Types.ObjectId(tplIdStr) });
         }
-        const tplDoc = await VideoTemplate.findOne({ $or: orClauses }).sort({ updatedAt: -1 }).lean();
+        tplDoc = await VideoTemplate.findOne({ $or: orClauses }).sort({ updatedAt: -1 }).lean();
 
-        if (!inputFiles.productBuffer && !inputFiles.productUrl) {
+        if (!inputFiles.productBuffer && !inputFiles.productUrl && tplDoc) {
           const tplProd = (tplDoc as any)?.productUrl || (tplDoc?.layers as any)?.product?.url || (tplDoc?.layers as any)?.product?.image;
           if (tplProd) {
             console.log('[create-video] Using template ' + templateId + ' constant product image: ' + tplProd);
@@ -249,8 +246,8 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        if (!inputFiles.logoBuffer && !inputFiles.logoUrl) {
-          const reqRatio = body.ratio || body.aspect_ratio || body.aspectRatio || (tplDoc as any)?.aspectRatio || '16:9';
+        if (!inputFiles.logoBuffer && !inputFiles.logoUrl && tplDoc) {
+          const reqRatio = body.ratio || body.aspect_ratio || body.aspectRatio || (tplDoc as any)?.defaultAspectRatio || (tplDoc as any)?.aspectRatio || '16:9';
           const aspectStore = (tplDoc as any)?.aspectStore || {};
           const tplLogo =
             (tplDoc as any)?.logoUrl ||
@@ -289,7 +286,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ratio = body.ratio || body.aspect_ratio || body.aspectRatio || '16:9';
+    const ratio = body.ratio || body.aspect_ratio || body.aspectRatio || (tplDoc as any)?.defaultAspectRatio || (tplDoc as any)?.aspectRatio || '16:9';
     const resolution = Number(body.resolution) || 720;
     const rawDur = body.duration ?? body.videoDuration ?? body.video_duration;
     const duration = rawDur ? Number(rawDur) : undefined;

@@ -5,6 +5,7 @@ import { RenderInputFiles } from '@/lib/videoRenderer/types';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { toAbsoluteUrl } from '@/lib/urlHelper';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -201,7 +202,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ratio = body.ratio || body.aspect_ratio || body.aspectRatio || '16:9';
+    let ratio = body.ratio || body.aspect_ratio || body.aspectRatio;
+    if (!ratio && templateId) {
+      try {
+        const { default: VideoTemplate } = await import('@/models/VideoTemplate');
+        const tplDoc = await VideoTemplate.findOne({
+          $or: [
+            ...(!isNaN(Number(templateId)) ? [{ templateId: Number(templateId) }] : []),
+            { templateId: String(templateId) },
+            ...(mongoose.Types.ObjectId.isValid(templateId) ? [{ _id: new mongoose.Types.ObjectId(templateId) }] : []),
+          ],
+        }).select('defaultAspectRatio aspectRatio').lean();
+        if (tplDoc) {
+          ratio = (tplDoc as any).defaultAspectRatio || (tplDoc as any).aspectRatio;
+        }
+      } catch {}
+    }
+    if (!ratio) {
+      ratio = '16:9';
+    }
     const resolution = Number(body.resolution) || 720;
     const rawDur = body.duration ?? body.videoDuration ?? body.video_duration;
     const duration = rawDur ? Number(rawDur) : undefined;

@@ -22,6 +22,7 @@ export interface VideoTemplate {
   templateDescription?: string;
   description?: string;
   aspectRatio?: string;
+  defaultAspectRatio?: string;
   videoDuration?: number;
   animationStyle?: string;
   language?: string;

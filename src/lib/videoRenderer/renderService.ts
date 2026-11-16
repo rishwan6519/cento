@@ -198,7 +198,7 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
           }
 
           if (tplDoc) {
-            const targetRatio = fullOptions.ratio || tplDoc.aspectRatio || '16:9';
+            const targetRatio = fullOptions.ratio || (tplDoc as any).defaultAspectRatio || tplDoc.aspectRatio || '16:9';
             fullOptions.ratio = targetRatio;
             if (tplDoc.aspectStore && !fullOptions.aspectStore) {
               fullOptions.aspectStore = tplDoc.aspectStore;
@@ -250,6 +250,18 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
       }
 
       const finalResult = await renderOfferVideo(fullOptions);
+      const primaryTargetRatio = fullOptions.ratio || (tplDoc as any)?.defaultAspectRatio || (tplDoc as any)?.aspectRatio || '16:9';
+      if (finalResult.videos && Array.isArray(finalResult.videos)) {
+        finalResult.videos.sort((a, b) => {
+          if (a.ratio === primaryTargetRatio) return -1;
+          if (b.ratio === primaryTargetRatio) return 1;
+          return 0;
+        });
+      }
+      const primaryVid = finalResult.videos?.find((v) => v.ratio === primaryTargetRatio) || finalResult.primaryVideo || finalResult.videos?.[0];
+      if (primaryVid) {
+        finalResult.primaryVideo = primaryVid;
+      }
       await persistJobState(jobId, finalResult);
 
       // Save all generated videos (all 4 aspect ratios) to MongoDB MediaItemModel
@@ -319,7 +331,8 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
           // Update VideoTemplate with latest rendered video pack
           if (tplDoc && tplDoc._id && finalResult.videos && finalResult.videos.length > 0) {
             try {
-              const primaryVid = finalResult.videos.find((v) => v.ratio === '16:9') || finalResult.primaryVideo || finalResult.videos[0];
+              const primaryTargetRatio = fullOptions.ratio || (tplDoc as any)?.defaultAspectRatio || (tplDoc as any)?.aspectRatio || '16:9';
+              const primaryVid = finalResult.videos.find((v) => v.ratio === primaryTargetRatio) || finalResult.primaryVideo || finalResult.videos[0];
               await VideoTemplate.findByIdAndUpdate(tplDoc._id, {
                 $set: {
                   lastRenderedVideoUrl: primaryVid?.url,
@@ -347,17 +360,18 @@ export async function queueRenderJob(options: Omit<RenderOptions, 'jobId'> & { j
         const cloudJob = await CloudbasesJob.findOne({ jobId });
         if (cloudJob) {
           cloudJob.status = finalResult.status === 'completed' ? 'completed' : 'failed';
-          const default16_9 = finalResult.videos.find((v) => v.ratio === '16:9') || finalResult.primaryVideo;
+          const primaryTargetRatio = fullOptions.ratio || (tplDoc as any)?.defaultAspectRatio || (tplDoc as any)?.aspectRatio || '16:9';
+          const primaryVid = finalResult.videos.find((v) => v.ratio === primaryTargetRatio) || finalResult.primaryVideo || finalResult.videos[0];
           cloudJob.resultData = {
             data: {
               status: finalResult.status,
               videos: finalResult.videos,
-              url: default16_9?.url,
-              file: default16_9?.file,
-              ratio: default16_9?.ratio,
+              url: primaryVid?.url,
+              file: primaryVid?.file,
+              ratio: primaryVid?.ratio,
             },
             videos: finalResult.videos,
-            primaryVideo: default16_9,
+            primaryVideo: primaryVid,
           };
           await cloudJob.save();
         }

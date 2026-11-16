@@ -55,7 +55,7 @@ export default function MakeVideoFromTemplateModal({
 
   // ── Aspect Ratio & Settings ──
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(
-    (initialTemplate?.aspectRatio as AspectRatio) || (selectedTemplate?.aspectRatio as AspectRatio) || "16:9"
+    ((initialTemplate as any)?.defaultAspectRatio as AspectRatio) || (initialTemplate?.aspectRatio as AspectRatio) || ((selectedTemplate as any)?.defaultAspectRatio as AspectRatio) || (selectedTemplate?.aspectRatio as AspectRatio) || "16:9"
   );
   const [generatePack, setGeneratePack] = useState<boolean>(true);
   const initialDur = Number(
@@ -153,7 +153,7 @@ export default function MakeVideoFromTemplateModal({
   // ── Handle Switching Template from Dropdown ──
   const handleSelectTemplate = (t: VideoTemplate) => {
     setSelectedTemplate(t);
-    const targetRatio = (t.aspectRatio as AspectRatio) || "16:9";
+    const targetRatio = ((t as any)?.defaultAspectRatio as AspectRatio) || (t.aspectRatio as AspectRatio) || "16:9";
     setAspectRatio(targetRatio);
 
     // Get layer definitions for this template

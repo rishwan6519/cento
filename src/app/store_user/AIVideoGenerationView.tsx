@@ -311,7 +311,8 @@ const AIVideoGenerationView: React.FC = () => {
     setSelectedTemplateId(tId);
     const tmpl = videoTemplates.find((t) => t._id === tId);
     if (tmpl) {
-      if (tmpl.aspectRatio) setAspectRatio(tmpl.aspectRatio as AspectRatio);
+      const targetRatio = (tmpl as any).defaultAspectRatio || tmpl.aspectRatio;
+      if (targetRatio) setAspectRatio(targetRatio as AspectRatio);
       if (tmpl.videoDuration && selectedModel.supportedDurations.includes(Number(tmpl.videoDuration))) setDuration(Number(tmpl.videoDuration));
       if (tmpl.aiModel && MODELS.some((m) => m.name === tmpl.aiModel)) {
         setAiModel(tmpl.aiModel);
@@ -599,7 +600,7 @@ const AIVideoGenerationView: React.FC = () => {
             <Select id="aivg-tmpl" label="AI Video Template (Optional)" value={selectedTemplateId} onChange={handleTemplateChange}
               options={[
                 { value: "", label: "None – Custom Setup" },
-                ...videoTemplates.map((t) => ({ value: t._id, label: `${t.templateName} (${t.aspectRatio})` })),
+                ...videoTemplates.map((t) => ({ value: t._id, label: `${t.templateName} (${(t as any).defaultAspectRatio || t.aspectRatio || "16:9"})` })),
               ]} />
             <Select id="aivg-res" label="Resolution" value={resolution} onChange={handleResolutionChange}
               options={[

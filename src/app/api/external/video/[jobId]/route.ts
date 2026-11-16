@@ -18,8 +18,16 @@ export async function GET(
       return NextResponse.json({ success: false, message: 'Job not found' }, { status: 404 });
     }
 
-    // Default to 16:9 video as primary response
-    const primary = (job.videos && job.videos.find((v) => v.ratio === '16:9')) || job.primaryVideo || job.videos[0];
+    // Pick primary video matching target ratio first
+    const targetRatio = (job as any)?.ratio || (job?.primaryVideo && (job.primaryVideo as any).ratio) || '16:9';
+    if (job.videos && Array.isArray(job.videos)) {
+      job.videos.sort((a, b) => {
+        if (a.ratio === targetRatio) return -1;
+        if (b.ratio === targetRatio) return 1;
+        return 0;
+      });
+    }
+    const primary = (job.videos && job.videos.find((v) => v.ratio === targetRatio)) || job.primaryVideo || (job.videos && job.videos.find((v) => v.ratio === '16:9')) || job.videos?.[0];
 
     if (job.status === 'completed' && primary) {
       return NextResponse.json({

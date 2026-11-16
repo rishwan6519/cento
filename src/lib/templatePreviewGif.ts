@@ -367,6 +367,8 @@ export async function generateTemplatePreviewGif(template: any, ratio: "16:9" | 
 export function ensureTemplatePreviewGifs(template: any, forceRefresh = false): {
   preview_16_9: string;
   preview_9_16: string;
+  default_preview: string;
+  defaultRatio: string;
 } {
   let tplId = Number(template.templateId || template.id);
   if (!tplId || isNaN(tplId) || tplId < 1000) {
@@ -398,8 +400,13 @@ export function ensureTemplatePreviewGifs(template: any, forceRefresh = false): 
       .catch((e) => console.error(`[ensureTemplatePreviewGifs] 9:16 error for tpl ${tplId}:`, e));
   }
 
+  const defaultRatio = String(template.defaultAspectRatio || template.aspectRatio || "16:9").trim();
+  const default_preview = defaultRatio === "9:16" ? rel916 : rel169;
+
   return {
     preview_16_9: rel169,
     preview_9_16: rel916,
+    default_preview,
+    defaultRatio,
   };
 }

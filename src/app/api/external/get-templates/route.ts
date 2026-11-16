@@ -24,13 +24,14 @@ function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: strin
   const otName = t.offertypename || (t.offer_type && (t.offer_type.name || t.offer_type.offertypename)) || t.offerType || "Individual Discount";
   
   // Ensure animated GIF preview files exist on disk and get direct URLs with current domain
-  const { preview_16_9: rel169, preview_9_16: rel916 } = ensureTemplatePreviewGifs({ ...t, templateId: tplId });
+  const { preview_16_9: rel169, preview_9_16: rel916, default_preview: relDefault, defaultRatio } = ensureTemplatePreviewGifs({ ...t, templateId: tplId });
   const preview169 = `${baseUrl}${rel169}`;
   const preview916 = `${baseUrl}${rel916}`;
+  const defaultPreview = `${baseUrl}${relDefault}`;
 
   const durationSec = Number(t.videoDuration || t.duration_seconds || t.duration || 10);
-  const width = t.base_width || (t.aspectRatio === "9:16" ? 1080 : 1920);
-  const height = t.base_height || (t.aspectRatio === "9:16" ? 1920 : 1080);
+  const width = t.base_width || (defaultRatio === "9:16" ? 1080 : 1920);
+  const height = t.base_height || (defaultRatio === "9:16" ? 1920 : 1080);
 
   const actualUserId = creator?._id ? String(creator._id) : (t.storeUserId ? String(t.storeUserId) : (t.userId ? String(t.userId) : undefined));
   const actualUserName = creator?.storeName || creator?.username || creator?.operatorName || undefined;
@@ -42,6 +43,10 @@ function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: strin
     template_id: tplId,
     name: t.templateName || `template-${tplId}`,
     status: t.status === "Inactive" ? "inactive" : "approved",
+    default_aspect_ratio: defaultRatio,
+    defaultAspectRatio: defaultRatio,
+    aspect_ratio: defaultRatio,
+    aspectRatio: defaultRatio,
     base_width: width,
     base_height: height,
     duration_seconds: durationSec,
@@ -58,9 +63,10 @@ function formatTemplateItem(t: any, index: number, creator?: any, baseUrl: strin
     offertypename: otName,
     preview_16_9: preview169,
     preview_9_16: preview916,
-    preview_url: preview169,
-    thumbnail: preview169,
-    thumbnail_url: preview169,
+    preview_url: defaultPreview,
+    previewUrl: defaultPreview,
+    thumbnail: defaultPreview,
+    thumbnail_url: defaultPreview,
     aspectBackgrounds: t.aspectBackgrounds || {},
     created_at: t.createdAt ? new Date(t.createdAt).toISOString().replace("T", " ").substring(0, 19) : undefined,
   };

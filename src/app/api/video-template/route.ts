@@ -99,6 +99,9 @@ export async function POST(req: NextRequest) {
 
     let preview169 = "";
     let preview916 = "";
+    let defaultPreview = "";
+    const targetDefRatio = savedTemplate.defaultAspectRatio || savedTemplate.aspectRatio || "16:9";
+
     try {
       const { ensureTemplatePreviewGifs } = await import('@/lib/templatePreviewGif');
       const gifs = ensureTemplatePreviewGifs(savedTemplate.toObject ? savedTemplate.toObject() : savedTemplate, true);
@@ -107,6 +110,7 @@ export async function POST(req: NextRequest) {
       const baseUrl = `${proto}://${host}`;
       preview169 = `${baseUrl}${gifs.preview_16_9}`;
       preview916 = `${baseUrl}${gifs.preview_9_16}`;
+      defaultPreview = targetDefRatio === "9:16" ? preview916 : preview169;
     } catch (err) {
       console.warn('[POST /api/video-template] Could not generate preview GIF:', err);
     }
@@ -122,12 +126,18 @@ export async function POST(req: NextRequest) {
     const actualUserEmail = creator?.email || undefined;
     const actualUserRole = creator?.role || undefined;
 
+    const chosenThumb = defaultPreview || (targetDefRatio === "9:16" ? (preview916 || thumbUrl) : (preview169 || thumbUrl));
+
     const formattedTemplateItem: any = {
       id: savedTemplate.templateId || next5DigitTemplateId,
       name: savedTemplate.templateName,
       status: "approved",
-      base_width: savedTemplate.aspectRatio === "9:16" ? 1080 : 1920,
-      base_height: savedTemplate.aspectRatio === "9:16" ? 1920 : 1080,
+      default_aspect_ratio: targetDefRatio,
+      defaultAspectRatio: targetDefRatio,
+      aspect_ratio: targetDefRatio,
+      aspectRatio: targetDefRatio,
+      base_width: targetDefRatio === "9:16" ? 1080 : 1920,
+      base_height: targetDefRatio === "9:16" ? 1920 : 1080,
       duration_seconds: savedTemplate.videoDuration || 10,
       fps: savedTemplate.fps || 30,
       engine: "custom",
@@ -142,10 +152,10 @@ export async function POST(req: NextRequest) {
       offertypename: finalOtName,
       preview_16_9: preview169 || thumbUrl,
       preview_9_16: preview916 || thumbUrl,
-      preview_url: preview169 || savedTemplate.preview_url || savedTemplate.previewUrl || thumbUrl,
-      previewUrl: preview169 || savedTemplate.previewUrl || savedTemplate.preview_url || thumbUrl,
-      thumbnail: preview169 || thumbRel,
-      thumbnail_url: preview169 || thumbUrl,
+      preview_url: chosenThumb,
+      previewUrl: chosenThumb,
+      thumbnail: chosenThumb,
+      thumbnail_url: chosenThumb,
       video_url: savedTemplate.lastRenderedVideoUrl || "",
       created_at: savedTemplate.createdAt ? new Date(savedTemplate.createdAt).toISOString().replace("T", " ").substring(0, 19) : new Date().toISOString().replace("T", " ").substring(0, 19),
     };
@@ -270,15 +280,39 @@ export async function GET(req: NextRequest) {
     const dbTemplates: any[] = await VideoTemplate.find(query).sort(sortField).lean();
 
     // Return templates with assigned 5-digit templateId and preview_url
+    const { ensureTemplatePreviewGifs } = await import('@/lib/templatePreviewGif');
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "iot-test.metizstoresparc.com";
+    const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+    const baseUrl = `${proto}://${host}`;
+
     const mappedTemplates = dbTemplates.map((t: any) => {
       const defaultFallbackPreview = "https://video-generator.storesparc.com/uploads/thumbnails/tpl_thumb_default.gif";
-      const thumbUrl = t.thumbnail_url || t.thumbnail || t.backgroundUrl || defaultFallbackPreview;
-      const previewUrl = t.preview_url || t.previewUrl || t.lastRenderedVideoUrl || thumbUrl;
+      const targetDefRatio = t.defaultAspectRatio || t.aspectRatio || "16:9";
+      let preview169 = "";
+      let preview916 = "";
+      let defaultPreview = "";
+      try {
+        const gifs = ensureTemplatePreviewGifs(t);
+        preview169 = `${baseUrl}${gifs.preview_16_9}`;
+        preview916 = `${baseUrl}${gifs.preview_9_16}`;
+        defaultPreview = targetDefRatio === "9:16" ? preview916 : preview169;
+      } catch {}
+
+      const thumbUrl = defaultPreview || t.thumbnail_url || t.thumbnail || t.backgroundUrl || defaultFallbackPreview;
+      const previewUrl = defaultPreview || t.preview_url || t.previewUrl || t.lastRenderedVideoUrl || thumbUrl;
+
       return {
         ...t,
         _id: String(t._id),
         templateId: t.templateId || 10001,
+        default_aspect_ratio: targetDefRatio,
+        defaultAspectRatio: targetDefRatio,
+        aspect_ratio: targetDefRatio,
+        aspectRatio: targetDefRatio,
+        preview_16_9: preview169 || thumbUrl,
+        preview_9_16: preview916 || thumbUrl,
         thumbnail_url: thumbUrl,
+        thumbnail: thumbUrl,
         preview_url: previewUrl,
         previewUrl: previewUrl,
         video_url: t.lastRenderedVideoUrl || "",

@@ -37,6 +37,7 @@ export interface VideoTemplateDocument extends Document {
   animationStyle: string;
   videoDuration: number;
   aspectRatio: string;
+  defaultAspectRatio?: string;
   language: string;
   aiModel?: string;
   isDummyOverride?: boolean;
@@ -202,7 +203,12 @@ const VideoTemplateSchema: Schema = new Schema(
     },
     aspectRatio: {
       type: String,
-      default: '9:16',
+      default: '16:9',
+      trim: true,
+    },
+    defaultAspectRatio: {
+      type: String,
+      default: '16:9',
       trim: true,
     },
     language: {

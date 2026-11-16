@@ -87,10 +87,11 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
   let channels: string[] = [];
   let rawVideos: any[] = [];
   let errorMessage = '';
+  let renderJob: any = null;
 
   // 1. Check local video renderer job (in-memory or status.json)
   try {
-    const renderJob = await getRenderJob(jobId);
+    renderJob = await getRenderJob(jobId);
     if (renderJob) {
       jobFound = true;
       status = renderJob.status;
@@ -275,17 +276,51 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
     }
   }
 
-  // User requirement: In get-video, show only ONE preview video (16:9) with its mediaId/videoId.
-  // Sibling aspect ratios (9:16, 1:1, 4:5) are saved in the backend library under this jobId for offer_approval.
-  const preview169 = formattedVideos.find((v) => v.ratio === '16:9') || formattedVideos[0];
-  const fullPreviewUrl = preview169 ? toAbsoluteUrl(preview169.url, req) : '';
+  // User requirement: In get-video, show only ONE preview video (matching template/job default ratio) with its mediaId/videoId.
+  // Sibling aspect ratios are saved in the backend library under this jobId for offer_approval.
+  let requestedRatio =
+    (renderJob as any)?.ratio ||
+    (renderJob?.primaryVideo && (renderJob.primaryVideo as any).ratio) ||
+    '';
 
-  const previewItem = preview169
+  if (!requestedRatio && templateId) {
+    try {
+      const VideoTemplate = (await import('@/models/VideoTemplate')).default;
+      const tpl = await VideoTemplate.findOne({
+        $or: [
+          ...(!isNaN(Number(templateId)) ? [{ templateId: Number(templateId) }] : []),
+          { templateId: String(templateId) },
+          ...(mongoose.Types.ObjectId.isValid(templateId) ? [{ _id: new mongoose.Types.ObjectId(templateId) }] : []),
+        ],
+      })
+        .select('defaultAspectRatio aspectRatio')
+        .lean();
+      if (tpl) {
+        requestedRatio = (tpl as any).defaultAspectRatio || (tpl as any).aspectRatio || '';
+      }
+    } catch {}
+  }
+
+  if (!requestedRatio) {
+    requestedRatio = mediaDocs[0]?.ratio || (rawVideos[0] as any)?.ratio || '16:9';
+  }
+
+  // Sort formattedVideos so that the requested ratio video comes first
+  formattedVideos.sort((a, b) => {
+    if (a.ratio === requestedRatio) return -1;
+    if (b.ratio === requestedRatio) return 1;
+    return 0;
+  });
+
+  const primaryVid = formattedVideos.find((v) => v.ratio === requestedRatio) || formattedVideos[0];
+  const fullPreviewUrl = primaryVid ? toAbsoluteUrl(primaryVid.url, req) : '';
+
+  const previewItem = primaryVid
     ? {
-        mediaId: preview169.mediaId,
+        mediaId: primaryVid.mediaId,
         url: fullPreviewUrl,
-        name: preview169.name,
-        ratio: preview169.ratio || '16:9',
+        name: primaryVid.name,
+        ratio: primaryVid.ratio || requestedRatio,
       }
     : null;
 
@@ -298,8 +333,9 @@ async function handleGetVideo(jobIdInput: string, req?: NextRequest) {
     success: true,
     status: 'completed',
     jobId,
-    videoId: preview169?.mediaId || jobId,
-    primaryVideoId: preview169?.mediaId || jobId,
+    videoId: primaryVid?.mediaId || jobId,
+    primaryVideoId: primaryVid?.mediaId || jobId,
+    ratio: primaryVid?.ratio || requestedRatio,
     offerId: offerId || '',
     templateId: templateId || '14',
     message: 'OK',
