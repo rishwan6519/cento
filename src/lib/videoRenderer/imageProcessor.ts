@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { AspectRatio, AspectSize, TextLayer } from './types';
+import { resolveAssetBuffer } from './assetResolver';
 
 /**
  * Calculate output canvas dimensions according to aspect ratio and target base resolution.
@@ -453,14 +454,14 @@ export async function renderTextLayerPng(
   canvasH: number
 ): Promise<{ buffer: Buffer; width: number; height: number } | null> {
   const rawText = String(layer.text || '').trim();
-  if (!rawText) return null;
+  if (!rawText && !layer.badgeImageUrl) return null;
 
   const minSide = Math.min(canvasW, canvasH);
   const fontColor = layer.fontColor || '#ffffff';
   const bgColor = layer.bgColor || '#ffc700';
   const shape = layer.shape || 'none';
   const isOrigami = shape === 'ribbon' || shape === 'parallelogram' || shape === 'origami';
-  const isTransparent = (shape === 'none' || (!layer.shape && layer.bgMode === 'transparent')) && !isOrigami;
+  const isTransparent = (shape === 'none' || (!layer.shape && layer.bgMode === 'transparent')) && !isOrigami && !layer.badgeImageUrl;
 
   // Base font size
   const pctSize = typeof layer.size === 'number' ? layer.size : 3.8;
@@ -475,9 +476,9 @@ export async function renderTextLayerPng(
   let padY = Math.round(fontSize * 0.35);
 
   const usableWrapW = Math.max(50, targetMaxW - padX * 2);
-  const textLines = wrapTextServer(rawText, usableWrapW, fontSize);
+  const textLines = rawText ? wrapTextServer(rawText, usableWrapW, fontSize) : [];
   const lineHeight = Math.round(fontSize * 1.28);
-  const totalTextH = textLines.length * lineHeight;
+  const totalTextH = textLines.length > 0 ? textLines.length * lineHeight : Math.round(fontSize * 1.5);
 
   let maxLineLen = 0;
   for (const line of textLines) {
@@ -485,8 +486,50 @@ export async function renderTextLayerPng(
   }
   const measuredW = Math.round(maxLineLen * fontSize * 0.58);
 
-  let boxW = customBoxW ? Math.max(customBoxW, measuredW + padX * 2) : Math.min(targetMaxW, measuredW + padX * 2);
+  let boxW = customBoxW ? Math.max(customBoxW, measuredW + padX * 2) : Math.min(targetMaxW, Math.max(measuredW + padX * 2, Math.round(fontSize * 3.5)));
   let boxH = Math.max(30, totalTextH + padY * 2);
+
+  // If custom badge / sticker image is specified, render the sticker and overlay text
+  if (layer.badgeImageUrl) {
+    try {
+      const stickerBuf = await resolveAssetBuffer(layer.badgeImageUrl);
+      if (stickerBuf) {
+        const finalW = Math.max(50, boxW + Math.round(fontSize * 0.8));
+        const finalH = Math.max(35, boxH + Math.round(fontSize * 0.4));
+        let baseBadge = await sharp(stickerBuf)
+          .resize(finalW, finalH, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toBuffer();
+
+        if (layer.overlayText !== false && textLines.length > 0) {
+          const startY = Math.round(finalH / 2 - ((textLines.length - 1) * lineHeight) / 2);
+          const textSvg = `
+            <svg width="${finalW}" height="${finalH}" xmlns="http://www.w3.org/2000/svg">
+              ${textLines.map((line, idx) => {
+                const lineY = Math.round(startY + idx * lineHeight + fontSize * 0.32);
+                return `<text
+                  x="${Math.round(finalW / 2)}"
+                  y="${lineY}"
+                  font-family="${layer.font || 'Arial'}, Montserrat, sans-serif"
+                  font-size="${fontSize}px"
+                  font-weight="${layer.fontWeight === 'normal' ? 'normal' : '900'}"
+                  font-style="${layer.fontStyle === 'italic' ? 'italic' : 'normal'}"
+                  fill="${fontColor}"
+                  text-anchor="middle"
+                  dominant-baseline="alphabetic"
+                >${escapeXml(line)}</text>`;
+              }).join('\n')}
+            </svg>
+          `;
+          baseBadge = await sharp(baseBadge).composite([{ input: Buffer.from(textSvg) }]).png().toBuffer();
+        }
+
+        return { buffer: baseBadge, width: finalW, height: finalH };
+      }
+    } catch (err) {
+      console.warn('[imageProcessor] Failed to render sticker badge, falling back to shape', err);
+    }
+  }
 
   let shapeMarkup = '';
 

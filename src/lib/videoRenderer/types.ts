@@ -23,7 +23,10 @@ export interface TextLayer {
   fontColor?: string;
   bgMode?: 'color' | 'transparent';
   bgColor?: string;
-  shape?: 'none' | 'circle' | 'pill' | 'rect' | 'rounded' | 'ribbon' | 'parallelogram' | 'origami';
+  shape?: 'none' | 'circle' | 'pill' | 'rect' | 'rounded' | 'ribbon' | 'parallelogram' | 'origami' | 'sticker' | string;
+  badgeImageUrl?: string;
+  badgeStyle?: string;
+  overlayText?: boolean;
   fontWeight?: 'normal' | 'bold' | string;
   fontStyle?: 'normal' | 'italic' | string;
   hidden?: boolean;

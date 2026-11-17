@@ -132,36 +132,68 @@ async function renderTemplateFrame(template: any, ratio: "16:9" | "9:16", pulse 
     } catch {}
   }
 
-  // Offer Badge / Discount Layer (Origami style matching Image 2)
+  // Offer Badge / Discount Layer (Custom Sticker Badge or Origami default)
   const discountText = (layers.discount && layers.discount.text) || template.offerLabel || template.discountLabel || "75% OFF";
   const badgeScale = pulse ? 1.05 : 1.0;
   const badgeW = Math.round((is169 ? 180 : 160) * badgeScale);
   const badgeH = Math.round((is169 ? 75 : 68) * badgeScale);
-  const badgeAngle = pulse ? -8 : -6;
-  const badgeBg = (layers.discount && layers.discount.bgColor) || "#ffc700";
-  const badgeFold = (layers.discount && layers.discount.borderColor) || "#047857";
+  let badgeDrawn = false;
 
-  const badgeSvg = `
-    <svg width="${badgeW + 40}" height="${badgeH + 40}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="-2" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.45" />
-        </filter>
-      </defs>
-      <g transform="rotate(${badgeAngle} ${(badgeW + 40) / 2} ${(badgeH + 40) / 2})">
-        <polygon points="20,${badgeH + 15} 5,${badgeH + 30} 30,${badgeH + 15}" fill="${badgeFold}" stroke="#ffffff" stroke-width="2"/>
-        <rect x="18" y="15" width="${badgeW}" height="${badgeH}" rx="12" fill="${badgeBg}" stroke="#ffffff" stroke-width="3.5" filter="url(#badgeShadow)"/>
-        <polygon points="8,22 16,32 6,34" fill="#ef4444"/>
-        <polygon points="${badgeW + 10},${badgeH + 5} ${badgeW + 20},${badgeH + 15} ${badgeW + 12},${badgeH + 20}" fill="#ef4444"/>
-        <polygon points="${badgeW + 12},20 ${badgeW + 22},25 ${badgeW + 18},30" fill="#facc15"/>
-        <text x="${(badgeW + 40) / 2}" y="${(badgeH + 40) / 2 + 8}" font-family="Arial, Montserrat, sans-serif" font-size="${Math.round(24 * badgeScale)}" font-weight="900" fill="#ffffff" text-anchor="middle">${escapeXml(discountText)}</text>
-      </g>
-    </svg>
-  `;
-  const badgeBuf = await sharp(Buffer.from(badgeSvg)).png().toBuffer();
-  const badgeLeft = is169 ? Math.round(width * 0.44) : Math.round((width - (badgeW + 40)) / 2);
-  const badgeTop = is169 ? Math.round(height * 0.32) : Math.round(height * 0.48);
-  overlays.push({ input: badgeBuf, left: badgeLeft, top: badgeTop });
+  if (layers.discount?.badgeImageUrl) {
+    try {
+      const stickerBuf = await resolveAssetBuffer(layers.discount.badgeImageUrl);
+      if (stickerBuf) {
+        let resBadge = await sharp(stickerBuf)
+          .resize(badgeW, badgeH, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toBuffer();
+
+        if (layers.discount?.overlayText !== false && discountText) {
+          const textSvg = `
+            <svg width="${badgeW}" height="${badgeH}" xmlns="http://www.w3.org/2000/svg">
+              <text x="${badgeW / 2}" y="${badgeH / 2 + 7}" font-family="Arial, Montserrat, sans-serif" font-size="${Math.round(22 * badgeScale)}" font-weight="900" fill="${layers.discount.fontColor || '#ffffff'}" text-anchor="middle">${escapeXml(discountText)}</text>
+            </svg>
+          `;
+          resBadge = await sharp(resBadge).composite([{ input: Buffer.from(textSvg) }]).png().toBuffer();
+        }
+
+        const badgeLeft = is169 ? Math.round(width * 0.44) : Math.round((width - badgeW) / 2);
+        const badgeTop = is169 ? Math.round(height * 0.32) : Math.round(height * 0.48);
+        overlays.push({ input: resBadge, left: badgeLeft, top: badgeTop });
+        badgeDrawn = true;
+      }
+    } catch (e) {
+      console.warn("[templatePreviewGif] Failed to render custom badge sticker:", e);
+    }
+  }
+
+  if (!badgeDrawn) {
+    const badgeAngle = pulse ? -8 : -6;
+    const badgeBg = (layers.discount && layers.discount.bgColor) || "#ffc700";
+    const badgeFold = (layers.discount && layers.discount.borderColor) || "#047857";
+
+    const badgeSvg = `
+      <svg width="${badgeW + 40}" height="${badgeH + 40}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="badgeShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="-2" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.45" />
+          </filter>
+        </defs>
+        <g transform="rotate(${badgeAngle} ${(badgeW + 40) / 2} ${(badgeH + 40) / 2})">
+          <polygon points="20,${badgeH + 15} 5,${badgeH + 30} 30,${badgeH + 15}" fill="${badgeFold}" stroke="#ffffff" stroke-width="2"/>
+          <rect x="18" y="15" width="${badgeW}" height="${badgeH}" rx="12" fill="${badgeBg}" stroke="#ffffff" stroke-width="3.5" filter="url(#badgeShadow)"/>
+          <polygon points="8,22 16,32 6,34" fill="#ef4444"/>
+          <polygon points="${badgeW + 10},${badgeH + 5} ${badgeW + 20},${badgeH + 15} ${badgeW + 12},${badgeH + 20}" fill="#ef4444"/>
+          <polygon points="${badgeW + 12},20 ${badgeW + 22},25 ${badgeW + 18},30" fill="#facc15"/>
+          <text x="${(badgeW + 40) / 2}" y="${(badgeH + 40) / 2 + 8}" font-family="Arial, Montserrat, sans-serif" font-size="${Math.round(24 * badgeScale)}" font-weight="900" fill="#ffffff" text-anchor="middle">${escapeXml(discountText)}</text>
+        </g>
+      </svg>
+    `;
+    const badgeBuf = await sharp(Buffer.from(badgeSvg)).png().toBuffer();
+    const badgeLeft = is169 ? Math.round(width * 0.44) : Math.round((width - (badgeW + 40)) / 2);
+    const badgeTop = is169 ? Math.round(height * 0.32) : Math.round(height * 0.48);
+    overlays.push({ input: badgeBuf, left: badgeLeft, top: badgeTop });
+  }
 
   // Headline
   const hlText = (layers.headline && layers.headline.text) || template.offerTitle || "Grab the crunch before it's gone!!";

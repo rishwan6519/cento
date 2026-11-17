@@ -73,7 +73,10 @@ export interface LayerStyle {
   textAlign?: "left" | "center" | "right";
   hidden?: boolean;
   fontColor?: string;
-  shape?: "none" | "circle" | "pill" | "rect" | "ribbon" | "parallelogram" | "rounded" | "origami";
+  shape?: "none" | "circle" | "pill" | "rect" | "ribbon" | "parallelogram" | "rounded" | "origami" | "sticker";
+  badgeImageUrl?: string;
+  badgeStyle?: string;
+  overlayText?: boolean;
   borderRadius?: number;
   borderWidth?: number;
   shadow?: boolean;
@@ -240,6 +243,242 @@ const DEFAULT_LAYERS: Record<AspectRatio, LayersConfig> = {
   },
 };
 
+
+export interface OfferBadgePreset {
+  id: string;
+  name: string;
+  dataUrl: string;
+}
+
+export const OFFER_BADGE_PRESETS: OfferBadgePreset[] = [
+  {
+    id: "origami_retail",
+    name: "3D Origami Retail Banner",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <filter id="ogShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="-2" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.4" />
+        </filter>
+        <linearGradient id="ogGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffd000"/>
+          <stop offset="100%" stop-color="#ff9900"/>
+        </linearGradient>
+      </defs>
+      <g transform="rotate(-6 120 60)">
+        <polygon points="26,102 10,122 56,102" fill="#047857" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
+        <rect x="20" y="16" width="200" height="88" rx="14" fill="url(#ogGrad)" stroke="#ffffff" stroke-width="4" filter="url(#ogShadow)"/>
+        <polygon points="10,24 20,36 8,38" fill="#ef4444"/>
+        <polygon points="220,18 232,28 222,34" fill="#facc15"/>
+        <polygon points="226,98 238,108 226,114" fill="#ef4444"/>
+        <polygon points="12,90 22,96 14,102" fill="#10b981"/>
+      </g>
+    </svg>`),
+  },
+  {
+    id: "hot_deal_fire",
+    name: "Hot Deal Fire Badge",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="fireGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#dc2626"/>
+          <stop offset="50%" stop-color="#ea580c"/>
+          <stop offset="100%" stop-color="#f59e0b"/>
+        </linearGradient>
+        <filter id="fireGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#ea580c" flood-opacity="0.5" />
+        </filter>
+      </defs>
+      <rect x="12" y="18" width="216" height="84" rx="42" fill="url(#fireGrad)" stroke="#ffffff" stroke-width="4" filter="url(#fireGlow)"/>
+      <rect x="18" y="24" width="204" height="72" rx="36" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <path d="M42,76 C32,76 26,68 28,58 C29,52 34,46 36,40 C38,48 42,48 45,43 C50,52 52,60 49,68 C48,72 45,76 42,76 Z" fill="#ffd000"/>
+      <path d="M41,74 C36,74 33,69 34,62 C35,58 38,54 39,50 C40,55 43,55 44,52 C46,58 46,63 45,68 C44,71 43,74 41,74 Z" fill="#ffffff"/>
+      <path d="M198,76 C188,76 182,68 184,58 C185,52 190,46 192,40 C194,48 198,48 201,43 C206,52 208,60 205,68 C204,72 201,76 198,76 Z" fill="#ffd000"/>
+    </svg>`),
+  },
+  {
+    id: "flash_sale_neon",
+    name: "Flash Sale Neon",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#0f172a"/>
+          <stop offset="100%" stop-color="#1e293b"/>
+        </linearGradient>
+        <filter id="neonShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.6"/>
+        </filter>
+      </defs>
+      <polygon points="28,16 228,16 212,104 12,104" fill="url(#neonGrad)" stroke="#facc15" stroke-width="4" filter="url(#neonShadow)"/>
+      <polygon points="36,24 220,24 206,96 22,96" fill="none" stroke="#facc15" stroke-width="1.5" stroke-opacity="0.5"/>
+      <polygon points="34,42 46,42 40,58 50,58 32,82 36,64 28,64" fill="#facc15"/>
+      <polygon points="204,42 216,42 210,58 220,58 202,82 206,64 198,64" fill="#facc15"/>
+    </svg>`),
+  },
+  {
+    id: "starburst_sale",
+    name: "Starburst Explosion",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="sbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fef08a"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+        <filter id="sbShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.5"/>
+        </filter>
+      </defs>
+      <path d="M120,8 L138,24 L164,12 L174,36 L202,34 L202,60 L226,70 L214,94 L230,114 L204,116 L192,138 L168,126 L150,144 L120,132 L90,144 L72,126 L48,138 L36,116 L10,114 L26,94 L14,70 L38,60 L38,34 L66,36 L76,12 L102,24 Z" transform="translate(0, -12)" fill="url(#sbGrad)" stroke="#ffffff" stroke-width="3.5" filter="url(#sbShadow)"/>
+      <circle cx="120" cy="60" r="46" fill="rgba(255,255,255,0.18)" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4,3"/>
+    </svg>`),
+  },
+  {
+    id: "best_seller_star",
+    name: "Best Seller Gold Star",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="bsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1e3a8a"/>
+          <stop offset="100%" stop-color="#3b82f6"/>
+        </linearGradient>
+        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#fef08a"/>
+          <stop offset="50%" stop-color="#fbbf24"/>
+          <stop offset="100%" stop-color="#d97706"/>
+        </linearGradient>
+      </defs>
+      <rect x="14" y="16" width="212" height="88" rx="18" fill="url(#bsGrad)" stroke="url(#goldGrad)" stroke-width="4"/>
+      <rect x="20" y="22" width="200" height="76" rx="14" fill="none" stroke="rgba(251,191,36,0.4)" stroke-width="1.5"/>
+      <polygon points="38,54 41,62 49,63 43,69 45,77 38,72 31,77 33,69 27,63 35,62" fill="url(#goldGrad)"/>
+      <polygon points="202,54 205,62 213,63 207,69 209,77 202,72 195,77 197,69 191,63 199,62" fill="url(#goldGrad)"/>
+    </svg>`),
+  },
+  {
+    id: "special_ribbon",
+    name: "Special Offer Ribbon",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="ribGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#7c3aed"/>
+          <stop offset="50%" stop-color="#c026d3"/>
+          <stop offset="100%" stop-color="#db2777"/>
+        </linearGradient>
+        <filter id="ribShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.45"/>
+        </filter>
+      </defs>
+      <polygon points="12,20 228,20 214,60 228,100 12,100 26,60" fill="url(#ribGrad)" stroke="#ffffff" stroke-width="3" filter="url(#ribShadow)"/>
+      <line x1="30" y1="28" x2="210" y2="28" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-dasharray="5,4"/>
+      <line x1="30" y1="92" x2="210" y2="92" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-dasharray="5,4"/>
+    </svg>`),
+  },
+  {
+    id: "retail_hang_tag",
+    name: "Retail Price Hang Tag",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="tagGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ef4444"/>
+          <stop offset="100%" stop-color="#b91c1c"/>
+        </linearGradient>
+        <filter id="tagShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="-2" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.4"/>
+        </filter>
+      </defs>
+      <g transform="rotate(-5 120 60)">
+        <polygon points="46,16 224,16 224,104 46,104 12,60" fill="url(#tagGrad)" stroke="#ffffff" stroke-width="3.5" filter="url(#tagShadow)"/>
+        <circle cx="38" cy="60" r="10" fill="#0f172a" stroke="#ffffff" stroke-width="2.5"/>
+        <polygon points="52,24 216,24 216,96 52,96 22,60" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="4,4"/>
+      </g>
+    </svg>`),
+  },
+  {
+    id: "circle_sale_stamp",
+    name: "Circle Sale Stamp",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+      <defs>
+        <linearGradient id="stampGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#dc2626"/>
+          <stop offset="100%" stop-color="#991b1b"/>
+        </linearGradient>
+        <filter id="stampShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.5"/>
+        </filter>
+      </defs>
+      <circle cx="80" cy="80" r="72" fill="url(#stampGrad)" stroke="#ffffff" stroke-width="4" filter="url(#stampShadow)"/>
+      <circle cx="80" cy="80" r="62" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="5,4"/>
+      <circle cx="80" cy="80" r="54" fill="rgba(0,0,0,0.15)"/>
+    </svg>`),
+  },
+  {
+    id: "cyber_neon_pill",
+    name: "Cyber Neon Pill",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="cybGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#06b6d4"/>
+          <stop offset="50%" stop-color="#3b82f6"/>
+          <stop offset="100%" stop-color="#8b5cf6"/>
+        </linearGradient>
+        <filter id="cybGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#06b6d4" flood-opacity="0.6"/>
+        </filter>
+      </defs>
+      <rect x="14" y="20" width="212" height="80" rx="40" fill="url(#cybGrad)" stroke="#ffffff" stroke-width="3.5" filter="url(#cybGlow)"/>
+      <rect x="20" y="26" width="200" height="68" rx="34" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+    </svg>`),
+  },
+  {
+    id: "emerald_saver",
+    name: "Emerald Super Saver",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="emGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#059669"/>
+          <stop offset="100%" stop-color="#064e3b"/>
+        </linearGradient>
+      </defs>
+      <rect x="14" y="18" width="212" height="84" rx="20" fill="url(#emGrad)" stroke="#34d399" stroke-width="3.5"/>
+      <rect x="20" y="24" width="200" height="72" rx="14" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <path d="M38,44 C48,44 54,54 50,66 C40,66 34,56 38,44 Z" fill="#34d399"/>
+      <path d="M202,44 C192,44 186,54 190,66 C200,66 206,56 202,44 Z" fill="#34d399"/>
+    </svg>`),
+  },
+  {
+    id: "golden_vip_badge",
+    name: "Golden VIP Luxury",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <linearGradient id="vipGold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fef08a"/>
+          <stop offset="40%" stop-color="#eab308"/>
+          <stop offset="70%" stop-color="#ca8a04"/>
+          <stop offset="100%" stop-color="#854d0e"/>
+        </linearGradient>
+      </defs>
+      <rect x="14" y="16" width="212" height="88" rx="12" fill="#09090b" stroke="url(#vipGold)" stroke-width="4"/>
+      <rect x="20" y="22" width="200" height="76" rx="8" fill="none" stroke="url(#vipGold)" stroke-width="1.5" stroke-opacity="0.6"/>
+      <polygon points="120,28 126,38 134,32 130,44 110,44 106,32 114,38" fill="url(#vipGold)"/>
+    </svg>`),
+  },
+  {
+    id: "clearance_red_stamp",
+    name: "Clearance Sale Stamp",
+    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
+      <defs>
+        <filter id="distress" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="-2" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
+        </filter>
+      </defs>
+      <g transform="rotate(-8 120 60)">
+        <rect x="16" y="18" width="208" height="84" rx="8" fill="#dc2626" stroke="#ffffff" stroke-width="4" filter="url(#distress)"/>
+        <rect x="22" y="24" width="196" height="72" rx="4" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="8,5"/>
+      </g>
+    </svg>`),
+  },
+];
+
+const globalBadgeImagesCache = new Map<string, HTMLImageElement>();
 
 const STICKER_PRESETS = [
   {
@@ -954,8 +1193,24 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
       const textH = Math.max(fontSize * 1.2, textLines.length * lineHeight);
 
       const isOrigami = L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram";
-      const isTransparent = (L.shape === "none" || (!L.shape && L.bgMode === "transparent")) && !isOrigami;
-      if (!isTransparent) {
+      const isTransparent = (L.shape === "none" || (!L.shape && L.bgMode === "transparent")) && !isOrigami && !L.badgeImageUrl;
+
+      if (L.badgeImageUrl) {
+        let bImg = globalBadgeImagesCache.get(L.badgeImageUrl);
+        if (!bImg) {
+          bImg = new Image();
+          bImg.crossOrigin = "anonymous";
+          bImg.src = L.badgeImageUrl;
+          globalBadgeImagesCache.set(L.badgeImageUrl, bImg);
+        }
+        if (bImg.complete && bImg.naturalWidth > 0) {
+          const bw = Math.max(textW + fontSize * 1.5, fontSize * 3.5);
+          const bh = Math.max(textH + fontSize * 0.8, fontSize * 1.8);
+          ctx.save();
+          ctx.drawImage(bImg, cx - bw / 2, cy - bh / 2, bw, bh);
+          ctx.restore();
+        }
+      } else if (!isTransparent) {
         if (L.shape === "rounded") {
           const pw = textW + fontSize * 1.1;
           const ph = textH + fontSize * 0.45;
@@ -1050,30 +1305,34 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
         }
       }
 
-      const isOrigamiBadge = L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram";
-      if (isOrigamiBadge) {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate((-7 * Math.PI) / 180);
-        ctx.translate(-cx, -cy);
-      }
-
-      ctx.fillStyle = L.fontColor || "#ffffff";
-      const textAlign = (L.textAlign as CanvasTextAlign) || "center";
-      ctx.textAlign = textAlign;
-      const startY = cy - ((textLines.length - 1) * lineHeight) / 2;
-      textLines.forEach((line: string, idx: number) => {
-        let lineX = cx;
-        if (textAlign === "left") {
-          lineX = cx - textW / 2;
-        } else if (textAlign === "right") {
-          lineX = cx + textW / 2;
+      if (L.badgeImageUrl && L.overlayText === false) {
+        // Pure sticker graphic mode without text overlay
+      } else {
+        const isOrigamiBadge = !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
+        if (isOrigamiBadge) {
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate((-7 * Math.PI) / 180);
+          ctx.translate(-cx, -cy);
         }
-        ctx.fillText(line, lineX, startY + idx * lineHeight);
-      });
 
-      if (isOrigamiBadge) {
-        ctx.restore();
+        ctx.fillStyle = L.fontColor || "#ffffff";
+        const textAlign = (L.textAlign as CanvasTextAlign) || "center";
+        ctx.textAlign = textAlign;
+        const startY = cy - ((textLines.length - 1) * lineHeight) / 2;
+        textLines.forEach((line: string, idx: number) => {
+          let lineX = cx;
+          if (textAlign === "left") {
+            lineX = cx - textW / 2;
+          } else if (textAlign === "right") {
+            lineX = cx + textW / 2;
+          }
+          ctx.fillText(line, lineX, startY + idx * lineHeight);
+        });
+
+        if (isOrigamiBadge) {
+          ctx.restore();
+        }
       }
 
       if (k === "oldPrice") {
@@ -1552,6 +1811,9 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [selectedDecorId, setSelectedDecorId] = useState<string | null>(null);
   const [showAddImageModal, setShowAddImageModal] = useState<boolean>(false);
   const decorImagesMap = useRef<Map<string, HTMLImageElement>>(new Map());
+  const badgeImagesMap = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [badgeUrlPromptOpen, setBadgeUrlPromptOpen] = useState<boolean>(false);
+  const [badgeUrlInput, setBadgeUrlInput] = useState<string>("");
 
   // Loaded Image objects for Canvas
   const [productImgObj, setProductImgObj] = useState<HTMLImageElement | null>(null);
@@ -1592,6 +1854,29 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const resetCrop = (key: LayerKey) => {
     updateCurrentLayer(key, { cropInset: { top: 0, right: 0, bottom: 0, left: 0 } });
     toast.success("Crop reset to full dimensions");
+  };
+
+  const handleOfferBadgeImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (PNG, SVG, JPG, WebP)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      if (selectedLayer) {
+        updateCurrentLayer(selectedLayer, {
+          badgeImageUrl: dataUrl,
+          badgeStyle: "custom_upload",
+          shape: "sticker",
+        });
+        toast.success("Custom offer badge sticker applied!");
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   const handleStartTransform = (
@@ -2608,8 +2893,27 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         let textH = Math.max(fontSize * 1.2, textLines.length * lineHeight);
 
         const isOrigami = L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram";
-        const isTransparent = (L.shape === "none" || (!L.shape && L.bgMode === "transparent")) && !isOrigami;
-        if (!isTransparent) {
+        const isTransparent = (L.shape === "none" || (!L.shape && L.bgMode === "transparent")) && !isOrigami && !L.badgeImageUrl;
+
+        if (L.badgeImageUrl) {
+          let bImg = globalBadgeImagesCache.get(L.badgeImageUrl);
+          if (!bImg) {
+            bImg = new Image();
+            bImg.crossOrigin = "anonymous";
+            bImg.src = L.badgeImageUrl;
+            globalBadgeImagesCache.set(L.badgeImageUrl, bImg);
+            bImg.onload = () => {
+              if (canvasRef.current) renderFrameOnCanvas(canvasRef.current, activeRatio, playbackTime, selectedLayer);
+            };
+          }
+          if (bImg.complete && bImg.naturalWidth > 0) {
+            const bw = customBoxW ? Math.max(customBoxW, textW + 36) : Math.max(textW + fontSize * 1.5, fontSize * 3.5);
+            const bh = customBoxH ? Math.max(customBoxH, textH + 20) : Math.max(textH + fontSize * 0.8, fontSize * 1.8);
+            ctx.save();
+            ctx.drawImage(bImg, cx - bw / 2, cy - bh / 2, bw, bh);
+            ctx.restore();
+          }
+        } else if (!isTransparent) {
           if (L.shape === "rounded") {
             const pw = customBoxW ? Math.max(textW + 20, customBoxW) : textW + fontSize * 1.1;
             const ph = customBoxH ? Math.max(textH + 10, customBoxH) : textH + fontSize * 0.45;
@@ -2751,35 +3055,39 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         }
 
         // Production-ready text rendering: perfectly centered, crisp, unclipped
-        const isOrigamiBadge = L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram";
-        if (isOrigamiBadge) {
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate((-7 * Math.PI) / 180);
-          ctx.translate(-cx, -cy);
-        }
-
-        ctx.fillStyle = L.fontColor || "#ffffff";
-        const textAlign = (L.textAlign as CanvasTextAlign) || "center";
-        ctx.textAlign = textAlign;
-        ctx.textBaseline = "middle";
-
-        const padX = fontSize * 0.6;
-        const pw = customBoxW ? Math.max(textW + padX * 2, customBoxW) : textW + padX * 2;
-
-        const startY = cy - ((textLines.length - 1) * lineHeight) / 2;
-        textLines.forEach((line: string, idx: number) => {
-          let lineX = cx;
-          if (textAlign === "left") {
-            lineX = cx - pw / 2 + padX;
-          } else if (textAlign === "right") {
-            lineX = cx + pw / 2 - padX;
+        if (L.badgeImageUrl && L.overlayText === false) {
+          // Pure graphic sticker without text overlay
+        } else {
+          const isOrigamiBadge = !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
+          if (isOrigamiBadge) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((-7 * Math.PI) / 180);
+            ctx.translate(-cx, -cy);
           }
-          ctx.fillText(line, lineX, startY + idx * lineHeight);
-        });
 
-        if (isOrigamiBadge) {
-          ctx.restore();
+          ctx.fillStyle = L.fontColor || "#ffffff";
+          const textAlign = (L.textAlign as CanvasTextAlign) || "center";
+          ctx.textAlign = textAlign;
+          ctx.textBaseline = "middle";
+
+          const padX = fontSize * 0.6;
+          const pw = customBoxW ? Math.max(textW + padX * 2, customBoxW) : textW + padX * 2;
+
+          const startY = cy - ((textLines.length - 1) * lineHeight) / 2;
+          textLines.forEach((line: string, idx: number) => {
+            let lineX = cx;
+            if (textAlign === "left") {
+              lineX = cx - pw / 2 + padX;
+            } else if (textAlign === "right") {
+              lineX = cx + pw / 2 - padX;
+            }
+            ctx.fillText(line, lineX, startY + idx * lineHeight);
+          });
+
+          if (isOrigamiBadge) {
+            ctx.restore();
+          }
         }
 
         // Strikethrough line for old price
@@ -6827,6 +7135,305 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                         />
                       </div>
 
+                      {/* Offer Badge Sticker & Graphic Design Studio */}
+                      {selectedLayer === "discount" && (
+                        <div
+                          className="ste-field-group"
+                          style={{
+                            background: "linear-gradient(145deg, rgba(17, 181, 187, 0.08) 0%, rgba(5, 20, 25, 0.6) 100%)",
+                            padding: "12px",
+                            borderRadius: "10px",
+                            border: "1px solid rgba(17, 181, 187, 0.3)",
+                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{ fontSize: "14px" }}>🏷️</span>
+                              <span style={{ fontSize: "12px", fontWeight: 800, color: "#11B5BB", letterSpacing: "0.02em" }}>
+                                BADGE STICKER &amp; DESIGN
+                              </span>
+                            </div>
+                            {selectedLayerData.badgeImageUrl ? (
+                              <span style={{ fontSize: "10px", background: "#065f46", color: "#6ee7b7", padding: "2px 7px", borderRadius: "4px", fontWeight: 700 }}>
+                                Sticker Active
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.08)", color: "#94a3b8", padding: "2px 7px", borderRadius: "4px", fontWeight: 600 }}>
+                                Vector Shape
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Active Sticker Card with Text Overlay Switch & Reset */}
+                          {selectedLayerData.badgeImageUrl && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "10px",
+                                background: "rgba(0, 0, 0, 0.4)",
+                                padding: "8px 10px",
+                                borderRadius: "8px",
+                                marginBottom: "10px",
+                                border: "1px solid rgba(17, 181, 187, 0.35)",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "48px",
+                                  height: "44px",
+                                  background: "rgba(255, 255, 255, 0.04)",
+                                  borderRadius: "6px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  overflow: "hidden",
+                                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                                  flexShrink: 0,
+                                  padding: "2px",
+                                }}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={selectedLayerData.badgeImageUrl}
+                                  alt="Active Badge Sticker"
+                                  style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                                />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {selectedLayerData.badgeStyle
+                                    ? OFFER_BADGE_PRESETS.find((p) => p.id === selectedLayerData.badgeStyle)?.name || "Custom Uploaded Sticker"
+                                    : "Custom Badge Graphic"}
+                                </div>
+                                <label style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "10px", color: "#cbd5e1", marginTop: "4px", cursor: "pointer" }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedLayerData.overlayText !== false}
+                                    onChange={(e) => updateCurrentLayer(selectedLayer, { overlayText: e.target.checked })}
+                                    style={{ accentColor: "#11B5BB", cursor: "pointer" }}
+                                  />
+                                  Overlay discount text on badge
+                                </label>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateCurrentLayer(selectedLayer, {
+                                    badgeImageUrl: undefined,
+                                    badgeStyle: undefined,
+                                    shape: "origami",
+                                  })
+                                }
+                                className="ste-btn ste-btn--secondary ste-btn--sm"
+                                style={{
+                                  padding: "4px 8px",
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  color: "#f87171",
+                                  border: "1px solid rgba(239, 68, 68, 0.4)",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                                title="Remove sticker graphic and revert to vector shape"
+                              >
+                                <FaTrash style={{ fontSize: "9px" }} /> Reset
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Upload Custom Sticker Graphic Button & URL Picker */}
+                          <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                            <label
+                              className="ste-btn ste-btn--secondary"
+                              style={{
+                                flex: 1,
+                                padding: "6px 10px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px",
+                                background: "rgba(17, 181, 187, 0.15)",
+                                borderColor: "rgba(17, 181, 187, 0.4)",
+                                color: "#ffffff",
+                                cursor: "pointer",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              <FaUpload style={{ fontSize: "10px", color: "#11B5BB" }} /> Upload Custom Sticker
+                              <input
+                                type="file"
+                                accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                                onChange={handleOfferBadgeImageUpload}
+                                style={{ display: "none" }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setBadgeUrlPromptOpen(!badgeUrlPromptOpen)}
+                              className="ste-btn ste-btn--secondary"
+                              style={{
+                                padding: "6px 10px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                borderRadius: "6px",
+                                color: badgeUrlPromptOpen ? "#11B5BB" : "#cbd5e1",
+                                borderColor: badgeUrlPromptOpen ? "#11B5BB" : "rgba(255,255,255,0.12)",
+                              }}
+                              title="Enter image URL"
+                            >
+                              <FaImage style={{ fontSize: "10px" }} /> URL
+                            </button>
+                          </div>
+
+                          {badgeUrlPromptOpen && (
+                            <div style={{ display: "flex", gap: "4px", marginBottom: "10px" }}>
+                              <input
+                                type="text"
+                                placeholder="https://.../sticker.png or data:image/..."
+                                value={badgeUrlInput}
+                                onChange={(e) => setBadgeUrlInput(e.target.value)}
+                                className="ste-input"
+                                style={{ fontSize: "11px", padding: "4px 8px", flex: 1 }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (badgeUrlInput.trim()) {
+                                    updateCurrentLayer(selectedLayer, {
+                                      badgeImageUrl: badgeUrlInput.trim(),
+                                      badgeStyle: "custom_url",
+                                      shape: "sticker",
+                                    });
+                                    setBadgeUrlPromptOpen(false);
+                                    setBadgeUrlInput("");
+                                    toast.success("Badge graphic URL applied!");
+                                  }
+                                }}
+                                className="ste-btn ste-btn--primary ste-btn--sm"
+                                style={{ padding: "4px 10px", fontSize: "11px", whiteSpace: "nowrap" }}
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Preset Badges & Stickers Gallery Header */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                            <span className="ste-sublabel" style={{ margin: 0, fontWeight: 700, color: "#cbd5e1" }}>
+                              Choose Badge Sticker Preset ({OFFER_BADGE_PRESETS.length} Designs)
+                            </span>
+                          </div>
+
+                          {/* Preset Stickers Gallery Grid */}
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(3, 1fr)",
+                              gap: "6px",
+                              maxHeight: "200px",
+                              overflowY: "auto",
+                              paddingRight: "2px",
+                            }}
+                          >
+                            {OFFER_BADGE_PRESETS.map((preset) => {
+                              const isSelected =
+                                selectedLayerData.badgeImageUrl === preset.dataUrl || selectedLayerData.badgeStyle === preset.id;
+                              return (
+                                <button
+                                  key={preset.id}
+                                  type="button"
+                                  onClick={() => {
+                                    updateCurrentLayer(selectedLayer, {
+                                      badgeImageUrl: preset.dataUrl,
+                                      badgeStyle: preset.id,
+                                      shape: "sticker",
+                                    });
+                                  }}
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    padding: "6px 4px",
+                                    borderRadius: "6px",
+                                    border: isSelected ? "2px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.12)",
+                                    background: isSelected ? "rgba(17, 181, 187, 0.22)" : "rgba(0, 0, 0, 0.35)",
+                                    cursor: "pointer",
+                                    transition: "all 0.15s ease",
+                                    position: "relative",
+                                    overflow: "hidden",
+                                  }}
+                                  title={preset.name}
+                                >
+                                  {isSelected && (
+                                    <span
+                                      style={{
+                                        position: "absolute",
+                                        top: "2px",
+                                        right: "2px",
+                                        width: "14px",
+                                        height: "14px",
+                                        borderRadius: "50%",
+                                        background: "#11B5BB",
+                                        color: "#051419",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "8px",
+                                        fontWeight: 900,
+                                        zIndex: 2,
+                                      }}
+                                    >
+                                      ✓
+                                    </span>
+                                  )}
+                                  <div
+                                    style={{
+                                      width: "100%",
+                                      height: "38px",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      padding: "2px",
+                                    }}
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={preset.dataUrl}
+                                      alt={preset.name}
+                                      style={{ maxWidth: "90%", maxHeight: "100%", objectFit: "contain" }}
+                                    />
+                                  </div>
+                                  <span
+                                    style={{
+                                      fontSize: "9px",
+                                      fontWeight: isSelected ? 700 : 500,
+                                      color: isSelected ? "#ffffff" : "#94a3b8",
+                                      marginTop: "3px",
+                                      textAlign: "center",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      width: "100%",
+                                    }}
+                                  >
+                                    {preset.name}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Typography & Formatting Controls */}
                       <div className="ste-field-group">
                         <label className="ste-label">Typography &amp; Style</label>
@@ -7134,15 +7741,28 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                       <div className="ste-field-group">
                         <label className="ste-label">Badge Shape / Background</label>
                         <select
-                          value={selectedLayerData.shape || "none"}
-                          onChange={(e) =>
-                            updateCurrentLayer(selectedLayer, {
-                              shape: e.target.value as any,
-                              bgMode: e.target.value === "none" ? "transparent" : "color",
-                            })
-                          }
+                          value={selectedLayerData.badgeImageUrl ? "sticker" : selectedLayerData.shape || "none"}
+                          onChange={(e) => {
+                            if (e.target.value === "sticker") {
+                              if (!selectedLayerData.badgeImageUrl) {
+                                updateCurrentLayer(selectedLayer, {
+                                  shape: "sticker",
+                                  badgeImageUrl: OFFER_BADGE_PRESETS[0].dataUrl,
+                                  badgeStyle: OFFER_BADGE_PRESETS[0].id,
+                                });
+                              }
+                            } else {
+                              updateCurrentLayer(selectedLayer, {
+                                shape: e.target.value as any,
+                                bgMode: e.target.value === "none" ? "transparent" : "color",
+                                badgeImageUrl: undefined,
+                                badgeStyle: undefined,
+                              });
+                            }
+                          }}
                           className="ste-select"
                         >
+                          <option value="sticker">🎨 Custom Sticker / Graphic Badge</option>
                           <option value="origami">🏷️ 3D Folded Banner (Retail Origami)</option>
                           <option value="rounded">Rounded Badge (Modern Curved)</option>
                           <option value="none">No Background Shape (Transparent Text)</option>
