@@ -41,6 +41,7 @@ import {
   FaCrosshairs,
   FaUpload,
 } from "react-icons/fa6";
+import { DEFAULT_FOOTER_TEXT, sanitizeFooter } from "@/lib/videoRenderer/types";
 
 // ─── Interfaces & Types ───────────────────────────────────────────────────────
 export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
@@ -210,7 +211,7 @@ const DEFAULT_LAYERS: Record<AspectRatio, LayersConfig> = {
     cta: { type: "text", text: "VISIT STORE ➔", x: 0.50, y: 0.88, size: 2.5, shape: "pill", fontColor: "#ffffff", bgColor: "#e51a24", border: "0", font: "Arial", animation: "pulse", animStart: 2.6, animEnd: 3.4 },
     qrCode: { type: "text", text: "", x: 0.86, y: 0.90, size: 1.8, shape: "rect", fontColor: "#ffffff", bgColor: "#051419", border: "1", borderColor: "#ffffff", animation: "fade_in", animStart: 2.8, animEnd: 3.6 },
     storeName: { type: "text", text: "URBAN RAIN", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-    footer: { type: "text", text: "*Terms & Conditions Apply · StoreSparc Video", x: 0.50, y: 0.95, size: 1.5, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
+    footer: { type: "text", text: DEFAULT_FOOTER_TEXT, x: 0.50, y: 0.95, size: 1.5, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
     logo: { type: "logo", x: 0.50, y: 0.05, size: 11, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
   },
   "1:1": {
@@ -224,7 +225,7 @@ const DEFAULT_LAYERS: Record<AspectRatio, LayersConfig> = {
     cta: { type: "text", text: "VISIT STORE ➔", x: 0.70, y: 0.80, size: 2.5, shape: "pill", fontColor: "#ffffff", bgColor: "#e51a24", border: "0", font: "Arial", animation: "pulse", animStart: 2.6, animEnd: 3.4 },
     qrCode: { type: "text", text: "", x: 0.88, y: 0.88, size: 1.8, shape: "rect", fontColor: "#ffffff", bgColor: "#051419", border: "1", borderColor: "#ffffff", animation: "fade_in", animStart: 2.8, animEnd: 3.6 },
     storeName: { type: "text", text: "URBAN RAIN", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-    footer: { type: "text", text: "*Terms & Conditions Apply · StoreSparc Video", x: 0.75, y: 0.94, size: 1.4, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
+    footer: { type: "text", text: DEFAULT_FOOTER_TEXT, x: 0.75, y: 0.94, size: 1.4, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
     logo: { type: "logo", x: 0.22, y: 0.08, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
   },
   "4:5": {
@@ -238,7 +239,7 @@ const DEFAULT_LAYERS: Record<AspectRatio, LayersConfig> = {
     cta: { type: "text", text: "VISIT STORE ➔", x: 0.70, y: 0.80, size: 2.5, shape: "pill", fontColor: "#ffffff", bgColor: "#e51a24", border: "0", font: "Arial", animation: "pulse", animStart: 2.6, animEnd: 3.4 },
     qrCode: { type: "text", text: "", x: 0.86, y: 0.90, size: 1.8, shape: "rect", fontColor: "#ffffff", bgColor: "#051419", border: "1", borderColor: "#ffffff", animation: "fade_in", animStart: 2.8, animEnd: 3.6 },
     storeName: { type: "text", text: "URBAN RAIN", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-    footer: { type: "text", text: "*Terms & Conditions Apply · StoreSparc Video", x: 0.75, y: 0.94, size: 1.4, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
+    footer: { type: "text", text: DEFAULT_FOOTER_TEXT, x: 0.75, y: 0.94, size: 1.4, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
     logo: { type: "logo", x: 0.23, y: 0.08, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
   },
 };
@@ -3730,7 +3731,9 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         merged.price.text = tplAny.priceLabel;
       }
       if (tplAny.footerText && merged.footer) {
-        merged.footer.text = tplAny.footerText;
+        merged.footer.text = sanitizeFooter(tplAny.footerText);
+      } else if (merged.footer) {
+        merged.footer.text = sanitizeFooter(merged.footer.text);
       }
 
       return merged as LayersConfig;
@@ -4004,7 +4007,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         discount: currentLayers.discount?.text || "50% OFF",
         description: currentLayers.description?.text || "Exclusive In-Store Deals",
         validity: currentLayers.validity?.text || "Valid Till Sunday",
-        footer: currentLayers.footer?.text || "*T&C Apply · StoreSparc Video",
+        footer: sanitizeFooter(currentLayers.footer?.text),
         ratio: activeRatio,
         duration,
         resolution,

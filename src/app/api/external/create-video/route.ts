@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import { queueRenderJob } from '@/lib/videoRenderer/renderService';
-import { RenderInputFiles } from '@/lib/videoRenderer/types';
+import { RenderInputFiles, DEFAULT_FOOTER_TEXT, sanitizeFooter } from '@/lib/videoRenderer/types';
 import { removeProductBackground } from '@/lib/videoRenderer/imageProcessor';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -333,10 +333,11 @@ export async function POST(req: NextRequest) {
       body.expiry ||
       '';
 
-    const footer =
+    const rawFooter =
       body.footer !== undefined
         ? body.footer
-        : (body.footer_text || body.terms || body.disclaimer || '*T&C Apply · StoreSparc');
+        : (body.footer_text || body.terms || body.disclaimer || DEFAULT_FOOTER_TEXT);
+    const footer = sanitizeFooter(rawFooter);
 
     const rawChannels = body.channels || body.socialMedia || body.share || body.shareTo || [];
     let channelsList: string[] = [];

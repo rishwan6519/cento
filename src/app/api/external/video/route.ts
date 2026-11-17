@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import { queueRenderJob } from '@/lib/videoRenderer/renderService';
-import { RenderInputFiles } from '@/lib/videoRenderer/types';
+import { RenderInputFiles, DEFAULT_FOOTER_TEXT, sanitizeFooter } from '@/lib/videoRenderer/types';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { toAbsoluteUrl } from '@/lib/urlHelper';
@@ -263,12 +263,13 @@ export async function POST(req: NextRequest) {
       body.expiry ||
       '';
 
-    const footer =
+    const rawFooter =
       body.footer ||
       body.footer_text ||
       body.terms ||
       body.disclaimer ||
-      '*T&C Apply · StoreSparc';
+      DEFAULT_FOOTER_TEXT;
+    const footer = sanitizeFooter(rawFooter);
 
     const queued = await queueRenderJob({
       layers: body.layers || undefined,

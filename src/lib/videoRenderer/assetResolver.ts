@@ -87,3 +87,4 @@ export async function resolveAssetBuffer(urlOrPath?: string): Promise<Buffer | n
 
   return null;
 }
+

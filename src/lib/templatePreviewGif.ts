@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { spawn } from "child_process";
 import { getFfmpegPath } from "./videoRenderer/ffmpegEngine";
 import { prepareLogoImage } from "./videoRenderer/imageProcessor";
+import { DEFAULT_FOOTER_TEXT, sanitizeFooter } from "./videoRenderer/types";
 
 function escapeXml(text: string): string {
   return String(text || "")
@@ -277,6 +278,24 @@ async function renderTemplateFrame(template: any, ratio: "16:9" | "9:16", pulse 
         overlays.push({ input: prep.buffer, left, top });
       } catch {}
     }
+  }
+
+  // Footer Disclaimer
+  const footerLayer = layers.footer;
+  if (!footerLayer || !footerLayer.hidden) {
+    const rawFoot = footerLayer?.text || DEFAULT_FOOTER_TEXT;
+    const footText = sanitizeFooter(rawFoot);
+    const footW = Math.round(width * 0.9);
+    const footH = 20;
+    const footSvg = `
+      <svg width="${footW}" height="${footH}" xmlns="http://www.w3.org/2000/svg">
+        <text x="${footW / 2}" y="14" font-family="Arial, sans-serif" font-size="8.5" fill="${footerLayer?.fontColor || '#e2e8f0'}" text-anchor="middle" opacity="0.85">${escapeXml(footText)}</text>
+      </svg>
+    `;
+    const footBuf = await sharp(Buffer.from(footSvg)).png().toBuffer();
+    const footLeft = Math.round((width - footW) / 2);
+    const footTop = Math.round(height * (footerLayer?.y ?? (is169 ? 0.94 : 0.96)));
+    overlays.push({ input: footBuf, left: footLeft, top: Math.min(height - footH - 4, footTop) });
   }
 
   return sharp(backgroundBuffer).composite(overlays).png().toBuffer();

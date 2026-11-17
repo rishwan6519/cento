@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import MakeVideoFromTemplateModal from "./MakeVideoFromTemplateModal";
+import { DEFAULT_FOOTER_TEXT, sanitizeFooter } from "@/lib/videoRenderer/types";
 import {
   FaFilm, FaEdit, FaTrash, FaSearch, FaPlus, FaTimes,
   FaTh, FaExpand, FaPen, FaTable,
@@ -330,7 +331,8 @@ export const TemplateCanvasPreview: React.FC<{
       const maxWrapW = customBoxW ? Math.min(customBoxW, canvasSafeMaxW) : defaultWrapW;
 
       // Wrap lines down when reaching selected boxWidth limit (including unbroken strings)
-      const textLines = wrapTextCanvas(ctx, L.text || "", maxWrapW, fontSize);
+      const rawText = key === "footer" ? sanitizeFooter(L.text) : (L.text || "");
+      const textLines = wrapTextCanvas(ctx, rawText, maxWrapW, fontSize);
       const lineHeight = Math.round(fontSize * 1.28);
 
       let maxLineW = 0;

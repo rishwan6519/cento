@@ -8,6 +8,7 @@ import {
   FaMusic, FaCheck, FaExclamationTriangle, FaStore, FaClock
 } from "react-icons/fa";
 import { VideoTemplate, AspectRatio, TemplateCanvasPreview } from "./AIVideoTemplatesView";
+import { DEFAULT_FOOTER_TEXT, sanitizeFooter } from "@/lib/videoRenderer/types";
 
 // Preset gradients matching Studio
 const PREVIEW_GRADIENTS = [
@@ -104,7 +105,7 @@ export default function MakeVideoFromTemplateModal({
     initLayers.description?.text || selectedTemplate?.templateDescription || selectedTemplate?.description || "Special limited-time promotional discount across all store departments. Don't miss out!"
   );
   const [footer, setFooter] = useState<string>(
-    initLayers.footer?.text || "*T&C Apply · StoreSparc Video"
+    sanitizeFooter(initLayers.footer?.text)
   );
 
   // ── Upload & AI Helper States ──
@@ -166,7 +167,7 @@ export default function MakeVideoFromTemplateModal({
     setOldPrice(lyr.oldPrice?.text || "$39.99");
     setCta(lyr.cta?.text || "Shop In-Store");
     setDescription(lyr.description?.text || t.templateDescription || t.description || "Exclusive promotional offer available at your nearest store!");
-    setFooter(lyr.footer?.text || "*T&C Apply · StoreSparc Video");
+    setFooter(sanitizeFooter(lyr.footer?.text));
 
     if (t.productUrl) setProductImageUrl(t.productUrl);
     if (t.backgroundUrl) {
@@ -278,7 +279,7 @@ export default function MakeVideoFromTemplateModal({
       mergedLayers.cta = { ...mergedLayers.cta, text: cta };
     }
     if (mergedLayers.footer) {
-      mergedLayers.footer = { ...mergedLayers.footer, text: footer };
+      mergedLayers.footer = { ...mergedLayers.footer, text: sanitizeFooter(footer) };
     }
 
     // Merge background
@@ -457,7 +458,7 @@ export default function MakeVideoFromTemplateModal({
         price,
         old_price: oldPrice,
         cta,
-        footer,
+        footer: sanitizeFooter(footer),
         ratio: aspectRatio,
         duration,
         music_preset: musicPreset,
@@ -932,7 +933,7 @@ export default function MakeVideoFromTemplateModal({
                     className="mkv-input"
                     value={footer}
                     onChange={(e) => setFooter(e.target.value)}
-                    placeholder="e.g. *T&C Apply · StoreSparc Video"
+                    placeholder="e.g. *T&C apply. Images for representation only."
                   />
                 </div>
               </div>

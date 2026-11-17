@@ -9,6 +9,8 @@ import {
   RenderJobResult,
   SingleVideoOutput,
   TemplateLayers,
+  DEFAULT_FOOTER_TEXT,
+  sanitizeFooter,
 } from './types';
 import {
   calculateDimensions,
@@ -85,7 +87,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: '',
+        text: DEFAULT_FOOTER_TEXT,
         x: 0.50,
         y: 0.95,
         size: 1.5,
@@ -143,7 +145,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: '',
+        text: DEFAULT_FOOTER_TEXT,
         x: 0.75,
         y: 0.94,
         size: 1.4,
@@ -201,7 +203,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: '',
+        text: DEFAULT_FOOTER_TEXT,
         x: 0.75,
         y: 0.94,
         size: 1.4,
@@ -260,7 +262,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
         bgColor: '#ffffff',
       },
       footer: {
-        text: '',
+        text: DEFAULT_FOOTER_TEXT,
         x: 0.78,
         y: 0.94,
         size: 1.5,
@@ -285,7 +287,7 @@ export function getDefaultLayers(ratio: AspectRatio | string, custom?: TemplateL
     headline: { ...defaults.headline, ...(custom.headline || {}), text: custom.headline?.text ?? defaults.headline?.text ?? '' },
     description: { ...defaults.description, ...(custom.description || {}), text: custom.description?.text ?? defaults.description?.text ?? '' },
     validity: { ...defaults.validity, ...(custom.validity || {}), text: custom.validity?.text ?? defaults.validity?.text ?? '' },
-    footer: { ...defaults.footer, ...(custom.footer || {}), text: custom.footer?.text ?? defaults.footer?.text ?? '' },
+    footer: { ...defaults.footer, ...(custom.footer || {}), text: sanitizeFooter(custom.footer?.text ?? defaults.footer?.text) },
     logo: { ...defaults.logo, ...(custom.logo || {}) },
   };
 }
@@ -316,7 +318,7 @@ export async function renderSingleAspect(
     }
     if (layers.description) layers.description.text = options.text.description || '';
     if (layers.validity) layers.validity.text = options.text.validity || '';
-    if (layers.footer) layers.footer.text = options.text.footer !== undefined ? options.text.footer : '';
+    if (layers.footer) layers.footer.text = sanitizeFooter(options.text.footer !== undefined ? options.text.footer : layers.footer.text);
     if (layers.price) layers.price.text = options.text.price || '';
     if (layers.oldPrice) layers.oldPrice.text = options.text.oldPrice || '';
     if (layers.cta) layers.cta.text = options.text.cta || '';

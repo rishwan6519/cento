@@ -154,7 +154,7 @@ const VideoTemplateSchema: Schema = new Schema(
     },
     footerText: {
       type: String,
-      default: '',
+      default: '*T&C apply. Images for representation only.',
       trim: true,
     },
     website: {

@@ -1,5 +1,26 @@
 export type AspectRatio = '16:9' | '9:16' | '1:1' | '4:5';
 
+export const DEFAULT_FOOTER_TEXT = '*T&C apply. Images for representation only.';
+
+export function sanitizeFooter(raw?: string): string {
+  if (!raw || !raw.trim()) {
+    return DEFAULT_FOOTER_TEXT;
+  }
+  const t = raw.trim();
+  if (
+    t.includes('StoreSparc') ||
+    t.includes('Terms & Conditions Apply') ||
+    t === 'TERMS & CONDITIONS APPLY' ||
+    t.toLowerCase() === '*t&c apply' ||
+    t.toLowerCase() === '*t&c apply.' ||
+    t.toLowerCase() === 'terms & conditions' ||
+    t.toLowerCase() === '*terms & conditions apply'
+  ) {
+    return DEFAULT_FOOTER_TEXT;
+  }
+  return t;
+}
+
 export interface AspectSize {
   width: number;
   height: number;
