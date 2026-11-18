@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       selectedDeviceId,
       description,
       frequencyInMinutes,
+      allowConcurrent,
     } = body;
 
     // Resolve type — accept either 'type' or 'category'
@@ -96,6 +97,31 @@ export async function POST(req: NextRequest) {
           delay: 0
         };
       }));
+    }
+
+    // Ensure files are saved to MediaItem library
+    if (Array.isArray(resolvedFiles) && resolvedFiles.length > 0) {
+      try {
+        for (const rf of resolvedFiles) {
+          const path = rf.path || rf.url || rf.fileUrl;
+          if (path) {
+            const exists = await MediaItem.findOne({ $or: [{ url: path }, { fileUrl: path }] });
+            if (!exists) {
+              await MediaItem.create({
+                name: rf.name || (path.split('/').pop() || 'Playlist Media'),
+                url: path,
+                fileUrl: path,
+                type: rf.type || (path.match(/\.(mp4|webm|mov)$/i) ? 'video' : path.match(/\.(mp3|wav|ogg)$/i) ? 'audio' : 'image'),
+                fileCategory: rf.videoCategory || 'other',
+                userId: userId || undefined,
+                duration: rf.duration || 12
+              });
+            }
+          }
+        }
+      } catch (saveErr) {
+        console.error('Error auto-saving playlist files to MediaItem library:', saveErr);
+      }
     }
 
     // Create new playlist
@@ -254,7 +280,7 @@ export async function POST(req: NextRequest) {
           const connectionOwnerId = dev.ownerId || resolvedUserId;
           const existingConnection = await DevicePlaylist.findOne({ deviceId: devId });
           
-          if (existingConnection && !isAnnouncement) {
+          if (existingConnection && !isAnnouncement && !allowConcurrent) {
             // Check for conflicts with existing media playlists (only for media playlists, not announcements)
             const existingPlaylists = await PlaylistConfig.find({
               _id: { $in: existingConnection.playlistIds }
@@ -382,7 +408,8 @@ export async function PUT(req: NextRequest) {
       backgroundAudio,
       userId,
       files,
-      frequencyInMinutes
+      frequencyInMinutes,
+      allowConcurrent
     } = body;
 
     if (!id) {
@@ -464,6 +491,30 @@ export async function PUT(req: NextRequest) {
           delay: 0
         };
       }));
+    }
+
+    if (Array.isArray(updateFields.files) && updateFields.files.length > 0) {
+      try {
+        for (const rf of updateFields.files) {
+          const path = rf.path || rf.url || rf.fileUrl;
+          if (path) {
+            const exists = await MediaItem.findOne({ $or: [{ url: path }, { fileUrl: path }] });
+            if (!exists) {
+              await MediaItem.create({
+                name: rf.name || (path.split('/').pop() || 'Playlist Media'),
+                url: path,
+                fileUrl: path,
+                type: rf.type || (path.match(/\.(mp4|webm|mov)$/i) ? 'video' : path.match(/\.(mp3|wav|ogg)$/i) ? 'audio' : 'image'),
+                fileCategory: rf.videoCategory || 'other',
+                userId: userId || undefined,
+                duration: rf.duration || 12
+              });
+            }
+          }
+        }
+      } catch (saveErr) {
+        console.error('Error auto-saving playlist files to MediaItem in PUT:', saveErr);
+      }
     }
 
     const playlist = await PlaylistConfig.findByIdAndUpdate(
@@ -567,7 +618,7 @@ export async function PUT(req: NextRequest) {
       if (resolvedUserId) {
         for (const devId of devicesToConnect) {
           const existingConnection = await DevicePlaylist.findOne({ deviceId: devId });
-          if (existingConnection) {
+          if (existingConnection && !allowConcurrent) {
             // Check for conflicts with existing media playlists
             const existingPlaylists = await PlaylistConfig.find({
               _id: { $in: existingConnection.playlistIds }
@@ -646,24 +697,48 @@ export async function GET(req: NextRequest) {
 
     await connectToDatabase();
 
-    // Look up the user to find their controllerId (super user)
-    const User = mongoose.models.User;
+    // Look up the user and permitted hierarchy
+    const UserModel = mongoose.models.User;
     const userObjectId = new mongoose.Types.ObjectId(userId);
-    let myPlaylistsQuery: any = { userId: userObjectId };
-    // (Removed controllerId logic as it is no longer needed)
+    const requestingUser = await UserModel.findById(userObjectId);
 
-    // Fetch user's own playlists
+    let permittedUserIds = [userObjectId];
+    let directCustomerDevices: any[] = [];
+
+    if (requestingUser) {
+      if (requestingUser.role === 'account_admin' || requestingUser.role === 'admin') {
+        const relatedUsers = await UserModel.find({
+          $or: [
+            { _id: requestingUser._id },
+            { controllerId: requestingUser._id },
+            ...(requestingUser.customerId ? [{ customerId: requestingUser.customerId }] : []),
+            { createdBy: requestingUser._id }
+          ]
+        }).select('_id');
+        permittedUserIds = relatedUsers.map(u => u._id);
+
+        if (requestingUser.customerId) {
+          const directDevs = await Device.find({ customerId: requestingUser.customerId }).select('_id');
+          directCustomerDevices = directDevs.map(d => d._id);
+        }
+      }
+    }
+
+    let myPlaylistsQuery = { userId: { $in: permittedUserIds } };
+
+    // Fetch user's own playlists (or all store playlists if account_admin)
     const ownPlaylists = await PlaylistConfig.find(myPlaylistsQuery)
       .populate('userId', 'username')
       .populate('files.fileId');
 
-    // Look up the user's devices
-    const onboarded = await OnboardedDevice.find({ userId: userObjectId }).select('deviceId');
-    const assigned = await AssignedDevice.find({ userId: userObjectId }).select('deviceId');
+    // Look up the user's devices (or all assigned devices across stores)
+    const onboarded = await OnboardedDevice.find({ userId: { $in: permittedUserIds } }).select('deviceId');
+    const assigned = await AssignedDevice.find({ userId: { $in: permittedUserIds } }).select('deviceId');
 
     const deviceIds = [
       ...onboarded.map(d => d.deviceId),
-      ...assigned.map(d => d.deviceId)
+      ...assigned.map(d => d.deviceId),
+      ...directCustomerDevices
     ];
 
     let connectedOtherPlaylists: any[] = [];

@@ -613,6 +613,8 @@ export const advancedPlaylistScheduleService = {
           if (Array.isArray(playlist.files)) {
             for (const file of playlist.files) {
               const fileObj = file.toObject ? file.toObject() : { ...file };
+              fileObj.playlistId = playlist._id ? playlist._id.toString() : String(playlist.id || sched._id);
+              fileObj.playlistName = playlist.name || 'Unnamed Playlist';
               let rawPath = fileObj.path || (fileObj.fileId && typeof fileObj.fileId === 'object' ? (fileObj.fileId.url || fileObj.fileId.fileUrl) : '') || '';
               if (rawPath) {
                 const fullUrl = rawPath.startsWith('http')

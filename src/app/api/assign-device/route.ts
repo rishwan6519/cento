@@ -24,7 +24,31 @@ export async function GET(request: Request) {
 
     const query: any = { status: 'active' };
     if (userId) {
-      query.userId = userId;
+      const requestingUser = await User.findById(userId);
+      if (requestingUser && (requestingUser.role === 'account_admin' || requestingUser.role === 'admin')) {
+        const relatedUsers = await User.find({
+          $or: [
+            { _id: requestingUser._id },
+            { controllerId: requestingUser._id },
+            ...(requestingUser.customerId ? [{ customerId: requestingUser.customerId }] : []),
+            { createdBy: requestingUser._id }
+          ]
+        }).select('_id');
+        const userIds = relatedUsers.map(u => u._id);
+
+        let deviceIds: any[] = [];
+        if (requestingUser.customerId) {
+          const customerDevices = await Device.find({ customerId: requestingUser.customerId }).select('_id');
+          deviceIds = customerDevices.map(d => d._id);
+        }
+
+        query.$or = [
+          { userId: { $in: userIds } },
+          ...(deviceIds.length > 0 ? [{ deviceId: { $in: deviceIds } }] : [])
+        ];
+      } else {
+        query.userId = userId;
+      }
     } else if (assignedBy) {
       query.assignedBy = assignedBy;
     } else if (customerId) {

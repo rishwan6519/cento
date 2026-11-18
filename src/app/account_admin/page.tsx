@@ -47,6 +47,9 @@ import AIVideoTemplatesView from "../store_user/AIVideoTemplatesView";
 import MediaLibraryView from "../store_user/MediaLibraryView";
 import SocialSchedulerView from "../store_user/SocialSchedulerView";
 import TemplateEditorView from "../store_user/TemplateEditorView";
+import ViewAllCampaigns from "../store_user/ViewAllCampaigns";
+import CreateMediaPlaylist from "../store_user/CreateMediaPlaylist";
+import TimelineSchedulesView from "../store_user/TimelineSchedulesView";
 
 // --- Sub-components for different views ---
 
@@ -2135,6 +2138,7 @@ export default function AccountAdminDashboard() {
     }
     setActiveView(view);
   };
+  const [editingPlaylist, setEditingPlaylist] = useState<any>(null);
   const [selectedStore, setSelectedStore] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -2204,6 +2208,17 @@ export default function AccountAdminDashboard() {
       ]
     },
   
+    { 
+      id: "campaigns_management", 
+      label: "Campaigns & Playlists", 
+      icon: MonitorPlay,
+      perm: null,
+      subItems: [
+        { id: "view_all_campaigns", label: "View all campaigns", icon: ListIcon },
+        { id: "create_media_playlist", label: "Create media playlist", icon: Plus },
+        { id: "timeline_schedules", label: "Timelines / Schedules", icon: Clock },
+      ]
+    },
     { 
       id: "stores", 
       label: "Store Management", 
@@ -2280,6 +2295,36 @@ export default function AccountAdminDashboard() {
   const renderContent = () => {
     switch (activeView) {
       case "dashboard": return <DashboardView setActiveView={setActiveView} userData={userData} />;
+      case "view_all_campaigns": return (
+        <ViewAllCampaigns
+          onNavigate={(view: any) => {
+            if (view === "createMediaPlaylist" || view === "mediaManagement") {
+              setEditingPlaylist(null);
+              setActiveView("create_media_playlist");
+            } else {
+              setActiveView(view);
+            }
+          }}
+          onEdit={(p: any) => {
+            setEditingPlaylist(p);
+            setActiveView("create_media_playlist");
+          }}
+        />
+      );
+      case "create_media_playlist": return (
+        <CreateMediaPlaylist
+          onNavigate={(view: any) => {
+            setEditingPlaylist(null);
+            if (view === "viewAllCampaigns") {
+              setActiveView("view_all_campaigns");
+            } else {
+              setActiveView(view);
+            }
+          }}
+          editingPlaylist={editingPlaylist}
+        />
+      );
+      case "timeline_schedules": return <TimelineSchedulesView />;
       case "onboard_store": return <OnboardStoreView accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;
       case "all_stores": return <AllStoresView setActiveView={setActiveView} setSelectedStore={setSelectedStore} accountAdminId={userData?._id} customerId={userData?.customerId} onEdit={(s) => { setSelectedStore(s); setActiveView("edit_store"); }} />;
       case "edit_store": return <EditStoreView store={selectedStore} accountAdminId={userData?._id} customerId={userData?.customerId} onComplete={() => setActiveView("all_stores")} />;

@@ -54,6 +54,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
   const [previewMediaName, setPreviewMediaName] = useState("");
+  const [conflictModal, setConflictModal] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
 
@@ -331,7 +332,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (forceConcurrent: boolean = false) => {
     if (!playlistName.trim()) {
       alert("Please enter a playlist name.");
       return;
@@ -395,7 +396,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         return;
       }
 
-      const body = {
+      const body: any = {
         userId,
         name: playlistName,
         type: playlistType || "media",
@@ -410,6 +411,10 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         files: filesPayload,
         id: editingPlaylist?._id || editingPlaylist?.id
       };
+      if (forceConcurrent) {
+        body.allowConcurrent = true;
+      }
+
       const method = editingPlaylist ? "PUT" : "POST";
       const res = await fetch("/api/playlists", {
         method,
@@ -417,8 +422,19 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        alert(editingPlaylist ? "Playlist updated and connected successfully!" : "Playlist created and connected to stores successfully!");
+      if (res.status === 409) {
+        setConflictModal({
+          open: true,
+          message: data.message || data.error || "Conflict alert: Another playlist is already connected during this time slot."
+        });
+        setSubmitting(false);
+        return;
+      }
+      if (res.ok && (data.success || data.data)) {
+        if (conflictModal.open) setConflictModal({ open: false, message: "" });
+        alert(forceConcurrent 
+          ? "Playlist connected successfully alongside existing schedules (Multiple Playlists running concurrently)!" 
+          : (editingPlaylist ? "Playlist updated and connected successfully!" : "Playlist created and connected to stores successfully!"));
         onNavigate("viewAllCampaigns");
       } else {
         alert(data.error || data.message || "Failed to connect playlist to stores.");
@@ -821,7 +837,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
 
           <div className="store-form-actions">
             <button className="store-btn-outline-grey" onClick={() => { setPlaylistName(''); setSelectedDeviceIds([]); setSelectedMediaIds([]); setSelectedFiles([]) }}>Reset</button>
-            <button className="store-btn-solid-orange store-btn-solid-orange--icon" onClick={handleSubmit} disabled={submitting}>
+            <button className="store-btn-solid-orange store-btn-solid-orange--icon" onClick={() => handleSubmit()} disabled={submitting}>
               {submitting 
                 ? (editingPlaylist ? 'Updating & Connecting…' : 'Connecting to stores…') 
                 : (editingPlaylist ? 'Update & connect playlist' : 'Connect playlist to stores')}
@@ -1092,6 +1108,50 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         }
         .store-btn-solid-orange--icon { display: flex; align-items: center; gap: 8px; }
       `}</style>
+
+      {/* Schedule Conflict Modal (Allow Concurrent Playback) */}
+      {conflictModal.open && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11,40,48,0.65)', backdropFilter: 'blur(5px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '24px', maxWidth: '520px', width: '100%', overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,0.3)', animation: 'fadeIn 0.2s ease-out' }}>
+            <div style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)', padding: '22px 26px', color: '#fff', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
+                ⚠️
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>Schedule Conflict Alert</h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>Overlapping playlist detected</p>
+              </div>
+            </div>
+            <div style={{ padding: '26px' }}>
+              <div style={{ background: '#FFF7ED', border: '1px solid #FFEDD5', borderRadius: '14px', padding: '16px', marginBottom: '20px' }}>
+                <p style={{ margin: 0, color: '#C2410C', fontSize: '0.9rem', lineHeight: 1.5, fontWeight: 600 }}>
+                  {conflictModal.message}
+                </p>
+              </div>
+              <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                Do you want to proceed and run both playlists <strong>concurrently</strong>? The platform supports multiple playlists on the same screen, mixing media smoothly according to your timeline contribution settings.
+              </p>
+            </div>
+            <div style={{ padding: '18px 26px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setConflictModal({ open: false, message: "" })}
+                style={{ padding: '10px 20px', background: '#fff', border: '1px solid #CBD5E1', color: '#64748B', fontWeight: 700, borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSubmit(true)}
+                disabled={submitting}
+                style={{ padding: '10px 24px', background: '#11B5BB', border: 'none', color: '#fff', fontWeight: 700, borderRadius: '12px', cursor: submitting ? 'not-allowed' : 'pointer', boxShadow: '0 4px 12px rgba(17,181,187,0.3)' }}
+              >
+                {submitting ? "Connecting..." : "Proceed (Run Concurrently)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

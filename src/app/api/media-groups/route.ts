@@ -23,15 +23,27 @@ export async function GET(req: NextRequest) {
     let userIdsToFetch = [new mongoose.Types.ObjectId(userId)];
 
     if (requestingUser) {
-      const adminId = requestingUser.role === 'account_admin' ? requestingUser._id : requestingUser.controllerId;
-      if (adminId) {
-         const relatedUsers = await User.find({ 
-            $or: [
-               { _id: adminId },
-               { controllerId: adminId }
-            ] 
-         }).select('_id');
-         userIdsToFetch = relatedUsers.map(u => u._id);
+      const orConditions: any[] = [{ _id: requestingUser._id }];
+      if (requestingUser.customerId) {
+        orConditions.push({ customerId: requestingUser.customerId });
+      }
+      if (requestingUser.controllerId) {
+        orConditions.push({ _id: requestingUser.controllerId });
+        orConditions.push({ controllerId: requestingUser.controllerId });
+      }
+      if (requestingUser.createdBy) {
+        orConditions.push({ _id: requestingUser.createdBy });
+        orConditions.push({ createdBy: requestingUser.createdBy });
+      }
+      if (requestingUser.role === 'account_admin' || requestingUser.role === 'admin') {
+        orConditions.push({ controllerId: requestingUser._id });
+        orConditions.push({ createdBy: requestingUser._id });
+      }
+
+      const relatedUsers = await User.find({ $or: orConditions }).select('_id');
+      userIdsToFetch = relatedUsers.map(u => u._id);
+      if (!userIdsToFetch.some(id => id.toString() === requestingUser._id.toString())) {
+        userIdsToFetch.push(requestingUser._id);
       }
     }
 

@@ -54,9 +54,10 @@ export default function TimelineSchedulesView() {
     slotIdx: number | null;
     start: string;
     end: string;
-    categories: string[];
+    mode: 'playlist' | 'category';
+    items: { key: string; label: string }[];
     percentages: Record<string, number>;
-  }>({ open: false, slotIdx: null, start: "", end: "", categories: [], percentages: {} });
+  }>({ open: false, slotIdx: null, start: "", end: "", mode: 'category', items: [], percentages: {} });
   const [selectedMedia, setSelectedMedia] = useState<MediaInstance | null>(null);
   const [expandedSlots, setExpandedSlots] = useState<Record<number, boolean>>({});
   const [editedQueues, setEditedQueues] = useState<Record<number, MediaInstance[]>>({});
@@ -174,59 +175,90 @@ export default function TimelineSchedulesView() {
 
   const handleOpenDistModal = (block: any) => {
     const queue = editedQueues[block.originalIndex] || [];
-    const catSet = new Set<string>();
-    
-    // 1. Pull all possible categories available on the device for this slot (provided by backend)
-    if (block.availableCategories && block.availableCategories.length > 0) {
-      block.availableCategories.forEach((cat: string) => catSet.add(cat));
-    } else {
-      // Fallback if backend doesn't provide it
-      queue.forEach(med => {
-        const vCat = (med as any).videoCategory;
-        if (vCat) {
-          catSet.add(vCat.toLowerCase());
-        } else {
-          catSet.add('uncategorized');
+    const isMultiPlaylist = Array.isArray(block.availablePlaylists) && block.availablePlaylists.length > 1;
+    const existingPcts = block.allocatedPercentages || {};
+
+    if (isMultiPlaylist) {
+      // Playlist-based distribution
+      const items = block.availablePlaylists.map((p: any) => ({
+        key: p.id || p.playlistId,
+        label: p.playlistName || 'Playlist'
+      }));
+
+      const percentages: Record<string, number> = {};
+      let hasExisting = false;
+
+      items.forEach((item: any) => {
+        if (existingPcts[item.key] !== undefined) {
+          percentages[item.key] = existingPcts[item.key];
+          hasExisting = true;
+        } else if (existingPcts[item.label] !== undefined) {
+          percentages[item.key] = existingPcts[item.label];
+          hasExisting = true;
         }
       });
-    }
 
-    // 2. Also ensure any already-configured categories are visible, even if they have 0 files right now
-    const existingPcts = block.allocatedPercentages || {};
-    Object.keys(existingPcts).forEach(cat => catSet.add(cat));
-    
-    const categories = Array.from(catSet);
-    const percentages: Record<string, number> = {};
-    
-    if (Object.keys(existingPcts).length > 0) {
-      categories.forEach(cat => percentages[cat] = existingPcts[cat] || 0);
+      if (!hasExisting) {
+        const split = Math.floor((100 / (items.length || 1)) * 100) / 100;
+        items.forEach((item: any) => percentages[item.key] = split);
+      }
+
+      setDistModal({
+        open: true,
+        slotIdx: block.originalIndex,
+        start: block.start,
+        end: block.end,
+        mode: 'playlist',
+        items,
+        percentages
+      });
     } else {
-      const split = Math.floor((100 / (categories.length || 1)) * 100) / 100;
-      categories.forEach(cat => percentages[cat] = split);
+      // Category-based distribution
+      const catSet = new Set<string>();
+      if (block.availableCategories && block.availableCategories.length > 0) {
+        block.availableCategories.forEach((cat: string) => catSet.add(cat));
+      } else {
+        queue.forEach(med => {
+          const vCat = (med as any).videoCategory;
+          catSet.add(vCat ? vCat.toLowerCase() : 'uncategorized');
+        });
+      }
+      Object.keys(existingPcts).forEach(cat => catSet.add(cat));
+
+      const items = Array.from(catSet).map(c => ({ key: c, label: c === 'unknown' ? 'Uncategorized' : c }));
+      const percentages: Record<string, number> = {};
+
+      if (Object.keys(existingPcts).length > 0) {
+        items.forEach(item => percentages[item.key] = existingPcts[item.key] || 0);
+      } else {
+        const split = Math.floor((100 / (items.length || 1)) * 100) / 100;
+        items.forEach(item => percentages[item.key] = split);
+      }
+
+      setDistModal({
+        open: true,
+        slotIdx: block.originalIndex,
+        start: block.start,
+        end: block.end,
+        mode: 'category',
+        items,
+        percentages
+      });
     }
-    
-    setDistModal({
-      open: true,
-      slotIdx: block.originalIndex,
-      start: block.start,
-      end: block.end,
-      categories,
-      percentages
-    });
   };
 
-  const handlePercentageChange = (cat: string, value: number) => {
+  const handlePercentageChange = (key: string, value: number) => {
     let newVal = value;
     if (newVal < 0) newVal = 0;
     if (newVal > 100) newVal = 100;
     
-    const newPcts = { ...distModal.percentages, [cat]: newVal };
-    const otherCats = distModal.categories.filter(c => c !== cat);
+    const newPcts = { ...distModal.percentages, [key]: newVal };
+    const otherItems = distModal.items.filter(item => item.key !== key);
     
-    if (otherCats.length > 0) {
+    if (otherItems.length > 0) {
       const remaining = 100 - newVal;
-      const split = Math.floor((remaining / otherCats.length) * 100) / 100;
-      otherCats.forEach(c => newPcts[c] = split);
+      const split = Math.floor((remaining / otherItems.length) * 100) / 100;
+      otherItems.forEach(item => newPcts[item.key] = split);
     }
     
     setDistModal({ ...distModal, percentages: newPcts });
@@ -549,7 +581,7 @@ export default function TimelineSchedulesView() {
                                   handleOpenDistModal(block);
                                 }}
                               >
-                                ⚙️ Edit Distribution
+                                {block.availablePlaylists && block.availablePlaylists.length > 1 ? '⚖️ Time Contribution' : '⚙️ Edit Distribution'}
                               </button>
                               <button 
                                  className="tsv-accordion-toggle"
@@ -690,7 +722,7 @@ export default function TimelineSchedulesView() {
             <div style={{ background: 'linear-gradient(to right, #0f172a, #1e293b)', padding: '24px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                <div>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     ✨ Smart Playlist Distribution
+                     {distModal.mode === 'playlist' ? '✨ Multi-Playlist Time Contribution' : '✨ Smart Playlist Distribution'}
                   </h3>
                   <p style={{ margin: '8px 0 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>
                      Time Slot: <strong style={{ color: '#fff' }}>{distModal.start} - {distModal.end}</strong>
@@ -704,23 +736,25 @@ export default function TimelineSchedulesView() {
             <div style={{ padding: '24px' }}>
                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
                   <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
-                     Adjust the visual slider for any category. The system will <strong>automatically balance</strong> the remaining categories to keep the total perfectly at 100%.
+                     {distModal.mode === 'playlist' 
+                       ? 'Multiple playlists are connected to this device for this time window. Set the screen time percentage for each playlist (e.g. 30% / 70%). The platform automatically interleaves and balances them to 100%.' 
+                       : 'Adjust the visual slider for any category. The system will automatically balance the remaining categories to keep the total perfectly at 100%.'}
                   </p>
                </div>
               
-              {distModal.categories.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>No categories found in this slot.</div>
+              {distModal.items.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>No items found in this slot.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {distModal.categories.map(cat => (
-                    <div key={cat} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 70px', alignItems: 'center', gap: '16px' }}>
-                      <label style={{ fontWeight: 700, color: '#334155', textTransform: 'capitalize', fontSize: '0.9rem' }}>
-                         {cat === 'unknown' ? 'Uncategorized' : cat}
+                  {distModal.items.map(item => (
+                    <div key={item.key} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 70px', alignItems: 'center', gap: '16px' }}>
+                      <label style={{ fontWeight: 700, color: '#334155', textTransform: 'capitalize', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.label}>
+                         {distModal.mode === 'playlist' ? `🎵 ${item.label}` : item.label}
                       </label>
                       <input 
                         type="range"
-                        value={distModal.percentages[cat] || 0}
-                        onChange={(e) => handlePercentageChange(cat, parseFloat(e.target.value) || 0)}
+                        value={distModal.percentages[item.key] || 0}
+                        onChange={(e) => handlePercentageChange(item.key, parseFloat(e.target.value) || 0)}
                         min={0}
                         max={100}
                         step={1}
@@ -728,12 +762,12 @@ export default function TimelineSchedulesView() {
                       />
                       <div style={{ position: 'relative' }}>
                          <input 
-                           type="number"
-                           value={Math.round(distModal.percentages[cat] || 0)}
-                           onChange={(e) => handlePercentageChange(cat, parseFloat(e.target.value) || 0)}
-                           min={0}
-                           max={100}
-                           style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '8px', textAlign: 'center', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}
+                            type="number"
+                            value={Math.round(distModal.percentages[item.key] || 0)}
+                            onChange={(e) => handlePercentageChange(item.key, parseFloat(e.target.value) || 0)}
+                            min={0}
+                            max={100}
+                            style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '8px', textAlign: 'center', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}
                          />
                          <span style={{ position: 'absolute', right: '-12px', top: '8px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700 }}>%</span>
                       </div>
