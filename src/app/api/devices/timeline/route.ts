@@ -163,23 +163,22 @@ export async function GET(req: NextRequest) {
 
       // Check for distribution config for this specific time slot
       let distConfig: Record<string, number> | null = null;
+      let rawDistMap: Record<string, number> | null = null;
       try {
         const slotDistDoc = await TimeSlotDistribution.findOne({ serialNumber, start: slot.start, end: slot.end }).lean() as any;
-        
         let distDocToUse = slotDistDoc;
-        
         if (!distDocToUse) {
-           // Fallback to global distribution
            distDocToUse = await PlaylistDistribution.findOne({ serialNumber }).lean() as any;
         }
-        
         if (distDocToUse && distDocToUse.distribution) {
           const distObj = distDocToUse.distribution instanceof Map
             ? Object.fromEntries(distDocToUse.distribution)
             : distDocToUse.distribution;
           if (Object.keys(distObj).length > 0) {
+            rawDistMap = {};
             distConfig = {};
             for (const [k, v] of Object.entries(distObj)) {
+               rawDistMap[k.toLowerCase()] = Number(v);
                const normK = normalizeCat(k);
                distConfig[normK] = (distConfig[normK] || 0) + Number(v);
             }
@@ -199,9 +198,104 @@ export async function GET(req: NextRequest) {
         filesByCategory[cat].push(m);
       }
 
-      if (distConfig && slot.medias.length > 0 && slotDurationSec > 0) {
-        // --- REQUIREMENT 1: Handle Missing Categories ---
+      // Check if multiple playlists are active concurrently in this time slot
+      const isMultiPlaylist = Array.isArray(slot.activePlaylists) && slot.activePlaylists.length > 1;
 
+      if (isMultiPlaylist && slot.medias.length > 0 && slotDurationSec > 0) {
+        // Group media items by playlist
+        const filesByPlaylist: Record<string, any[]> = {};
+        for (const m of slot.medias) {
+          const pKey = (m.playlistId || m.playlistName || 'default').toString();
+          if (!filesByPlaylist[pKey]) filesByPlaylist[pKey] = [];
+          filesByPlaylist[pKey].push(m);
+        }
+
+        // Determine playlist percentage distribution
+        let playlistDistConfig: Record<string, number> = {};
+        let hasCustomDist = false;
+
+        if (rawDistMap) {
+          for (const p of slot.activePlaylists) {
+            const pId = (p.id || p.playlistId || '').toString().toLowerCase();
+            const pName = (p.playlistName || '').toLowerCase();
+            if (rawDistMap[pId] !== undefined) {
+              playlistDistConfig[p.id || p.playlistId] = rawDistMap[pId];
+              hasCustomDist = true;
+            } else if (rawDistMap[pName] !== undefined) {
+              playlistDistConfig[p.id || p.playlistId] = rawDistMap[pName];
+              hasCustomDist = true;
+            }
+          }
+        }
+
+        if (!hasCustomDist) {
+          const equalSplit = Math.floor((100 / slot.activePlaylists.length) * 100) / 100;
+          for (const p of slot.activePlaylists) {
+            playlistDistConfig[p.id || p.playlistId] = equalSplit;
+          }
+        }
+
+        const allGeneratedItems: any[] = [];
+
+        for (const p of slot.activePlaylists) {
+          const pKey = (p.id || p.playlistId || '').toString();
+          const pFiles = filesByPlaylist[pKey] || slot.medias.filter((m: any) => 
+            (m.playlistId && m.playlistId.toString() === pKey) || 
+            (m.playlistName && m.playlistName === p.playlistName)
+          );
+
+          if (!pFiles || pFiles.length === 0) continue;
+
+          const fractionPct = playlistDistConfig[pKey] || (100 / slot.activePlaylists.length);
+          finalAllocatedPercentages[p.playlistName || pKey] = fractionPct;
+
+          const allocatedSeconds = Math.floor(slotDurationSec * (fractionPct / 100));
+          let pElapsed = 0;
+          let pBag = shuffleArray(pFiles);
+
+          while (pElapsed < allocatedSeconds) {
+            if (pBag.length === 0) pBag = shuffleArray(pFiles);
+            const m = pBag.pop();
+            let dur = Number(m.duration) || 12;
+            if (dur < 1) dur = 1;
+
+            const remaining = allocatedSeconds - pElapsed;
+            if (dur > remaining) dur = remaining;
+            if (dur <= 0) break;
+
+            const cleanM = {
+               fileId: typeof m.fileId === 'object' && m.fileId !== null ? (m.fileId._id?.toString() || m.fileId.toString()) : m.fileId,
+               name: m.name,
+               path: m.path,
+               type: m.type,
+               shuffle: m.shuffle || false,
+               displayOrder: m.displayOrder || 0,
+               delay: m.delay || 0,
+               maxVolume: m.maxVolume || 100,
+               minVolume: m.minVolume || 0,
+               backgroundImageEnabled: m.backgroundImageEnabled || false,
+               backgroundImage: m.backgroundImage || null,
+               _id: m._id ? m._id.toString() : undefined,
+               url: m.url || m.path,
+               fileCategory: m.fileCategory,
+               videoCategory: m.videoCategory,
+               duration: dur,
+               ratio: m.ratio,
+               width: m.width,
+               height: m.height,
+               playlistId: pKey,
+               playlistName: p.playlistName
+            };
+
+            allGeneratedItems.push(cleanM);
+            pElapsed += dur;
+
+            if (allGeneratedItems.length >= MAX_ITEMS || allGeneratedItems.length > 5000) break;
+          }
+        }
+
+        unrolledMedias = smartShuffle(allGeneratedItems);
+      } else if (distConfig && slot.medias.length > 0 && slotDurationSec > 0) {
         // --- REQUIREMENT 1: Handle Missing Categories ---
         const validCategories = Object.keys(distConfig).filter(cat => filesByCategory[cat] && filesByCategory[cat].length > 0);
         let activeDistConfig: Record<string, number> = {};
@@ -291,7 +385,6 @@ export async function GET(req: NextRequest) {
           }
 
           // True random shuffle of the entire generated timeline (Professional Random Mix)
-          // Uses smartShuffle to ensure the same video doesn't play consecutively
           unrolledMedias = smartShuffle(allGeneratedItems);
         }
       }
@@ -380,16 +473,22 @@ export async function GET(req: NextRequest) {
         item.endTime = currentStartTime;
       }
 
+      const displayPlaylistName = slot.activePlaylists && slot.activePlaylists.length > 1
+        ? slot.activePlaylists.map((p: any) => p.playlistName).join(' + ')
+        : (slot.playlist?.name || (slot.activePlaylists && slot.activePlaylists[0]?.playlistName) || 'Scheduled Timeline Slot');
+
       transformedTimeline.push({
         originalIndex: currentBlockIdx,
         start: slot.start,
         end: slot.end,
         durationSeconds: slotDurationSec,
-        playlistName: slot.playlist?.name,
+        playlistName: displayPlaylistName,
+        activePlaylists: slot.activePlaylists || [],
         isGap: false,
         allocatedPercentages: Object.keys(finalAllocatedPercentages).length > 0 ? finalAllocatedPercentages : undefined,
         medias: unrolledMedias,
-        availableCategories: Object.keys(filesByCategory || {})
+        availableCategories: Object.keys(filesByCategory || {}),
+        availablePlaylists: slot.activePlaylists || []
       });
     }
 
