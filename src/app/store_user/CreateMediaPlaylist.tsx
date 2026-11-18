@@ -148,11 +148,11 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       const a = d.data || [];
       const individualDevices = a.map((x: any) => ({
         _id: x.deviceId?._id || x._id,
-        name: x.deviceId?.name || "Unknown Device",
-        sn: x.deviceId?.serialNumber || "N/A",
-        type: x.deviceId?.typeId?.name || "Device",
-        status: x.deviceId?.status || "inactive",
-        address: x.userId?.storeLocation || "N/A"
+        name: x.deviceId?.name || x.name || "Unknown Device",
+        sn: x.deviceId?.serialNumber || x.serialNumber || x.sn || "N/A",
+        type: x.deviceId?.typeId?.name || x.type || "Device",
+        status: x.deviceId?.status || x.status || "inactive",
+        address: x.userId?.storeLocation || x.address || "N/A"
       }));
       setDevices(individualDevices);
     }).catch(() => setDevices([])).finally(() => setLoadingDevices(false));
@@ -802,13 +802,16 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                 : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
                   {devices.map(s => {
                     const isSel = selectedDeviceIds.includes(s._id);
-                    const isOnline = (s.status || "").toLowerCase() === "online";
+                    const isOnline = ["online", "active"].includes((s.status || "").toLowerCase());
                     return (<div key={s._id} onClick={() => toggleDevice(s._id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, border: `2px solid ${isSel ? '#F05A28' : '#EAEFEF'}`, borderRadius: 14, cursor: 'pointer', background: isSel ? '#FFF8F5' : '#fff', position: 'relative' }}>
                       <div style={{ width: 36, height: 36, borderRadius: 8, background: '#EAF6F8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F05A28' }}><FaDesktop size={14} /></div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontWeight: 700, fontSize: '.82rem', color: '#162B30' }}>{s.name} <span style={{ color: isOnline ? '#16A34A' : '#DC2626', fontSize: 10 }}>●</span></p>
-                        <p style={{ fontSize: '.7rem', color: '#A4B6B9', marginTop: 2 }}>{s.address}</p>
-                        <p style={{ fontSize: '.7rem', fontWeight: 700, color: isOnline ? '#16A34A' : '#DC2626', marginTop: 4 }}>{s.status || "Inactive"}</p>
+                        <p style={{ fontSize: '.72rem', color: '#0E7490', fontWeight: 700, marginTop: 2 }}>SN: {s.sn || "N/A"}</p>
+                        {s.address && s.address !== "N/A" && (
+                          <p style={{ fontSize: '.7rem', color: '#A4B6B9', marginTop: 1 }}>{s.address}</p>
+                        )}
+                        <p style={{ fontSize: '.7rem', fontWeight: 700, color: isOnline ? '#16A34A' : '#DC2626', marginTop: 3, textTransform: 'capitalize' }}>{s.status || "Inactive"}</p>
                         {isSel && editingPlaylist && (
                           <button
                             onClick={(e) => handleDisconnectDevice(e, s._id)}
