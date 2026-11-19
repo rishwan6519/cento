@@ -90,6 +90,8 @@ export default function MakeVideoFromTemplateModal({
   const [headline, setHeadline] = useState<string>(
     initLayers.headline?.text || selectedTemplate?.templateName || "MEGA WEEKEND FLASH SALE"
   );
+  const [offerPosition, setOfferPosition] = useState<"template" | "center">("template");
+  const [offerStyleMode, setOfferStyleMode] = useState<"template" | "none">("template");
   const [discount, setDiscount] = useState<string>(
     initLayers.discount?.text || "50% OFF"
   );
@@ -238,14 +240,28 @@ export default function MakeVideoFromTemplateModal({
     } else if (discount) {
       mergedLayers.discount = {
         text: discount,
-        x: currentRatio === "9:16" ? 0.8 : 0.76,
-        y: currentRatio === "9:16" ? 0.30 : 0.28,
-        size: currentRatio === "9:16" ? 4.5 : 5.5,
+        x: 0.50, // Default to center so it never jumps to the side
+        y: 0.50,
+        size: currentRatio === "9:16" ? 6.0 : 7.0,
+        shape: "none",
+        bgMode: "transparent",
         fontColor: "#ffffff",
-        bg: "#FF5722",
-        badgeStyle: "circle",
         animation: "zoom_bounce"
       };
+    }
+
+    // Apply explicit user choice from video creation form
+    if (mergedLayers.discount) {
+      if (offerPosition === "center") {
+        mergedLayers.discount.x = 0.50;
+        mergedLayers.discount.y = 0.50;
+      }
+      if (offerStyleMode === "none") {
+        mergedLayers.discount.shape = "none";
+        mergedLayers.discount.bgMode = "transparent";
+        mergedLayers.discount.badgeImageUrl = undefined;
+        mergedLayers.discount.badgeStyle = undefined;
+      }
     }
 
     if (mergedLayers.description) {
@@ -288,6 +304,29 @@ export default function MakeVideoFromTemplateModal({
       ratioBgs[currentRatio] = bgImageUrl;
     }
 
+    // Synchronize discount text, position, and style to all 4 ratios in aspectStore
+    const updatedAspectStore: Record<string, any> = { ...(base.aspectStore || {}) };
+    const allRatios: AspectRatio[] = ["16:9", "9:16", "1:1", "4:5"];
+
+    for (const r of allRatios) {
+      const rLayers = updatedAspectStore[r] ? { ...updatedAspectStore[r] } : { ...mergedLayers };
+      if (rLayers.discount || discount) {
+        const baseDisc = rLayers.discount || mergedLayers.discount || {};
+        rLayers.discount = {
+          ...baseDisc,
+          text: discount,
+          shape: mergedLayers.discount?.shape ?? baseDisc.shape,
+          bgMode: mergedLayers.discount?.bgMode ?? baseDisc.bgMode,
+          badgeImageUrl: mergedLayers.discount?.badgeImageUrl ?? baseDisc.badgeImageUrl,
+          badgeStyle: mergedLayers.discount?.badgeStyle ?? baseDisc.badgeStyle,
+          x: (offerPosition === "center" || (mergedLayers.discount?.x !== undefined && Math.abs(mergedLayers.discount.x - 0.5) < 0.05)) ? 0.50 : (mergedLayers.discount?.x ?? baseDisc.x ?? 0.50),
+          y: (offerPosition === "center" || (mergedLayers.discount?.y !== undefined && Math.abs(mergedLayers.discount.y - 0.5) < 0.05)) ? 0.50 : (mergedLayers.discount?.y ?? baseDisc.y ?? 0.50),
+        };
+      }
+      updatedAspectStore[r] = rLayers;
+    }
+    updatedAspectStore[currentRatio] = mergedLayers;
+
     return {
       ...base,
       templateName: headline || base.templateName || "Offer Video",
@@ -299,14 +338,11 @@ export default function MakeVideoFromTemplateModal({
       bgGradIndex: bgType === "gradient" ? bgGradIndex : ((base as any).bgGradIndex || 0),
       logoUrl: logoUrl || base.logoUrl,
       layers: mergedLayers,
-      aspectStore: {
-        ...(base.aspectStore || {}),
-        [currentRatio]: mergedLayers,
-      },
+      aspectStore: updatedAspectStore,
     };
   }, [
     selectedTemplate, aspectRatio, headline, discount, description, validity,
-    price, oldPrice, cta, footer, productImageUrl, bgType, bgImageUrl, bgGradIndex, logoUrl
+    price, oldPrice, cta, footer, productImageUrl, bgType, bgImageUrl, bgGradIndex, logoUrl, offerPosition, offerStyleMode
   ]);
 
   // Handle Local File Upload for Product Image
@@ -631,14 +667,101 @@ export default function MakeVideoFromTemplateModal({
 
                 <div className="mkv-grid-2">
                   <div className="mkv-field">
-                    <label className="mkv-label">Discount / Offer Badge</label>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <label className="mkv-label" style={{ margin: 0 }}>Discount / Offer Text</label>
+                      <span style={{ fontSize: "10px", color: offerStyleMode === "none" || (dynamicPreviewTemplate.layers?.discount?.shape === "none") ? "#38bdf8" : "#94a3b8", fontWeight: 700 }}>
+                        {offerStyleMode === "none" || (dynamicPreviewTemplate.layers?.discount?.shape === "none") ? "Without Badge (Text Only)" : "Badge Style"}
+                      </span>
+                    </div>
                     <input
                       type="text"
                       className="mkv-input"
+                      style={{ marginTop: "4px" }}
                       value={discount}
                       onChange={(e) => setDiscount(e.target.value)}
                       placeholder="e.g. 50% OFF or BUY 1 GET 1"
                     />
+                    {/* Position & Style Controls */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px", background: "rgba(0,0,0,0.25)", padding: "8px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700 }}>Offer Position:</span>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setOfferPosition("center")}
+                            style={{
+                              padding: "3px 8px",
+                              fontSize: "10px",
+                              borderRadius: "6px",
+                              fontWeight: 700,
+                              border: offerPosition === "center" ? "1px solid #11b5bb" : "1px solid rgba(255,255,255,0.15)",
+                              background: offerPosition === "center" ? "rgba(17,181,187,0.25)" : "transparent",
+                              color: offerPosition === "center" ? "#38bdf8" : "#94a3b8",
+                              cursor: "pointer",
+                            }}
+                            title="Lock offer position directly at Center (50%, 50%) without moving to any other side"
+                          >
+                            ✦ Center (50%, 50%)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOfferPosition("template")}
+                            style={{
+                              padding: "3px 8px",
+                              fontSize: "10px",
+                              borderRadius: "6px",
+                              fontWeight: 700,
+                              border: offerPosition === "template" ? "1px solid #11b5bb" : "1px solid rgba(255,255,255,0.15)",
+                              background: offerPosition === "template" ? "rgba(17,181,187,0.25)" : "transparent",
+                              color: offerPosition === "template" ? "#38bdf8" : "#94a3b8",
+                              cursor: "pointer",
+                            }}
+                            title="Keep original position from template"
+                          >
+                            📌 Template Position
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700 }}>Badge Background:</span>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setOfferStyleMode("none")}
+                            style={{
+                              padding: "3px 8px",
+                              fontSize: "10px",
+                              borderRadius: "6px",
+                              fontWeight: 700,
+                              border: offerStyleMode === "none" ? "1px solid #11b5bb" : "1px solid rgba(255,255,255,0.15)",
+                              background: offerStyleMode === "none" ? "rgba(17,181,187,0.25)" : "transparent",
+                              color: offerStyleMode === "none" ? "#38bdf8" : "#94a3b8",
+                              cursor: "pointer",
+                            }}
+                            title="Display offer text without any badge graphic"
+                          >
+                            📝 Without Offer Badge
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOfferStyleMode("template")}
+                            style={{
+                              padding: "3px 8px",
+                              fontSize: "10px",
+                              borderRadius: "6px",
+                              fontWeight: 700,
+                              border: offerStyleMode === "template" ? "1px solid #11b5bb" : "1px solid rgba(255,255,255,0.15)",
+                              background: offerStyleMode === "template" ? "rgba(17,181,187,0.25)" : "transparent",
+                              color: offerStyleMode === "template" ? "#38bdf8" : "#94a3b8",
+                              cursor: "pointer",
+                            }}
+                            title="Display with template badge background"
+                          >
+                            🏷️ Template Badge
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div className="mkv-field">
                     <label className="mkv-label">Offer Validity</label>

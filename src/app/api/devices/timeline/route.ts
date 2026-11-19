@@ -198,105 +198,9 @@ export async function GET(req: NextRequest) {
         filesByCategory[cat].push(m);
       }
 
-      // Check if multiple playlists are active concurrently in this time slot
-      const isMultiPlaylist = Array.isArray(slot.activePlaylists) && slot.activePlaylists.length > 1;
-
-      if (isMultiPlaylist && slot.medias.length > 0 && slotDurationSec > 0) {
-        // Group media items by playlist
-        const filesByPlaylist: Record<string, any[]> = {};
-        for (const m of slot.medias) {
-          const pKey = (m.playlistId || m.playlistName || 'default').toString();
-          if (!filesByPlaylist[pKey]) filesByPlaylist[pKey] = [];
-          filesByPlaylist[pKey].push(m);
-        }
-
-        // Determine playlist percentage distribution
-        let playlistDistConfig: Record<string, number> = {};
-        let hasCustomDist = false;
-
-        if (rawDistMap) {
-          for (const p of slot.activePlaylists) {
-            const pId = (p.id || p.playlistId || '').toString().toLowerCase();
-            const pName = (p.playlistName || '').toLowerCase();
-            if (rawDistMap[pId] !== undefined) {
-              playlistDistConfig[p.id || p.playlistId] = rawDistMap[pId];
-              hasCustomDist = true;
-            } else if (rawDistMap[pName] !== undefined) {
-              playlistDistConfig[p.id || p.playlistId] = rawDistMap[pName];
-              hasCustomDist = true;
-            }
-          }
-        }
-
-        if (!hasCustomDist) {
-          const equalSplit = Math.floor((100 / slot.activePlaylists.length) * 100) / 100;
-          for (const p of slot.activePlaylists) {
-            playlistDistConfig[p.id || p.playlistId] = equalSplit;
-          }
-        }
-
-        const allGeneratedItems: any[] = [];
-
-        for (const p of slot.activePlaylists) {
-          const pKey = (p.id || p.playlistId || '').toString();
-          const pFiles = filesByPlaylist[pKey] || slot.medias.filter((m: any) => 
-            (m.playlistId && m.playlistId.toString() === pKey) || 
-            (m.playlistName && m.playlistName === p.playlistName)
-          );
-
-          if (!pFiles || pFiles.length === 0) continue;
-
-          const fractionPct = playlistDistConfig[pKey] || (100 / slot.activePlaylists.length);
-          finalAllocatedPercentages[p.playlistName || pKey] = fractionPct;
-
-          const allocatedSeconds = Math.floor(slotDurationSec * (fractionPct / 100));
-          let pElapsed = 0;
-          let pBag = shuffleArray(pFiles);
-
-          while (pElapsed < allocatedSeconds) {
-            if (pBag.length === 0) pBag = shuffleArray(pFiles);
-            const m = pBag.pop();
-            let dur = Number(m.duration) || 12;
-            if (dur < 1) dur = 1;
-
-            const remaining = allocatedSeconds - pElapsed;
-            if (dur > remaining) dur = remaining;
-            if (dur <= 0) break;
-
-            const cleanM = {
-               fileId: typeof m.fileId === 'object' && m.fileId !== null ? (m.fileId._id?.toString() || m.fileId.toString()) : m.fileId,
-               name: m.name,
-               path: m.path,
-               type: m.type,
-               shuffle: m.shuffle || false,
-               displayOrder: m.displayOrder || 0,
-               delay: m.delay || 0,
-               maxVolume: m.maxVolume || 100,
-               minVolume: m.minVolume || 0,
-               backgroundImageEnabled: m.backgroundImageEnabled || false,
-               backgroundImage: m.backgroundImage || null,
-               _id: m._id ? m._id.toString() : undefined,
-               url: m.url || m.path,
-               fileCategory: m.fileCategory,
-               videoCategory: m.videoCategory,
-               duration: dur,
-               ratio: m.ratio,
-               width: m.width,
-               height: m.height,
-               playlistId: pKey,
-               playlistName: p.playlistName
-            };
-
-            allGeneratedItems.push(cleanM);
-            pElapsed += dur;
-
-            if (allGeneratedItems.length >= MAX_ITEMS || allGeneratedItems.length > 5000) break;
-          }
-        }
-
-        unrolledMedias = smartShuffle(allGeneratedItems);
-      } else if (distConfig && slot.medias.length > 0 && slotDurationSec > 0) {
-        // --- REQUIREMENT 1: Handle Missing Categories ---
+      // Category-based distribution (Media type wise)
+      if (distConfig && slot.medias.length > 0 && slotDurationSec > 0) {
+        // --- REQUIREMENT: Handle Missing Categories ---
         const validCategories = Object.keys(distConfig).filter(cat => filesByCategory[cat] && filesByCategory[cat].length > 0);
         let activeDistConfig: Record<string, number> = {};
 
@@ -366,15 +270,15 @@ export async function GET(req: NextRequest) {
                  duration: dur,
                  ratio: m.ratio,
                  width: m.width,
-                 height: m.height
+                 height: m.height,
+                 playlistId: m.playlistId,
+                 playlistName: m.playlistName
               };
 
               generatedItems.push(cleanM);
               catElapsed += dur;
 
-              if (generatedItems.length >= MAX_ITEMS) {
-                 break;
-              }
+              if (generatedItems.length >= MAX_ITEMS) break;
               if (generatedItems.length > 5000) {
                 console.warn('[devices/timeline] Hard cap of 5000 items reached for category', type);
                 break;
@@ -389,67 +293,58 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      if (unrolledMedias.length === 0) {
-        // Fallback to strict sequential repeating loop if no config or config was totally invalid
+      if (unrolledMedias.length === 0 && slot.medias.length > 0 && slotDurationSec > 0) {
+        // Fallback to interleave / sequential repeating loop if no config or config was totally invalid
         let accumulatedSec = 0;
         let index = 0;
+        const isMulti = Array.isArray(slot.activePlaylists) && slot.activePlaylists.length > 1;
+        const sourceMedias = isMulti ? smartShuffle(slot.medias) : slot.medias;
 
-        if (slot.medias.length > 0 && slotDurationSec > 0) {
-          while (accumulatedSec < slotDurationSec) {
-            const mediaItem = slot.medias[index % slot.medias.length];
+        while (accumulatedSec < slotDurationSec) {
+          const mediaItem = sourceMedias[index % sourceMedias.length];
 
-            let dur = Number(mediaItem.duration) || 12;
-            if (dur < 1) dur = 1; // Enforce minimum 1s duration
+          let dur = Number(mediaItem.duration) || 12;
+          if (dur < 1) dur = 1; // Enforce minimum 1s duration
 
-            const cleanMedia = {
-                 fileId: typeof mediaItem.fileId === 'object' && mediaItem.fileId !== null ? (mediaItem.fileId._id?.toString() || mediaItem.fileId.toString()) : mediaItem.fileId,
-                 name: mediaItem.name,
-                 path: mediaItem.path,
-                 type: mediaItem.type,
-                 shuffle: mediaItem.shuffle || false,
-                 displayOrder: mediaItem.displayOrder || 0,
-                 delay: mediaItem.delay || 0,
-                 maxVolume: mediaItem.maxVolume || 100,
-                 minVolume: mediaItem.minVolume || 0,
-                 backgroundImageEnabled: mediaItem.backgroundImageEnabled || false,
-                 backgroundImage: mediaItem.backgroundImage || null,
-                 _id: mediaItem._id ? mediaItem._id.toString() : undefined,
-                 url: mediaItem.url || mediaItem.path,
-                 fileCategory: mediaItem.fileCategory,
-                 videoCategory: mediaItem.videoCategory,
-                 duration: dur,
-                 ratio: mediaItem.ratio,
-                 width: mediaItem.width,
-                 height: mediaItem.height
-            };
+          const cleanMedia = {
+               fileId: typeof mediaItem.fileId === 'object' && mediaItem.fileId !== null ? (mediaItem.fileId._id?.toString() || mediaItem.fileId.toString()) : mediaItem.fileId,
+               name: mediaItem.name,
+               path: mediaItem.path,
+               type: mediaItem.type,
+               shuffle: mediaItem.shuffle || false,
+               displayOrder: mediaItem.displayOrder || 0,
+               delay: mediaItem.delay || 0,
+               maxVolume: mediaItem.maxVolume || 100,
+               minVolume: mediaItem.minVolume || 0,
+               backgroundImageEnabled: mediaItem.backgroundImageEnabled || false,
+               backgroundImage: mediaItem.backgroundImage || null,
+               _id: mediaItem._id ? mediaItem._id.toString() : undefined,
+               url: mediaItem.url || mediaItem.path,
+               fileCategory: mediaItem.fileCategory,
+               videoCategory: mediaItem.videoCategory,
+               duration: dur,
+               ratio: mediaItem.ratio,
+               width: mediaItem.width,
+               height: mediaItem.height,
+               playlistId: mediaItem.playlistId,
+               playlistName: mediaItem.playlistName
+          };
 
-            unrolledMedias.push(cleanMedia);
+          unrolledMedias.push(cleanMedia);
 
-            accumulatedSec += dur;
-            index++;
+          accumulatedSec += dur;
+          index++;
 
-            // Safety breaks
-            if (unrolledMedias.length >= MAX_ITEMS) {
-               break;
-            }
-            if (unrolledMedias.length > 5000) {
-              console.warn('[devices/timeline] Hard cap of 5000 items reached in fallback loop');
-              break;
-            }
-            if (dur <= 0 && index > slot.medias.length * 2) {
-              console.warn('[devices/timeline] Infinite loop protection hit.');
-              break;
-            }
+          // Safety breaks
+          if (unrolledMedias.length >= MAX_ITEMS) break;
+          if (unrolledMedias.length > 10000) {
+            console.warn('[devices/timeline] Hard cap of 10000 items reached');
+            break;
           }
         }
       }
 
-      // Ensure random shuffling (with duplicate prevention) for the fallback loop as well
-      if (unrolledMedias.length > 0) {
-         unrolledMedias = smartShuffle(unrolledMedias);
-      }
-
-      // --- REQUIREMENT 3: Calculate start and end times for each item ---
+      // Format start and end playout timestamps for each generated media
       const addSecondsToTime = (timeStr: string, secondsToAdd: number): string => {
         const parts = timeStr.split(':');
         let h = parseInt(parts[0] || '0', 10);
@@ -473,9 +368,30 @@ export async function GET(req: NextRequest) {
         item.endTime = currentStartTime;
       }
 
-      const displayPlaylistName = slot.activePlaylists && slot.activePlaylists.length > 1
-        ? slot.activePlaylists.map((p: any) => p.playlistName).join(' + ')
-        : (slot.playlist?.name || (slot.activePlaylists && slot.activePlaylists[0]?.playlistName) || 'Scheduled Timeline Slot');
+      // Deduplicate active playlists for neat and compact display
+      const uniquePlaylistsMap = new Map<string, any>();
+      for (const p of (slot.activePlaylists || [])) {
+        const pName = (p.playlistName || '').trim();
+        const pId = (p.id || p.playlistId || '').toString();
+        const key = pId ? `${pId}_${pName}` : pName;
+        if (key && !uniquePlaylistsMap.has(key)) {
+          uniquePlaylistsMap.set(key, { ...p, playlistName: pName || 'Unnamed Playlist' });
+        }
+      }
+      const uniquePlaylists = Array.from(uniquePlaylistsMap.values());
+
+      const uniqueNames: string[] = Array.from(
+        new Set(uniquePlaylists.map((p: any) => p.playlistName).filter(Boolean))
+      );
+
+      let displayPlaylistName = slot.playlist?.name || (slot.activePlaylists && slot.activePlaylists[0]?.playlistName) || 'Scheduled Timeline Slot';
+      if (uniqueNames.length === 1) {
+        displayPlaylistName = uniqueNames[0];
+      } else if (uniqueNames.length === 2) {
+        displayPlaylistName = `${uniqueNames[0]} + ${uniqueNames[1]}`;
+      } else if (uniqueNames.length > 2) {
+        displayPlaylistName = `${uniqueNames[0]} + ${uniqueNames[1]} (+${uniqueNames.length - 2} more)`;
+      }
 
       transformedTimeline.push({
         originalIndex: currentBlockIdx,
@@ -483,12 +399,13 @@ export async function GET(req: NextRequest) {
         end: slot.end,
         durationSeconds: slotDurationSec,
         playlistName: displayPlaylistName,
-        activePlaylists: slot.activePlaylists || [],
+        allPlaylistNames: uniqueNames,
+        activePlaylists: uniquePlaylists,
         isGap: false,
         allocatedPercentages: Object.keys(finalAllocatedPercentages).length > 0 ? finalAllocatedPercentages : undefined,
         medias: unrolledMedias,
         availableCategories: Object.keys(filesByCategory || {}),
-        availablePlaylists: slot.activePlaylists || []
+        availablePlaylists: uniquePlaylists
       });
     }
 

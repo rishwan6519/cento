@@ -1193,10 +1193,10 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
       }
       const textH = Math.max(fontSize * 1.2, textLines.length * lineHeight);
 
-      const isOrigami = L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram";
-      const isTransparent = (L.shape === "none" || (!L.shape && L.bgMode === "transparent")) && !isOrigami && !L.badgeImageUrl;
+      const isOrigami = !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
+      const isTransparent = (L.shape === "none" || (!L.shape && L.bgMode === "transparent"));
 
-      if (L.badgeImageUrl) {
+      if (!isTransparent && L.badgeImageUrl) {
         let bImg = globalBadgeImagesCache.get(L.badgeImageUrl);
         if (!bImg) {
           bImg = new Image();
@@ -1306,10 +1306,10 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
         }
       }
 
-      if (L.badgeImageUrl && L.overlayText === false) {
+      if (!isTransparent && L.badgeImageUrl && L.overlayText === false) {
         // Pure sticker graphic mode without text overlay
       } else {
-        const isOrigamiBadge = !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
+        const isOrigamiBadge = !isTransparent && !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
         if (isOrigamiBadge) {
           ctx.save();
           ctx.translate(cx, cy);
@@ -7058,7 +7058,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                 {(
                   [
                     ["product", "Product Image"],
-                    ["discount", "Offer Badge"],
+                    ["discount", "Offer Text / Badge"],
                     ["headline", "Headline"],
                     ["description", "Description"],
                     ["price", "Price"],
@@ -7137,6 +7137,163 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                           placeholder="Enter text..."
                         />
                       </div>
+
+                      {/* OFFER DISPLAY STYLE: Without Offer Badge vs Vector Shape vs Sticker */}
+                      {selectedLayer === "discount" && (
+                        <div
+                          className="ste-field-group"
+                          style={{
+                            background: "linear-gradient(145deg, rgba(17, 181, 187, 0.12) 0%, rgba(5, 20, 25, 0.75) 100%)",
+                            padding: "12px",
+                            borderRadius: "10px",
+                            border: "1px solid rgba(17, 181, 187, 0.4)",
+                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{ fontSize: "14px" }}>🎯</span>
+                              <span style={{ fontSize: "12px", fontWeight: 800, color: "#11B5BB", letterSpacing: "0.02em" }}>
+                                OFFER DISPLAY STYLE
+                              </span>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                background: selectedLayerData.shape === "none" ? "#0369a1" : selectedLayerData.badgeImageUrl ? "#065f46" : "rgba(255,255,255,0.08)",
+                                color: selectedLayerData.shape === "none" ? "#bae6fd" : selectedLayerData.badgeImageUrl ? "#6ee7b7" : "#94a3b8",
+                                padding: "2px 7px",
+                                borderRadius: "4px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {selectedLayerData.shape === "none" ? "Plain Text (No Badge)" : selectedLayerData.badgeImageUrl ? "Sticker Badge" : "Vector Shape"}
+                            </span>
+                          </div>
+
+                          {/* 3-Way Mode Selector */}
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateCurrentLayer(selectedLayer, {
+                                  shape: "none",
+                                  bgMode: "transparent",
+                                  badgeImageUrl: undefined,
+                                  badgeStyle: undefined,
+                                });
+                                toast.success("Offer set to Plain Text (Without Offer Badge)!");
+                              }}
+                              className={`ste-btn ${selectedLayerData.shape === "none" && !selectedLayerData.badgeImageUrl ? "ste-btn--primary" : "ste-btn--secondary"}`}
+                              style={{ padding: "8px 6px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "5px" }}
+                              title="Display offer percentage as plain text without any badge background"
+                            >
+                              📝 Without Offer Badge
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateCurrentLayer(selectedLayer, {
+                                  shape: "origami",
+                                  bgMode: "color",
+                                  bgColor: selectedLayerData.bgColor || "#ffc700",
+                                  borderColor: selectedLayerData.borderColor || "#047857",
+                                  badgeImageUrl: undefined,
+                                  badgeStyle: undefined,
+                                });
+                                toast.success("Offer set to 3D Retail Origami Badge!");
+                              }}
+                              className={`ste-btn ${selectedLayerData.shape !== "none" && !selectedLayerData.badgeImageUrl ? "ste-btn--primary" : "ste-btn--secondary"}`}
+                              style={{ padding: "8px 6px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "5px" }}
+                              title="Display offer with 3D origami vector badge background"
+                            >
+                              🏷️ Vector Badge Shape
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateCurrentLayer(selectedLayer, {
+                                shape: "sticker",
+                                badgeImageUrl: selectedLayerData.badgeImageUrl || OFFER_BADGE_PRESETS[0].dataUrl,
+                                badgeStyle: selectedLayerData.badgeStyle || OFFER_BADGE_PRESETS[0].id,
+                              });
+                              toast.success("Offer set to Graphic Sticker Badge!");
+                            }}
+                            className={`ste-btn ${selectedLayerData.badgeImageUrl ? "ste-btn--primary" : "ste-btn--secondary"}`}
+                            style={{ width: "100%", padding: "7px 6px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "5px", marginBottom: "8px" }}
+                            title="Display offer with custom sticker graphic"
+                          >
+                            🎨 Sticker Graphic Badge
+                          </button>
+
+                          {/* Quick Center Snapping & Sync Across Ratios */}
+                          <div style={{ paddingTop: "8px", borderTop: "1px dashed rgba(255,255,255,0.12)", display: "flex", flexDirection: "column", gap: "5px" }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateCurrentLayer(selectedLayer, { x: 0.50, y: 0.50 });
+                                toast.success("Offer centered in canvas (X: 50%, Y: 50%)!");
+                              }}
+                              className="ste-btn ste-btn--secondary ste-btn--sm"
+                              style={{
+                                width: "100%",
+                                padding: "6px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                justifyContent: "center",
+                                gap: "6px",
+                                background: Math.round(selectedLayerData.x * 100) === 50 && Math.round(selectedLayerData.y * 100) === 50 ? "rgba(17, 181, 187, 0.25)" : undefined,
+                                borderColor: Math.round(selectedLayerData.x * 100) === 50 && Math.round(selectedLayerData.y * 100) === 50 ? "#11B5BB" : undefined,
+                                color: Math.round(selectedLayerData.x * 100) === 50 && Math.round(selectedLayerData.y * 100) === 50 ? "#38bdf8" : undefined,
+                              }}
+                              title="Snap offer percentage directly to the exact Center (50%, 50%)"
+                            >
+                              <FaCrosshairs size={11} /> Place Offer in Exact Center (50%, 50%)
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = selectedLayerData;
+                                setAspectLayers((prev) => {
+                                  const updated = { ...prev };
+                                  (["9:16", "16:9", "1:1", "4:5"] as AspectRatio[]).forEach((r) => {
+                                    if (!updated[r]) return;
+                                    updated[r] = {
+                                      ...updated[r],
+                                      [selectedLayer]: {
+                                        ...(updated[r][selectedLayer] || {}),
+                                        x: cur.x,
+                                        y: cur.y,
+                                        size: cur.size,
+                                        shape: cur.shape,
+                                        bgMode: cur.bgMode,
+                                        badgeImageUrl: cur.badgeImageUrl,
+                                        badgeStyle: cur.badgeStyle,
+                                        fontColor: cur.fontColor,
+                                        bgColor: cur.bgColor,
+                                        borderColor: cur.borderColor,
+                                        text: cur.text,
+                                        font: cur.font,
+                                      },
+                                    };
+                                  });
+                                  return updated;
+                                });
+                                toast.success("Applied offer position & style to all 4 aspect ratios!");
+                              }}
+                              className="ste-btn ste-btn--secondary ste-btn--sm"
+                              style={{ width: "100%", padding: "5px", fontSize: "10px", fontWeight: 600, justifyContent: "center", gap: "5px" }}
+                              title="Copy this position and style to 16:9, 9:16, 1:1, and 4:5 so it never moves"
+                            >
+                              🌐 Sync Position &amp; Style to All 4 Ratios
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Offer Badge Sticker & Graphic Design Studio */}
                       {selectedLayer === "discount" && (

@@ -133,14 +133,33 @@ async function renderTemplateFrame(template: any, ratio: "16:9" | "9:16", pulse 
     } catch {}
   }
 
-  // Offer Badge / Discount Layer (Custom Sticker Badge or Origami default)
+  // Offer Badge / Discount Layer (Supports Without Badge, Custom Sticker, or Origami)
   const discountText = (layers.discount && layers.discount.text) || template.offerLabel || template.discountLabel || "75% OFF";
   const badgeScale = pulse ? 1.05 : 1.0;
   const badgeW = Math.round((is169 ? 180 : 160) * badgeScale);
   const badgeH = Math.round((is169 ? 75 : 68) * badgeScale);
   let badgeDrawn = false;
 
-  if (layers.discount?.badgeImageUrl) {
+  const discX = typeof layers.discount?.x === "number" ? layers.discount.x : (is169 ? 0.44 : 0.50);
+  const discY = typeof layers.discount?.y === "number" ? layers.discount.y : (is169 ? 0.52 : 0.48);
+  const cx = Math.round(discX * width);
+  const cy = Math.round(discY * height);
+
+  // 1. Plain Text Only (Without Offer Badge)
+  const isNoBadge = layers.discount?.shape === "none" || (!layers.discount?.shape && layers.discount?.bgMode === "transparent" && !layers.discount?.badgeImageUrl);
+  if (isNoBadge) {
+    if (discountText) {
+      const textSvg = `
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          <text x="${cx}" y="${cy}" font-family="${layers.discount?.font || 'Arial'}, Montserrat, sans-serif" font-size="${Math.round(26 * badgeScale)}" font-weight="900" fill="${layers.discount?.fontColor || '#ffffff'}" text-anchor="middle" dominant-baseline="middle">${escapeXml(discountText)}</text>
+        </svg>
+      `;
+      const textBuf = await sharp(Buffer.from(textSvg)).png().toBuffer();
+      overlays.push({ input: textBuf, left: 0, top: 0 });
+      badgeDrawn = true;
+    }
+  } else if (layers.discount?.badgeImageUrl) {
+    // 2. Custom Graphic Sticker Badge
     try {
       const stickerBuf = await resolveAssetBuffer(layers.discount.badgeImageUrl);
       if (stickerBuf) {
@@ -158,8 +177,8 @@ async function renderTemplateFrame(template: any, ratio: "16:9" | "9:16", pulse 
           resBadge = await sharp(resBadge).composite([{ input: Buffer.from(textSvg) }]).png().toBuffer();
         }
 
-        const badgeLeft = is169 ? Math.round(width * 0.44) : Math.round((width - badgeW) / 2);
-        const badgeTop = is169 ? Math.round(height * 0.32) : Math.round(height * 0.48);
+        const badgeLeft = Math.round(cx - badgeW / 2);
+        const badgeTop = Math.round(cy - badgeH / 2);
         overlays.push({ input: resBadge, left: badgeLeft, top: badgeTop });
         badgeDrawn = true;
       }
@@ -168,7 +187,8 @@ async function renderTemplateFrame(template: any, ratio: "16:9" | "9:16", pulse 
     }
   }
 
-  if (!badgeDrawn) {
+  // 3. Fallback Vector Origami Badge
+  if (!badgeDrawn && !isNoBadge) {
     const badgeAngle = pulse ? -8 : -6;
     const badgeBg = (layers.discount && layers.discount.bgColor) || "#ffc700";
     const badgeFold = (layers.discount && layers.discount.borderColor) || "#047857";
@@ -191,8 +211,8 @@ async function renderTemplateFrame(template: any, ratio: "16:9" | "9:16", pulse 
       </svg>
     `;
     const badgeBuf = await sharp(Buffer.from(badgeSvg)).png().toBuffer();
-    const badgeLeft = is169 ? Math.round(width * 0.44) : Math.round((width - (badgeW + 40)) / 2);
-    const badgeTop = is169 ? Math.round(height * 0.32) : Math.round(height * 0.48);
+    const badgeLeft = Math.round(cx - (badgeW + 40) / 2);
+    const badgeTop = Math.round(cy - (badgeH + 40) / 2);
     overlays.push({ input: badgeBuf, left: badgeLeft, top: badgeTop });
   }
 
