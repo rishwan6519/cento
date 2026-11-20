@@ -54,6 +54,7 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
   const [previewMediaName, setPreviewMediaName] = useState("");
+  const [conflictModal, setConflictModal] = useState<{ open: boolean; message: string }>({ open: false, message: "" });
 
   const userId = typeof window !== "undefined" ? localStorage.getItem("userId") ?? "" : "";
 
@@ -147,11 +148,11 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
       const a = d.data || [];
       const individualDevices = a.map((x: any) => ({
         _id: x.deviceId?._id || x._id,
-        name: x.deviceId?.name || "Unknown Device",
-        sn: x.deviceId?.serialNumber || "N/A",
-        type: x.deviceId?.typeId?.name || "Device",
-        status: x.deviceId?.status || "inactive",
-        address: x.userId?.storeLocation || "N/A"
+        name: x.deviceId?.name || x.name || "Unknown Device",
+        sn: x.deviceId?.serialNumber || x.serialNumber || x.sn || "N/A",
+        type: x.deviceId?.typeId?.name || x.type || "Device",
+        status: x.deviceId?.status || x.status || "inactive",
+        address: x.userId?.storeLocation || x.address || "N/A"
       }));
       setDevices(individualDevices);
     }).catch(() => setDevices([])).finally(() => setLoadingDevices(false));
@@ -331,8 +332,15 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
     }
   };
 
-  const handleSubmit = async () => {
-    if (!playlistName.trim() || selectedDeviceIds.length === 0) return;
+  const handleSubmit = async (forceConcurrent: boolean = false) => {
+    if (!playlistName.trim()) {
+      alert("Please enter a playlist name.");
+      return;
+    }
+    if (selectedDeviceIds.length === 0) {
+      alert("Please select at least one store device.");
+      return;
+    }
     setSubmitting(true);
     try {
       let filesPayload: any[] = [];
@@ -355,8 +363,12 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
               backgroundImage: bg.imageId
             };
           });
+        } else {
+          alert("Upload failed: " + (d.error || "Unknown error"));
+          setSubmitting(false);
+          return;
         }
-      } else {
+      } else if (selectedMediaIds.length > 0) {
         filesPayload = selectedMediaIds.map(id => {
           const bg = bgSettings[id] || { enabled: false, imageId: null };
           return {
@@ -365,9 +377,26 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
             backgroundImage: bg.imageId
           };
         });
+      } else if (editingPlaylist && editingPlaylist.files && editingPlaylist.files.length > 0) {
+        filesPayload = editingPlaylist.files.map((f: any) => {
+          const fid = (f.fileId && typeof f.fileId === 'object') ? (f.fileId._id || f.fileId.id) : (f.fileId || f.mediaId?._id || f.mediaId || f._id);
+          const idStr = String(fid || "");
+          const bg = bgSettings[idStr] || { enabled: !!f.backgroundImageEnabled, imageId: f.backgroundImage || null };
+          return {
+            fileId: idStr,
+            backgroundImageEnabled: bg.enabled,
+            backgroundImage: bg.imageId
+          };
+        }).filter((f: any) => Boolean(f.fileId));
       }
 
-      const body = {
+      if (filesPayload.length === 0) {
+        alert("Please select or upload at least one media file for this playlist.");
+        setSubmitting(false);
+        return;
+      }
+
+      const body: any = {
         userId,
         name: playlistName,
         type: playlistType || "media",
@@ -382,6 +411,10 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         files: filesPayload,
         id: editingPlaylist?._id || editingPlaylist?.id
       };
+      if (forceConcurrent) {
+        body.allowConcurrent = true;
+      }
+
       const method = editingPlaylist ? "PUT" : "POST";
       const res = await fetch("/api/playlists", {
         method,
@@ -389,16 +422,43 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         body: JSON.stringify(body)
       });
       const data = await res.json();
-      if (data.success) onNavigate("dashboard");
-    } catch { } finally { setSubmitting(false); }
+      if (res.status === 409) {
+        setConflictModal({
+          open: true,
+          message: data.message || data.error || "Conflict alert: Another playlist is already connected during this time slot."
+        });
+        setSubmitting(false);
+        return;
+      }
+      if (res.ok && (data.success || data.data)) {
+        if (conflictModal.open) setConflictModal({ open: false, message: "" });
+        alert(forceConcurrent 
+          ? "Playlist connected successfully alongside existing schedules (Multiple Playlists running concurrently)!" 
+          : (editingPlaylist ? "Playlist updated and connected successfully!" : "Playlist created and connected to stores successfully!"));
+        onNavigate("viewAllCampaigns");
+      } else {
+        alert(data.error || data.message || "Failed to connect playlist to stores.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network error connecting playlist. Please check your connection and try again.");
+    } finally { 
+      setSubmitting(false); 
+    }
   };
   return (
     <div className="store-create-playlist-view">
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
-        <button onClick={() => onNavigate("mediaManagement")} style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}>
+        <button 
+          onClick={() => onNavigate(editingPlaylist ? "viewAllCampaigns" : "mediaManagement")} 
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#162B30", display: "flex", alignItems: "center", padding: 0 }}
+          title={editingPlaylist ? "Back to All Campaigns" : "Back to Media Management"}
+        >
           <FaArrowLeft size={18} />
         </button>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#162B30", margin: 0 }}>Create New Media Playlist</h1>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#162B30", margin: 0 }}>
+          {editingPlaylist ? `Edit Media Playlist: ${playlistName || editingPlaylist.name || "Campaign"}` : "Create New Media Playlist"}
+        </h1>
       </div>
       {/* Step 1: Select Media */}
       <div className="store-step-card">
@@ -611,7 +671,14 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                       <tr key={id}>
                         <td><input type="checkbox" className="store-checkbox" checked={selectedMediaIds.includes(String(id))} onChange={() => toggleMedia(id)} /></td>
                         <td style={{ fontWeight: 500, color: '#445459' }}>
-                          {media.name}
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span>{media.name}</span>
+                            {(media.fileCategory === 'offer' || media.templateId) && (
+                              <span style={{ fontSize: '0.65rem', background: 'rgba(240, 90, 40, 0.12)', color: '#F05A28', border: '1px solid rgba(240, 90, 40, 0.3)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                Ad Video
+                              </span>
+                            )}
+                          </div>
                           {badge === 'audio' && selectedMediaIds.includes(String(id)) && (
                             <div style={{ marginTop: 8, padding: '8px 10px', background: '#F8FAFB', borderRadius: 6, border: '1px dashed #D6E6E9', maxWidth: 220 }}>
                               <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#162B30' }}>
@@ -735,13 +802,16 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
                 : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
                   {devices.map(s => {
                     const isSel = selectedDeviceIds.includes(s._id);
-                    const isOnline = (s.status || "").toLowerCase() === "online";
+                    const isOnline = ["online", "active"].includes((s.status || "").toLowerCase());
                     return (<div key={s._id} onClick={() => toggleDevice(s._id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, border: `2px solid ${isSel ? '#F05A28' : '#EAEFEF'}`, borderRadius: 14, cursor: 'pointer', background: isSel ? '#FFF8F5' : '#fff', position: 'relative' }}>
                       <div style={{ width: 36, height: 36, borderRadius: 8, background: '#EAF6F8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F05A28' }}><FaDesktop size={14} /></div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontWeight: 700, fontSize: '.82rem', color: '#162B30' }}>{s.name} <span style={{ color: isOnline ? '#16A34A' : '#DC2626', fontSize: 10 }}>●</span></p>
-                        <p style={{ fontSize: '.7rem', color: '#A4B6B9', marginTop: 2 }}>{s.address}</p>
-                        <p style={{ fontSize: '.7rem', fontWeight: 700, color: isOnline ? '#16A34A' : '#DC2626', marginTop: 4 }}>{s.status || "Inactive"}</p>
+                        <p style={{ fontSize: '.72rem', color: '#0E7490', fontWeight: 700, marginTop: 2 }}>SN: {s.sn || "N/A"}</p>
+                        {s.address && s.address !== "N/A" && (
+                          <p style={{ fontSize: '.7rem', color: '#A4B6B9', marginTop: 1 }}>{s.address}</p>
+                        )}
+                        <p style={{ fontSize: '.7rem', fontWeight: 700, color: isOnline ? '#16A34A' : '#DC2626', marginTop: 3, textTransform: 'capitalize' }}>{s.status || "Inactive"}</p>
                         {isSel && editingPlaylist && (
                           <button
                             onClick={(e) => handleDisconnectDevice(e, s._id)}
@@ -770,8 +840,10 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
 
           <div className="store-form-actions">
             <button className="store-btn-outline-grey" onClick={() => { setPlaylistName(''); setSelectedDeviceIds([]); setSelectedMediaIds([]); setSelectedFiles([]) }}>Reset</button>
-            <button className="store-btn-solid-orange store-btn-solid-orange--icon" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Creating…' : 'Connect playlist to stores'}
+            <button className="store-btn-solid-orange store-btn-solid-orange--icon" onClick={() => handleSubmit()} disabled={submitting}>
+              {submitting 
+                ? (editingPlaylist ? 'Updating & Connecting…' : 'Connecting to stores…') 
+                : (editingPlaylist ? 'Update & connect playlist' : 'Connect playlist to stores')}
             </button>
           </div>
         </div>
@@ -1039,6 +1111,50 @@ export default function CreateMediaPlaylist({ onNavigate, editingPlaylist }: Pro
         }
         .store-btn-solid-orange--icon { display: flex; align-items: center; gap: 8px; }
       `}</style>
+
+      {/* Schedule Conflict Modal (Allow Concurrent Playback) */}
+      {conflictModal.open && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11,40,48,0.65)', backdropFilter: 'blur(5px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '24px', maxWidth: '520px', width: '100%', overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,0.3)', animation: 'fadeIn 0.2s ease-out' }}>
+            <div style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)', padding: '22px 26px', color: '#fff', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
+                ⚠️
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>Schedule Conflict Alert</h3>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>Overlapping playlist detected</p>
+              </div>
+            </div>
+            <div style={{ padding: '26px' }}>
+              <div style={{ background: '#FFF7ED', border: '1px solid #FFEDD5', borderRadius: '14px', padding: '16px', marginBottom: '20px' }}>
+                <p style={{ margin: 0, color: '#C2410C', fontSize: '0.9rem', lineHeight: 1.5, fontWeight: 600 }}>
+                  {conflictModal.message}
+                </p>
+              </div>
+              <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                Do you want to proceed and run both playlists <strong>concurrently</strong>? The platform supports multiple playlists on the same screen, mixing media smoothly according to your timeline contribution settings.
+              </p>
+            </div>
+            <div style={{ padding: '18px 26px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setConflictModal({ open: false, message: "" })}
+                style={{ padding: '10px 20px', background: '#fff', border: '1px solid #CBD5E1', color: '#64748B', fontWeight: 700, borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSubmit(true)}
+                disabled={submitting}
+                style={{ padding: '10px 24px', background: '#11B5BB', border: 'none', color: '#fff', fontWeight: 700, borderRadius: '12px', cursor: submitting ? 'not-allowed' : 'pointer', boxShadow: '0 4px 12px rgba(17,181,187,0.3)' }}
+              >
+                {submitting ? "Connecting..." : "Proceed (Run Concurrently)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,23 +21,47 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
 
     const userObjectId = new mongoose.Types.ObjectId(userId);
-    // (Removed controllerId logic)
+    const UserModel = mongoose.models.User;
+    const requestingUser = await UserModel.findById(userObjectId);
+
+    let permittedUserIds = [userObjectId];
+    let directCustomerDevices = [];
+
+    if (requestingUser) {
+      if (requestingUser.role === 'account_admin' || requestingUser.role === 'admin') {
+        const relatedUsers = await UserModel.find({
+          $or: [
+            { _id: requestingUser._id },
+            { controllerId: requestingUser._id },
+            ...(requestingUser.customerId ? [{ customerId: requestingUser.customerId }] : []),
+            { createdBy: requestingUser._id }
+          ]
+        }).select('_id');
+        permittedUserIds = relatedUsers.map(u => u._id);
+
+        if (requestingUser.customerId) {
+          const directDevs = await (mongoose.models.Device || (await import('@/models/Device')).default).find({ customerId: requestingUser.customerId }).select('_id');
+          directCustomerDevices = directDevs.map(d => d._id);
+        }
+      }
+    }
     
-    // 1. Fetch user's own playlists
-    const ownPlaylists = await AnnouncementPlaylist.find({ userId: userObjectId })
+    // 1. Fetch user's own playlists (or all store playlists if account_admin)
+    const ownPlaylists = await AnnouncementPlaylist.find({ userId: { $in: permittedUserIds } })
       .populate('userId', 'username')
       .sort({ createdAt: -1 });
 
-    // 2. Fetch connected playlists that are NOT owned by this user
+    // 2. Fetch connected playlists that are NOT owned by these users
     let connectedOtherPlaylists: any[] = [];
     
-    // Find all device IDs that this user owns or is assigned to
-    const onboarded = await OnboardedDevice.find({ userId: userObjectId }).select('deviceId');
-    const assigned = await AssignedDevice.find({ userId: userObjectId }).select('deviceId'); // Removed status: 'active' filter to be safe
+    // Find all device IDs that these users own or are assigned to
+    const onboarded = await OnboardedDevice.find({ userId: { $in: permittedUserIds } }).select('deviceId');
+    const assigned = await AssignedDevice.find({ userId: { $in: permittedUserIds } }).select('deviceId');
     
     const deviceIds = [
       ...onboarded.map(d => d.deviceId),
-      ...assigned.map(d => d.deviceId)
+      ...assigned.map(d => d.deviceId),
+      ...directCustomerDevices
     ];
 
     if (deviceIds.length > 0) {
