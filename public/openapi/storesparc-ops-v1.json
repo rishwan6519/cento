@@ -6,7 +6,14 @@
     "description": "Unified API specification covering all 13 Staff and 7 Store Manager operational areas"
   },
   "servers": [
-    { "url": "/api/v1", "description": "Current Environment" }
+    {
+      "url": "https://iot-test.metizstoresparc.com/api/v1",
+      "description": "Test Environment"
+    },
+    {
+      "url": "http://localhost:3000/api/v1",
+      "description": "Local Development Server"
+    }
   ],
   "components": {
     "securitySchemes": {

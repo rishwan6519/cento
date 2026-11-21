@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     const formatItem = (item: any) => ({
       id: item._id.toString(),
       kind: item.kind,
+      requester_id: item.requesterId,
       requester_name: item.requesterName,
       summary: item.summary,
       detail: item.detail,
