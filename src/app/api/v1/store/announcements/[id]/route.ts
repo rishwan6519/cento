@@ -1,0 +1,43 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/db';
+import StoreAnnouncement from '@/models/StoreAnnouncement';
+import { requireAuth } from '@/lib/storesparc/auth';
+import { withIdempotency } from '@/lib/storesparc/idempotency';
+import { apiError, notFoundError, conflictError } from '@/lib/storesparc/errors';
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { caller, errorResponse } = await requireAuth(req, ['Store Manager', 'Central admin']);
+  if (errorResponse) return errorResponse;
+
+  const { id } = await context.params;
+
+  return withIdempotency(req, caller!.userId, async () => {
+    try {
+      await connectToDatabase();
+      const post = await StoreAnnouncement.findById(id);
+
+      if (!post) {
+        return notFoundError('Announcement post not found');
+      }
+
+      if (post.status !== 'scheduled') {
+        return conflictError('CANNOT_CANCEL', `Cannot cancel post with status "${post.status}"`);
+      }
+
+      post.status = 'cancelled';
+      await post.save();
+
+      return NextResponse.json({
+        id: post._id.toString(),
+        status: 'cancelled',
+        message: 'Scheduled announcement cancelled successfully',
+      });
+    } catch (error: any) {
+      return apiError('INTERNAL_ERROR', error.message || 'Failed to cancel announcement', 500);
+    }
+  });
+}
+

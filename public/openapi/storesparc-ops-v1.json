@@ -1,0 +1,232 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Store Sparc Ops API",
+    "version": "1.0.0",
+    "description": "Unified API specification covering all 13 Staff and 7 Store Manager operational areas"
+  },
+  "servers": [
+    { "url": "/api/v1", "description": "Current Environment" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "field_errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": { "type": "string" },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        },
+        "required": ["code", "message"]
+      }
+    }
+  },
+  "security": [{ "BearerAuth": [] }],
+  "paths": {
+    "/auth/resolve": {
+      "get": {
+        "summary": "Resolve caller identity (GAP-API-001)",
+        "responses": { "200": { "description": "Identity resolved" } }
+      }
+    },
+    "/store/config": {
+      "get": {
+        "summary": "Get store configuration and geofence (GAP-API-014)",
+        "responses": { "200": { "description": "Store configuration" } }
+      }
+    },
+    "/attendance/today": {
+      "get": {
+        "summary": "Get today's attendance state (GAP-API-004)",
+        "responses": { "200": { "description": "Attendance status and flags" } }
+      }
+    },
+    "/attendance/check-in": {
+      "post": {
+        "summary": "Check in with geofence verification (GAP-API-004)",
+        "parameters": [
+          { "name": "Idempotency-Key", "in": "header", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Check-in accepted or queued" } }
+      }
+    },
+    "/attendance/check-out": {
+      "post": {
+        "summary": "Check out and compute worked minutes (GAP-API-004)",
+        "responses": { "200": { "description": "Checked out successfully" } }
+      }
+    },
+    "/hours": {
+      "get": {
+        "summary": "Get a week's hours and confirmation status (GAP-API-005)",
+        "parameters": [
+          { "name": "week_start", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Weekly hours" } }
+      },
+      "post": {
+        "summary": "Submit attendance corrections or confirm week (GAP-API-005)",
+        "responses": { "200": { "description": "Action executed" } }
+      }
+    },
+    "/store/approvals": {
+      "get": {
+        "summary": "List pending and decided approvals for manager (GAP-SM-003)",
+        "responses": { "200": { "description": "List of approvals" } }
+      }
+    },
+    "/store/approvals/{id}/decide": {
+      "post": {
+        "summary": "Approve or decline an item (GAP-SM-003, GAP-SM-004, GAP-SM-005)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Decision applied" } }
+      }
+    },
+    "/roster/published": {
+      "get": {
+        "summary": "Get staff member's published shifts (GAP-API-002)",
+        "parameters": [
+          { "name": "week_start", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Published shifts" } }
+      }
+    },
+    "/store/roster": {
+      "get": {
+        "summary": "Get store week roster plan (GAP-SM-007)",
+        "parameters": [
+          { "name": "week_start", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Week plan with coverage and shifts" } }
+      }
+    },
+    "/store/roster/shifts": {
+      "post": {
+        "summary": "Assign shifts to a staff member (GAP-SM-007)",
+        "responses": { "200": { "description": "Draft plan updated" } }
+      }
+    },
+    "/store/roster/publish": {
+      "post": {
+        "summary": "Publish week roster to staff (GAP-SM-008)",
+        "responses": { "200": { "description": "Week published" } }
+      }
+    },
+    "/availability": {
+      "get": {
+        "summary": "Get staff member availability (GAP-API-006)",
+        "responses": { "200": { "description": "Availability" } }
+      },
+      "post": {
+        "summary": "Submit availability for week or month (GAP-API-006)",
+        "responses": { "200": { "description": "Availability saved" } }
+      }
+    },
+    "/store/availability/team": {
+      "get": {
+        "summary": "Get store team availability overview (GAP-SM-006)",
+        "responses": { "200": { "description": "Team availability status" } }
+      }
+    },
+    "/tasks": {
+      "get": {
+        "summary": "List visible tasks (GAP-API-007)",
+        "responses": { "200": { "description": "List of tasks" } }
+      },
+      "post": {
+        "summary": "Create task by manager (GAP-SM-009)",
+        "responses": { "200": { "description": "Task created" } }
+      }
+    },
+    "/tasks/{id}/{action}": {
+      "post": {
+        "summary": "Claim or complete or assign a task (GAP-API-007, GAP-SM-009)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["claim", "complete", "assign"] } }
+        ],
+        "responses": { "200": { "description": "Task updated" } }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "summary": "Get staff alerts feed (GAP-API-008)",
+        "responses": { "200": { "description": "Alerts feed" } }
+      }
+    },
+    "/alerts/{id}/read": {
+      "post": {
+        "summary": "Mark alert as read (GAP-API-008)",
+        "responses": { "200": { "description": "Alert updated" } }
+      }
+    },
+    "/push/register": {
+      "post": {
+        "summary": "Register mobile device FCM push token (GAP-API-009)",
+        "responses": { "200": { "description": "Token registered" } }
+      }
+    },
+    "/push/unregister": {
+      "post": {
+        "summary": "Unregister mobile device FCM push token (GAP-API-009)",
+        "responses": { "200": { "description": "Token removed" } }
+      }
+    },
+    "/store/dashboard": {
+      "get": {
+        "summary": "Store Manager dashboard summary (GAP-SM-002, GAP-SM-004)",
+        "responses": { "200": { "description": "Aggregated metrics" } }
+      }
+    },
+    "/store/announcements": {
+      "get": {
+        "summary": "Get announcement board (GAP-SM-010)",
+        "responses": { "200": { "description": "Board and messages" } }
+      },
+      "post": {
+        "summary": "Send or schedule announcement (GAP-SM-010)",
+        "responses": { "200": { "description": "Announcement saved" } }
+      }
+    },
+    "/store/screens": {
+      "get": {
+        "summary": "List store screens and what is playing (GAP-API-011, GAP-API-012)",
+        "responses": { "200": { "description": "Screen status list" } }
+      }
+    },
+    "/store/screens/{id}/report-offline": {
+      "post": {
+        "summary": "Report offline screen to central (GAP-SM-011)",
+        "responses": { "200": { "description": "Screen reported" } }
+      }
+    },
+    "/swaps": {
+      "get": {
+        "summary": "List my swap requests (GAP-API-003)",
+        "responses": { "200": { "description": "Swap requests" } }
+      },
+      "post": {
+        "summary": "Request shift swap (GAP-API-003)",
+        "responses": { "200": { "description": "Swap requested" } }
+      }
+    }
+  }
+}
