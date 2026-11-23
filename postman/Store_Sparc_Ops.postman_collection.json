@@ -1,0 +1,746 @@
+{
+  "info": {
+    "_postman_id": "7b8e5a12-4c22-4d91-9e12-3c8f8b091e32",
+    "name": "Store Sparc Ops API Collection",
+    "description": "Complete Postman collection covering all 13 Staff and 7 Store Manager operational areas for Store Sparc Ops app.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://iot-test.metizstoresparc.com/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "YOUR_JWT_ACCESS_TOKEN",
+      "type": "string"
+    },
+    {
+      "key": "storeId",
+      "value": "65b2f8a9e1b2c3d4e5f6a7b8",
+      "type": "string"
+    },
+    {
+      "key": "weekStart",
+      "value": "2026-11-24",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Authentication & Config",
+      "item": [
+        {
+          "name": "Resolve Caller Identity (GAP-API-001)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resolve",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "resolve"]
+            },
+            "description": "Resolves user role (Staff, Store Manager, Central admin) and assigned store."
+          }
+        },
+        {
+          "name": "Get Store Configuration (GAP-API-014)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/store/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "config"]
+            },
+            "description": "Returns geofence coordinates, radius, trading hours, and store timezone."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Attendance & Geofencing",
+      "item": [
+        {
+          "name": "Get Today Attendance Status (GAP-API-004)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/attendance/today",
+              "host": ["{{baseUrl}}"],
+              "path": ["attendance", "today"]
+            }
+          }
+        },
+        {
+          "name": "Check-in with GPS Reading (GAP-API-004)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{storeId}}\",\n  \"client_timestamp\": \"2026-11-24T09:00:00.000Z\",\n  \"location_reading\": {\n    \"latitude\": 12.9716,\n    \"longitude\": 77.5946,\n    \"accuracy\": 10,\n    \"time\": \"2026-11-24T09:00:00.000Z\"\n  },\n  \"manual_confirmation_requested\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance/check-in",
+              "host": ["{{baseUrl}}"],
+              "path": ["attendance", "check-in"]
+            }
+          }
+        },
+        {
+          "name": "Check-out at End of Shift (GAP-API-004)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_timestamp\": \"2026-11-24T17:30:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance/check-out",
+              "host": ["{{baseUrl}}"],
+              "path": ["attendance", "check-out"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Roster & Shifts",
+      "item": [
+        {
+          "name": "Staff - Get My Published Shifts (GAP-API-002)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roster/published?week_start={{weekStart}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["roster", "published"],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Manager - Get Week Plan & Coverage (GAP-SM-007)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/store/roster?week_start={{weekStart}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "roster"],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Manager - Assign Shifts (GAP-SM-007)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"staff_member\": \"USER_ID_HERE\",\n  \"staff_name\": \"Rahul K\",\n  \"shifts\": [\n    {\n      \"date\": \"2026-11-24\",\n      \"start\": 540,\n      \"end\": 1020\n    },\n    {\n      \"date\": \"2026-11-25\",\n      \"start\": 600,\n      \"end\": 1080\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/roster/shifts",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "roster", "shifts"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Publish Week Roster (GAP-SM-008)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"client_timestamp\": \"2026-11-23T18:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/roster/publish",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "roster", "publish"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Availability",
+      "item": [
+        {
+          "name": "Staff - Get My Availability (GAP-API-006)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/availability?week_start={{weekStart}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["availability"],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Staff - Submit Availability (GAP-API-006)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"days\": [\n    {\n      \"date\": \"2026-11-24\",\n      \"status\": \"available\"\n    },\n    {\n      \"date\": \"2026-11-25\",\n      \"status\": \"unavailable\",\n      \"note\": \"Personal appointment\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/availability",
+              "host": ["{{baseUrl}}"],
+              "path": ["availability"]
+            }
+          }
+        },
+        {
+          "name": "Manager - View Team Availability (GAP-SM-006)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/store/availability/team?week_start={{weekStart}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "availability", "team"],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Swaps & Approvals",
+      "item": [
+        {
+          "name": "Staff - List My Swap Requests (GAP-API-003)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/swaps",
+              "host": ["{{baseUrl}}"],
+              "path": ["swaps"]
+            }
+          }
+        },
+        {
+          "name": "Staff - Request Shift Swap (GAP-API-003)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shift_id\": \"SHIFT_ID_HERE\",\n  \"client_timestamp\": \"2026-11-24T10:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/swaps",
+              "host": ["{{baseUrl}}"],
+              "path": ["swaps"]
+            }
+          }
+        },
+        {
+          "name": "Manager - List Approvals Queue (GAP-SM-003)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/store/approvals",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "approvals"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Approve Decision (GAP-SM-003)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approve\": true,\n  \"client_timestamp\": \"2026-11-24T10:15:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/approvals/APPROVAL_ID_HERE/decide",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "approvals", "APPROVAL_ID_HERE", "decide"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Decline Decision (GAP-SM-003)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approve\": false,\n  \"reason\": \"Not on store premises\",\n  \"client_timestamp\": \"2026-11-24T10:15:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/approvals/APPROVAL_ID_HERE/decide",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "approvals", "APPROVAL_ID_HERE", "decide"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Task Management",
+      "item": [
+        {
+          "name": "List Visible Tasks (GAP-API-007)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Create Task (GAP-SM-009)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Aisle 3 Stock Count\",\n  \"note\": \"Count beverages before 4 PM\",\n  \"category\": \"priority\",\n  \"due_date\": \"2026-11-24T16:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"]
+            }
+          }
+        },
+        {
+          "name": "Staff - Claim Task (GAP-API-007)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/TASK_ID_HERE/claim",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "TASK_ID_HERE", "claim"]
+            }
+          }
+        },
+        {
+          "name": "Staff - Complete Task (GAP-API-007)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/TASK_ID_HERE/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "TASK_ID_HERE", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Assign / Reassign Task (GAP-SM-009)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee_id\": \"USER_ID_HERE\",\n  \"assignee_name\": \"Rahul K\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/TASK_ID_HERE/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "TASK_ID_HERE", "assign"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Weekly Hours & Confirmation",
+      "item": [
+        {
+          "name": "Staff - Get Weekly Hours Summary (GAP-API-005)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/hours?week_start={{weekStart}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["hours"],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Staff - Submit Attendance Corrections (GAP-API-005)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"submit_corrections\",\n  \"week_start\": \"{{weekStart}}\",\n  \"corrections\": [\n    {\n      \"date\": \"2026-11-24\",\n      \"start\": 540,\n      \"end\": 1020\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/hours",
+              "host": ["{{baseUrl}}"],
+              "path": ["hours"]
+            }
+          }
+        },
+        {
+          "name": "Staff - Confirm Week Hours (GAP-API-005)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"confirm_week\",\n  \"week_start\": \"{{weekStart}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/hours",
+              "host": ["{{baseUrl}}"],
+              "path": ["hours"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Store Dashboard & Announcements",
+      "item": [
+        {
+          "name": "Manager - Get Store Dashboard (GAP-SM-002)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/store/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Get Announcements Board (GAP-SM-010)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/store/announcements",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "announcements"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Send or Schedule Announcement (GAP-SM-010)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Store meeting tomorrow morning at 09:15 AM\",\n  \"scheduled_for\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/announcements",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "announcements"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Cancel Scheduled Announcement (GAP-SM-010)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/announcements/POST_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "announcements", "POST_ID_HERE"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Store Screens & Reports",
+      "item": [
+        {
+          "name": "Staff/Manager - List Store Screens (GAP-API-011)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "screens"]
+            }
+          }
+        },
+        {
+          "name": "Manager - Report Screen Offline (GAP-SM-011)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens/SCREEN_ID_HERE/report-offline",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "screens", "SCREEN_ID_HERE", "report-offline"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Alerts & Push Tokens",
+      "item": [
+        {
+          "name": "Staff - Get Alerts Feed (GAP-API-008)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            }
+          }
+        },
+        {
+          "name": "Staff - Mark Alert Read (GAP-API-008)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/ALERT_ID_HERE/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "ALERT_ID_HERE", "read"]
+            }
+          }
+        },
+        {
+          "name": "Register Mobile FCM Push Token (GAP-API-009)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"FCM_DEVICE_TOKEN_SAMPLE_STRING\",\n  \"platform\": \"Android\",\n  \"app_id\": \"com.storesparc.ops\",\n  \"environment\": \"test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/push/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["push", "register"]
+            }
+          }
+        },
+        {
+          "name": "Unregister Mobile Push Token (GAP-API-009)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"FCM_DEVICE_TOKEN_SAMPLE_STRING\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/push/unregister",
+              "host": ["{{baseUrl}}"],
+              "path": ["push", "unregister"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
