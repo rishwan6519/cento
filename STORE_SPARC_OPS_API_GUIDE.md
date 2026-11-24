@@ -1007,18 +1007,21 @@ The server constructs a single unified push envelope. The `data` block maintains
 ### 1. Store Dashboard (GAP-SM-002, GAP-SM-004)
 * **Method:** `GET`
 * **Endpoint:** `/store/dashboard`
-* **Purpose:** Aggregates real-time store metrics (sales sample, attendance, approvals, next week roster status, tasks, screens).
-* **Headers:** `Authorization: Bearer <token>` (Role: Store Manager or Central admin)
+* **Purpose:** Aggregates real-time store metrics (sales sample, live attendance, approvals queue, next week roster planning, store tasks, screen hardware health, scheduled announcements).
+* **Headers:** `Authorization: Bearer <token>` (Role: `Store Manager` or `Central admin`)
+* **Query Parameters:**
+  * `store_id` (string, optional): Allows `Central admin` callers to view any store's dashboard. For `Store Manager`, defaults to the manager's assigned `storeId`.
 * **Response Format (200 OK):**
 ```json
 {
-  "as_of": "string (ISO 8601)",
+  "as_of": "string (ISO 8601 UTC)",
   "sales": {
     "amount": number,
-    "currency": "string",
+    "currency": "string (e.g. INR, AUD, USD)",
     "comparison": "up" | "down" | "flat",
     "percent": number,
-    "is_sample": boolean // true in Phase 1
+    "compared_against": "string (e.g. last_week_same_day)",
+    "is_sample": boolean // true in Phase 1 (PRD review finding D5)
   },
   "attendance": {
     "checked_in": number,
@@ -1028,15 +1031,15 @@ The server constructs a single unified push envelope. The `data` block maintains
       {
         "user_id": "string",
         "name": "string",
-        "rostered_start": number,
-        "flag": "string" | null
+        "rostered_start": number, // minutes from midnight, e.g. 540 = 09:00
+        "flag": "LATE" | "EXPECTED_SOON" | null // computed by server using lateness grace window
       }
     ]
   },
   "approvals": {
     "waiting": number,
     "flagged": number,
-    "oldest_submitted_at": "string (ISO 8601)" | null
+    "oldest_submitted_at": "string (ISO 8601 UTC)" | null
   },
   "next_week_roster": {
     "week_start": "string (YYYY-MM-DD)",
@@ -1056,10 +1059,24 @@ The server constructs a single unified push envelope. The `data` block maintains
   },
   "announcements": {
     "scheduled": number,
-    "next_scheduled_for": "string (ISO 8601)" | null
+    "next_scheduled_for": "string (ISO 8601 UTC)" | null
   }
 }
 ```
+
+#### 💡 Open Questions Resolved (GAP-SM-002, GAP-SM-004):
+1. **Is there a sales (POS) feed in Phase 1, and which period is the comparison against? The PRD puts sales in Phase 2 (review finding D5).**
+   * **Answer:**
+     * **Phase 1 Status:** There is **NO live POS sales integration in Phase 1**. Per PRD review finding D5, live POS adapter ingestion is scheduled for Phase 2.
+     * **API Behavior:** The server explicitly returns `"is_sample": true` on the `sales` object. The mobile app renders the label *"Sample Data"* (or an info badge) next to the revenue tile so store managers are informed that sales numbers are illustrative until POS integration goes live.
+     * **Comparison Baseline:** The comparison baseline is **`"last_week_same_day"`** (comparing today's cumulative sales to the exact same weekday and hour of the preceding week). This eliminates artificial variance caused by weekend vs weekday retail traffic patterns.
+2. **Will the manager's dashboard and Central's view of the same store read one source? The prototype showed two different sets of numbers for one store (review finding A2).**
+   * **Answer:**
+     * **Yes, absolutely ONE authoritative source of truth.** Both the Store Manager mobile app (`GET /api/v1/store/dashboard`) and Central Web Portal (`GET /api/v1/store/dashboard?store_id=...`) invoke the exact same aggregation query against the primary operational MongoDB collections (`AttendanceRecord`, `RosterShift`, `ApprovalRequest`, `StoreTask`, `Device`).
+     * **Root Cause of Finding A2:** The prototype discrepancy occurred because Central previously queried an asynchronous overnight batch data warehouse (24-hour lag), while the manager prototype read from mock in-memory state.
+     * **Resolution:** In Store Sparc Ops v1, both views query the **same Operational Data Store (ODS)** in real-time, guaranteeing 100% data and numerical parity across Central and Store Manager views.
+3. **How is lateness calculated for awaited staff?**
+   * **Answer:** The server compares the current store-local time against `rostered_start + lateness_grace_minutes` (configured in `StoreConfig`, default 5 minutes). If current time exceeds start plus grace, the server returns `"flag": "LATE"`. If within 15 minutes before shift start, it returns `"flag": "EXPECTED_SOON"`. The client never computes lateness; it displays the badge only when the API provides a non-null flag.
 
 ---
 

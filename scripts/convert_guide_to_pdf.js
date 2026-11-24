@@ -522,15 +522,30 @@ async function convertMarkdownGuideToPdf() {
   // Save to workspace root
   const outputPath = path.join(__dirname, '..', 'STORE_SPARC_OPS_API_GUIDE.pdf');
   const pdfBytes = await pdfDoc.save();
-  fs.writeFileSync(outputPath, pdfBytes);
-  console.log(`Generated PDF at ${outputPath} (${pdfBytes.length} bytes, ${pdfDoc.getPageCount()} pages)`);
+  try {
+    fs.writeFileSync(outputPath, pdfBytes);
+    console.log(`Generated PDF at ${outputPath} (${pdfBytes.length} bytes, ${pdfDoc.getPageCount()} pages)`);
+  } catch (err) {
+    if (err.code === 'EBUSY') {
+      console.warn(`File ${outputPath} is currently opened by user. Writing to STORE_SPARC_OPS_API_GUIDE_v2.pdf`);
+      const altPath = path.join(__dirname, '..', 'STORE_SPARC_OPS_API_GUIDE_v2.pdf');
+      fs.writeFileSync(altPath, pdfBytes);
+      console.log(`Saved alternate copy at ${altPath}`);
+    } else {
+      throw err;
+    }
+  }
 
   // Save to artifact directory
   const artifactDir = 'C:\\Users\\krishwan\\.gemini\\antigravity\\brain\\80084802-adb1-4c8d-b215-1a923062ef64';
   if (fs.existsSync(artifactDir)) {
-    const artifactPath = path.join(artifactDir, 'STORE_SPARC_OPS_API_GUIDE.pdf');
-    fs.writeFileSync(artifactPath, pdfBytes);
-    console.log(`Saved copy to artifact directory at ${artifactPath}`);
+    try {
+      const artifactPath = path.join(artifactDir, 'STORE_SPARC_OPS_API_GUIDE.pdf');
+      fs.writeFileSync(artifactPath, pdfBytes);
+      console.log(`Saved copy to artifact directory at ${artifactPath}`);
+    } catch (aErr) {
+      console.warn('Artifact write warning:', aErr.message);
+    }
   }
 }
 
@@ -538,3 +553,4 @@ convertMarkdownGuideToPdf().catch(err => {
   console.error('Failed to convert markdown guide to PDF:', err);
   process.exit(1);
 });
+
