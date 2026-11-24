@@ -123,3 +123,4 @@ export async function GET(
     return apiError('INTERNAL_ERROR', error.message || 'Failed to fetch screen details', 500);
   }
 }
+

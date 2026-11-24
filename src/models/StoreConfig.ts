@@ -19,6 +19,18 @@ export interface IStoreConfig extends Document {
   timeZone: string; // e.g. 'Asia/Kolkata'
   whatsAppGroupLink?: string;
   centralWhatsAppLink?: string;
+  latenessGraceMinutes?: number;
+  breakRules?: {
+    mealBreakMinutes: number;
+    thresholdHours: number;
+    autoDeduct: boolean;
+  };
+  availabilityDeadline?: {
+    weekday: number; // 3 = Wednesday
+    time: string; // "23:59"
+  };
+  currency?: string;
+  currencySymbol?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +69,24 @@ const StoreConfigSchema: Schema = new Schema(
     timeZone: { type: String, default: 'Asia/Kolkata' },
     whatsAppGroupLink: { type: String, default: 'https://chat.whatsapp.com/testgroup' },
     centralWhatsAppLink: { type: String, default: 'https://chat.whatsapp.com/StoreSparcCentral' },
+    latenessGraceMinutes: { type: Number, default: 5 },
+    breakRules: {
+      type: {
+        mealBreakMinutes: { type: Number, default: 30 },
+        thresholdHours: { type: Number, default: 5 },
+        autoDeduct: { type: Boolean, default: true },
+      },
+      default: { mealBreakMinutes: 30, thresholdHours: 5, autoDeduct: true },
+    },
+    availabilityDeadline: {
+      type: {
+        weekday: { type: Number, default: 3 },
+        time: { type: String, default: '23:59' },
+      },
+      default: { weekday: 3, time: '23:59' },
+    },
+    currency: { type: String, default: 'AUD' },
+    currencySymbol: { type: String, default: '$' },
   },
   { timestamps: true }
 );

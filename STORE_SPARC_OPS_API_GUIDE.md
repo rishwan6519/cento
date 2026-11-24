@@ -159,8 +159,8 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 
 ### 2. Get Store Configuration (GAP-API-014)
 * **Method:** `GET`
-* **Endpoint:** `/store/config`
-* **Purpose:** Provides geofence radius, lat/long coordinates, trading hours, and store timezone.
+* **Endpoint:** `/store/config?store_id={optional_store_id}`
+* **Purpose:** Provides geofence radius, lat/long coordinates, trading hours per weekday (minutes from midnight to prefill partial availability), signage rotation, maximum announcement length, and store operational policies.
 * **Headers:** `Authorization: Bearer <token>`
 * **Request Body:** None
 * **Response Format (200 OK):**
@@ -179,12 +179,42 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
       "is_closed": boolean
     }
   ],
-  "signage_rotation": number, // in seconds
-  "max_announcement_length": number,
-  "time_zone": "string",      // IANA format e.g. "Asia/Kolkata"
-  "whatsapp_group_link": "string"
+  "signage_rotation": number, // in seconds (e.g. 15)
+  "max_announcement_length": number, // character limit (e.g. 500)
+  "time_zone": "string",      // IANA format e.g. "Asia/Kolkata" or "Australia/Sydney"
+  "whatsapp_group_link": "string",
+  "central_whatsapp_link": "string",
+  "lateness_grace_minutes": number, // grace window before lateness flag (e.g. 5)
+  "break_rules": {
+    "meal_break_minutes": number,  // unpaid break duration (e.g. 30)
+    "threshold_hours": number,     // shift length triggering meal break (e.g. 5)
+    "auto_deduct": boolean
+  },
+  "availability_deadline": {
+    "weekday": number, // 3 = Wednesday
+    "time": "string"   // "23:59"
+  },
+  "currency": "string",        // e.g. "AUD", "INR"
+  "currency_symbol": "string"  // e.g. "$", "₹"
 }
 ```
+
+#### 💡 Open Questions Resolved (GAP-API-014):
+1. **Which service owns store settings?**
+   * **Answer:** **The Central Enterprise Store Identity & Master Data Service owns store settings.**
+     * **Authoritative Control:** Central IT and corporate administrators manage store master metadata (Store ID, physical address, master geocoordinates, legal entity name).
+     * **Delegated Store Manager Administration:** Store Managers manage store operational parameters (geofence radius between 50m–500m, trading hours, Staff WhatsApp group link, signage rotation, announcement lengths) via the **Store Manager Web Portal** (`PUT /store/config`), persisted in `StoreConfig`.
+     * **Zero Hard-Coding in Mobile App:** Adheres to the core design principle: *"these values come from the API, never from app code"*. When trading hours or geofence radii change, all mobile staff devices immediately reflect the new configuration on the next API call without requiring mobile app binary updates.
+2. **Are there other per-store values we should read rather than hard-code?**
+   * **Answer:** **Yes, the following 8 critical operational attributes are served dynamically by the API:**
+     1. `time_zone`: Critical for calculating roster cutoffs, shift starts, and availability deadlines across multi-timezone store networks.
+     2. `lateness_grace_minutes` (default: 5m): Configurable grace window for check-in compliance across different store formats.
+     3. `break_rules`: Meal break durations and deduction thresholds adhering to regional labor union laws.
+     4. `availability_deadline`: Cutoff day and time (Wednesday 23:59) for roster submission.
+     5. `whatsapp_group_link` & `central_whatsapp_link`: Dynamic deep links for staff group messaging (GAP-API-010).
+     6. `signage_rotation` (default: 15s): Playlist dwell-time interval for in-store digital signage displays.
+     7. `max_announcement_length` (default: 500 chars): Validation limit for emergency store audio and digital board broadcasts.
+     8. `currency` & `currency_symbol`: Currency formatting for store manager revenue and sales tracking.
 
 ---
 
@@ -192,15 +222,28 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 * **Method:** `PUT`
 * **Endpoint:** `/store/config`
 * **Role Permission:** `Store Manager` | `Central admin`
-* **Purpose:** Updates store physical coordinates (latitude, longitude), geofence radius, WhatsApp group link, and trading hours.
+* **Purpose:** Updates store physical coordinates (latitude, longitude), geofence radius, WhatsApp group link, trading hours, and operational policies.
 * **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 * **Request Format:**
 ```json
 {
   "latitude": number,
   "longitude": number,
-  "geofence_radius": number, // in metres, e.g. 150
-  "whatsapp_group_link": "string"
+  "geofence_radius": number,
+  "trading_hours": [
+    {
+      "weekday": number,
+      "open_minutes": number,
+      "close_minutes": number,
+      "is_closed": boolean
+    }
+  ],
+  "signage_rotation": number,
+  "max_announcement_length": number,
+  "whatsapp_group_link": "string",
+  "central_whatsapp_link": "string",
+  "time_zone": "string",
+  "lateness_grace_minutes": number
 }
 ```
 * **Response Format (200 OK):**
@@ -212,8 +255,17 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
   "latitude": number,
   "longitude": number,
   "geofence_radius": number,
+  "trading_hours": [ ... ],
+  "signage_rotation": number,
+  "max_announcement_length": number,
   "time_zone": "string",
-  "whatsapp_group_link": "string"
+  "whatsapp_group_link": "string",
+  "central_whatsapp_link": "string",
+  "lateness_grace_minutes": number,
+  "break_rules": { ... },
+  "availability_deadline": { ... },
+  "currency": "string",
+  "currency_symbol": "string"
 }
 ```
 
