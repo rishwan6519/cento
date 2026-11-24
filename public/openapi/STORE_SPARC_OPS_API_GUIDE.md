@@ -86,6 +86,77 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 
 ---
 
+### 1.1 Start MFA Challenge (GAP-API-001)
+* **Method:** `POST`
+* **Endpoint:** `/auth/mfa/start`
+* **Purpose:** Initiates an MFA verification challenge (SMS/Email OTP).
+* **Headers:** `Content-Type: application/json`
+* **Request Format:**
+```json
+{
+  "user_id": "string",
+  "method": "sms" | "email" | "authenticator"
+}
+```
+* **Response Format (200 OK):**
+```json
+{
+  "challenge_id": "string",
+  "method": "string",
+  "code_length": number,
+  "destination_hint": "string", // e.g. "+91 ****** 4321"
+  "expires_in_seconds": number
+}
+```
+
+---
+
+### 1.2 Verify MFA Challenge (GAP-API-001)
+* **Method:** `POST`
+* **Endpoint:** `/auth/mfa/verify`
+* **Purpose:** Validates the 6-digit MFA challenge code and returns an authenticated session token.
+* **Headers:** `Content-Type: application/json`
+* **Request Format:**
+```json
+{
+  "challenge_id": "string",
+  "code": "string"
+}
+```
+* **Response Format (200 OK):**
+```json
+{
+  "verified": boolean,
+  "message": "string",
+  "token": "string",
+  "user_id": "string",
+  "role": "Staff" | "Store Manager" | "Central admin"
+}
+```
+
+---
+
+### 1.3 Sign Out Session (GAP-API-001)
+* **Method:** `POST`
+* **Endpoint:** `/auth/sign-out`
+* **Purpose:** Ends the user session server-side and unregisters device push notifications.
+* **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+* **Request Format:**
+```json
+{
+  "device_token": "string"
+}
+```
+* **Response Format (200 OK):**
+```json
+{
+  "success": boolean,
+  "message": "string"
+}
+```
+
+---
+
 ### 2. Get Store Configuration (GAP-API-014)
 * **Method:** `GET`
 * **Endpoint:** `/store/config`

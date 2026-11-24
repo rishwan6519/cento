@@ -114,6 +114,100 @@
           "response": []
         },
         {
+          "name": "Start MFA Challenge (GAP-API-001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.challenge_id) {",
+                  "        pm.collectionVariables.set(\"challengeId\", data.challenge_id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-user-id", "value": "{{staffUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"string\",\n  \"method\": \"sms\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/mfa/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "mfa", "start"]
+            },
+            "description": "Initiates an MFA verification challenge, returning challenge_id, code_length, and masked destination_hint (e.g. phone number)."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify MFA Code (GAP-API-001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.token) {",
+                  "        pm.collectionVariables.set(\"token\", data.token);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challenge_id\": \"string\",\n  \"code\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/mfa/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "mfa", "verify"]
+            },
+            "description": "Verifies the 6-digit MFA challenge code. On success, issues a full session JWT token."
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Out Session (GAP-API-001)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-user-id", "value": "{{staffUserId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_token\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/sign-out",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "sign-out"]
+            },
+            "description": "Ends the user session server-side and removes push notifications device registration."
+          },
+          "response": []
+        },
+        {
           "name": "Get Store Configuration (GAP-API-014)",
           "request": {
             "method": "GET",
