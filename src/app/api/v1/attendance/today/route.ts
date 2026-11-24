@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import AttendanceRecord from '@/models/AttendanceRecord';
+import RosterShift from '@/models/RosterShift';
 import { requireAuth } from '@/lib/storesparc/auth';
 import { apiError } from '@/lib/storesparc/errors';
 
@@ -18,10 +19,23 @@ export async function GET(req: NextRequest) {
     });
 
     if (!record) {
+      // Find today's rostered shift to determine if staff is rostered or not
+      const todayShift = await RosterShift.findOne({
+        userId: caller!.userId,
+        date: today,
+        status: 'published',
+      });
+
       return NextResponse.json({
         date: today,
-        phase: 'not_checked_in',
-        today_shift: null,
+        phase: todayShift ? 'not_checked_in' : 'not_rostered',
+        today_shift: todayShift
+          ? {
+              id: todayShift._id.toString(),
+              start_minutes: todayShift.startMinutes,
+              end_minutes: todayShift.endMinutes,
+            }
+          : null,
         checked_in_at: null,
         checked_out_at: null,
         location_check: 'in_range',
@@ -56,4 +70,3 @@ export async function GET(req: NextRequest) {
     return apiError('INTERNAL_ERROR', error.message || 'Failed to fetch attendance', 500);
   }
 }
-

@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/db';
 import AttendanceRecord from '@/models/AttendanceRecord';
 import StoreConfig from '@/models/StoreConfig';
 import ApprovalRequest from '@/models/ApprovalRequest';
+import RosterShift from '@/models/RosterShift';
 import { requireAuth } from '@/lib/storesparc/auth';
 import { withIdempotency } from '@/lib/storesparc/idempotency';
 import { calculateDistanceMetres } from '@/lib/storesparc/geo';
@@ -57,6 +58,33 @@ export async function POST(req: NextRequest) {
       let message = 'Check-in recorded successfully';
       let approvalRequestId: string | undefined;
 
+      // 1. Check today's rostered shift
+      const todayShift = await RosterShift.findOne({
+        userId: caller!.userId,
+        date: todayStr,
+        status: 'published',
+      });
+
+      const checkInMinutes = clientDate.getHours() * 60 + clientDate.getMinutes();
+      const LATENESS_GRACE_WINDOW_MINUTES = 5; // 5-minute grace window
+
+      if (!todayShift) {
+        flags.push({ code: 'NOT_ROSTERED', label: 'Checked in when not rostered for today' });
+      } else {
+        if (checkInMinutes < todayShift.startMinutes - 15) {
+          flags.push({
+            code: 'EARLY_CHECKIN',
+            label: `Checked in early (${Math.round(todayShift.startMinutes - checkInMinutes)}m before roster start)`,
+          });
+        } else if (checkInMinutes > todayShift.startMinutes + LATENESS_GRACE_WINDOW_MINUTES) {
+          flags.push({
+            code: 'LATE_CHECKIN',
+            label: `Checked in late by ${Math.round(checkInMinutes - todayShift.startMinutes)} minutes`,
+          });
+        }
+      }
+
+      // 2. Validate GPS Location Reading & Geofence
       if (location_reading && location_reading.latitude && location_reading.longitude) {
         const distance = calculateDistanceMetres(
           location_reading.latitude,
@@ -107,7 +135,7 @@ export async function POST(req: NextRequest) {
           }
         }
       } else {
-        // No location reading provided
+        // No location reading provided (GPS off / permission denied)
         if (manual_confirmation_requested) {
           verdict = 'awaiting_manager_confirmation';
           phase = 'awaiting_manager_confirmation';
@@ -128,7 +156,7 @@ export async function POST(req: NextRequest) {
           });
           approvalRequestId = approval._id.toString();
         } else {
-          return apiError('LOCATION_REQUIRED', 'Location reading is required for check-in', 400);
+          return apiError('LOCATION_REQUIRED', 'Location reading is required for check-in. Ask for manual confirmation if location is disabled.', 400);
         }
       }
 
@@ -144,6 +172,14 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const rosteredShiftInfo = todayShift
+        ? {
+            id: todayShift._id.toString(),
+            startMinutes: todayShift.startMinutes,
+            endMinutes: todayShift.endMinutes,
+          }
+        : undefined;
+
       // Save or update attendance record
       if (!attendance) {
         attendance = new AttendanceRecord({
@@ -152,6 +188,7 @@ export async function POST(req: NextRequest) {
           storeId,
           date: todayStr,
           phase,
+          rosteredShift: rosteredShiftInfo,
           checkedInAt: phase === 'checked_in' ? clientDate : undefined,
           locationCheck,
           locationReading: location_reading,
@@ -162,6 +199,7 @@ export async function POST(req: NextRequest) {
       } else {
         attendance.phase = phase;
         if (phase === 'checked_in') attendance.checkedInAt = clientDate;
+        if (rosteredShiftInfo) attendance.rosteredShift = rosteredShiftInfo;
         attendance.locationCheck = locationCheck;
         attendance.locationReading = location_reading;
         attendance.flags = flags;
@@ -182,4 +220,3 @@ export async function POST(req: NextRequest) {
     }
   });
 }
-

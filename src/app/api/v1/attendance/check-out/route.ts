@@ -33,6 +33,17 @@ export async function POST(req: NextRequest) {
       attendance.checkedOutAt = clientDate;
       attendance.workedMinutes = workedMinutes;
 
+      // Check if check-out time exceeds rostered shift end time
+      if (attendance.rosteredShift?.endMinutes) {
+        const checkOutMinutes = clientDate.getHours() * 60 + clientDate.getMinutes();
+        if (checkOutMinutes > attendance.rosteredShift.endMinutes + 10) {
+          attendance.flags.push({
+            code: 'AFTER_ROSTER_END',
+            label: `Checked out after rostered shift end (${Math.round(checkOutMinutes - attendance.rosteredShift.endMinutes)}m late)`,
+          });
+        }
+      }
+
       await attendance.save();
 
       return NextResponse.json({
@@ -41,10 +52,10 @@ export async function POST(req: NextRequest) {
         message: 'Checked out successfully',
         worked_minutes: workedMinutes,
         phase: 'checked_out',
+        flags: attendance.flags,
       });
     } catch (error: any) {
       return apiError('INTERNAL_ERROR', error.message || 'Check-out failed', 500);
     }
   });
 }
-
