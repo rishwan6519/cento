@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import RosterWeek from '@/models/RosterWeek';
 import RosterShift from '@/models/RosterShift';
+import StaffAvailability from '@/models/StaffAvailability';
+import StoreConfig from '@/models/StoreConfig';
 import { requireAuth } from '@/lib/storesparc/auth';
 import { withIdempotency } from '@/lib/storesparc/idempotency';
 import { apiError, conflictError } from '@/lib/storesparc/errors';
@@ -29,6 +31,7 @@ export async function POST(req: NextRequest) {
           weekStart: week_start,
           status: 'draft',
           editable: true,
+          hasUnpublishedChanges: true,
         });
       }
 
@@ -36,20 +39,64 @@ export async function POST(req: NextRequest) {
         return conflictError('WEEK_LOCKED', week.lockedReason || 'This week is locked for editing');
       }
 
-      // If week was published, setting shifts puts week back to draft until republished (PRD 5.1)
-      if (week.status === 'published') {
-        week.status = 'draft';
-        await week.save();
+      // 1. Validate Unavailability: Refuse shift on a day staff member declared unavailable
+      const staffAvail = await StaffAvailability.findOne({
+        storeId,
+        userId: staff_member,
+        $or: [{ weekStart: week_start }, { 'days.date': { $in: shifts.map((s: any) => s.date) } }],
+      });
+
+      if (staffAvail && Array.isArray(staffAvail.days)) {
+        const unavailDates = new Set(
+          staffAvail.days.filter((d: any) => d.status === 'unavailable').map((d: any) => d.date)
+        );
+        for (const s of shifts) {
+          if (unavailDates.has(s.date)) {
+            return conflictError(
+              'STAFF_UNAVAILABLE',
+              `Cannot assign shift on ${s.date}: staff member declared unavailable for this date`
+            );
+          }
+        }
       }
 
-      // Remove previous draft shifts for this staff member in this week
+      // 2. Validate Trading Hours: Refuse shift outside trading hours (+30m opening/closing buffer)
+      const storeConfig = await StoreConfig.findOne({ storeId });
+      if (storeConfig && Array.isArray(storeConfig.tradingHours)) {
+        for (const s of shifts) {
+          const shiftDate = new Date(`${s.date}T00:00:00Z`);
+          const dayNum = shiftDate.getUTCDay();
+          const dayHours = storeConfig.tradingHours.find((th: any) => th.weekday === dayNum);
+          if (dayHours && !dayHours.isClosed) {
+            if (s.start < dayHours.openMinutes - 30 || s.end > dayHours.closeMinutes + 30) {
+              return conflictError(
+                'OUTSIDE_TRADING_HOURS',
+                `Shift on ${s.date} (${s.start}-${s.end} mins) is outside store trading hours (${dayHours.openMinutes}-${dayHours.closeMinutes})`
+              );
+            }
+          }
+        }
+      }
+
+      // 3. Dual-State Versioning (PRD Open Question 2):
+      // When a published week is edited, staff continues seeing currently published shifts until republished.
+      // We stage changes as drafts and flag hasUnpublishedChanges.
+      const isAlreadyPublished = !!week.publishedAt;
+      week.hasUnpublishedChanges = true;
+      if (!isAlreadyPublished) {
+        week.status = 'draft';
+      }
+      await week.save();
+
+      // Remove existing draft shifts for this staff member in this week
       await RosterShift.deleteMany({
         storeId,
         weekStart: week_start,
         userId: staff_member,
+        status: 'draft',
       });
 
-      // Insert new shifts
+      // Insert new draft shifts
       const newShifts = shifts.map((s: any) => ({
         storeId,
         weekStart: week_start,
@@ -68,8 +115,9 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         week_start,
-        status: 'draft',
-        message: 'Shifts updated successfully',
+        status: week.status,
+        has_unpublished_changes: true,
+        message: 'Shifts staged successfully as draft. Publish week to make visible to staff.',
         assigned_count: newShifts.length,
       });
     } catch (error: any) {
@@ -77,4 +125,3 @@ export async function POST(req: NextRequest) {
     }
   });
 }
-

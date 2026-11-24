@@ -15,6 +15,7 @@ export interface IRosterWeek extends Document {
   editable: boolean;
   lockedReason?: string;
   coverageGaps: ICoverageGap[];
+  hasUnpublishedChanges?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +44,7 @@ const RosterWeekSchema: Schema = new Schema(
     editable: { type: Boolean, default: true },
     lockedReason: { type: String },
     coverageGaps: [CoverageGapSchema],
+    hasUnpublishedChanges: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

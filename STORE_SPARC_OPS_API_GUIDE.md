@@ -1245,7 +1245,56 @@ The server constructs a single unified push envelope. The `data` block maintains
 
 ### 4. Roster Planning & Publishing (GAP-SM-007, GAP-SM-008)
 * **Get Week Plan:** `GET /store/roster?week_start=YYYY-MM-DD`
+* **Headers:** `Authorization: Bearer <token>` (Store Manager or Central admin)
+* **Response Format (200 OK):**
+```json
+{
+  "week_start": "string (YYYY-MM-DD)",
+  "status": "draft" | "published",
+  "editable": boolean,
+  "locked_reason": "string" | null,
+  "published_at": "string (ISO 8601 UTC)" | null,
+  "coverage": {
+    "gaps": [
+      {
+        "date": "string (YYYY-MM-DD)",
+        "from_minutes": number,
+        "to_minutes": number,
+        "message": "string"
+      }
+    ]
+  },
+  "staff": [
+    {
+      "user_id": "string",
+      "name": "string",
+      "availability_submitted": boolean,
+      "rostered_minutes": number,
+      "declared_availability": [
+        {
+          "date": "string",
+          "status": "available" | "partial" | "unavailable",
+          "from": number | null,
+          "to": number | null,
+          "note": "string" | null
+        }
+      ],
+      "shifts": [
+        {
+          "id": "string",
+          "date": "string (YYYY-MM-DD)",
+          "start_minutes": number,
+          "end_minutes": number,
+          "swap_eligible": boolean
+        }
+      ]
+    }
+  ]
+}
+```
+
 * **Assign Shifts:** `POST /store/roster/shifts`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
 * **Request Body (Assign Shifts):**
 ```json
 {
@@ -1255,19 +1304,31 @@ The server constructs a single unified push envelope. The `data` block maintains
   "shifts": [
     {
       "date": "string (YYYY-MM-DD)",
-      "start": number, // minutes from midnight (e.g. 540)
-      "end": number   // minutes from midnight (e.g. 1020)
+      "start": number, // minutes from midnight (e.g. 540 = 09:00)
+      "end": number   // minutes from midnight (e.g. 1020 = 17:00)
     }
-  ]
+  ],
+  "client_timestamp": "string (ISO 8601 UTC)"
+}
+```
+* **Response Format (200 OK):**
+```json
+{
+  "week_start": "string (YYYY-MM-DD)",
+  "status": "draft",
+  "has_unpublished_changes": true,
+  "assigned_count": number,
+  "message": "Shifts staged successfully as draft. Publish week to make visible to staff."
 }
 ```
 
 * **Publish Week Roster:** `POST /store/roster/publish`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
 * **Request Body (Publish):**
 ```json
 {
   "week_start": "string (YYYY-MM-DD)",
-  "client_timestamp": "string (ISO 8601)"
+  "client_timestamp": "string (ISO 8601 UTC)"
 }
 ```
 * **Response Format (Publish 200 OK):**
@@ -1275,10 +1336,10 @@ The server constructs a single unified push envelope. The `data` block maintains
 {
   "week_start": "string (YYYY-MM-DD)",
   "status": "published",
-  "published_at": "string (ISO 8601)",
+  "published_at": "string (ISO 8601 UTC)",
   "coverage_warnings": [
     {
-      "date": "string",
+      "date": "string (YYYY-MM-DD)",
       "from_minutes": number,
       "to_minutes": number,
       "message": "string"
@@ -1287,6 +1348,29 @@ The server constructs a single unified push envelope. The `data` block maintains
   "message": "Roster published to Staff successfully"
 }
 ```
+
+#### 💡 Open Questions Resolved (GAP-SM-007, GAP-SM-008):
+1. **What counts as a coverage gap, and what message comes with it?**
+   * **Answer:**
+     * **Minimum Staffing Threshold:** The retail operational standard requires a **minimum of 2 staff members on duty** during store trading hours (for cashier redundancy, customer assistance, and shop floor security).
+     * **Specific Gap Conditions & Message Texts:**
+       * *Zero Staff on Duty:* If trading hours have 0 staff rostered $\rightarrow$ `message: "No staff rostered during store trading hours (09:00 - 12:00)"`.
+       * *Understaffed (< 2 Staff):* If only 1 staff member is rostered $\rightarrow$ `message: "Understaffed: Only 1 staff member scheduled. Minimum 2 required for store operations & safety."`.
+       * *Uncovered Store Opening / Closing:* If store opens at 09:00 but shifts start at 10:00 $\rightarrow$ `message: "Store opening gap: Store opens at 09:00 but first shift starts at 10:00."`.
+     * **Non-Blocking Rule:** Coverage gaps are **warnings only**. The API allows the manager to publish even with coverage warnings (`coverage_warnings: [...]`), empowering managers to accommodate emergency solo shifts or phased openings.
+2. **When a manager edits a published week, should staff keep seeing the last published version until it is republished?**
+   * **Answer:**
+     * **Yes, staff MUST continue seeing their current published shifts.**
+     * **Problem with Prototype Fake:** The fake followed PRD 5.1 literally: editing one shift reverted the entire week to draft, causing next week's roster to suddenly disappear from all employees' mobile screens (`GET /roster/published`). This created massive shop floor confusion.
+     * **Architectural Resolution (Dual-State Staging):**
+       1. When a manager edits shifts in an already published week (`POST /store/roster/shifts`), the modifications are staged as **draft shifts** (`status: "draft"`), and `week.hasUnpublishedChanges = true`.
+       2. Staff members calling `GET /roster/published` **continue to see their existing published shifts without disruption**.
+       3. When the manager taps **"Publish"** (`POST /store/roster/publish`), the backend atomically promotes all draft shifts to `status: "published"`, purges obsolete assignments, clears `hasUnpublishedChanges`, and dispatches a single `roster_published` alert to all affected staff.
+3. **Server Assignment Enforcement:**
+   * The server refuses assignments with `409 Conflict`:
+     * If assigned on a date where the staff member declared `status: "unavailable"` $\rightarrow$ `code: "STAFF_UNAVAILABLE"`.
+     * If assigned outside configured store trading hours (with 30m prep/cleanup buffer) $\rightarrow$ `code: "OUTSIDE_TRADING_HOURS"`.
+     * If assigned to a locked past week $\rightarrow$ `code: "WEEK_LOCKED"`.
 
 ---
 
