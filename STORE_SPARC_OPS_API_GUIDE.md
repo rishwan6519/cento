@@ -6,26 +6,110 @@
 
 ---
 
-## 🛠️ Global Standards & Error Format
+## 🛠️ PART 0: ARCHITECTURAL PRINCIPLES & RULES FOR EVERY API
 
-All error responses return HTTP status `4xx` or `5xx` with the standard machine-readable JSON format:
+### 1. The Server Makes Every Business Decision
+The Store Sparc Ops mobile application operates strictly as a presentation and action-queueing client. The mobile app **never computes business logic**. All operational verdicts and state derivations originate from the API:
+* **Geofence Verdicts:** The server calculates the exact distance between the store's physical coordinates and the single check-in GPS reading against the store's configured radius, issuing verdicts (`accepted`, `outside_geofence`, `awaiting_manager_confirmation`, `rejected`).
+* **Lateness & Compliance Flags:** The server evaluates client check-in times against published roster shift bounds, applying a configurable grace window (default 5 min) and emitting compliance flags (`NOT_ROSTERED`, `EARLY_CHECKIN`, `LATE_CHECKIN`, `AFTER_ROSTER_END`).
+* **Shift Swap Eligibility & Cover:** The server determines whether a shift is eligible for swapping (`swap_eligible`), prevents duplicate open swap requests (`409 Conflict`), and identifies eligible team cover.
+* **Hours Totals & State:** The server calculates total rostered minutes, recorded minutes, deducts unpaid meal breaks according to jurisdictional rules, and flags day states (`recorded`, `missing_check_out`, `not_recorded`, `on_shift`, `not_worked_yet`).
+* **Editable Boundaries:** The server determines which days can be edited and whether a week can be confirmed (`can_confirm`, locked reasons). Confirmed weeks are immutable for staff.
+* **Task Role Visibility:** The server filters tasks by caller role; `manager_only` tasks never reach staff members.
+* **State-Derived Alerts:** Alerts such as `"hours_to_confirm"` exist dynamically and are automatically purged by the server once the staff member confirms the week.
 
+---
+
+### 2. Sign-In, Identity & SSO (OIDC + PKCE)
+* **Authentication Standard:** OpenID Connect (OIDC) Authorization Code Flow with Proof Key for Code Exchange (PKCE) for public mobile clients (zero client secrets).
+* **Issuer / Discovery URLs:**
+  * **Production:** `https://auth.storesparc.com/.well-known/openid-configuration`
+  * **Staging / Test:** `https://iot-test.metizstoresparc.com/api/v1/auth` (or Centelon SSO Test Tenant)
+* **Client Registrations (per app & environment):**
+  * **Android:** Client ID `storesparc-ops-android`, Redirect URI `com.storesparc.ops://oauth/callback`
+  * **iOS:** Client ID `storesparc-ops-ios`, Redirect URI `com.storesparc.ops://oauth/callback`
+* **Scopes & Audience:**
+  * **Scopes:** `openid profile email offline_access store_ops.read store_ops.write`
+  * **Audience (`aud`):** `https://api.storesparc.com/api/v1`
+* **Token Lifetimes & Refresh Behaviour:**
+  * **Access Token:** Short-lived JWT (15 to 60 minutes) containing claims: `sub` (User ID), `role` (`Staff` | `Store Manager` | `Central admin`), `store_id`, `aud`, and `iss`.
+  * **Refresh Token:** Long-lived (30 days with rolling refresh), securely stored in mobile hardware keystore (iOS Keychain / Android EncryptedSharedPreferences).
+  * **Revocation & Sign-out:** Calling `POST /api/v1/auth/sign-out` terminates the session server-side, revokes the refresh token, and purges the device's push notification tokens.
+* **MFA Triggering & Verification:**
+  * If `mfa_required: true` is returned during identity resolution, the client initiates `POST /auth/mfa/start` to obtain a `challenge_id` and masked destination hint, followed by `POST /auth/mfa/verify` with the 6-digit OTP code to issue the access token.
+* **Caller Identity:** The authenticated user is extracted exclusively from the JWT Bearer token. **Writes never carry a user ID in the request body.**
+
+---
+
+### 3. Offline Writes & Queueing Strategy
+Staff operate in retail basements and shop floors with intermittent signal. Every client mutation is queued locally and dispatched upon reconnecting:
+* **Headers & Payload Requirements:**
+  * **`Idempotency-Key` (Header):** Unique UUID v4 per user action.
+  * **`client_timestamp` (Body):** ISO 8601 timestamp with offset (e.g. `2026-11-24T13:45:00.000+05:30`) recording exactly when the staff member tapped the action.
+* **Server Guarantees:**
+  1. **Execute Exactly Once:** A replay of an existing key returns the original cached response with HTTP header `X-Idempotent-Replay: true` without re-executing side effects.
+  2. **Timestamp Dual-Resolution:** The server uses `client_timestamp` as the true event time for attendance and audit logs, but returns its own authoritative `server_timestamp` in the response.
+  3. **Error Partitioning:**
+     * **4xx Client Errors (Permanent Rejection):** Cached in the idempotency store. The mobile app presents the error to the user and discards the queued action.
+     * **5xx / 429 / Timeouts (Transient Errors):** Never cached in the idempotency store. The mobile client retains the item in its offline queue, applying exponential backoff with jitter before retrying.
+
+---
+
+### 4. Global Error Envelope & HTTP Status Codes
+Every API returns a consistent machine-readable JSON error format:
 ```json
 {
   "code": "STRING",         // e.g. "UNAUTHORIZED", "FORBIDDEN", "CONFLICT", "VALIDATION_ERROR"
   "message": "STRING",      // Human-readable message
   "field_errors": [
     {
-      "field": "STRING",    // Optional field name that caused the error
-      "message": "STRING"   // Specific validation error
+      "field": "STRING",    // Optional field name causing the failure
+      "message": "STRING"   // Specific field validation failure
     }
   ]
 }
 ```
+* **`400 Bad Request / Validation Error`:** Malformed JSON or invalid parameters.
+* **`401 Unauthorized`:** Access token is missing, expired, or cryptographically invalid.
+* **`403 Forbidden`:** Authenticated caller's role is not authorized for the requested resource (e.g. Staff invoking manager approvals).
+* **`404 Not Found`:** Target entity does not exist or does not belong to the caller's store.
+* **`409 Conflict`:** Conflicting business state (e.g. duplicate swap request for the same shift, submitting corrections to an already confirmed week, double check-in).
+* **`429 Too Many Requests`:** Rate limit exceeded. Mobile clients must read the `Retry-After` header.
+* **`500 Internal Server Error`:** Unhandled server fault. Client queues must retry.
 
-* **`401 Unauthorized`**: Token missing, expired, or invalid.
-* **`403 Forbidden`**: Caller role is not authorized (e.g. Staff calling Manager endpoint).
-* **`409 Conflict`**: Conflicting operation (e.g. Duplicate swap request for same shift, editing locked week, already checked in).
+---
+
+### 5. Time & Week Conventions
+* **Store-Local Time:** Shifts, availability intervals, and attendance timestamps are store-local. Responses return ISO 8601 strings with explicit timezone offsets alongside the store's IANA timezone (e.g. `2026-11-24T09:00:00+05:30` with `time_zone: "Asia/Kolkata"` or `+11:00` with `time_zone: "Australia/Sydney"`).
+* **Week Definition:** Weeks are strictly defined as **Monday (Day 1) to Sunday (Day 7)** following ISO-8601 week definitions. Week parameters are always Monday dates formatted as `YYYY-MM-DD`.
+
+---
+
+### 6. Conventions (Pagination, Versioning, Rate Limits & Base URLs)
+* **API Versioning:** URI prefix path versioning `/v1` (e.g. `/api/v1/...`).
+* **Pagination Standard:** Offset (`page`, `limit`) and cursor-based (`before`, `limit`) pagination. Responses include `total`, `limit`, `has_more`, and `next_cursor`.
+* **Rate Limits:** Standard mobile limit of 100 requests per minute per user; unauthenticated endpoints rate-limited to 20 requests per minute per IP.
+* **Environment Base URLs:**
+  * **Staging / Test:** `https://iot-test.metizstoresparc.com/api/v1`
+  * **Production:** `https://metizstoresparc.com/api/v1`
+
+---
+
+### 💡 Open Questions Resolved (Page 1 - Rules for Every API):
+1. **Is the idempotency header `Idempotency-Key`, and how long are keys remembered?**
+   * **Answer:** **Yes, the canonical header is `Idempotency-Key`** (with case-insensitive fallback to `idempotency-key`). Keys are remembered for **7 days (168 hours)** in MongoDB via an automated TTL index on `IdempotencyRecord`. This matches the standard weekly roster planning and payroll cycle, allowing offline mobile queues to safely replay un-synced weekend or off-grid shifts without duplicate writes.
+2. **Do you return the server timestamp on every write?**
+   * **Answer:** **Yes.** Every write endpoint returns `server_timestamp` (or its domain equivalent: `submitted_at`, `decided_at`, `confirmed_at`, `published_at` in ISO 8601 UTC format). This provides the mobile client with an authoritative clock reference, allowing the app to calculate clock skew, calibrate foreground timers, and display verified audit logs.
+3. **Which existing services own roster, attendance, tasks and signage: one API or several?**
+   * **Answer:** **Single Unified API Gateway (`/api/v1`) backed by Modular Domain Services.**
+     * From the mobile client's perspective, **there is exactly ONE API (Single Unified Gateway Base URL `https://.../api/v1`)**. The mobile app never communicates with disparate URLs or fragmented microservice gateways.
+     * Behind the unified gateway, domain boundaries are cleanly partitioned into modular services:
+       1. *Identity & Store Service:* Auth, MFA, Store Config, Groups (`/auth`, `/store/config`, `/chat/groups`).
+       2. *Workforce & Roster Service:* Roster, Swaps, Availability, Weekly Hours (`/roster`, `/swaps`, `/availability`, `/hours`).
+       3. *Attendance & Compliance Service:* Check-in, Geofencing, Overtime & Lateness flags (`/attendance`).
+       4. *Task Management Service:* Task creation, claiming, completion, and team release (`/tasks`).
+       5. *Digital Signage & Promotion Service:* Player heartbeat, current media, screen reporting (`/store/screens`).
+       6. *Alerts & Notification Service:* Real-time feed, FCM/APNs push dispatching (`/alerts`, `/push`).
 
 ---
 
