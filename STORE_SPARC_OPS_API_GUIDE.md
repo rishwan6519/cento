@@ -117,6 +117,37 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 
 ---
 
+### 2.1 Update Store Configuration & Geofence
+* **Method:** `PUT`
+* **Endpoint:** `/store/config`
+* **Role Permission:** `Store Manager` | `Central admin`
+* **Purpose:** Updates store physical coordinates (latitude, longitude), geofence radius, WhatsApp group link, and trading hours.
+* **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+* **Request Format:**
+```json
+{
+  "latitude": number,
+  "longitude": number,
+  "geofence_radius": number, // in metres, e.g. 150
+  "whatsapp_group_link": "string"
+}
+```
+* **Response Format (200 OK):**
+```json
+{
+  "message": "string",
+  "store_id": "string",
+  "store_name": "string",
+  "latitude": number,
+  "longitude": number,
+  "geofence_radius": number,
+  "time_zone": "string",
+  "whatsapp_group_link": "string"
+}
+```
+
+---
+
 ### 3. Today's Attendance State (GAP-API-004)
 * **Method:** `GET`
 * **Endpoint:** `/attendance/today`

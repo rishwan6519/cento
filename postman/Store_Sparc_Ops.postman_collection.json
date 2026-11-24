@@ -129,6 +129,29 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Update Store Configuration & Geofence (Manager / Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-user-id", "value": "{{managerUserId}}" },
+              { "key": "x-user-role", "value": "Store Manager" },
+              { "key": "x-store-id", "value": "{{storeId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 0.0,\n  \"longitude\": 0.0,\n  \"geofence_radius\": 0,\n  \"whatsapp_group_link\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "config"]
+            },
+            "description": "Updates the store physical coordinates (latitude & longitude), geofence radius in metres, and WhatsApp group link. Allowed for Store Manager or Central Admin."
+          },
+          "response": []
         }
       ]
     },
