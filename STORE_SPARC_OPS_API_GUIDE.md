@@ -343,32 +343,66 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 ---
 
 ### 7. Staff Availability (GAP-API-006)
-* **Get Availability:** `GET /availability?week_start=YYYY-MM-DD`
-* **Submit Availability:** `POST /availability`
-* **Headers:** `Idempotency-Key: string (UUID)`
-* **Request Body (POST):**
+* **Get Week Availability:** `GET /availability?week_start=YYYY-MM-DD`
+* **Get Month Availability:** `GET /availability?month=YYYY-MM`
+* **Submit Week Availability:** `POST /availability`
+* **Submit Month Days Off:** `POST /availability`
+* **Headers:** `Idempotency-Key: string (UUID)`, `Authorization: Bearer <token>`
+* **Response Format (GET Week 200 OK):**
 ```json
 {
   "week_start": "string (YYYY-MM-DD)",
-  "month": "string (YYYY-MM)", // Optional
+  "editable": boolean,
+  "locked_reason": "string" | null,
+  "submitted_at": "string (ISO 8601)" | null,
   "days": [
     {
       "date": "string (YYYY-MM-DD)",
       "status": "available" | "partial" | "unavailable",
-      "from_minutes": number,  // Required only if partial
-      "to_minutes": number,    // Required only if partial
+      "from": number | null,
+      "to": number | null,
+      "note": "string" | null
+    }
+  ]
+}
+```
+* **Response Format (GET Month 200 OK):**
+```json
+{
+  "month": "string (YYYY-MM)",
+  "submitted_at": "string (ISO 8601)" | null,
+  "days": [
+    {
+      "date": "string (YYYY-MM-DD)",
+      "day_off": boolean,
+      "editable": boolean,
+      "locked_reason": "string" | null
+    }
+  ]
+}
+```
+* **Request Body (Submit Week):**
+```json
+{
+  "week_start": "string (YYYY-MM-DD)",
+  "days": [
+    {
+      "date": "string (YYYY-MM-DD)",
+      "status": "available" | "partial" | "unavailable",
+      "from": number,
+      "to": number,
       "note": "string"
     }
   ]
 }
 ```
-* **Response Format (200 OK):**
+* **Request Body (Submit Month Days Off):**
 ```json
 {
-  "week_start": "string (YYYY-MM-DD)",
-  "submitted_at": "string (ISO 8601)",
-  "days": [ ... ],
-  "message": "string"
+  "month": "string (YYYY-MM)",
+  "days_off": [
+    "string (YYYY-MM-DD)"
+  ]
 }
 ```
 
