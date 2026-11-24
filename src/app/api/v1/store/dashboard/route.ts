@@ -99,10 +99,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       as_of: now.toISOString(),
       sales: {
-        amount: 245000,
+        amount: 0,
         currency: 'INR',
-        comparison: 'up',
-        percent: 8.4,
+        comparison: 'flat',
+        percent: 0.0,
         compared_against: 'last_week_same_day',
         is_sample: true, // Labeled sample data per PRD Phase 1 finding D5
       },
@@ -129,9 +129,9 @@ export async function GET(req: NextRequest) {
         unclaimed_priority: unclaimedPriorityTasks,
       },
       screens: {
-        live: liveDevices || 4,
-        total: totalDevices || 4,
-        offline: offlineDevices || 0,
+        live: liveDevices,
+        total: totalDevices,
+        offline: offlineDevices,
       },
       announcements: {
         scheduled: scheduledCount,

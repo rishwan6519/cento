@@ -43,13 +43,9 @@ export async function GET(req: NextRequest) {
       group: {
         id: `group_${storeId}`,
         name: `${caller!.storeName || 'Store'} Team Chat`,
-        whatsapp_link: config?.whatsAppGroupLink || 'https://chat.whatsapp.com/sample',
+        whatsapp_link: config?.whatsAppGroupLink || '',
       },
-      message_templates: [
-        'Team briefing at store opening tomorrow',
-        'Promotion event starting this weekend: all hands on deck',
-        'Important inventory count scheduled for Friday evening',
-      ],
+      message_templates: [],
       scheduled_posts: scheduledPosts,
       sent_posts: sentPosts,
     });

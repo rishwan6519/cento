@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "7b8e5a12-4c22-4d91-9e12-3c8f8b091e32",
-    "name": "Store Sparc Ops API (with Demo Data & Examples)",
-    "description": "Production-ready Postman collection pre-configured with Demo Headers, Realistic Request Payloads, and Saved Example Responses for instant zero-setup testing.",
+    "name": "Store Sparc Ops API (Clean Formats)",
+    "description": "Standard Postman collection with request field schemas and empty response templates for live server testing.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -12,26 +12,41 @@
       "type": "string"
     },
     {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "storeId",
-      "value": "65b2f8a9e1b2c3d4e5f6a7b8",
+      "value": "",
       "type": "string"
     },
     {
       "key": "staffUserId",
-      "value": "65b2f8a9e1b2c3d4e5f6a701",
+      "value": "",
       "type": "string"
     },
     {
       "key": "managerUserId",
-      "value": "65b2f8a9e1b2c3d4e5f6a702",
+      "value": "",
       "type": "string"
     },
     {
       "key": "weekStart",
-      "value": "2026-11-24",
+      "value": "YYYY-MM-DD",
       "type": "string"
     }
   ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
   "item": [
     {
       "name": "1. Authentication & Config",
@@ -43,25 +58,15 @@
             "header": [
               { "key": "x-user-id", "value": "{{staffUserId}}" },
               { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Rahul K (Staff)" }
+              { "key": "x-store-id", "value": "{{storeId}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/auth/resolve",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "resolve"]
-            },
-            "description": "Demo: Resolves caller profile, role, and store locality."
-          },
-          "response": [
-            {
-              "name": "Demo Response - Identity Resolved",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"user_id\": \"65b2f8a9e1b2c3d4e5f6a701\",\n  \"display_name\": \"Rahul K (Staff)\",\n  \"role\": \"Staff\",\n  \"store\": {\n    \"id\": \"65b2f8a9e1b2c3d4e5f6a7b8\",\n    \"name\": \"Sparc Flagship Store\",\n    \"locality\": \"Downtown\"\n  },\n  \"mfa_required\": false\n}"
             }
-          ]
+          },
+          "response": []
         },
         {
           "name": "Get Store Configuration (GAP-API-014)",
@@ -76,18 +81,9 @@
               "raw": "{{baseUrl}}/store/config",
               "host": ["{{baseUrl}}"],
               "path": ["store", "config"]
-            },
-            "description": "Demo: Returns geofence radius, lat/long coordinates, and trading hours."
-          },
-          "response": [
-            {
-              "name": "Demo Response - Store Config",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"store_id\": \"65b2f8a9e1b2c3d4e5f6a7b8\",\n  \"store_name\": \"Sparc Store\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946,\n  \"geofence_radius\": 150,\n  \"trading_hours\": [\n    { \"weekday\": 1, \"open_minutes\": 540, \"close_minutes\": 1260, \"is_closed\": false },\n    { \"weekday\": 2, \"open_minutes\": 540, \"close_minutes\": 1260, \"is_closed\": false }\n  ],\n  \"signage_rotation\": 15,\n  \"max_announcement_length\": 500,\n  \"time_zone\": \"Asia/Kolkata\",\n  \"whatsapp_group_link\": \"https://chat.whatsapp.com/testgroup\"\n}"
             }
-          ]
+          },
+          "response": []
         }
       ]
     },
@@ -109,15 +105,7 @@
               "path": ["attendance", "today"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Today Attendance",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"date\": \"2026-11-24\",\n  \"phase\": \"not_checked_in\",\n  \"today_shift\": {\n    \"id\": \"shift_demo_101\",\n    \"start_minutes\": 540,\n    \"end_minutes\": 1020\n  },\n  \"checked_in_at\": null,\n  \"checked_out_at\": null,\n  \"location_check\": \"in_range\",\n  \"location_note\": null,\n  \"flags\": [],\n  \"worked_minutes\": 0,\n  \"manager_note\": null\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Check-in with GPS Location (GAP-API-004)",
@@ -128,12 +116,11 @@
               { "key": "x-user-id", "value": "{{staffUserId}}" },
               { "key": "x-user-role", "value": "Staff" },
               { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Rahul K (Staff)" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"store_id\": \"{{storeId}}\",\n  \"client_timestamp\": \"2026-11-24T09:00:00.000Z\",\n  \"location_reading\": {\n    \"latitude\": 12.9716,\n    \"longitude\": 77.5946,\n    \"accuracy\": 10,\n    \"time\": \"2026-11-24T09:00:00.000Z\"\n  },\n  \"manual_confirmation_requested\": true\n}"
+              "raw": "{\n  \"store_id\": \"{{storeId}}\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\",\n  \"location_reading\": {\n    \"latitude\": 0.0,\n    \"longitude\": 0.0,\n    \"accuracy\": 0,\n    \"time\": \"{{$isoTimestamp}}\"\n  },\n  \"manual_confirmation_requested\": false\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/attendance/check-in",
@@ -141,15 +128,7 @@
               "path": ["attendance", "check-in"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Check-in Accepted",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"verdict\": \"accepted\",\n  \"server_timestamp\": \"2026-11-24T09:00:02.000Z\",\n  \"message\": \"Check-in recorded successfully\",\n  \"flags\": [],\n  \"phase\": \"checked_in\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Check-out at End of Shift (GAP-API-004)",
@@ -164,7 +143,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"client_timestamp\": \"2026-11-24T17:30:00.000Z\"\n}"
+              "raw": "{\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/attendance/check-out",
@@ -172,15 +151,7 @@
               "path": ["attendance", "check-out"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Checked Out",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"verdict\": \"accepted\",\n  \"server_timestamp\": \"2026-11-24T17:30:01.000Z\",\n  \"message\": \"Checked out successfully\",\n  \"worked_minutes\": 510,\n  \"phase\": \"checked_out\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -205,15 +176,7 @@
               ]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Published Shifts",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"store_id\": \"65b2f8a9e1b2c3d4e5f6a7b8\",\n  \"week_start\": \"2026-11-24\",\n  \"shifts\": [\n    {\n      \"id\": \"6742a1b2c3d4e5f6a7b8001\",\n      \"date\": \"2026-11-24\",\n      \"start_minutes\": 540,\n      \"end_minutes\": 1020,\n      \"swap_eligible\": true\n    },\n    {\n      \"id\": \"6742a1b2c3d4e5f6a7b8002\",\n      \"date\": \"2026-11-25\",\n      \"start_minutes\": 600,\n      \"end_minutes\": 1080,\n      \"swap_eligible\": true\n    }\n  ]\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - Get Week Plan & Coverage (GAP-SM-007)",
@@ -233,15 +196,7 @@
               ]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Manager Plan",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"week_start\": \"2026-11-24\",\n  \"status\": \"draft\",\n  \"editable\": true,\n  \"locked_reason\": null,\n  \"published_at\": null,\n  \"coverage\": { \"gaps\": [] },\n  \"staff\": [\n    {\n      \"user_id\": \"65b2f8a9e1b2c3d4e5f6a701\",\n      \"name\": \"Rahul K\",\n      \"availability_submitted\": true,\n      \"rostered_minutes\": 960,\n      \"shifts\": []\n    }\n  ]\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - Assign Shifts (GAP-SM-007)",
@@ -256,7 +211,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"staff_member\": \"{{staffUserId}}\",\n  \"staff_name\": \"Rahul K\",\n  \"shifts\": [\n    { \"date\": \"2026-11-24\", \"start\": 540, \"end\": 1020 },\n    { \"date\": \"2026-11-25\", \"start\": 600, \"end\": 1080 }\n  ]\n}"
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"staff_member\": \"{{staffUserId}}\",\n  \"staff_name\": \"\",\n  \"shifts\": [\n    { \"date\": \"YYYY-MM-DD\", \"start\": 540, \"end\": 1020 }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/store/roster/shifts",
@@ -264,15 +219,7 @@
               "path": ["store", "roster", "shifts"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Shifts Assigned",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"week_start\": \"2026-11-24\",\n  \"status\": \"draft\",\n  \"message\": \"Shifts updated successfully\",\n  \"assigned_count\": 2\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - Publish Week Roster (GAP-SM-008)",
@@ -287,7 +234,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"client_timestamp\": \"2026-11-23T18:00:00.000Z\"\n}"
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/store/roster/publish",
@@ -295,15 +242,7 @@
               "path": ["store", "roster", "publish"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Roster Published",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"week_start\": \"2026-11-24\",\n  \"status\": \"published\",\n  \"published_at\": \"2026-11-23T18:00:00.000Z\",\n  \"coverage_warnings\": [],\n  \"message\": \"Roster published to Staff successfully\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -328,15 +267,7 @@
               ]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Staff Availability",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"week_start\": \"2026-11-24\",\n  \"days\": [\n    { \"date\": \"2026-11-24\", \"status\": \"available\" },\n    { \"date\": \"2026-11-25\", \"status\": \"unavailable\", \"note\": \"Doctor appointment\" }\n  ],\n  \"editable\": true,\n  \"locked_reason\": null,\n  \"submitted_at\": \"2026-11-21T10:00:00.000Z\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Staff - Submit Availability (GAP-API-006)",
@@ -351,7 +282,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"days\": [\n    { \"date\": \"2026-11-24\", \"status\": \"available\" },\n    { \"date\": \"2026-11-25\", \"status\": \"unavailable\", \"note\": \"Doctor appointment\" }\n  ]\n}"
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"days\": [\n    { \"date\": \"YYYY-MM-DD\", \"status\": \"available\", \"from_minutes\": 540, \"to_minutes\": 1020, \"note\": \"\" }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/availability",
@@ -359,15 +290,7 @@
               "path": ["availability"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Submitted Availability",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"week_start\": \"2026-11-24\",\n  \"submitted_at\": \"2026-11-24T10:30:00.000Z\",\n  \"days\": [\n    { \"date\": \"2026-11-24\", \"status\": \"available\" },\n    { \"date\": \"2026-11-25\", \"status\": \"unavailable\", \"note\": \"Doctor appointment\" }\n  ],\n  \"message\": \"Availability submitted successfully\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - View Team Availability (GAP-SM-006)",
@@ -387,15 +310,7 @@
               ]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Team Availability",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"week_start\": \"2026-11-24\",\n  \"is_roster_published\": false,\n  \"team\": [\n    {\n      \"user_id\": \"65b2f8a9e1b2c3d4e5f6a701\",\n      \"name\": \"Rahul K\",\n      \"role\": \"Staff\",\n      \"status\": \"Submitted\",\n      \"submitted_at\": \"2026-11-21T10:00:00.000Z\",\n      \"days\": [{ \"date\": \"2026-11-24\", \"status\": \"available\" }]\n    }\n  ]\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -417,15 +332,7 @@
               "path": ["swaps"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Swap Requests",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"swap_requests\": [\n    {\n      \"id\": \"674201010101010101010101\",\n      \"shift_id\": \"6742a1b2c3d4e5f6a7b8001\",\n      \"shift_start\": 540,\n      \"shift_end\": 1020,\n      \"status\": \"pending\",\n      \"submitted_at\": \"2026-11-24T10:00:00.000Z\",\n      \"offered_to\": \"Open to the team\",\n      \"decision_reason\": null,\n      \"covered_by\": null\n    }\n  ]\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Staff - Request Shift Swap (GAP-API-003)",
@@ -436,12 +343,11 @@
               { "key": "x-user-id", "value": "{{staffUserId}}" },
               { "key": "x-user-role", "value": "Staff" },
               { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Rahul K" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"shift_id\": \"6742a1b2c3d4e5f6a7b8001\",\n  \"client_timestamp\": \"2026-11-24T10:00:00.000Z\"\n}"
+              "raw": "{\n  \"shift_id\": \"\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/swaps",
@@ -449,15 +355,7 @@
               "path": ["swaps"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Swap Submitted",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"id\": \"674201010101010101010101\",\n  \"shift_id\": \"6742a1b2c3d4e5f6a7b8001\",\n  \"status\": \"pending\",\n  \"submitted_at\": \"2026-11-24T10:00:00.000Z\",\n  \"message\": \"Shift swap request submitted to Store Manager\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - List Approvals Queue (GAP-SM-003)",
@@ -474,18 +372,10 @@
               "path": ["store", "approvals"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Pending Approvals",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"pending\": [\n    {\n      \"id\": \"674201010101010101010101\",\n      \"kind\": \"manual_checkin\",\n      \"requester_id\": \"65b2f8a9e1b2c3d4e5f6a701\",\n      \"requester_name\": \"Rahul K\",\n      \"summary\": \"Rahul K manual check-in request\",\n      \"submitted_at\": \"2026-11-24T09:00:15.000Z\",\n      \"status\": \"pending\",\n      \"compliance_flag\": { \"flagged\": true, \"reason\": \"Distance 420m outside geofence\" },\n      \"decline_reasons\": [\"Not on store premises\", \"Unscheduled shift\"]\n    }\n  ],\n  \"decided\": []\n}"
-            }
-          ]
+          "response": []
         },
         {
-          "name": "Manager - Approve Decision (GAP-SM-003)",
+          "name": "Manager - Approve / Decline Decision (GAP-SM-003)",
           "request": {
             "method": "POST",
             "header": [
@@ -493,28 +383,19 @@
               { "key": "x-user-id", "value": "{{managerUserId}}" },
               { "key": "x-user-role", "value": "Store Manager" },
               { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Anoop (Manager)" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"approve\": true,\n  \"client_timestamp\": \"2026-11-24T10:15:00.000Z\"\n}"
+              "raw": "{\n  \"approve\": true,\n  \"reason\": \"\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/store/approvals/674201010101010101010101/decide",
+              "raw": "{{baseUrl}}/store/approvals/:id/decide",
               "host": ["{{baseUrl}}"],
-              "path": ["store", "approvals", "674201010101010101010101", "decide"]
+              "path": ["store", "approvals", ":id", "decide"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Approval Applied",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"id\": \"674201010101010101010101\",\n  \"kind\": \"manual_checkin\",\n  \"status\": \"approved\",\n  \"decided_at\": \"2026-11-24T10:15:00.000Z\",\n  \"decided_by\": \"Anoop (Manager)\",\n  \"decision_reason\": null,\n  \"message\": \"Approval request approved\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -536,15 +417,7 @@
               "path": ["tasks"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Tasks List",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"tasks\": [\n    {\n      \"id\": \"6742c0010010010010010010\",\n      \"title\": \"Aisle 3 Stock Count\",\n      \"category\": \"priority\",\n      \"note\": \"Count beverages before 4 PM\",\n      \"role_label\": null,\n      \"due\": \"2026-11-24T16:00:00.000Z\",\n      \"assignee_name\": null,\n      \"assigned_to_me\": false,\n      \"can_claim\": true,\n      \"can_complete\": false,\n      \"status\": \"open\"\n    }\n  ]\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - Create Task (GAP-SM-009)",
@@ -555,12 +428,11 @@
               { "key": "x-user-id", "value": "{{managerUserId}}" },
               { "key": "x-user-role", "value": "Store Manager" },
               { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Anoop (Manager)" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Aisle 3 Stock Count\",\n  \"note\": \"Count beverages before 4 PM\",\n  \"category\": \"priority\",\n  \"due_date\": \"2026-11-24T16:00:00.000Z\"\n}"
+              "raw": "{\n  \"title\": \"\",\n  \"note\": \"\",\n  \"category\": \"group\",\n  \"role\": \"\",\n  \"due_date\": \"{{$isoTimestamp}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/tasks",
@@ -568,15 +440,7 @@
               "path": ["tasks"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Task Created",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"id\": \"6742c0010010010010010010\",\n  \"title\": \"Aisle 3 Stock Count\",\n  \"category\": \"priority\",\n  \"status\": \"open\",\n  \"message\": \"Task created successfully\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Staff - Claim Task (GAP-API-007)",
@@ -585,24 +449,15 @@
             "header": [
               { "key": "x-user-id", "value": "{{staffUserId}}" },
               { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Rahul K" }
+              { "key": "x-store-id", "value": "{{storeId}}" }
             ],
             "url": {
-              "raw": "{{baseUrl}}/tasks/6742c0010010010010010010/claim",
+              "raw": "{{baseUrl}}/tasks/:id/claim",
               "host": ["{{baseUrl}}"],
-              "path": ["tasks", "6742c0010010010010010010", "claim"]
+              "path": ["tasks", ":id", "claim"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Task Claimed",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"id\": \"6742c0010010010010010010\",\n  \"status\": \"claimed\",\n  \"assignee_name\": \"Rahul K\",\n  \"message\": \"Task claimed successfully\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Staff - Complete Task (GAP-API-007)",
@@ -611,24 +466,15 @@
             "header": [
               { "key": "x-user-id", "value": "{{staffUserId}}" },
               { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Rahul K" }
+              { "key": "x-store-id", "value": "{{storeId}}" }
             ],
             "url": {
-              "raw": "{{baseUrl}}/tasks/6742c0010010010010010010/complete",
+              "raw": "{{baseUrl}}/tasks/:id/complete",
               "host": ["{{baseUrl}}"],
-              "path": ["tasks", "6742c0010010010010010010", "complete"]
+              "path": ["tasks", ":id", "complete"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Task Completed",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"id\": \"6742c0010010010010010010\",\n  \"status\": \"completed\",\n  \"completed_by\": \"Rahul K\",\n  \"completed_at\": \"2026-11-24T15:30:00.000Z\",\n  \"message\": \"Task marked as completed\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -653,18 +499,10 @@
               ]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Hours Summary",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"week_start\": \"2026-11-24\",\n  \"status\": \"in_progress\",\n  \"rostered_minutes\": 960,\n  \"recorded_minutes\": 945,\n  \"can_confirm\": true,\n  \"confirmed_at\": null,\n  \"corrections_pending\": false\n}"
-            }
-          ]
+          "response": []
         },
         {
-          "name": "Staff - Confirm Week Hours (GAP-API-005)",
+          "name": "Staff - Submit Attendance Corrections / Confirm (GAP-API-005)",
           "request": {
             "method": "POST",
             "header": [
@@ -676,7 +514,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"action\": \"confirm_week\",\n  \"week_start\": \"{{weekStart}}\"\n}"
+              "raw": "{\n  \"action\": \"confirm_week\",\n  \"week_start\": \"{{weekStart}}\",\n  \"corrections\": [\n    { \"date\": \"YYYY-MM-DD\", \"start\": 540, \"end\": 1020 }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/hours",
@@ -684,15 +522,7 @@
               "path": ["hours"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Week Confirmed",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"status\": \"confirmed\",\n  \"confirmed_at\": \"2026-11-24T18:00:00.000Z\",\n  \"message\": \"Week hours confirmed successfully\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -714,15 +544,7 @@
               "path": ["store", "dashboard"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Dashboard Metrics",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"sales\": {\n    \"amount\": 245000,\n    \"currency\": \"INR\",\n    \"comparison\": \"up\",\n    \"percent\": 8.4,\n    \"is_sample\": true\n  },\n  \"attendance\": {\n    \"checked_in\": 12,\n    \"rostered_today\": 14,\n    \"manual_check_ins_waiting\": 1,\n    \"awaited\": [\n      { \"name\": \"Sneha P\", \"rostered_start\": 540 }\n    ]\n  },\n  \"approvals\": {\n    \"waiting\": 1,\n    \"flagged\": 1,\n    \"oldest_submitted_at\": \"2026-11-24T09:00:15.000Z\"\n  },\n  \"next_week_roster\": {\n    \"week_start\": \"2026-11-24\",\n    \"published\": false,\n    \"coverage_warnings\": 0\n  },\n  \"tasks\": { \"open\": 4, \"unclaimed_priority\": 1 },\n  \"screens\": { \"live\": 4, \"total\": 4, \"offline\": 0 }\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - Send Announcement (GAP-SM-010)",
@@ -733,12 +555,11 @@
               { "key": "x-user-id", "value": "{{managerUserId}}" },
               { "key": "x-user-role", "value": "Store Manager" },
               { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Anoop (Manager)" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"message\": \"Store team briefing tomorrow morning at 09:15 AM\",\n  \"scheduled_for\": null\n}"
+              "raw": "{\n  \"message\": \"\",\n  \"scheduled_for\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/store/announcements",
@@ -746,15 +567,7 @@
               "path": ["store", "announcements"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Announcement Sent",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"id\": \"6742d0010010010010010099\",\n  \"message\": \"Store team briefing tomorrow morning at 09:15 AM\",\n  \"status\": \"sent\",\n  \"author\": \"Anoop (Manager)\",\n  \"created_at\": \"2026-11-24T12:00:00.000Z\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -776,15 +589,7 @@
               "path": ["store", "screens"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Screens List",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"screens\": [\n    {\n      \"id\": \"6742e0010010010010010011\",\n      \"store_id\": \"65b2f8a9e1b2c3d4e5f6a7b8\",\n      \"name\": \"Main Entrance Display 1\",\n      \"zone\": \"main_hall\",\n      \"online\": true,\n      \"is_playing\": \"Festive_Offer_Promo.mp4\",\n      \"content_type\": \"video\"\n    }\n  ]\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Manager - Report Screen Offline (GAP-SM-011)",
@@ -794,24 +599,15 @@
               { "key": "x-user-id", "value": "{{managerUserId}}" },
               { "key": "x-user-role", "value": "Store Manager" },
               { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "x-user-name", "value": "Anoop (Manager)" },
               { "key": "Idempotency-Key", "value": "{{$guid}}" }
             ],
             "url": {
-              "raw": "{{baseUrl}}/store/screens/6742e0010010010010010011/report-offline",
+              "raw": "{{baseUrl}}/store/screens/:id/report-offline",
               "host": ["{{baseUrl}}"],
-              "path": ["store", "screens", "6742e0010010010010010011", "report-offline"]
+              "path": ["store", "screens", ":id", "report-offline"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Screen Reported Offline",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"id\": \"6742e0010010010010010011\",\n  \"store_id\": \"65b2f8a9e1b2c3d4e5f6a7b8\",\n  \"online\": false,\n  \"reported_at\": \"2026-11-24T14:00:00.000Z\",\n  \"reported_by\": \"Anoop (Manager)\",\n  \"message\": \"Offline screen successfully reported to Central\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     },
@@ -833,15 +629,7 @@
               "path": ["alerts"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Alerts Feed",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"unread_count\": 1,\n  \"alerts\": [\n    {\n      \"id\": \"6742f0010010010010010055\",\n      \"category\": \"roster_published\",\n      \"title\": \"Next Week Roster Published\",\n      \"body\": \"Your shifts for week 24 Nov are now available\",\n      \"read\": false,\n      \"created_at\": \"2026-11-24T08:00:00.000Z\"\n    }\n  ]\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "Register Mobile FCM Push Token (GAP-API-009)",
@@ -856,7 +644,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"fcm_sample_token_xyz_1234567890\",\n  \"platform\": \"Android\",\n  \"app_id\": \"com.storesparc.ops\",\n  \"environment\": \"test\"\n}"
+              "raw": "{\n  \"token\": \"\",\n  \"platform\": \"Android\",\n  \"app_id\": \"com.storesparc.ops\",\n  \"environment\": \"test\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/push/register",
@@ -864,15 +652,7 @@
               "path": ["push", "register"]
             }
           },
-          "response": [
-            {
-              "name": "Demo Response - Push Registered",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "body": "{\n  \"registered\": true,\n  \"platform\": \"Android\",\n  \"app_id\": \"com.storesparc.ops\",\n  \"environment\": \"test\",\n  \"message\": \"Device push token registered successfully\"\n}"
-            }
-          ]
+          "response": []
         }
       ]
     }
