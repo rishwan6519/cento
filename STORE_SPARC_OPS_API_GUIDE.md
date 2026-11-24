@@ -1176,11 +1176,18 @@ The server constructs a single unified push envelope. The `data` block maintains
 
 ### 3. Team Availability (GAP-SM-006)
 * **Method:** `GET`
-* **Endpoint:** `/store/availability/team?week_start=YYYY-MM-DD`
-* **Response Format (200 OK):**
+* **Endpoint:** `/store/availability/team`
+* **Headers:** `Authorization: Bearer <token>` (Store Manager or Central admin)
+* **Query Parameters:**
+  * `week_start` (string, e.g. `2026-11-30`, optional if `month` provided): Get team's weekly availability breakdown.
+  * `month` (string, e.g. `2026-11`, optional if `week_start` provided): Get team's monthly overview with days off.
+  * `store_id` (string, optional): For Central admin callers to inspect any store.
+
+#### 1. Team's Week View Response Format (`?week_start=YYYY-MM-DD` 200 OK):
 ```json
 {
   "week_start": "string (YYYY-MM-DD)",
+  "store_id": "string",
   "is_roster_published": boolean,
   "team": [
     {
@@ -1188,17 +1195,51 @@ The server constructs a single unified push envelope. The `data` block maintains
       "name": "string",
       "role": "string",
       "status": "Submitted" | "Not submitted",
-      "submitted_at": "string (ISO 8601)" | null,
+      "submitted_at": "string (ISO 8601 UTC)" | null,
       "days": [
         {
           "date": "string (YYYY-MM-DD)",
-          "status": "available" | "partial" | "unavailable"
+          "status": "available" | "partial" | "unavailable",
+          "from": number | null,   // minutes from midnight, partial days only
+          "to": number | null,     // minutes from midnight, partial days only
+          "note": "string" | null
         }
       ]
     }
   ]
 }
 ```
+
+#### 2. Team's Month View Response Format (`?month=YYYY-MM` 200 OK):
+```json
+{
+  "month": "string (YYYY-MM)",
+  "store_id": "string",
+  "team": [
+    {
+      "user_id": "string",
+      "name": "string",
+      "role": "string",
+      "status": "Submitted" | "Not submitted",
+      "submitted_at": "string (ISO 8601 UTC)" | null,
+      "days_off": [
+        "string (YYYY-MM-DD)" // List of dates where status is unavailable
+      ]
+    }
+  ]
+}
+```
+
+#### 💡 Open Questions Resolved (GAP-SM-006):
+1. **Is the month view needed in Phase 1? The PRD names only the week view; the app built both.**
+   * **Answer:**
+     * **Yes, the backend fully supports both Week and Month team views in Phase 1.**
+     * **Reasoning:** Since the mobile frontend engineering team already built both views into the store manager interface, removing the month view would break the UI experience.
+     * Furthermore, under the unified data architecture established in **GAP-API-006**, both the week and month views query the **exact same underlying MongoDB collection (`StaffAvailability`)**:
+       * A day off recorded in the month view automatically translates into `status: "unavailable"` in the week view.
+       * The month view provides store managers with macro-level leave planning and visibility over blackout dates, while the week view provides the micro-level partial-day trading hour availability required to construct daily shift schedules.
+2. **How does the manager's "Availability Missing" alert originate?**
+   * **Answer:** The alert originates directly from the team availability dataset. On Wednesday at 23:59:59 store time (the weekly availability deadline), the background cron job scans `GET /store/availability/team?week_start=<next_monday>`. For any staff member where `status === "Not submitted"`, the server counts the missing submissions and triggers an `availability_due` alert to the Store Manager (`"3 staff members have missing availability for week of 2026-11-30"`). Anyone with no submission explicitly renders as `"Not submitted"`.
 
 ---
 
