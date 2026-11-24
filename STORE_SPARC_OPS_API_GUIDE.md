@@ -1106,13 +1106,14 @@ The server constructs a single unified push envelope. The `data` block maintains
 }
 ```
 
-* **Decide Approval (Approve / Decline):** `POST /store/approvals/{id}/decide`
+* **Decide Approval (Approve / Decline / Confirm):** `POST /store/approvals/{id}/decide`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
 * **Request Body:**
 ```json
 {
-  "approve": boolean,
-  "reason": "string", // Required when approve is false
-  "client_timestamp": "string (ISO 8601)"
+  "approve": boolean,           // Or "confirm": true/false (for manual check-in)
+  "reason": "string",          // Required when declining; MUST match one of the item's decline_reasons
+  "client_timestamp": "string (ISO 8601 UTC)"
 }
 ```
 * **Response Format (200 OK):**
@@ -1121,12 +1122,55 @@ The server constructs a single unified push envelope. The `data` block maintains
   "id": "string",
   "kind": "shift_swap" | "attendance_correction" | "manual_checkin",
   "status": "approved" | "declined",
-  "decided_at": "string (ISO 8601)",
+  "decided_at": "string (ISO 8601 UTC)",
   "decided_by": "string",
   "decision_reason": "string" | null,
   "message": "string"
 }
 ```
+
+#### 💡 Open Questions Resolved (GAP-SM-003, GAP-SM-004, GAP-SM-005):
+1. **What makes an item flagged, and what reason text comes with the flag? (Review finding A1)**
+   * **Answer:**
+     * The server evaluates business and compliance boundaries at submission time and sets `compliance_flag: { flagged: true, reason: "..." }`.
+     * **Specific Trigger Conditions & Reason Texts by Kind:**
+       * **`shift_swap`**:
+         * *Clopening / Rest Break Breach:* Turnaround between shifts $< 11$ hours $\rightarrow$ `"Turnaround under 11h (Clopening risk)"`.
+         * *Short Notice:* Requested within 24 hours of shift start $\rightarrow$ `"Short notice: Swap requested less than 24h prior to shift start"`.
+         * *Role/Skill Mismatch:* Requester shift requires certified skill (e.g. Keyholder) missing from replacement $\rightarrow$ `"Skill mismatch: Missing required certification"`.
+         * *Overtime Threshold:* Covering peer will exceed 38h/40h weekly contract hours $\rightarrow$ `"Overtime risk: Replacement staff exceeds weekly contract limit (38h)"`.
+       * **`attendance_correction`**:
+         * *Out of Hours:* Claimed hours extend beyond store trading hours $\rightarrow$ `"Claimed hours extend past store trading close"`.
+         * *Roster Discrepancy:* Variance between claimed hours and roster $> 60$ minutes $\rightarrow$ `"High variance: Discrepancy against rostered shift exceeds 60m"`.
+         * *Late Submission:* Submitted after weekly payroll cutoff $\rightarrow$ `"Late submission: Prior week payroll cutoff exceeded"`.
+       * **`manual_checkin`**:
+         * *Out of Geofence:* Reading $> 150$m from store $\rightarrow$ `"Location mismatch: [X]m outside store geofence"`.
+         * *Unscheduled Attendance:* No published shift for user today $\rightarrow$ `"Not rostered: No scheduled shift for today"`.
+         * *GPS Unavailable:* GPS disabled or low accuracy ($> 200$m) $\rightarrow$ `"GPS unavailable / Low accuracy"`.
+2. **Where do the decline reasons come from, and are they fixed per kind? (Review finding D7)**
+   * **Answer:**
+     * **Server-Provided Catalogs:** Decline reasons originate strictly from the server in `item.decline_reasons`. The mobile app **never hardcodes decline strings**.
+     * **Fixed & Category-Specific per Kind:** Yes. To resolve review finding D7 (where `"Would exceed hours limit"` was mistakenly shown on manual check-ins), decline reasons are now strictly partitioned:
+       * **`shift_swap`**:
+         1. `"Insufficient coverage on shift"`
+         2. `"Skill / role requirement not met"`
+         3. `"Short notice / within 24 hours of shift"`
+         4. `"Overtime threshold breach (exceeds contract hours)"`
+       * **`attendance_correction`**:
+         1. `"Discrepancy with store CCTV / POS records"`
+         2. `"Unauthorized work outside trading hours"`
+         3. `"Prior payroll period finalized and locked"`
+       * **`manual_checkin`**:
+         1. `"Employee confirmed absent from premises"`
+         2. `"Unscheduled / unauthorized attendance"`
+         3. `"Location outside store geofence"`
+     * **Validation Enforcement:** When declining, the server verifies that the submitted `reason` matches one of the item's own `decline_reasons` (or starts with `"Other:"`). Invalid reasons are rejected with `422 Unprocessable Entity` (`code: "INVALID_DECLINE_REASON"`).
+3. **Manager Role in Swaps & Absence of Leave/Discount Approvals in Phase 1:**
+   * **Answer:**
+     * For shift swaps, the server or peer-to-peer matching decides who covers. The manager **only approves or declines**; the manager **never selects the replacement**.
+     * There are **NO leave approvals (annual/sick leave) or discount approvals in Phase 1**. Only the 3 retail operational kinds (`shift_swap`, `attendance_correction`, `manual_checkin`) are supported.
+4. **How Manual Check-Ins Settle Attendance (GAP-SM-004):**
+   * **Answer:** A confirmed manual check-in request automatically updates the staff member's `AttendanceRecord` to `phase: "checked_in"`, `location_check: "manager_confirmed"`, and `checked_in_at = decision_time`, immediately granting shop-floor attendance standing and notifying the staff member via `check_in_outcome` alert.
 
 ---
 

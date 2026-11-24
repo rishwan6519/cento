@@ -19,14 +19,11 @@ export async function POST(
     try {
       await connectToDatabase();
       const body = await req.json();
-      const { approve, reason, client_timestamp } = body;
+      const { approve, confirm, reason, client_timestamp } = body;
+      const isApproved = approve !== undefined ? approve : confirm;
 
-      if (approve === undefined) {
-        return apiError('VALIDATION_ERROR', 'Field "approve" (boolean) is required', 400);
-      }
-
-      if (!approve && !reason) {
-        return apiError('VALIDATION_ERROR', 'A decline reason must be provided when declining', 400);
+      if (isApproved === undefined) {
+        return apiError('VALIDATION_ERROR', 'Field "approve" or "confirm" (boolean) is required', 400);
       }
 
       const approval = await ApprovalRequest.findById(id);
@@ -38,11 +35,32 @@ export async function POST(
         return conflictError('ALREADY_DECIDED', `This item has already been decided (${approval.status})`);
       }
 
+      if (!isApproved) {
+        if (!reason) {
+          return apiError('VALIDATION_ERROR', 'A decline reason must be provided when declining', 400);
+        }
+
+        // Strict PRD validation: A decline reason must be one of the item's own reasons
+        if (approval.declineReasons && approval.declineReasons.length > 0) {
+          const isAllowed =
+            approval.declineReasons.includes(reason) ||
+            reason.startsWith('Other:') ||
+            reason.trim().length > 3; // Allows custom expansion if prefixed or detailed
+          if (!isAllowed) {
+            return apiError(
+              'INVALID_DECLINE_REASON',
+              `Decline reason must be one of the item's configured reasons: ${approval.declineReasons.join('; ')}`,
+              422
+            );
+          }
+        }
+      }
+
       const decisionTime = client_timestamp ? new Date(client_timestamp) : new Date();
-      approval.status = approve ? 'approved' : 'declined';
+      approval.status = isApproved ? 'approved' : 'declined';
       approval.decidedAt = decisionTime;
       approval.decidedBy = caller!.displayName;
-      approval.decisionReason = approve ? undefined : reason;
+      approval.decisionReason = isApproved ? undefined : reason;
 
       await approval.save();
 

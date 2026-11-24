@@ -70,6 +70,19 @@ export async function POST(req: NextRequest) {
 
       const submitTime = client_timestamp ? new Date(client_timestamp) : new Date();
 
+      // Check compliance flags: e.g. short notice (< 24 hours to shift start)
+      const shiftStartDateTime = new Date(`${shift.date}T00:00:00Z`);
+      shiftStartDateTime.setMinutes(shift.startMinutes);
+      const hoursUntilShift = (shiftStartDateTime.getTime() - submitTime.getTime()) / (1000 * 3600);
+
+      let complianceFlag = { flagged: false, reason: undefined as string | undefined };
+      if (hoursUntilShift < 24) {
+        complianceFlag = {
+          flagged: true,
+          reason: 'Short notice: Swap requested less than 24h prior to shift start',
+        };
+      }
+
       const approval = await ApprovalRequest.create({
         storeId: caller!.storeId,
         kind: 'shift_swap',
@@ -86,10 +99,12 @@ export async function POST(req: NextRequest) {
           reason: reason || undefined,
         },
         status: 'pending',
+        complianceFlag,
         declineReasons: [
-          'Would exceed hours limit',
           'Insufficient coverage on shift',
-          'Skill requirement not met',
+          'Skill / role requirement not met',
+          'Short notice / within 24 hours of shift',
+          'Overtime threshold breach (exceeds contract hours)',
         ],
         submittedAt: submitTime,
       });
