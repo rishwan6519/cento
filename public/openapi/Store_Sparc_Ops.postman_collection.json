@@ -7,7 +7,6 @@
   },
   "variable": [
     {
-      
       "key": "baseUrl",
       "value": "https://iot-test.metizstoresparc.com/api/v1",
       "type": "string"
@@ -90,8 +89,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
             },
             "description": "Authenticates a Staff or Store Manager user with username and password, returning a JWT Bearer token. On success, the Postman test script automatically stores the token, staffUserId, and storeId into collection variables."
           },
@@ -102,14 +106,28 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/auth/resolve",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "resolve"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resolve"
+              ]
             }
           },
           "response": []
@@ -135,8 +153,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -144,8 +168,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/mfa/start",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "mfa", "start"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "mfa",
+                "start"
+              ]
             },
             "description": "Initiates an MFA verification challenge, returning challenge_id, code_length, and masked destination_hint (e.g. phone number)."
           },
@@ -172,7 +202,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -180,8 +213,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/mfa/verify",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "mfa", "verify"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "mfa",
+                "verify"
+              ]
             },
             "description": "Verifies the 6-digit MFA challenge code. On success, issues a full session JWT token."
           },
@@ -192,8 +231,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -201,8 +246,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/sign-out",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "sign-out"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sign-out"
+              ]
             },
             "description": "Ends the user session server-side and removes push notifications device registration."
           },
@@ -213,14 +263,28 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/config",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "config"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "config"
+              ]
             }
           },
           "response": []
@@ -230,10 +294,22 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -241,8 +317,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/store/config",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "config"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "config"
+              ]
             },
             "description": "Updates the store physical coordinates (latitude & longitude), geofence radius in metres, and WhatsApp group link. Allowed for Store Manager or Central Admin."
           },
@@ -258,14 +339,28 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/attendance/today",
-              "host": ["{{baseUrl}}"],
-              "path": ["attendance", "today"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "today"
+              ]
             }
           },
           "response": []
@@ -275,11 +370,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -287,8 +397,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/attendance/check-in",
-              "host": ["{{baseUrl}}"],
-              "path": ["attendance", "check-in"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "check-in"
+              ]
             }
           },
           "response": []
@@ -298,11 +413,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -310,8 +440,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/attendance/check-out",
-              "host": ["{{baseUrl}}"],
-              "path": ["attendance", "check-out"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "check-out"
+              ]
             }
           },
           "response": []
@@ -326,16 +461,33 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/roster/published?week_start={{weekStart}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["roster", "published"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roster",
+                "published"
+              ],
               "query": [
-                { "key": "week_start", "value": "{{weekStart}}" }
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
               ]
             }
           },
@@ -346,16 +498,33 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/roster?week_start={{weekStart}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "roster"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "roster"
+              ],
               "query": [
-                { "key": "week_start", "value": "{{weekStart}}" }
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
               ]
             }
           },
@@ -366,11 +535,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -378,8 +562,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/store/roster/shifts",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "roster", "shifts"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "roster",
+                "shifts"
+              ]
             }
           },
           "response": []
@@ -389,11 +579,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -401,8 +606,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/store/roster/publish",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "roster", "publish"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "roster",
+                "publish"
+              ]
             }
           },
           "response": []
@@ -417,16 +628,32 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/availability?week_start={{weekStart}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["availability"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ],
               "query": [
-                { "key": "week_start", "value": "{{weekStart}}" }
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
               ]
             }
           },
@@ -437,16 +664,32 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/availability?month=2026-11",
-              "host": ["{{baseUrl}}"],
-              "path": ["availability"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ],
               "query": [
-                { "key": "month", "value": "2026-11" }
+                {
+                  "key": "month",
+                  "value": "2026-11"
+                }
               ]
             }
           },
@@ -457,11 +700,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -469,8 +727,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/availability",
-              "host": ["{{baseUrl}}"],
-              "path": ["availability"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ]
             }
           },
           "response": []
@@ -480,11 +742,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -492,8 +769,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/availability",
-              "host": ["{{baseUrl}}"],
-              "path": ["availability"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ]
             }
           },
           "response": []
@@ -503,16 +784,34 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/availability/team?week_start={{weekStart}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "availability", "team"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "availability",
+                "team"
+              ],
               "query": [
-                { "key": "week_start", "value": "{{weekStart}}" }
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
               ]
             }
           },
@@ -528,14 +827,27 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/swaps",
-              "host": ["{{baseUrl}}"],
-              "path": ["swaps"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ]
             }
           },
           "response": []
@@ -545,11 +857,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -557,8 +884,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/swaps",
-              "host": ["{{baseUrl}}"],
-              "path": ["swaps"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ]
             }
           },
           "response": []
@@ -568,15 +899,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/swaps/:id/withdraw",
-              "host": ["{{baseUrl}}"],
-              "path": ["swaps", ":id", "withdraw"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                ":id",
+                "withdraw"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -594,14 +943,28 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/approvals",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "approvals"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "approvals"
+              ]
             }
           },
           "response": []
@@ -611,11 +974,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -623,8 +1001,15 @@
             },
             "url": {
               "raw": "{{baseUrl}}/store/approvals/:id/decide",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "approvals", ":id", "decide"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "approvals",
+                ":id",
+                "decide"
+              ]
             }
           },
           "response": []
@@ -639,15 +1024,60 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Manager - Get Task Form Options (GAP-SM-009)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/options",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "options"
+              ]
+            },
+            "description": "Returns categories (group, priority, role_specific, manager_only), roles, and eligible store personnel for task creation."
           },
           "response": []
         },
@@ -656,11 +1086,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -668,8 +1113,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/tasks",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
             }
           },
           "response": []
@@ -679,14 +1128,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/tasks/:id/claim",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks", ":id", "claim"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "claim"
+              ]
             }
           },
           "response": []
@@ -696,14 +1160,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/tasks/:id/complete",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks", ":id", "complete"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "complete"
+              ]
             }
           },
           "response": []
@@ -713,16 +1192,132 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/tasks/:id/release",
-              "host": ["{{baseUrl}}"],
-              "path": ["tasks", ":id", "release"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "release"
+              ]
             },
             "description": "Releases a claimed task back to the team pool so other staff on shift can claim and finish it."
+          },
+          "response": []
+        },
+        {
+          "name": "Manager - Edit Task (GAP-SM-009)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"note\": \"string\",\n  \"category\": \"priority\",\n  \"role\": null,\n  \"due\": \"YYYY-MM-DDTHH:mm:ssZ\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Edits an existing task (title, note, category, role, due date/time)."
+          },
+          "response": []
+        },
+        {
+          "name": "Manager - Assign / Reassign Task (GAP-SM-009)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee_id\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "assign"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Assigns or reassigns a task to a specific staff member, or pass assignee_id: null to release it back to the store pool."
           },
           "response": []
         }
@@ -736,16 +1331,32 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/hours?week_start={{weekStart}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["hours"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "hours"
+              ],
               "query": [
-                { "key": "week_start", "value": "{{weekStart}}" }
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
               ]
             }
           },
@@ -756,11 +1367,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -768,8 +1394,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/hours",
-              "host": ["{{baseUrl}}"],
-              "path": ["hours"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "hours"
+              ]
             }
           },
           "response": []
@@ -784,14 +1414,28 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/dashboard",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "dashboard"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "dashboard"
+              ]
             }
           },
           "response": []
@@ -801,11 +1445,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -813,9 +1472,57 @@
             },
             "url": {
               "raw": "{{baseUrl}}/store/announcements",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "announcements"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "announcements"
+              ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Manager - Cancel Scheduled Announcement (GAP-SM-010)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/announcements/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "announcements",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Cancels a scheduled post prior to dispatch, transitioning state to cancelled."
           },
           "response": []
         }
@@ -829,14 +1536,28 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/screens",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "screens"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens"
+              ]
             }
           },
           "response": []
@@ -846,16 +1567,34 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/screens/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "screens", ":id"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens",
+                ":id"
+              ],
               "variable": [
-                { "key": "id", "value": "" }
+                {
+                  "key": "id",
+                  "value": ""
+                }
               ]
             }
           },
@@ -866,15 +1605,34 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/store/screens/:id/report-offline",
-              "host": ["{{baseUrl}}"],
-              "path": ["store", "screens", ":id", "report-offline"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens",
+                ":id",
+                "report-offline"
+              ]
             }
           },
           "response": []
@@ -889,17 +1647,36 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/alerts?limit=20&unread_only=false",
-              "host": ["{{baseUrl}}"],
-              "path": ["alerts"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ],
               "query": [
-                { "key": "limit", "value": "20" },
-                { "key": "unread_only", "value": "false" }
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unread_only",
+                  "value": "false"
+                }
               ]
             }
           },
@@ -910,18 +1687,42 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/alerts/:id/read",
-              "host": ["{{baseUrl}}"],
-              "path": ["alerts", ":id", "read"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                ":id",
+                "read"
+              ],
               "variable": [
-                { "key": "id", "value": "" }
+                {
+                  "key": "id",
+                  "value": ""
+                }
               ]
             }
           },
@@ -932,16 +1733,36 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/alerts/read-all",
-              "host": ["{{baseUrl}}"],
-              "path": ["alerts", "read-all"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "read-all"
+              ]
             }
           },
           "response": []
@@ -951,11 +1772,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{managerUserId}}" },
-              { "key": "x-user-role", "value": "Store Manager" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -963,8 +1799,12 @@
             },
             "url": {
               "raw": "{{baseUrl}}/alerts",
-              "host": ["{{baseUrl}}"],
-              "path": ["alerts"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ]
             }
           },
           "response": []
@@ -974,11 +1814,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -986,8 +1841,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/push/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["push", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "push",
+                "register"
+              ]
             }
           },
           "response": []
@@ -997,10 +1857,22 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1008,8 +1880,13 @@
             },
             "url": {
               "raw": "{{baseUrl}}/push/unregister",
-              "host": ["{{baseUrl}}"],
-              "path": ["push", "unregister"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "push",
+                "unregister"
+              ]
             }
           },
           "response": []
@@ -1024,14 +1901,28 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-user-id", "value": "{{staffUserId}}" },
-              { "key": "x-user-role", "value": "Staff" },
-              { "key": "x-store-id", "value": "{{storeId}}" }
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/chat/groups",
-              "host": ["{{baseUrl}}"],
-              "path": ["chat", "groups"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "groups"
+              ]
             }
           },
           "response": []
