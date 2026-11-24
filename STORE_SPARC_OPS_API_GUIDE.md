@@ -435,9 +435,40 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 ---
 
 ### 10. Weekly Hours & Corrections (GAP-API-005)
-* **Get Summary:** `GET /hours?week_start=YYYY-MM-DD`
+* **Get Week Hours:** `GET /hours?week_start=YYYY-MM-DD`
+* **Response Format (GET /hours 200 OK):**
+```json
+{
+  "week_start": "string (YYYY-MM-DD)",
+  "status": "in_progress" | "needs_confirmation" | "confirmed",
+  "rostered_minutes": number,
+  "recorded_minutes": number,
+  "can_confirm": boolean,
+  "confirmed_at": "string (ISO 8601)" | null,
+  "corrections_pending": boolean,
+  "days": [
+    {
+      "date": "string (YYYY-MM-DD)",
+      "rostered_shift": {
+        "id": "string",
+        "start_minutes": number,
+        "end_minutes": number
+      } | null,
+      "state": "recorded" | "missing_check_out" | "not_recorded" | "on_shift" | "not_worked_yet",
+      "recorded_start": number | null,
+      "recorded_end": number | null,
+      "editable": boolean,
+      "correction": {
+        "start": number,
+        "end": number,
+        "status": "pending" | "approved" | "declined"
+      } | null
+    }
+  ]
+}
+```
 * **Submit Corrections or Confirm:** `POST /hours`
-* **Request Body (POST):**
+* **Request Body (POST /hours):**
 ```json
 {
   "action": "submit_corrections" | "confirm_week",
@@ -451,12 +482,13 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
   ]
 }
 ```
-* **Response Format (200 OK):**
+* **Response Format (POST /hours 200 OK):**
 ```json
 {
   "status": "corrections_submitted" | "confirmed",
   "confirmed_at": "string (ISO 8601)" | null,
-  "message": "string"
+  "message": "string",
+  "week_start": "string"
 }
 ```
 
