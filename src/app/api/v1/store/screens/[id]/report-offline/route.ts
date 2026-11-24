@@ -36,6 +36,28 @@ export async function POST(
           reportedAt: reportTime,
           status: 'reported',
         });
+
+        // Notify Store Managers of offline screen incident
+        const StoreAlert = (await import('@/models/StoreAlert')).default;
+        const User = (await import('@/models/User')).default;
+        const managers = await User.find({
+          storeId,
+          role: { $in: ['Store Manager', 'Central admin'] },
+        }).select('_id');
+
+        if (managers.length > 0) {
+          const alertDocs = managers.map((m: any) => ({
+            userId: m._id.toString(),
+            storeId,
+            category: 'priority_task',
+            title: 'Screen Reported Offline',
+            body: `${caller!.displayName} reported "${device.name}" as offline.`,
+            read: false,
+            targetScreen: 'screens',
+            targetArgument: device._id.toString(),
+          }));
+          await StoreAlert.insertMany(alertDocs);
+        }
       }
 
       return NextResponse.json({

@@ -40,6 +40,16 @@ const deviceSchema = new mongoose.Schema({
     enum: ['active', 'inactive', 'maintenance'],
     default: 'active'
   },
+  zone: {
+    type: String,
+    enum: ['entrance', 'window', 'registers', 'aisles'],
+    default: 'entrance'
+  },
+  storeId: {
+    type: String,
+    required: false,
+    index: true
+  },
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',

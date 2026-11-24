@@ -767,10 +767,11 @@ The server constructs a single unified push envelope. The `data` block maintains
 
 ---
 
-### 14. Store Screens & Current Media (GAP-API-011, GAP-API-012)
-* **Method:** `GET`
-* **Endpoint:** `/store/screens`
-* **Response Format (200 OK):**
+### 14. Store Screens & Playback Status (GAP-API-011, GAP-API-012, GAP-SM-011)
+* **List Store Screens:** `GET /store/screens`
+* **Report Screen Offline:** `POST /store/screens/{id}/report-offline`
+* **Headers:** `Authorization: Bearer <token>`
+* **Response Format (`GET /store/screens` 200 OK):**
 ```json
 {
   "screens": [
@@ -778,10 +779,12 @@ The server constructs a single unified push envelope. The `data` block maintains
       "id": "string",
       "store_id": "string",
       "name": "string",
-      "zone": "string",
+      "zone": "entrance" | "window" | "registers" | "aisles",
       "online": boolean,
-      "is_playing": "string", // Media path/title
-      "content_type": "string",
+      "what_it_is_showing": "string" | null,
+      "is_playing": "string",
+      "kind_of_content": "video" | "live_offer" | "announcement" | "nothing",
+      "content_type": "video" | "live_offer" | "announcement" | "nothing",
       "offline_since": "string (ISO 8601)" | null,
       "reported_at": "string (ISO 8601)" | null,
       "reported_by": "string" | null
@@ -789,6 +792,37 @@ The server constructs a single unified push envelope. The `data` block maintains
   ]
 }
 ```
+
+#### Report Offline Screen Format (`POST /store/screens/{id}/report-offline`):
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
+* **Response Format (200 OK):**
+```json
+{
+  "id": "string",
+  "store_id": "string",
+  "name": "string",
+  "online": false,
+  "reported_at": "string (ISO 8601)",
+  "reported_by": "string",
+  "message": "string"
+}
+```
+
+#### 💡 Open Questions Resolved (GAP-API-011):
+1. **Is the Store Promotion Platform the source, and in which environments?**
+   * **Answer:**
+     * **Primary Source of Truth:** Yes, the Store Promotion Platform (CMS & Signage Runtime) is the authoritative source. Hardware players (Raspberry Pis, Android TV signage boxes, Tizen displays) send 30-second heartbeats and current playback telemetry (`DeviceCurrentPlaying`, `PiStatus`, `Device`) to the Promotion Platform backend.
+     * **Environments:**
+       * **Staging / Test:** Connected to the Test Promotion Platform (`https://iot-test.metizstoresparc.com`), aggregating virtual emulator screens and staging Pi players running test playlists.
+       * **Production:** Connected to the Live Production Promotion Platform (`https://metizstoresparc.com`), aggregating physical in-store commercial signage displays.
+2. **Should the app poll, or will status changes be pushed? Is the zone list fixed?**
+   * **Answer:**
+     * **Status Synchronization (Hybrid Polling + Selective Push):**
+       * **Periodic Polling:** Playlists rotate media every 10–30 seconds. Pushing every minor playback transition over FCM/APNs would exhaust battery, push quotas, and spam mobile clients. Therefore, the mobile app performs lightweight polling (30–60s interval) only when the Screens tab is actively open in the foreground, combined with pull-to-refresh.
+       * **Selective Critical Pushes:** When a screen transitions to offline for >10 minutes or is reported offline by staff, a high-priority push notification (`priority_task` alert) is immediately dispatched to the Store Manager.
+     * **Fixed Physical Zone List:**
+       * **Yes, the 4 retail zones are fixed for Phase 1 mobile layout:** `"entrance"`, `"window"`, `"registers"`, and `"aisles"`. The mobile UI tabs/groups screens into these 4 physical locations for rapid store walk-through verification.
+       * **Extensibility:** The backend enum gracefully defaults any unknown zone tags to `"aisles"`, preserving UI stability as stores add custom spatial tags in future phases.
 
 ---
 

@@ -50,3 +50,4 @@ export async function GET(req: NextRequest) {
     return apiError('INTERNAL_ERROR', error.message || 'Failed to fetch groups', 500);
   }
 }
+
