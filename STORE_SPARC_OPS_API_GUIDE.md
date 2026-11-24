@@ -445,6 +445,7 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 * **List Tasks:** `GET /tasks` (Manager-only tasks are automatically filtered out for staff)
 * **Claim Task:** `POST /tasks/{id}/claim`
 * **Complete Task:** `POST /tasks/{id}/complete`
+* **Release Task:** `POST /tasks/{id}/release`
 * **Response Format (GET /tasks):**
 ```json
 {
@@ -452,14 +453,21 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
     {
       "id": "string",
       "title": "string",
-      "category": "group" | "priority" | "role_specific",
+      "category": "group" | "priority" | "role_specific" | "manager_only",
       "note": "string" | null,
       "role_label": "string" | null,
-      "due": "string (ISO 8601)" | null,
+      "due": {
+        "date": "string (YYYY-MM-DD)",
+        "time": "string (HH:mm)" | null
+      } | null,
       "assignee_name": "string" | null,
       "assigned_to_me": boolean,
+      "completed_by": "string" | null,
+      "completed_at": "string (ISO 8601)" | null,
       "can_claim": boolean,
       "can_complete": boolean,
+      "can_release": boolean,
+      "created_by": "string",
       "status": "open" | "claimed" | "completed"
     }
   ]

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
     const query: any = { storeId: caller!.storeId };
 
-    // Staff never sees manager-only tasks
+    // The server filters by role, so manager-only tasks never reach Staff
     if (caller!.role === 'Staff') {
       query.category = { $ne: 'manager_only' };
     }
@@ -26,7 +26,20 @@ export async function GET(req: NextRequest) {
       const canClaim = t.status === 'open' && !t.assigneeId;
       const canComplete =
         t.status !== 'completed' &&
-        (isAssignedToMe || isClaimedByMe || caller!.role === 'Store Manager');
+        (isAssignedToMe || isClaimedByMe || caller!.role === 'Store Manager' || caller!.role === 'Central admin');
+      const canRelease =
+        t.status === 'claimed' &&
+        (isClaimedByMe || isAssignedToMe || caller!.role === 'Store Manager' || caller!.role === 'Central admin');
+
+      let dueObj: { date: string; time: string | null } | null = null;
+      if (t.dueDate) {
+        const d = new Date(t.dueDate);
+        const hasTime = d.getUTCHours() !== 0 || d.getUTCMinutes() !== 0;
+        dueObj = {
+          date: d.toISOString().split('T')[0],
+          time: hasTime ? d.toISOString().substring(11, 16) : null,
+        };
+      }
 
       return {
         id: t._id.toString(),
@@ -34,13 +47,14 @@ export async function GET(req: NextRequest) {
         category: t.category,
         note: t.note || null,
         role_label: t.role || null,
-        due: t.dueDate ? t.dueDate.toISOString() : null,
+        due: dueObj,
         assignee_name: t.assigneeName || null,
         assigned_to_me: isAssignedToMe,
         completed_by: t.completedBy || null,
         completed_at: t.completedAt ? t.completedAt.toISOString() : null,
         can_claim: canClaim,
         can_complete: canComplete,
+        can_release: canRelease,
         created_by: t.createdBy,
         status: t.status,
       };
@@ -92,4 +106,3 @@ export async function POST(req: NextRequest) {
     }
   });
 }
-

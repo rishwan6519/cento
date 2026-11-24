@@ -707,6 +707,24 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Staff - Release Task Back to Team (GAP-API-007)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-user-id", "value": "{{staffUserId}}" },
+              { "key": "x-user-role", "value": "Staff" },
+              { "key": "x-store-id", "value": "{{storeId}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/release",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", ":id", "release"]
+            },
+            "description": "Releases a claimed task back to the team pool so other staff on shift can claim and finish it."
+          },
+          "response": []
         }
       ]
     },
