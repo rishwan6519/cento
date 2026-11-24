@@ -36,3 +36,4 @@ const PushDevice =
   mongoose.models.PushDevice || mongoose.model<IPushDevice>('PushDevice', PushDeviceSchema);
 
 export default PushDevice;
+

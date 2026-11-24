@@ -197,6 +197,12 @@
         "responses": { "200": { "description": "Token removed" } }
       }
     },
+    "/chat/groups": {
+      "get": {
+        "summary": "List my WhatsApp groups (GAP-API-010)",
+        "responses": { "200": { "description": "List of WhatsApp deep link groups" } }
+      }
+    },
     "/store/dashboard": {
       "get": {
         "summary": "Store Manager dashboard summary (GAP-SM-002, GAP-SM-004)",

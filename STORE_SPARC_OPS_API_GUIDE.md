@@ -731,7 +731,43 @@ The server constructs a single unified push envelope. The `data` block maintains
 
 ---
 
-### 13. Store Screens & Current Media (GAP-API-011, GAP-API-012)
+### 13. Chat & Groups (GAP-API-010)
+* **Method:** `GET`
+* **Endpoint:** `/chat/groups` *(alias: `/groups`)*
+* **Purpose:** Returns the store-specific and central WhatsApp group deep links for staff communication.
+* **Headers:** `Authorization: Bearer <token>`
+* **Request Body:** None
+* **Response Format (200 OK):**
+```json
+{
+  "groups": [
+    {
+      "id": "string",
+      "name": "string",
+      "kind": "store" | "Central",
+      "whatsapp_deep_link": "string (URL e.g. https://chat.whatsapp.com/...)",
+      "description": "string"
+    }
+  ]
+}
+```
+
+#### 💬 Architecture & Deep Linking Mechanics:
+* **No In-App Chat:** The app does not implement an internal chat engine. Tapping a group card triggers `launchUrl(Uri.parse(group.whatsapp_deep_link), mode: LaunchMode.externalApplication)`.
+* **Universal Deep Links:** Links beginning with `https://chat.whatsapp.com/...` are automatically captured by mobile OS Universal Links / Android App Links to open the native WhatsApp application.
+* **No Separate Request Inbox:** Swap requests and attendance correction statuses already display on the Roster (`/swaps`) and Hours (`/hours`) screens, eliminating the need for a separate messaging request inbox.
+
+#### 💡 Open Questions Resolved (GAP-API-010):
+1. **Do the WhatsApp links come from an API, or are they set up per store somewhere else?**
+   * **Answer:** **The WhatsApp links strictly come from the API (Dynamic Store Configuration).**
+     * **API Delivery:** Delivered dynamically via `GET /chat/groups` (and `GET /store/config`).
+     * **Per-Store Configuration:** Configured per store by Store Managers through the **Store Manager Web Portal Settings** (`src/app/store_user/SettingsView.tsx`), which saves via `PUT /store/config` (`whatsAppGroupLink`).
+     * **Central Group Link:** Maintained centrally by Central Admins in `StoreConfig.centralWhatsAppLink`.
+     * **Zero Hard-Coding:** Adheres strictly to the PRD architectural decision: *"Area 13; nothing per-store is hard-coded in the app: Store settings come from the API"*.
+
+---
+
+### 14. Store Screens & Current Media (GAP-API-011, GAP-API-012)
 * **Method:** `GET`
 * **Endpoint:** `/store/screens`
 * **Response Format (200 OK):**

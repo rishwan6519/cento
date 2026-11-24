@@ -18,6 +18,7 @@ export interface IStoreConfig extends Document {
   maxAnnouncementLength: number;
   timeZone: string; // e.g. 'Asia/Kolkata'
   whatsAppGroupLink?: string;
+  centralWhatsAppLink?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,6 +56,7 @@ const StoreConfigSchema: Schema = new Schema(
     maxAnnouncementLength: { type: Number, default: 500 },
     timeZone: { type: String, default: 'Asia/Kolkata' },
     whatsAppGroupLink: { type: String, default: 'https://chat.whatsapp.com/testgroup' },
+    centralWhatsAppLink: { type: String, default: 'https://chat.whatsapp.com/StoreSparcCentral' },
   },
   { timestamps: true }
 );

@@ -995,6 +995,28 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "11. Chat & Groups",
+      "item": [
+        {
+          "name": "Staff - List My Groups (GAP-API-010)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-user-id", "value": "{{staffUserId}}" },
+              { "key": "x-user-role", "value": "Staff" },
+              { "key": "x-store-id", "value": "{{storeId}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/groups",
+              "host": ["{{baseUrl}}"],
+              "path": ["chat", "groups"]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
