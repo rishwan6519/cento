@@ -52,6 +52,51 @@
       "name": "1. Authentication & Config",
       "item": [
         {
+          "name": "Staff / Manager Login (Acquire Auth Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.token) {",
+                  "        pm.collectionVariables.set(\"token\", data.token);",
+                  "    }",
+                  "    if (data.user_id) {",
+                  "        pm.collectionVariables.set(\"staffUserId\", data.user_id);",
+                  "    }",
+                  "    if (data.store && data.store.id) {",
+                  "        pm.collectionVariables.set(\"storeId\", data.store.id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"string\",\n  \"password\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticates a Staff or Store Manager user with username and password, returning a JWT Bearer token. On success, the Postman test script automatically stores the token, staffUserId, and storeId into collection variables."
+          },
+          "response": []
+        },
+        {
           "name": "Resolve Caller Identity (GAP-API-001)",
           "request": {
             "method": "GET",

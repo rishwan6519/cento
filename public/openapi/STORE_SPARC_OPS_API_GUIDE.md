@@ -33,6 +33,36 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 
 ---
 
+### 0. Staff / Manager Login (Acquire Auth Token)
+* **Method:** `POST`
+* **Endpoint:** `/auth/login`
+* **Purpose:** Authenticates Staff or Store Manager credentials and returns a JWT Bearer token valid for 7 days.
+* **Headers:** `Content-Type: application/json`
+* **Request Format:**
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+* **Response Format (200 OK):**
+```json
+{
+  "message": "Login successful",
+  "token": "string",
+  "user_id": "string",
+  "display_name": "string",
+  "role": "Staff" | "Store Manager" | "Central admin",
+  "store": {
+    "id": "string",
+    "name": "string",
+    "locality": "string"
+  }
+}
+```
+
+---
+
 ### 1. Resolve Caller Identity (GAP-API-001)
 * **Method:** `GET`
 * **Endpoint:** `/auth/resolve`
@@ -627,3 +657,4 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
   "message": "Offline screen successfully reported to Central"
 }
 ```
+
