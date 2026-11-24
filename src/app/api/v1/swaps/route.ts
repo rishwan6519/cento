@@ -54,6 +54,10 @@ export async function POST(req: NextRequest) {
         return notFoundError('Shift not found');
       }
 
+      if (shift.swapEligible === false) {
+        return apiError('SWAP_NOT_ELIGIBLE', 'This shift is marked as not eligible for swapping by the store manager', 400);
+      }
+
       // Check if a swap request already open for this shift
       const existing = await ApprovalRequest.findOne({
         'detail.shift_id': shift_id,

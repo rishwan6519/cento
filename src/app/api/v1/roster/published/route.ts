@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 import RosterWeek from '@/models/RosterWeek';
 import RosterShift from '@/models/RosterShift';
+import ApprovalRequest from '@/models/ApprovalRequest';
 import { requireAuth } from '@/lib/storesparc/auth';
 import { apiError } from '@/lib/storesparc/errors';
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
       weekStart,
     });
 
-    // An unpublished week returns nothing; app never shows draft to staff
+    // The server decides which weeks are published. An unpublished week returns nothing; the app never shows a draft.
     if (!week || week.status !== 'published') {
       return NextResponse.json({
         store_id: caller!.storeId,
@@ -39,6 +40,15 @@ export async function GET(req: NextRequest) {
       status: 'published',
     }).sort({ date: 1, startMinutes: 1 });
 
+    // Look up any pending swap requests to dynamically evaluate swap_eligible
+    const shiftIds = shifts.map((s) => s._id.toString());
+    const pendingSwaps = await ApprovalRequest.find({
+      'detail.shift_id': { $in: shiftIds },
+      status: 'pending',
+    }).select('detail.shift_id');
+
+    const pendingShiftIds = new Set(pendingSwaps.map((p) => p.detail?.shift_id));
+
     return NextResponse.json({
       store_id: caller!.storeId,
       week_start: weekStart,
@@ -47,11 +57,10 @@ export async function GET(req: NextRequest) {
         date: s.date,
         start_minutes: s.startMinutes,
         end_minutes: s.endMinutes,
-        swap_eligible: s.swapEligible,
+        swap_eligible: Boolean(s.swapEligible) && !pendingShiftIds.has(s._id.toString()),
       })),
     });
   } catch (error: any) {
     return apiError('INTERNAL_ERROR', error.message || 'Failed to fetch roster', 500);
   }
 }
-
