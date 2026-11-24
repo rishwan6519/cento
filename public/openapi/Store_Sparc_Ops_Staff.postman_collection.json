@@ -1,0 +1,1332 @@
+{
+  "info": {
+    "_postman_id": "c8e4a112-9b76-47c4-82a1-staff001sparc",
+    "name": "Store Sparc Ops - Staff API Collection",
+    "description": "Dedicated Postman collection for Store Staff mobile operations (GAP-API-001 through GAP-API-014). Contains strict request field schemas, authentication tokens, idempotency headers, and empty response templates for live server testing.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://iot-test.metizstoresparc.com/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "storeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "staffUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "weekStart",
+      "value": "YYYY-MM-DD",
+      "type": "string"
+    },
+    {
+      "key": "challengeId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Authentication & Identity (Staff)",
+      "item": [
+        {
+          "name": "Staff Login (Acquire Bearer Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.token) pm.collectionVariables.set(\"token\", data.token);",
+                  "    if (data.user_id) pm.collectionVariables.set(\"staffUserId\", data.user_id);",
+                  "    if (data.store && data.store.id) pm.collectionVariables.set(\"storeId\", data.store.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"string\",\n  \"password\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticates a staff member, returning a JWT token with Staff claims. Test script auto-populates collection variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Resolve Caller Identity (GAP-API-001)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resolve"
+              ]
+            },
+            "description": "Resolves staff profile, assigned store, roles, and UI feature permissions."
+          },
+          "response": []
+        },
+        {
+          "name": "Start MFA Challenge (GAP-API-001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.challenge_id) pm.collectionVariables.set(\"challengeId\", data.challenge_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{staffUserId}}\",\n  \"method\": \"sms\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/mfa/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "mfa",
+                "start"
+              ]
+            },
+            "description": "Initiates SMS one-time passcode MFA verification for mobile staff."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify MFA Code (GAP-API-001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.token) pm.collectionVariables.set(\"token\", data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challenge_id\": \"{{challengeId}}\",\n  \"code\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/mfa/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "mfa",
+                "verify"
+              ]
+            },
+            "description": "Verifies the 6-digit MFA OTP and issues full session JWT."
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Out Session (GAP-API-001)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_token\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Invalidates staff session and unregisters mobile push notifications."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Attendance & Geofencing (GAP-API-004)",
+      "item": [
+        {
+          "name": "Get Today Attendance Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/attendance/today",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "today"
+              ]
+            },
+            "description": "Returns server verdict for today's rostered shift, punch records, geofence check, and can_check_in / can_check_out flags."
+          },
+          "response": []
+        },
+        {
+          "name": "Check-in with GPS Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 0,\n  \"lng\": 0,\n  \"accuracy_m\": 5,\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance/check-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "check-in"
+              ]
+            },
+            "description": "Submits shift check-in punch with phone GPS coordinates and Idempotency key. Server validates geofence perimeter."
+          },
+          "response": []
+        },
+        {
+          "name": "Check-out at End of Shift",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 0,\n  \"lng\": 0,\n  \"accuracy_m\": 5,\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/attendance/check-out",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "attendance",
+                "check-out"
+              ]
+            },
+            "description": "Records end-of-shift punch, calculating shift worked duration on the server."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Roster Schedule (GAP-API-002)",
+      "item": [
+        {
+          "name": "Get My Published Shifts (Week)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/roster/shifts?week_start={{weekStart}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roster",
+                "shifts"
+              ],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            },
+            "description": "Retrieves staff member's published shifts for the specified week. Server returns draft status as false for staff view."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Staff Availability (GAP-API-006)",
+      "item": [
+        {
+          "name": "Get My Weekly Availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/availability?week_start={{weekStart}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            },
+            "description": "Returns submitted availability blocks for the upcoming week."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Monthly Availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/availability?month=YYYY-MM",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "YYYY-MM"
+                }
+              ]
+            },
+            "description": "Returns declared days off across the month."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Weekly Availability",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"days\": [\n    {\n      \"date\": \"YYYY-MM-DD\",\n      \"status\": \"available\",\n      \"from_minutes\": 540,\n      \"to_minutes\": 1020,\n      \"note\": \"\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ]
+            },
+            "description": "Submits staff member's availability per day (from/to minutes from midnight or status 'unavailable')."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Monthly Days Off",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month\": \"YYYY-MM\",\n  \"days_off\": [\n    \"YYYY-MM-DD\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ]
+            },
+            "description": "Submits requested days off across the calendar month."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Shift Swaps (GAP-API-003)",
+      "item": [
+        {
+          "name": "List My Swap Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ]
+            },
+            "description": "Lists active and past shift swap requests submitted by or targeting the authenticated staff member."
+          },
+          "response": []
+        },
+        {
+          "name": "Request Shift Swap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shift_id\": \"string\",\n  \"requested_peer_id\": \"string\",\n  \"reason\": \"string\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/swaps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps"
+              ]
+            },
+            "description": "Proposes a shift swap to a peer. Server checks eligibility, rest turnaround, and compliance flags."
+          },
+          "response": []
+        },
+        {
+          "name": "Withdraw Shift Swap Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/swaps/:id/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "swaps",
+                ":id",
+                "withdraw"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Withdraws a pending swap before manager decision."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Task Execution (GAP-API-007)",
+      "item": [
+        {
+          "name": "List Visible Store Tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            },
+            "description": "Lists tasks available to staff (open group tasks, role-matched tasks, and tasks assigned to caller). Manager-only tasks are excluded."
+          },
+          "response": []
+        },
+        {
+          "name": "Claim Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/claim",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "claim"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Claims an open store task. Server assigns task to caller and marks state in_progress."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "complete"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Marks an assigned task as completed with audit timestamp."
+          },
+          "response": []
+        },
+        {
+          "name": "Release Task Back to Team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/release",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "release"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Releases a claimed task back to the store pool."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Weekly Hours & Corrections (GAP-API-005)",
+      "item": [
+        {
+          "name": "Get Weekly Hours Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/hours/summary?week_start={{weekStart}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "hours",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            },
+            "description": "Returns staff member's total rostered vs worked hours, daily breakdown, and pending attendance corrections."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Attendance Corrections / Confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"corrections\": [\n    {\n      \"date\": \"YYYY-MM-DD\",\n      \"requested_check_in\": \"YYYY-MM-DDTHH:mm:ssZ\",\n      \"requested_check_out\": \"YYYY-MM-DDTHH:mm:ssZ\",\n      \"reason\": \"string\"\n    }\n  ],\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/hours/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "hours",
+                "confirm"
+              ]
+            },
+            "description": "Confirms week hours or submits punch corrections. Corrections queue directly into Manager's Approvals Queue."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Store Digital Screens (GAP-API-011, GAP-API-012)",
+      "item": [
+        {
+          "name": "List Store Screens",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens"
+              ]
+            },
+            "description": "Returns list of in-store digital signage devices and their live status."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Screen Current Playback",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Returns current media playback playlist and status of a screen."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Alerts & Push Tokens (GAP-API-008, GAP-API-009)",
+      "item": [
+        {
+          "name": "Get Alerts Feed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts?limit=20&unread_only=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unread_only",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Retrieves staff notifications (swap updates, roster published, new tasks, store announcements)."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Alert Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/:id/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                ":id",
+                "read"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Marks a specific notification as read."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Alerts Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "read-all"
+              ]
+            },
+            "description": "Marks all notifications as read."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Mobile Push Token (FCM)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_token\": \"string\",\n  \"platform\": \"android\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/devices/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "devices",
+                "token"
+              ]
+            },
+            "description": "Registers Firebase Cloud Messaging (FCM) or Apple APNs device token for push delivery."
+          },
+          "response": []
+        },
+        {
+          "name": "Unregister Mobile Push Token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_token\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/devices/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "devices",
+                "token"
+              ]
+            },
+            "description": "Removes device token on sign-out to prevent notifications delivering to logged-out devices."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Store Groups & WhatsApp (GAP-API-010)",
+      "item": [
+        {
+          "name": "List My Store Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups"
+              ]
+            },
+            "description": "Returns store team channels and WhatsApp onboarding community invite links."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11. Store Policy & Configuration (GAP-API-014)",
+      "item": [
+        {
+          "name": "Get Store Policy & Geofence (Read-Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{staffUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Staff"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "config"
+              ]
+            },
+            "description": "Fetches store operational policies, geofence radius, and timezone rules."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

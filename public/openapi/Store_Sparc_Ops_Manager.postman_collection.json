@@ -1,0 +1,1271 @@
+{
+  "info": {
+    "_postman_id": "a9f3b221-8c65-46b3-91b2-manager01sparc",
+    "name": "Store Sparc Ops - Store Manager API Collection",
+    "description": "Dedicated Postman collection for Store Manager & Central Admin operations (GAP-SM-002 through GAP-SM-011). Covers real-time dashboard metrics, approvals queue, dual-state roster planning, task management, WhatsApp announcements, screen diagnostics, and store policies.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://iot-test.metizstoresparc.com/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "storeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "managerUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "weekStart",
+      "value": "YYYY-MM-DD",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Authentication & Identity (Manager)",
+      "item": [
+        {
+          "name": "Store Manager Login (Acquire Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.token) pm.collectionVariables.set(\"token\", data.token);",
+                  "    if (data.user_id) pm.collectionVariables.set(\"managerUserId\", data.user_id);",
+                  "    if (data.store && data.store.id) pm.collectionVariables.set(\"storeId\", data.store.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"string\",\n  \"password\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticates Store Manager user, auto-populating managerUserId, token, and storeId."
+          },
+          "response": []
+        },
+        {
+          "name": "Resolve Manager Identity (GAP-API-001)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resolve"
+              ]
+            },
+            "description": "Resolves Manager role, administrative claim scopes, and store assignments."
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Out Session (GAP-API-001)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_token\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Terminates manager session and invalidates active JWT."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Store Dashboard (GAP-SM-002, GAP-SM-004)",
+      "item": [
+        {
+          "name": "Get Store Dashboard (Live Metrics & Lateness)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "dashboard"
+              ]
+            },
+            "description": "Returns as_of timestamp, sales (is_sample: true, comparison), attendance (checked_in, rostered, awaited staff with LATE vs EXPECTED_SOON flags, manual check-ins), approvals, next week roster status, tasks, and screen status."
+          },
+          "response": []
+        },
+        {
+          "name": "Central Admin - Inspect Store Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Central Admin"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/dashboard?store_id={{storeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{storeId}}"
+                }
+              ]
+            },
+            "description": "Single Source of Truth inspection: Central Admin token querying dashboard with store_id query param."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Approvals Queue & Decisions (GAP-SM-003, GAP-SM-004, GAP-SM-005)",
+      "item": [
+        {
+          "name": "List Approvals Queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/approvals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "approvals"
+              ]
+            },
+            "description": "Returns pending & decided items across shift swaps, attendance corrections, and manual check-ins with compliance flags and permissible decline reasons."
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Shift Swap or Attendance Correction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approve\": true,\n  \"reason\": null,\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/approvals/:id/decide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "approvals",
+                ":id",
+                "decide"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Approves a pending swap or correction. Manager does not select replacement; server resolves coverage."
+          },
+          "response": []
+        },
+        {
+          "name": "Decline with Item's Own Decline Reason",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approve\": false,\n  \"reason\": \"Would leave station under-skilled\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/approvals/:id/decide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "approvals",
+                ":id",
+                "decide"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Declines request. Reason MUST match one of the item's own decline_reasons, else rejected with 422."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm or Decline Manual Check-in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirm\": true,\n  \"reason\": null,\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/approvals/:id/decide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "approvals",
+                ":id",
+                "decide"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Settles manual punch request. On confirmation, server creates actual staff attendance punch."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Team Availability (GAP-SM-006)",
+      "item": [
+        {
+          "name": "Get Team Weekly Availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/availability/team?week_start={{weekStart}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "availability",
+                "team"
+              ],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            },
+            "description": "Returns whole-store team availability for the planning week, roster published status, and individual submissions."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team Monthly Days Off",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/availability/team?month=YYYY-MM",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "availability",
+                "team"
+              ],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "YYYY-MM"
+                }
+              ]
+            },
+            "description": "Month view: returns staff submitted days off across the calendar month for leave foresight."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Roster Planning & Publishing (GAP-SM-007, GAP-SM-008)",
+      "item": [
+        {
+          "name": "Get Week Plan & Coverage Gaps",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/roster?week_start={{weekStart}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "roster"
+              ],
+              "query": [
+                {
+                  "key": "week_start",
+                  "value": "{{weekStart}}"
+                }
+              ]
+            },
+            "description": "Fetches full planning grid: draft vs published shifts, editable flag, locked reason, and non-blocking coverage gaps."
+          },
+          "response": []
+        },
+        {
+          "name": "Assign / Stage Shifts (Draft Mode)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"user_id\": \"string\",\n  \"shifts\": [\n    {\n      \"date\": \"YYYY-MM-DD\",\n      \"start_minutes\": 540,\n      \"end_minutes\": 1020\n    }\n  ],\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/roster/shifts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "roster",
+                "shifts"
+              ]
+            },
+            "description": "Stages shift assignments as draft. Server rejects assignments on unavailable days (409) or outside trading hours (409)."
+          },
+          "response": []
+        },
+        {
+          "name": "Publish Week Roster",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"week_start\": \"{{weekStart}}\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/roster/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "roster",
+                "publish"
+              ]
+            },
+            "description": "Atomically promotes draft shifts to published. Staff devices immediately receive roster_published alert."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Task Management (GAP-SM-009)",
+      "item": [
+        {
+          "name": "List Store Tasks (Including Manager-Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            },
+            "description": "Called by Store Manager: returns all store tasks including confidential manager_only items."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Task Form Options",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/options",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                "options"
+              ]
+            },
+            "description": "Returns task categories (group, priority, role_specific, manager_only), roles, and eligible store personnel."
+          },
+          "response": []
+        },
+        {
+          "name": "Create New Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"note\": \"string\",\n  \"category\": \"priority\",\n  \"role\": null,\n  \"assignee_id\": null,\n  \"due\": \"YYYY-MM-DDTHH:mm:ssZ\",\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            },
+            "description": "Creates a task. Priority tasks trigger push notifications to floor staff. Setting assignee_id: null leaves task open to pool."
+          },
+          "response": []
+        },
+        {
+          "name": "Edit Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"note\": \"string\",\n  \"category\": \"priority\",\n  \"role\": null,\n  \"due\": \"YYYY-MM-DDTHH:mm:ssZ\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Updates title, description, category, role, or due date."
+          },
+          "response": []
+        },
+        {
+          "name": "Assign or Reassign Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee_id\": \"string\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks/:id/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tasks",
+                ":id",
+                "assign"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Assigns task directly to a staff member. Passing assignee_id: null opens the task to team pool."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Store Announcements & WhatsApp (GAP-SM-010)",
+      "item": [
+        {
+          "name": "Get Announcement Board & Templates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/announcements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "announcements"
+              ]
+            },
+            "description": "Returns WhatsApp group link, quick templates, scheduled posts, and historical broadcast log."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Now or Schedule Announcement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"string\",\n  \"scheduled_for\": null,\n  \"client_timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/announcements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "announcements"
+              ]
+            },
+            "description": "Dispatches to WhatsApp group & raises store_announcement staff alert. Max 14 days future schedule."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Scheduled Announcement",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/announcements/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "announcements",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Cancels a scheduled post prior to dispatch (Cancel-only workflow)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Digital Screens & Offline Reporting (GAP-SM-011)",
+      "item": [
+        {
+          "name": "List Store Screens with Incident Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens"
+              ]
+            },
+            "description": "Displays screens including reported: true, reported_at, and reported_by audit fields."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Screen Diagnostics & Current Playback",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Detailed hardware diagnostics and playlist telemetry for an individual display."
+          },
+          "response": []
+        },
+        {
+          "name": "Report Screen Offline (SPP Ticket & Central Notification)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens/:id/report-offline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "screens",
+                ":id",
+                "report-offline"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Reports an offline screen. Logs telemetry in SPP, sets reported: true, and notifies Central. Accepts 1 report per incident."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Store Alerts & Push Broadcasts (GAP-API-008 / Area 12)",
+      "item": [
+        {
+          "name": "Get Manager Alerts Feed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts?limit=20&unread_only=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unread_only",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Retrieves manager alerts: pending approvals, missing availability, offline screens, priority tasks."
+          },
+          "response": []
+        },
+        {
+          "name": "Broadcast Alert to Floor Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"message\": \"string\",\n  \"severity\": \"high\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/alerts/broadcast",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alerts",
+                "broadcast"
+              ]
+            },
+            "description": "Dispatches emergency or high-priority broadcast alert to on-duty staff phones."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Store Configuration & Geofencing (GAP-API-014)",
+      "item": [
+        {
+          "name": "Get Store Operating Configuration",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "config"
+              ]
+            },
+            "description": "Fetches operating policies, geofence radius, trading hours, and late grace threshold."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Store Policy, Trading Hours & Geofence",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-user-id",
+                "value": "{{managerUserId}}"
+              },
+              {
+                "key": "x-user-role",
+                "value": "Store Manager"
+              },
+              {
+                "key": "x-store-id",
+                "value": "{{storeId}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"geofence_radius_meters\": 100,\n  \"trading_hours\": {\n    \"monday\": {\n      \"open\": \"08:00\",\n      \"close\": \"20:00\"\n    },\n    \"tuesday\": {\n      \"open\": \"08:00\",\n      \"close\": \"20:00\"\n    },\n    \"wednesday\": {\n      \"open\": \"08:00\",\n      \"close\": \"20:00\"\n    },\n    \"thursday\": {\n      \"open\": \"08:00\",\n      \"close\": \"20:00\"\n    },\n    \"friday\": {\n      \"open\": \"08:00\",\n      \"close\": \"21:00\"\n    },\n    \"saturday\": {\n      \"open\": \"08:00\",\n      \"close\": \"21:00\"\n    },\n    \"sunday\": {\n      \"open\": \"10:00\",\n      \"close\": \"18:00\"\n    }\n  },\n  \"grace_minutes_allowed\": 5,\n  \"max_announcement_length\": 500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/store/config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "store",
+                "config"
+              ]
+            },
+            "description": "Updates store trading hours, geofence perimeter, and operational limits."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
