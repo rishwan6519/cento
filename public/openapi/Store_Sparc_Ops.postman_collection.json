@@ -842,6 +842,26 @@
           "response": []
         },
         {
+          "name": "Staff/Manager - Get Screen Current Playback (GAP-API-012)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-user-id", "value": "{{staffUserId}}" },
+              { "key": "x-user-role", "value": "Staff" },
+              { "key": "x-store-id", "value": "{{storeId}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/store/screens/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["store", "screens", ":id"],
+              "variable": [
+                { "key": "id", "value": "" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Manager - Report Screen Offline (GAP-SM-011)",
           "request": {
             "method": "POST",

@@ -769,9 +769,11 @@ The server constructs a single unified push envelope. The `data` block maintains
 
 ### 14. Store Screens & Playback Status (GAP-API-011, GAP-API-012, GAP-SM-011)
 * **List Store Screens:** `GET /store/screens`
+* **Get Single Screen Playback Detail:** `GET /store/screens/{id}` *(alias: `/store/screens/{id}/current`)*
 * **Report Screen Offline:** `POST /store/screens/{id}/report-offline`
 * **Headers:** `Authorization: Bearer <token>`
-* **Response Format (`GET /store/screens` 200 OK):**
+
+#### Response Format (`GET /store/screens` 200 OK):
 ```json
 {
   "screens": [
@@ -793,6 +795,33 @@ The server constructs a single unified push envelope. The `data` block maintains
 }
 ```
 
+#### Response Format (`GET /store/screens/{id}` 200 OK - GAP-API-012):
+```json
+{
+  "id": "string",
+  "store_id": "string",
+  "name": "string",
+  "zone": "entrance" | "window" | "registers" | "aisles",
+  "online": boolean,
+  "what_it_is_showing": "string" | null,
+  "is_playing": "string",
+  "kind_of_content": "video" | "live_offer" | "announcement" | "nothing",
+  "content_type": "video" | "live_offer" | "announcement" | "nothing",
+  "offline_since": "string (ISO 8601)" | null,
+  "reported_at": "string (ISO 8601)" | null,
+  "reported_by": "string" | null,
+  "current_item": {
+    "kind": "video" | "live_offer" | "announcement" | "nothing",
+    "title": "string",
+    "detail": "string",
+    "duration_seconds": number,
+    "started_at": "string (ISO 8601)",
+    "media_url": "string (Signed URL)" | null,
+    "thumbnail_url": "string" | null
+  }
+}
+```
+
 #### Report Offline Screen Format (`POST /store/screens/{id}/report-offline`):
 * **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
 * **Response Format (200 OK):**
@@ -807,6 +836,15 @@ The server constructs a single unified push envelope. The `data` block maintains
   "message": "string"
 }
 ```
+
+#### 💡 Media Authorization & In-App Mirroring Architecture (GAP-API-012):
+1. **Sample Visuals Mirror (Phase 1 Baseline):**
+   * The mobile app renders a simulated mirroring card based on `current_item.kind` and `current_item.title`, displaying a running progress bar synchronized to `current_item.duration_seconds` and `current_item.started_at`. This provides staff with zero-lag awareness of in-store visual playback without heavy video streaming overhead.
+2. **Full Live Video / Image Mirroring (Phase 2):**
+   * **Media URL Provisioning & Authorization:**
+     * The `media_url` is provisioned as an HMAC-signed CDN URL (e.g. `https://cdn.metizstoresparc.com/media/promo.mp4?token=...&expires=...`) with short-term expiry (15–60 minutes).
+     * For internal media streaming routes, the mobile player transmits the standard `Authorization: Bearer <token>` in the HTTP streaming request header (`httpHeaders` in Flutter `video_player` / React Native Video).
+     * Local device caching (`ETag` and `Cache-Control: public, max-age=86400`) ensures repetitive 15-second promo loops do not re-consume cellular data.
 
 #### 💡 Open Questions Resolved (GAP-API-011):
 1. **Is the Store Promotion Platform the source, and in which environments?**

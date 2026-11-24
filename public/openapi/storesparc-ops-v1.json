@@ -225,6 +225,15 @@
         "responses": { "200": { "description": "Screen status list" } }
       }
     },
+    "/store/screens/{id}": {
+      "get": {
+        "summary": "What one screen is playing now (GAP-API-012)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Screen details and current playing item" } }
+      }
+    },
     "/store/screens/{id}/report-offline": {
       "post": {
         "summary": "Report offline screen to central (GAP-SM-011)",
