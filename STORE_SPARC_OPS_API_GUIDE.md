@@ -1535,16 +1535,118 @@ The server constructs a single unified push envelope. The `data` block maintains
 ---
 
 ### 6. Store Announcements (GAP-SM-010)
-* **Get Announcement Board:** `GET /store/announcements`
-* **Send / Schedule Announcement:** `POST /store/announcements`
+
+* **1. Get Announcement Board:** `GET /store/announcements`
+* **Headers:** `Authorization: Bearer <token>` (Store Manager or Central admin)
+* **Response Format (200 OK):**
+```json
+{
+  "group": {
+    "id": "group_store_104",
+    "name": "Store #104 Team Operations",
+    "whatsapp_link": "https://chat.whatsapp.com/B9xK8LmNoP12"
+  },
+  "max_message_length": 280,
+  "message_templates": [
+    {
+      "id": "tmpl_cover",
+      "title": "Shift Cover Needed",
+      "text": "Team, we need shift cover today from [START] to [END]. Please submit a swap or see manager."
+    },
+    {
+      "id": "tmpl_huddle",
+      "title": "Daily Team Huddle",
+      "text": "All staff huddle today at [TIME] at the main register counter. Review today's targets."
+    },
+    {
+      "id": "tmpl_promo",
+      "title": "Promotion Campaign Kickoff",
+      "text": "New promotional campaign starts tomorrow. Please verify price tags and shelf banners."
+    },
+    {
+      "id": "tmpl_closing",
+      "title": "Store Closing Checklist",
+      "text": "Evening closing team: please ensure register reconciliation and stockroom lockup by 21:30."
+    }
+  ],
+  "scheduled_posts": [
+    {
+      "id": "post_701",
+      "message": "Team meeting at 5 PM near register 1",
+      "status": "scheduled",
+      "author": "John Doe (Store Manager)",
+      "created_at": "2026-11-24T10:00:00.000Z",
+      "scheduled_for": "2026-11-24T17:00:00.000Z"
+    }
+  ],
+  "sent_posts": [
+    {
+      "id": "post_699",
+      "message": "Welcome Sarah Connor to the checkout team!",
+      "status": "sent",
+      "author": "John Doe (Store Manager)",
+      "created_at": "2026-11-24T08:00:00.000Z",
+      "sent_at": "2026-11-24T08:00:00.000Z"
+    }
+  ]
+}
+```
+
+* **2. Send Now or Schedule Post:** `POST /store/announcements`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
 * **Request Body (POST):**
 ```json
 {
-  "message": "string",
-  "scheduled_for": "string (ISO 8601)" | null // null for immediate send
+  "group_id": "group_store_104",              // Store WhatsApp group
+  "message": "Morning huddle at 09:15 AM.",   // Length constrained by StoreConfig.maxAnnouncementLength (280)
+  "scheduled_for": "2026-11-24T09:15:00.000Z", // ISO 8601 UTC when scheduling; null for immediate broadcast
+  "client_timestamp": "2026-11-24T08:30:00.000Z"
 }
 ```
-* **Cancel Scheduled Post:** `DELETE /store/announcements/{id}`
+* **Response Format (200 OK):**
+```json
+{
+  "id": "post_702",
+  "message": "Morning huddle at 09:15 AM.",
+  "status": "scheduled" | "sent",
+  "author": "John Doe (Store Manager)",
+  "created_at": "2026-11-24T08:30:00.000Z",
+  "scheduled_for": "2026-11-24T09:15:00.000Z" | null,
+  "sent_at": "2026-11-24T08:30:00.000Z" | null
+}
+```
+
+* **3. Cancel a Scheduled Post:** `DELETE /store/announcements/{id}`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
+* **Response Format (200 OK):**
+```json
+{
+  "id": "post_702",
+  "message": "Morning huddle at 09:15 AM.",
+  "status": "cancelled",
+  "author": "John Doe (Store Manager)",
+  "created_at": "2026-11-24T08:30:00.000Z",
+  "scheduled_for": "2026-11-24T09:15:00.000Z",
+  "cancelled_at": "2026-11-24T08:45:00.000Z"
+}
+```
+
+#### 💡 Open Questions Resolved (GAP-SM-010):
+1. **How do posts reach WhatsApp? Do group limits fit a whole store, and must staff opt in or use personal numbers? (Review finding E1)**
+   * **Answer:**
+     * **Delivery Pipeline:**
+       1. *In-App Alert:* When sent (immediately or when schedule fires), the backend broadcasts an in-app `store_announcement` alert and FCM push notification to all store staff mobile devices.
+       2. *WhatsApp Delivery:* The server relays the post via the **Meta Cloud API / WhatsApp Business Platform webhook bot** to the store's configured WhatsApp Group ID (`wa_group_id`).
+     * **Group Capacity:** WhatsApp group chats support **up to 1,024 members** (and Communities up to 2,000 members). Typical retail store staff ranges from 15 to 150 members, fitting comfortably within WhatsApp's standard limits.
+     * **Opt-in & Personal Numbers:** Staff opt in voluntarily upon onboarding by tapping the dynamic WhatsApp invite deep link provided by the app (`GET /chat/groups`). Group membership constitutes affirmative consent; personal mobile numbers are supported without requiring dedicated corporate SIM cards.
+2. **How far ahead can a post be scheduled, and can a scheduled post be edited?**
+   * **Answer:**
+     * **Scheduling Horizon:** Announcements can be scheduled **up to 14 days in advance** (aligned with the 2-week rolling roster window), and must be set at least **5 minutes in the future**. Attempts to schedule further than 14 days are rejected (`400 Bad Request: "SCHEDULE_HORIZON_EXCEEDED"`).
+     * **Cancel-Only Architecture:** The mobile app strictly implements a **Cancel-only** workflow:
+       * Scheduled posts cannot be mutated in place. If a post requires changes, the manager cancels the post (`DELETE /store/announcements/{id}`) and submits a new one.
+       * This eliminates race conditions where an edit might conflict with a background dispatcher executing delivery. Cancelled posts retain their audit trail in MongoDB with `status: "cancelled"`.
+3. **Maximum Message Length Enforcement:**
+   * Constrained dynamically by store configuration (`StoreConfig.maxAnnouncementLength`, default 280 characters). Any post exceeding this length is rejected with `400 Bad Request` (`code: "MESSAGE_TOO_LONG"`).
 
 ---
 

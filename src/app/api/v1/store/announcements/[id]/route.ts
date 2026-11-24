@@ -24,20 +24,24 @@ export async function DELETE(
       }
 
       if (post.status !== 'scheduled') {
-        return conflictError('CANNOT_CANCEL', `Cannot cancel post with status "${post.status}"`);
+        return conflictError('CANNOT_CANCEL', `Cannot cancel post with status "${post.status}". Only scheduled posts can be cancelled.`);
       }
 
+      const now = new Date();
       post.status = 'cancelled';
       await post.save();
 
       return NextResponse.json({
         id: post._id.toString(),
-        status: 'cancelled',
-        message: 'Scheduled announcement cancelled successfully',
+        message: post.message,
+        status: post.status,
+        author: post.author,
+        created_at: post.createdAt.toISOString(),
+        scheduled_for: post.scheduledFor ? post.scheduledFor.toISOString() : null,
+        cancelled_at: now.toISOString(),
       });
     } catch (error: any) {
       return apiError('INTERNAL_ERROR', error.message || 'Failed to cancel announcement', 500);
     }
   });
 }
-
