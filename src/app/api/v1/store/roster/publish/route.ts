@@ -44,6 +44,27 @@ export async function POST(req: NextRequest) {
         { status: 'published' }
       );
 
+      // Emit roster_published alert to all staff with shifts in this published week
+      const distinctUserIds = await RosterShift.distinct('userId', {
+        storeId,
+        weekStart: week_start,
+      });
+
+      if (distinctUserIds.length > 0) {
+        const StoreAlert = (await import('@/models/StoreAlert')).default;
+        const alertDocs = distinctUserIds.map((uid) => ({
+          userId: uid,
+          storeId,
+          category: 'roster_published',
+          title: 'Roster Published',
+          body: `The shift roster for week ${week_start} has been published.`,
+          read: false,
+          targetScreen: 'roster',
+          targetArgument: week_start,
+        }));
+        await StoreAlert.insertMany(alertDocs);
+      }
+
       return NextResponse.json({
         week_start,
         status: 'published',

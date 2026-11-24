@@ -874,6 +874,74 @@
               { "key": "x-store-id", "value": "{{storeId}}" }
             ],
             "url": {
+              "raw": "{{baseUrl}}/alerts?limit=20&unread_only=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "unread_only", "value": "false" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Staff - Mark Alert Read (GAP-API-008)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-user-id", "value": "{{staffUserId}}" },
+              { "key": "x-user-role", "value": "Staff" },
+              { "key": "x-store-id", "value": "{{storeId}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/:id/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", ":id", "read"],
+              "variable": [
+                { "key": "id", "value": "" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Staff - Mark All Alerts Read (GAP-API-008)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-user-id", "value": "{{staffUserId}}" },
+              { "key": "x-user-role", "value": "Staff" },
+              { "key": "x-store-id", "value": "{{storeId}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "read-all"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Store Manager - Broadcast Alert / Announcement (GAP-API-008 / Area 12)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-user-id", "value": "{{managerUserId}}" },
+              { "key": "x-user-role", "value": "Store Manager" },
+              { "key": "x-store-id", "value": "{{storeId}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"store_announcement\",\n  \"title\": \"\",\n  \"body\": \"\",\n  \"target_screen\": \"announcements\",\n  \"target_argument\": null\n}"
+            },
+            "url": {
               "raw": "{{baseUrl}}/alerts",
               "host": ["{{baseUrl}}"],
               "path": ["alerts"]

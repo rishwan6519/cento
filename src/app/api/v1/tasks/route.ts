@@ -94,6 +94,37 @@ export async function POST(req: NextRequest) {
         createdBy: caller!.displayName,
       });
 
+      // Raise task_assigned or priority_task alerts (PRD GAP-API-008)
+      const StoreAlert = (await import('@/models/StoreAlert')).default;
+      if (assignee_id) {
+        await StoreAlert.create({
+          userId: assignee_id,
+          storeId: caller!.storeId,
+          category: 'task_assigned',
+          title: 'New Task Assigned',
+          body: `You have been assigned to task: "${task.title}".`,
+          read: false,
+          targetScreen: 'tasks',
+          targetArgument: task._id.toString(),
+        });
+      } else if (category === 'priority') {
+        const User = (await import('@/models/User')).default;
+        const staffUsers = await User.find({ storeId: caller!.storeId, role: 'Staff' }).select('_id');
+        if (staffUsers.length > 0) {
+          const priorityAlerts = staffUsers.map((u: any) => ({
+            userId: u._id.toString(),
+            storeId: caller!.storeId,
+            category: 'priority_task',
+            title: 'Priority Task Created',
+            body: `Priority task available: "${task.title}".`,
+            read: false,
+            targetScreen: 'tasks',
+            targetArgument: task._id.toString(),
+          }));
+          await StoreAlert.insertMany(priorityAlerts);
+        }
+      }
+
       return NextResponse.json({
         id: task._id.toString(),
         title: task.title,

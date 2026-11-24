@@ -88,6 +88,38 @@ export async function POST(
           }
           await attendance.save();
         }
+
+        // Raise check_in_outcome alert to the staff member
+        const StoreAlert = (await import('@/models/StoreAlert')).default;
+        await StoreAlert.create({
+          userId: approval.requesterId,
+          storeId: approval.storeId,
+          category: 'check_in_outcome',
+          title: `Manual Check-In ${approve ? 'Confirmed' : 'Declined'}`,
+          body: approve
+            ? `Your manual check-in request was confirmed by ${caller!.displayName}.`
+            : `Your manual check-in request was declined. Reason: ${reason || 'Manager declined'}.`,
+          read: false,
+          targetScreen: 'attendance',
+          targetArgument: attendance?._id?.toString() || approval.submittedAt.toISOString().split('T')[0],
+        });
+      }
+
+      // If it's an attendance correction request, raise alert to the staff member
+      if (approval.kind === 'attendance_correction') {
+        const StoreAlert = (await import('@/models/StoreAlert')).default;
+        await StoreAlert.create({
+          userId: approval.requesterId,
+          storeId: approval.storeId,
+          category: 'hours_to_confirm',
+          title: `Attendance Correction ${approve ? 'Approved' : 'Declined'}`,
+          body: approve
+            ? `Your attendance corrections for ${approval.detail?.week_start || 'week'} were approved by ${caller!.displayName}. Please confirm your week hours.`
+            : `Your attendance corrections for ${approval.detail?.week_start || 'week'} were declined. Reason: ${reason || 'Manager declined'}.`,
+          read: false,
+          targetScreen: 'hours',
+          targetArgument: approval.detail?.week_start || null,
+        });
       }
 
       return NextResponse.json({

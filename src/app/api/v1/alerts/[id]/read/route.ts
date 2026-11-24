@@ -29,9 +29,15 @@ export async function POST(
       alert.read = true;
       await alert.save();
 
+      const unreadCount = await StoreAlert.countDocuments({
+        userId: caller!.userId,
+        read: false,
+      });
+
       return NextResponse.json({
         id: alert._id.toString(),
         read: true,
+        unread_count: unreadCount,
         message: 'Alert marked as read',
       });
     } catch (error: any) {
@@ -39,4 +45,3 @@ export async function POST(
     }
   });
 }
-

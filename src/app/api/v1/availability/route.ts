@@ -55,17 +55,19 @@ export async function GET(req: NextRequest) {
 
       // Build map of date -> status
       const dateStatusMap = new Map<string, string>();
-      let latestSubmittedAt: Date | null = null;
+      let latestSubmittedAt: any = null;
 
-      records.forEach((rec) => {
-        if (!latestSubmittedAt || rec.submittedAt > latestSubmittedAt) {
+      records.forEach((rec: any) => {
+        if (!latestSubmittedAt || (rec.submittedAt && rec.submittedAt > latestSubmittedAt)) {
           latestSubmittedAt = rec.submittedAt;
         }
-        rec.days.forEach((d: IDayAvailability) => {
-          if (d.date.startsWith(month)) {
-            dateStatusMap.set(d.date, d.status);
-          }
-        });
+        if (Array.isArray(rec.days)) {
+          rec.days.forEach((d: IDayAvailability) => {
+            if (d.date.startsWith(month)) {
+              dateStatusMap.set(d.date, d.status);
+            }
+          });
+        }
       });
 
       const monthDays = monthDates.map((dateStr) => {
@@ -141,7 +143,7 @@ export async function GET(req: NextRequest) {
 
     const existingDaysMap = new Map<string, IDayAvailability>();
     if (record && Array.isArray(record.days)) {
-      record.days.forEach((d) => existingDaysMap.set(d.date, d));
+      record.days.forEach((d: any) => existingDaysMap.set(d.date, d));
     }
 
     const days = dayDates.map((dateStr) => {

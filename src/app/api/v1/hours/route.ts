@@ -268,6 +268,14 @@ export async function POST(req: NextRequest) {
         weekly.canConfirm = false;
         await weekly.save();
 
+        // State-derived alert clearing: "hours to confirm" goes once the week is confirmed (PRD GAP-API-008)
+        const StoreAlert = (await import('@/models/StoreAlert')).default;
+        await StoreAlert.deleteMany({
+          userId: caller!.userId,
+          category: 'hours_to_confirm',
+          targetArgument: weekStart,
+        });
+
         return NextResponse.json({
           status: 'confirmed',
           confirmed_at: weekly.confirmedAt.toISOString(),

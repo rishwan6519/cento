@@ -536,13 +536,38 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 
 ---
 
-### 11. Alerts Feed (GAP-API-008)
-* **List Alerts:** `GET /alerts`
-* **Mark Read:** `POST /alerts/{id}/read`
-* **Response Format (GET /alerts):**
+### 11. Alerts Feed & Lifecycle (GAP-API-008)
+* **List Alerts Feed:** `GET /alerts?page=1&limit=20&unread_only=false&category={category}&before={ISO_TIMESTAMP}`
+* **Mark Alert Read:** `POST /alerts/{id}/read`
+* **Mark All Alerts Read:** `POST /alerts/read-all`
+* **Broadcast Alert / Store Announcement:** `POST /alerts` *(Store Manager & Central Admin only)*
+
+#### Query Parameters (`GET /alerts`):
+* `page`: integer (default: 1)
+* `limit`: integer (default: 20, max: 100)
+* `unread_only`: boolean (`true` | `false`, default: `false`)
+* `category`: string (optional filter by category)
+* `before`: string (cursor ISO 8601 timestamp for cursor-based infinite scroll)
+
+#### Staff Categories in Use:
+1. `swap_decided`: Raised when Store Manager approves or declines a shift swap request.
+2. `task_assigned`: Raised when a task is directly assigned to the caller.
+3. `priority_task`: Raised when a high-priority unassigned task is created for the store team.
+4. `availability_due`: State-derived alert reminding staff to submit next week's availability before the Wednesday 23:59 deadline.
+5. `hours_to_confirm`: State-derived alert when a completed week requires staff confirmation. Automatically cleared when the week is confirmed (`status: "confirmed"`).
+6. `check_in_outcome`: Raised when Store Manager approves or declines a manual check-in request or location dispute.
+7. `store_announcement`: Broadcasted by Store Manager to all store staff members.
+8. `roster_published`: Broadcasted when Store Manager publishes the shift roster for an upcoming week.
+
+#### Response Format (`GET /alerts` 200 OK):
 ```json
 {
   "unread_count": number,
+  "total": number,
+  "page": number,
+  "limit": number,
+  "has_more": boolean,
+  "next_cursor": "string (ISO 8601)" | null,
   "alerts": [
     {
       "id": "string",
@@ -550,13 +575,66 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
       "title": "string",
       "body": "string",
       "read": boolean,
-      "target_screen": "string" | null,
+      "target_screen": "swaps" | "tasks" | "hours" | "availability" | "attendance" | "roster" | "announcements" | null,
       "target_argument": "string" | null,
       "created_at": "string (ISO 8601)"
     }
   ]
 }
 ```
+
+#### Response Format (`POST /alerts/{id}/read` 200 OK):
+```json
+{
+  "id": "string",
+  "read": true,
+  "unread_count": number,
+  "message": "string"
+}
+```
+
+#### Response Format (`POST /alerts/read-all` 200 OK):
+```json
+{
+  "read": true,
+  "unread_count": 0,
+  "marked_count": number,
+  "message": "string"
+}
+```
+
+#### Request Format (`POST /alerts`):
+```json
+{
+  "category": "store_announcement" | "priority_task",
+  "title": "string",
+  "body": "string",
+  "target_screen": "announcements" | "tasks" | "roster",
+  "target_argument": "string" | null,
+  "user_ids": [
+    "string"
+  ]
+}
+```
+
+#### Response Format (`POST /alerts` 200 OK):
+```json
+{
+  "category": "string",
+  "recipients_count": number,
+  "message": "string"
+}
+```
+
+#### 💡 Open Questions Resolved (GAP-API-008):
+1. **Pull feed, push payloads, or both?**
+   * **Answer:** **Both (Hybrid Architecture)**.
+     * **Push Payloads (APNS / FCM via `/push/register`):** Used for real-time alerting when the app is in the background or killed. Carries lightweight metadata (`badge`, `alert_id`, `category`, `target_screen`, `target_argument`, `title`, `body`) enabling instant deep-linking upon notification tap.
+     * **Pull Feed (`GET /alerts`):** The authoritative source of truth. Polled on app resume/foregrounding and notification screen open. Guarantees 100% synchronization, accurate unread badge count, and dynamically purges state-cleared alerts (e.g. "hours to confirm" disappears once confirmed).
+2. **How are target screens and arguments encoded, and is the feed paged?**
+   * **Answer:**
+     * **Target Screen & Argument Encoding:** `target_screen` is a structured string enum matching the mobile route hierarchy (`"swaps"`, `"tasks"`, `"hours"`, `"availability"`, `"attendance"`, `"roster"`, `"announcements"`). `target_argument` is the entity identifier (e.g. `taskId`, `shiftId`, or `weekStart` like `"2026-11-23"`). Mobile routers unpack this directly via `Navigator.pushNamed(context, alert.target_screen, arguments: alert.target_argument)`.
+     * **Pagination:** The feed is fully cursor and offset paged via query parameters `page=1&limit=20` or cursor `before=ISO_TIMESTAMP`. The response includes `has_more` and `next_cursor` alongside the global `unread_count`.
 
 ---
 
