@@ -2360,7 +2360,7 @@ export default function AccountAdminDashboard() {
   return (
     <div className="flex h-screen bg-[#EBF5F6] font-sans overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-[260px] bg-[#122A30] flex flex-col h-full text-white/80 shrink-0 shadow-xl z-20">
+      <aside className={`bg-[#122A30] flex flex-col h-full text-white/80 shrink-0 shadow-xl z-20 transition-all duration-300 ${activeView === "templateEditor" ? "w-0 opacity-0 overflow-hidden pointer-events-none p-0" : "w-[260px]"}`}>
         <div className="p-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#00BCD4] flex items-center justify-center shrink-0 text-white shadow-md">
             <MonitorSmartphone size={24} />
@@ -2513,8 +2513,8 @@ export default function AccountAdminDashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 content-scrollbar bg-[#EBF5F6]">
-          <div className="max-w-[1200px] mx-auto">
+        <div className={`flex-1 overflow-y-auto ${activeView === "templateEditor" ? "p-0 overflow-hidden bg-white" : "p-8 content-scrollbar bg-[#EBF5F6]"}`}>
+          <div className={activeView === "templateEditor" ? "w-full h-full" : "max-w-[1200px] mx-auto"}>
              {renderContent()}
           </div>
         </div>

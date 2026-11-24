@@ -8,7 +8,6 @@ import {
   FaRotateRight,
   FaFloppyDisk,
   FaVideo,
-  FaFilm,
   FaLayerGroup,
   FaImage,
   FaMusic,
@@ -40,603 +39,44 @@ import {
   FaAlignRight,
   FaCrosshairs,
   FaUpload,
+  FaFont,
+  FaPalette,
+  FaStar,
+  FaShapes,
+  FaCirclePlay,
+  FaArrowsUpDownLeftRight,
 } from "react-icons/fa6";
 import { DEFAULT_FOOTER_TEXT, sanitizeFooter } from "@/lib/videoRenderer/types";
+import {
+  AspectRatio,
+  LayerKey,
+  LayerStyle,
+  LayersConfig,
+  AspectDimension,
+  DecorItem,
+  SavedTemplateItem,
+  DemoAudioTune,
+  OfferBadgePreset,
+  TemplateEditorProps,
+  ASPECT_SPECS,
+  DEMO_AUDIO_TUNES,
+  DEFAULT_LAYERS,
+  OFFER_BADGE_PRESETS,
+  STICKER_PRESETS,
+  PRESET_GRADIENTS,
+  PRESET_SOLID_COLORS,
+  OFFER_TYPES,
+  AI_STYLES,
+  AI_COLOR_THEMES,
+  globalBadgeImagesCache,
+  wrapTextCanvas,
+} from "./templateEditorConstants";
 
-// ─── Interfaces & Types ───────────────────────────────────────────────────────
-export type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
-export type LayerKey =
-  | "product"
-  | "discount"
-  | "headline"
-  | "description"
-  | "price"
-  | "oldPrice"
-  | "validity"
-  | "cta"
-  | "qrCode"
-  | "storeName"
-  | "footer"
-  | "logo";
+// Re-export types so external files importing from TemplateEditorView continue working seamlessly
+export type { AspectRatio, LayerKey, LayerStyle, LayersConfig, AspectDimension, DecorItem, SavedTemplateItem };
+export { ASPECT_SPECS, DEMO_AUDIO_TUNES, DEFAULT_LAYERS, OFFER_BADGE_PRESETS, STICKER_PRESETS };
 
-export interface LayerStyle {
-  type: "text" | "product" | "logo" | "decor";
-  text?: string;
-  x: number; // 0.0 - 1.0 (relative)
-  y: number; // 0.0 - 1.0 (relative)
-  size: number; // percentage scale
-  boxHeight?: number; // custom box height scale or percentage
-  boxWidth?: number; // custom box width scale or percentage
-  cropInset?: { top: number; right: number; bottom: number; left: number };
-  font?: string;
-  fontWeight?: "normal" | "bold";
-  fontStyle?: "normal" | "italic";
-  textAlign?: "left" | "center" | "right";
-  hidden?: boolean;
-  fontColor?: string;
-  shape?: "none" | "circle" | "pill" | "rect" | "ribbon" | "parallelogram" | "rounded" | "origami" | "sticker";
-  badgeImageUrl?: string;
-  badgeStyle?: string;
-  overlayText?: boolean;
-  borderRadius?: number;
-  borderWidth?: number;
-  shadow?: boolean;
-  bgMode?: "color" | "transparent";
-  bgColor?: string;
-  border?: "0" | "1";
-  borderColor?: string;
-  animation?: string;
-  animStart?: number;
-  animEnd?: number;
-}
-
-export type LayersConfig = Record<LayerKey, LayerStyle>;
-
-export interface AspectDimension {
-  ratio: AspectRatio;
-  label: string;
-  width: number;
-  height: number;
-}
-
-export interface DecorItem {
-  id: string;
-  url: string;
-  x: number;
-  y: number;
-  size: number;
-  name?: string;
-  hidden?: boolean;
-  animation?: string;
-  borderRadius?: number;
-  shape?: string;
-  borderWidth?: number;
-  borderColor?: string;
-  shadow?: boolean;
-}
-
-export interface SavedTemplateItem {
-  _id: string;
-  templateId?: number | string;
-  templateName: string;
-  templateDescription?: string;
-  aspectRatio?: string;
-  videoDuration?: number;
-  status?: string;
-  layers?: any;
-  aspectStore?: any;
-  backgroundUrl?: string;
-  aspectBackgrounds?: Record<string, string>;
-  logoUrl?: string;
-  productUrl?: string;
-  musicUrl?: string;
-  animationStyle?: string;
-  animation?: any;
-  offerType?: string;
-  offertypeId?: string;
-  offertypename?: string;
-  offer_type?: {
-    id?: string;
-    name?: string;
-    offertypeId?: string;
-    offertypename?: string;
-  };
-  offerTitle?: string;
-  offerDescription?: string;
-  ctaButtonText?: string;
-  discountLabel?: string;
-  priceLabel?: string;
-  footerText?: string;
-  thumbnail?: string;
-  thumbnail_url?: string;
-  preview_url?: string;
-  previewUrl?: string;
-  [key: string]: any;
-  aiStyle?: string;
-  aiColorTheme?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  isDummy?: boolean;
-  decorations?: DecorItem[];
-  lastRenderedVideoUrl?: string;
-}
-
-const ASPECT_SPECS: Record<AspectRatio, AspectDimension> = {
-  "9:16": { ratio: "9:16", label: "9:16 Portrait (Reels/Mobile)", width: 1080, height: 1920 },
-  "16:9": { ratio: "16:9", label: "16:9 Landscape (TV/Signage)", width: 1920, height: 1080 },
-  "1:1": { ratio: "1:1", label: "1:1 Square (Feed/Post)", width: 1080, height: 1080 },
-  "4:5": { ratio: "4:5", label: "4:5 Portrait (Social Ad)", width: 1080, height: 1350 },
-};
-
-export interface DemoAudioTune {
-  id: string;
-  name: string;
-  desc: string;
-  url: string;
-  icon: string;
-}
-
-export const DEMO_AUDIO_TUNES: DemoAudioTune[] = [
-  { id: "upbeat_retail", name: "Bright Retail Chime", desc: "Soft acoustic bells & gentle marimba chords (Pure tune, no vocals)", url: "/audio/presets/upbeat_retail.mp3", icon: "🔔" },
-  { id: "ambient_piano", name: "Soft Ambient Piano", desc: "Calm, relaxing instrumental piano chord progression", url: "/audio/presets/ambient_piano.mp3", icon: "🎹" },
-  { id: "energetic_sale", name: "Retail Marimba Beat", desc: "Clean wooden marimba plucks with a subtle store groove", url: "/audio/presets/energetic_sale.mp3", icon: "🛍️" },
-  { id: "luxury_minimal", name: "Luxury Ambient Lounge", desc: "Warm soothing synth pads & glass bell accents", url: "/audio/presets/luxury_minimal.mp3", icon: "✨" },
-  { id: "modern_store", name: "Gentle Acoustic Melody", desc: "Warm nylon-pluck acoustic guitar arpeggios", url: "/audio/presets/modern_store.mp3", icon: "🎸" },
-  { id: "electric_pulse", name: "Modern Tech Pulse", desc: "Minimalist, rhythmic digital background tune", url: "/audio/presets/electric_pulse.mp3", icon: "⚡" },
-];
-
-const DEFAULT_LAYERS: Record<AspectRatio, LayersConfig> = {
-  "16:9": {
-    product: { type: "product", x: 0.18, y: 0.45, size: 38, shape: "none", bgMode: "transparent", bgColor: "transparent", animation: "slide_up", animStart: 0.2, animEnd: 1.2 },
-    discount: { type: "text", text: "75% OFF", x: 0.44, y: 0.54, size: 7.2, shape: "origami", fontColor: "#ffffff", bgColor: "#ffc700", border: "1", borderColor: "#047857", font: "Arial", animation: "zoom_bounce", animStart: 0.8, animEnd: 1.5 },
-    headline: { type: "text", text: "Grab the crunch before it's gone!!", x: 0.74, y: 0.36, size: 3.8, boxWidth: 44, shape: "none", fontColor: "#ffffff", font: "Arial", fontWeight: "bold", textAlign: "center", animation: "fade_in", animStart: 1.4, animEnd: 2.2 },
-    description: { type: "text", text: "Ritz Crackers 300g available at an exclusive discount!!", x: 0.74, y: 0.58, size: 2.4, boxWidth: 38, shape: "none", fontColor: "#ffffff", font: "Arial", textAlign: "center", animation: "fade_up", animStart: 1.8, animEnd: 2.6 },
-    price: { type: "text", text: "", x: 0.64, y: 0.68, size: 3.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 2.0, animEnd: 2.7 },
-    oldPrice: { type: "text", text: "", x: 0.84, y: 0.68, size: 2.6, shape: "none", fontColor: "#fca5a5", font: "Arial", animation: "fade_in", animStart: 2.0, animEnd: 2.7 },
-    validity: { type: "text", text: "Offer Validity: 1st Aug - 31st Dec 2026", x: 0.74, y: 0.78, size: 2.0, shape: "pill", fontColor: "#111111", bgColor: "#ffffff", border: "0", font: "Arial", animation: "slide_up", animStart: 2.4, animEnd: 3.1 },
-    cta: { type: "text", text: "VISIT STORE ➔", x: 0.74, y: 0.88, size: 2.4, shape: "pill", fontColor: "#ffffff", bgColor: "#e51a24", border: "0", font: "Arial", animation: "pulse", animStart: 2.6, animEnd: 3.4 },
-    qrCode: { type: "text", text: "", x: 0.90, y: 0.84, size: 1.8, shape: "rect", fontColor: "#ffffff", bgColor: "#051419", border: "1", borderColor: "#ffffff", animation: "fade_in", animStart: 2.8, animEnd: 3.6 },
-    storeName: { type: "text", text: "URBAN RAIN", x: 0.165, y: 0.05, size: 2.0, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-    footer: { type: "text", text: "*T&C apply. Images for representation only.", x: 0.50, y: 0.96, size: 1.5, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
-    logo: { type: "logo", x: 0.165, y: 0.09, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-  },
-  "9:16": {
-    product: { type: "product", x: 0.50, y: 0.28, size: 65, animation: "slide_up", animStart: 0.2, animEnd: 1.2 },
-    discount: { type: "text", text: "75% OFF", x: 0.50, y: 0.46, size: 7.5, shape: "origami", fontColor: "#ffffff", bgColor: "#ffc700", border: "1", borderColor: "#047857", font: "Arial", animation: "zoom_bounce", animStart: 0.8, animEnd: 1.5 },
-    headline: { type: "text", text: "Grab the crunch before it's gone!!", x: 0.50, y: 0.58, size: 3.8, boxWidth: 80, shape: "none", fontColor: "#ffffff", font: "Arial", textAlign: "center", animation: "fade_in", animStart: 1.4, animEnd: 2.2 },
-    description: { type: "text", text: "Ritz Crackers 300g available at an exclusive discount!!", x: 0.50, y: 0.69, size: 2.4, boxWidth: 75, shape: "none", fontColor: "#ffffff", font: "Arial", textAlign: "center", animation: "fade_up", animStart: 1.8, animEnd: 2.6 },
-    price: { type: "text", text: "", x: 0.35, y: 0.76, size: 3.5, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 2.0, animEnd: 2.7 },
-    oldPrice: { type: "text", text: "", x: 0.65, y: 0.76, size: 2.8, shape: "none", fontColor: "#fca5a5", font: "Arial", animation: "fade_in", animStart: 2.0, animEnd: 2.7 },
-    validity: { type: "text", text: "Offer Validity: 1st Aug - 31st Dec 2026", x: 0.50, y: 0.79, size: 2.0, shape: "pill", fontColor: "#111111", bgColor: "#ffffff", border: "0", font: "Arial", animation: "slide_up", animStart: 2.4, animEnd: 3.1 },
-    cta: { type: "text", text: "VISIT STORE ➔", x: 0.50, y: 0.88, size: 2.5, shape: "pill", fontColor: "#ffffff", bgColor: "#e51a24", border: "0", font: "Arial", animation: "pulse", animStart: 2.6, animEnd: 3.4 },
-    qrCode: { type: "text", text: "", x: 0.86, y: 0.90, size: 1.8, shape: "rect", fontColor: "#ffffff", bgColor: "#051419", border: "1", borderColor: "#ffffff", animation: "fade_in", animStart: 2.8, animEnd: 3.6 },
-    storeName: { type: "text", text: "URBAN RAIN", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-    footer: { type: "text", text: DEFAULT_FOOTER_TEXT, x: 0.50, y: 0.95, size: 1.5, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
-    logo: { type: "logo", x: 0.50, y: 0.05, size: 11, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-  },
-  "1:1": {
-    product: { type: "product", x: 0.28, y: 0.42, size: 50, animation: "slide_up", animStart: 0.2, animEnd: 1.2 },
-    discount: { type: "text", text: "75% OFF", x: 0.35, y: 0.65, size: 7.0, shape: "origami", fontColor: "#ffffff", bgColor: "#ffc700", border: "1", borderColor: "#047857", font: "Arial", animation: "zoom_bounce", animStart: 0.8, animEnd: 1.5 },
-    headline: { type: "text", text: "Grab the crunch before it's gone!!", x: 0.70, y: 0.28, size: 3.6, boxWidth: 48, shape: "none", fontColor: "#ffffff", font: "Arial", textAlign: "center", animation: "fade_in", animStart: 1.4, animEnd: 2.2 },
-    description: { type: "text", text: "Ritz Crackers 300g available at an exclusive discount!!", x: 0.70, y: 0.48, size: 2.4, boxWidth: 44, shape: "none", fontColor: "#ffffff", font: "Arial", textAlign: "center", animation: "fade_up", animStart: 1.8, animEnd: 2.6 },
-    price: { type: "text", text: "", x: 0.62, y: 0.60, size: 3.8, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "zoom_bounce", animStart: 2.0, animEnd: 2.7 },
-    oldPrice: { type: "text", text: "", x: 0.82, y: 0.60, size: 2.8, shape: "none", fontColor: "#fca5a5", font: "Arial", animation: "fade_in", animStart: 2.0, animEnd: 2.7 },
-    validity: { type: "text", text: "Offer Validity: 1st Aug - 31st Dec 2026", x: 0.70, y: 0.68, size: 2.0, shape: "pill", fontColor: "#111111", bgColor: "#ffffff", border: "0", font: "Arial", animation: "slide_up", animStart: 2.4, animEnd: 3.1 },
-    cta: { type: "text", text: "VISIT STORE ➔", x: 0.70, y: 0.80, size: 2.5, shape: "pill", fontColor: "#ffffff", bgColor: "#e51a24", border: "0", font: "Arial", animation: "pulse", animStart: 2.6, animEnd: 3.4 },
-    qrCode: { type: "text", text: "", x: 0.88, y: 0.88, size: 1.8, shape: "rect", fontColor: "#ffffff", bgColor: "#051419", border: "1", borderColor: "#ffffff", animation: "fade_in", animStart: 2.8, animEnd: 3.6 },
-    storeName: { type: "text", text: "URBAN RAIN", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-    footer: { type: "text", text: DEFAULT_FOOTER_TEXT, x: 0.75, y: 0.94, size: 1.4, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
-    logo: { type: "logo", x: 0.22, y: 0.08, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-  },
-  "4:5": {
-    product: { type: "product", x: 0.28, y: 0.40, size: 52, animation: "slide_up", animStart: 0.2, animEnd: 1.2 },
-    discount: { type: "text", text: "75% OFF", x: 0.36, y: 0.64, size: 7.2, shape: "origami", fontColor: "#ffffff", bgColor: "#ffc700", border: "1", borderColor: "#047857", font: "Arial", animation: "zoom_bounce", animStart: 0.8, animEnd: 1.5 },
-    headline: { type: "text", text: "Grab the crunch before it's gone!!", x: 0.70, y: 0.28, size: 3.6, boxWidth: 48, shape: "none", fontColor: "#ffffff", font: "Arial", textAlign: "center", animation: "fade_in", animStart: 1.4, animEnd: 2.2 },
-    description: { type: "text", text: "Ritz Crackers 300g available at an exclusive discount!!", x: 0.70, y: 0.48, size: 2.4, boxWidth: 44, shape: "none", fontColor: "#ffffff", font: "Arial", textAlign: "center", animation: "fade_up", animStart: 1.8, animEnd: 2.6 },
-    price: { type: "text", text: "", x: 0.36, y: 0.76, size: 4.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "zoom_bounce", animStart: 2.0, animEnd: 2.7 },
-    oldPrice: { type: "text", text: "", x: 0.64, y: 0.76, size: 3.0, shape: "none", fontColor: "#fca5a5", font: "Arial", animation: "fade_in", animStart: 2.0, animEnd: 2.7 },
-    validity: { type: "text", text: "Offer Validity: 1st Aug - 31st Dec 2026", x: 0.70, y: 0.68, size: 2.0, shape: "pill", fontColor: "#111111", bgColor: "#ffffff", border: "0", font: "Arial", animation: "slide_up", animStart: 2.4, animEnd: 3.1 },
-    cta: { type: "text", text: "VISIT STORE ➔", x: 0.70, y: 0.80, size: 2.5, shape: "pill", fontColor: "#ffffff", bgColor: "#e51a24", border: "0", font: "Arial", animation: "pulse", animStart: 2.6, animEnd: 3.4 },
-    qrCode: { type: "text", text: "", x: 0.86, y: 0.90, size: 1.8, shape: "rect", fontColor: "#ffffff", bgColor: "#051419", border: "1", borderColor: "#ffffff", animation: "fade_in", animStart: 2.8, animEnd: 3.6 },
-    storeName: { type: "text", text: "URBAN RAIN", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-    footer: { type: "text", text: DEFAULT_FOOTER_TEXT, x: 0.75, y: 0.94, size: 1.4, shape: "none", fontColor: "#ffffff", font: "Arial", animation: "fade_in", animStart: 3.0, animEnd: 3.6 },
-    logo: { type: "logo", x: 0.23, y: 0.08, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-  },
-};
-
-
-export interface OfferBadgePreset {
-  id: string;
-  name: string;
-  dataUrl: string;
-}
-
-export const OFFER_BADGE_PRESETS: OfferBadgePreset[] = [
-  {
-    id: "origami_retail",
-    name: "3D Origami Retail Banner",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <filter id="ogShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="-2" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.4" />
-        </filter>
-        <linearGradient id="ogGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#ffd000"/>
-          <stop offset="100%" stop-color="#ff9900"/>
-        </linearGradient>
-      </defs>
-      <g transform="rotate(-6 120 60)">
-        <polygon points="26,102 10,122 56,102" fill="#047857" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>
-        <rect x="20" y="16" width="200" height="88" rx="14" fill="url(#ogGrad)" stroke="#ffffff" stroke-width="4" filter="url(#ogShadow)"/>
-        <polygon points="10,24 20,36 8,38" fill="#ef4444"/>
-        <polygon points="220,18 232,28 222,34" fill="#facc15"/>
-        <polygon points="226,98 238,108 226,114" fill="#ef4444"/>
-        <polygon points="12,90 22,96 14,102" fill="#10b981"/>
-      </g>
-    </svg>`),
-  },
-  {
-    id: "hot_deal_fire",
-    name: "Hot Deal Fire Badge",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="fireGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#dc2626"/>
-          <stop offset="50%" stop-color="#ea580c"/>
-          <stop offset="100%" stop-color="#f59e0b"/>
-        </linearGradient>
-        <filter id="fireGlow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#ea580c" flood-opacity="0.5" />
-        </filter>
-      </defs>
-      <rect x="12" y="18" width="216" height="84" rx="42" fill="url(#fireGrad)" stroke="#ffffff" stroke-width="4" filter="url(#fireGlow)"/>
-      <rect x="18" y="24" width="204" height="72" rx="36" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="6,4"/>
-      <path d="M42,76 C32,76 26,68 28,58 C29,52 34,46 36,40 C38,48 42,48 45,43 C50,52 52,60 49,68 C48,72 45,76 42,76 Z" fill="#ffd000"/>
-      <path d="M41,74 C36,74 33,69 34,62 C35,58 38,54 39,50 C40,55 43,55 44,52 C46,58 46,63 45,68 C44,71 43,74 41,74 Z" fill="#ffffff"/>
-      <path d="M198,76 C188,76 182,68 184,58 C185,52 190,46 192,40 C194,48 198,48 201,43 C206,52 208,60 205,68 C204,72 201,76 198,76 Z" fill="#ffd000"/>
-    </svg>`),
-  },
-  {
-    id: "flash_sale_neon",
-    name: "Flash Sale Neon",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#0f172a"/>
-          <stop offset="100%" stop-color="#1e293b"/>
-        </linearGradient>
-        <filter id="neonShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.6"/>
-        </filter>
-      </defs>
-      <polygon points="28,16 228,16 212,104 12,104" fill="url(#neonGrad)" stroke="#facc15" stroke-width="4" filter="url(#neonShadow)"/>
-      <polygon points="36,24 220,24 206,96 22,96" fill="none" stroke="#facc15" stroke-width="1.5" stroke-opacity="0.5"/>
-      <polygon points="34,42 46,42 40,58 50,58 32,82 36,64 28,64" fill="#facc15"/>
-      <polygon points="204,42 216,42 210,58 220,58 202,82 206,64 198,64" fill="#facc15"/>
-    </svg>`),
-  },
-  {
-    id: "starburst_sale",
-    name: "Starburst Explosion",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="sbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#fef08a"/>
-          <stop offset="50%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#dc2626"/>
-        </linearGradient>
-        <filter id="sbShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.5"/>
-        </filter>
-      </defs>
-      <path d="M120,8 L138,24 L164,12 L174,36 L202,34 L202,60 L226,70 L214,94 L230,114 L204,116 L192,138 L168,126 L150,144 L120,132 L90,144 L72,126 L48,138 L36,116 L10,114 L26,94 L14,70 L38,60 L38,34 L66,36 L76,12 L102,24 Z" transform="translate(0, -12)" fill="url(#sbGrad)" stroke="#ffffff" stroke-width="3.5" filter="url(#sbShadow)"/>
-      <circle cx="120" cy="60" r="46" fill="rgba(255,255,255,0.18)" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4,3"/>
-    </svg>`),
-  },
-  {
-    id: "best_seller_star",
-    name: "Best Seller Gold Star",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="bsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#1e3a8a"/>
-          <stop offset="100%" stop-color="#3b82f6"/>
-        </linearGradient>
-        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#fef08a"/>
-          <stop offset="50%" stop-color="#fbbf24"/>
-          <stop offset="100%" stop-color="#d97706"/>
-        </linearGradient>
-      </defs>
-      <rect x="14" y="16" width="212" height="88" rx="18" fill="url(#bsGrad)" stroke="url(#goldGrad)" stroke-width="4"/>
-      <rect x="20" y="22" width="200" height="76" rx="14" fill="none" stroke="rgba(251,191,36,0.4)" stroke-width="1.5"/>
-      <polygon points="38,54 41,62 49,63 43,69 45,77 38,72 31,77 33,69 27,63 35,62" fill="url(#goldGrad)"/>
-      <polygon points="202,54 205,62 213,63 207,69 209,77 202,72 195,77 197,69 191,63 199,62" fill="url(#goldGrad)"/>
-    </svg>`),
-  },
-  {
-    id: "special_ribbon",
-    name: "Special Offer Ribbon",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="ribGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#7c3aed"/>
-          <stop offset="50%" stop-color="#c026d3"/>
-          <stop offset="100%" stop-color="#db2777"/>
-        </linearGradient>
-        <filter id="ribShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.45"/>
-        </filter>
-      </defs>
-      <polygon points="12,20 228,20 214,60 228,100 12,100 26,60" fill="url(#ribGrad)" stroke="#ffffff" stroke-width="3" filter="url(#ribShadow)"/>
-      <line x1="30" y1="28" x2="210" y2="28" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-dasharray="5,4"/>
-      <line x1="30" y1="92" x2="210" y2="92" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-dasharray="5,4"/>
-    </svg>`),
-  },
-  {
-    id: "retail_hang_tag",
-    name: "Retail Price Hang Tag",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="tagGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#ef4444"/>
-          <stop offset="100%" stop-color="#b91c1c"/>
-        </linearGradient>
-        <filter id="tagShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="-2" dy="5" stdDeviation="4" flood-color="#000000" flood-opacity="0.4"/>
-        </filter>
-      </defs>
-      <g transform="rotate(-5 120 60)">
-        <polygon points="46,16 224,16 224,104 46,104 12,60" fill="url(#tagGrad)" stroke="#ffffff" stroke-width="3.5" filter="url(#tagShadow)"/>
-        <circle cx="38" cy="60" r="10" fill="#0f172a" stroke="#ffffff" stroke-width="2.5"/>
-        <polygon points="52,24 216,24 216,96 52,96 22,60" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="4,4"/>
-      </g>
-    </svg>`),
-  },
-  {
-    id: "circle_sale_stamp",
-    name: "Circle Sale Stamp",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
-      <defs>
-        <linearGradient id="stampGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#dc2626"/>
-          <stop offset="100%" stop-color="#991b1b"/>
-        </linearGradient>
-        <filter id="stampShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.5"/>
-        </filter>
-      </defs>
-      <circle cx="80" cy="80" r="72" fill="url(#stampGrad)" stroke="#ffffff" stroke-width="4" filter="url(#stampShadow)"/>
-      <circle cx="80" cy="80" r="62" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="5,4"/>
-      <circle cx="80" cy="80" r="54" fill="rgba(0,0,0,0.15)"/>
-    </svg>`),
-  },
-  {
-    id: "cyber_neon_pill",
-    name: "Cyber Neon Pill",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="cybGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#06b6d4"/>
-          <stop offset="50%" stop-color="#3b82f6"/>
-          <stop offset="100%" stop-color="#8b5cf6"/>
-        </linearGradient>
-        <filter id="cybGlow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#06b6d4" flood-opacity="0.6"/>
-        </filter>
-      </defs>
-      <rect x="14" y="20" width="212" height="80" rx="40" fill="url(#cybGrad)" stroke="#ffffff" stroke-width="3.5" filter="url(#cybGlow)"/>
-      <rect x="20" y="26" width="200" height="68" rx="34" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
-    </svg>`),
-  },
-  {
-    id: "emerald_saver",
-    name: "Emerald Super Saver",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="emGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#059669"/>
-          <stop offset="100%" stop-color="#064e3b"/>
-        </linearGradient>
-      </defs>
-      <rect x="14" y="18" width="212" height="84" rx="20" fill="url(#emGrad)" stroke="#34d399" stroke-width="3.5"/>
-      <rect x="20" y="24" width="200" height="72" rx="14" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-dasharray="6,4"/>
-      <path d="M38,44 C48,44 54,54 50,66 C40,66 34,56 38,44 Z" fill="#34d399"/>
-      <path d="M202,44 C192,44 186,54 190,66 C200,66 206,56 202,44 Z" fill="#34d399"/>
-    </svg>`),
-  },
-  {
-    id: "golden_vip_badge",
-    name: "Golden VIP Luxury",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <linearGradient id="vipGold" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#fef08a"/>
-          <stop offset="40%" stop-color="#eab308"/>
-          <stop offset="70%" stop-color="#ca8a04"/>
-          <stop offset="100%" stop-color="#854d0e"/>
-        </linearGradient>
-      </defs>
-      <rect x="14" y="16" width="212" height="88" rx="12" fill="#09090b" stroke="url(#vipGold)" stroke-width="4"/>
-      <rect x="20" y="22" width="200" height="76" rx="8" fill="none" stroke="url(#vipGold)" stroke-width="1.5" stroke-opacity="0.6"/>
-      <polygon points="120,28 126,38 134,32 130,44 110,44 106,32 114,38" fill="url(#vipGold)"/>
-    </svg>`),
-  },
-  {
-    id: "clearance_red_stamp",
-    name: "Clearance Sale Stamp",
-    dataUrl: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-      <defs>
-        <filter id="distress" x="-10%" y="-10%" width="120%" height="120%">
-          <feDropShadow dx="-2" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
-        </filter>
-      </defs>
-      <g transform="rotate(-8 120 60)">
-        <rect x="16" y="18" width="208" height="84" rx="8" fill="#dc2626" stroke="#ffffff" stroke-width="4" filter="url(#distress)"/>
-        <rect x="22" y="24" width="196" height="72" rx="4" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="8,5"/>
-      </g>
-    </svg>`),
-  },
-];
-
-const globalBadgeImagesCache = new Map<string, HTMLImageElement>();
-
-const STICKER_PRESETS = [
-  {
-    name: "75% OFF Retail Badge",
-    defaultSize: 18,
-    url: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" width="200" height="120">
-      <defs>
-        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#ffdd00"/>
-          <stop offset="100%" stop-color="#ff8800"/>
-        </linearGradient>
-        <filter id="f1" x="-10%" y="-10%" width="120%" height="130%">
-          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.5"/>
-        </filter>
-      </defs>
-      <!-- Shadow Green Flap -->
-      <polygon points="18,102 4,118 42,102" fill="#047857" stroke="#ffffff" stroke-width="2"/>
-      <!-- Main Badge -->
-      <rect x="10" y="10" width="180" height="88" rx="14" fill="url(#g1)" stroke="#ffffff" stroke-width="4" filter="url(#f1)" transform="rotate(-6 100 54)"/>
-      <text x="100" y="66" font-family="Arial, sans-serif" font-weight="900" font-size="34" fill="#ffffff" text-anchor="middle" transform="rotate(-6 100 54)">75% OFF</text>
-    </svg>`),
-  },
-  {
-    name: "Hot Deal Fire Badge",
-    defaultSize: 16,
-    url: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">
-      <defs>
-        <linearGradient id="gf" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#ef4444"/>
-          <stop offset="100%" stop-color="#f97316"/>
-        </linearGradient>
-      </defs>
-      <rect x="6" y="8" width="188" height="84" rx="42" fill="url(#gf)" stroke="#ffffff" stroke-width="3"/>
-      <text x="100" y="60" font-family="Arial, sans-serif" font-weight="900" font-size="28" fill="#ffffff" text-anchor="middle">🔥 HOT DEAL</text>
-    </svg>`),
-  },
-  {
-    name: "Flash Sale Badge",
-    defaultSize: 16,
-    url: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">
-      <rect x="6" y="8" width="188" height="84" rx="12" fill="#051419" stroke="#eab308" stroke-width="3.5"/>
-      <rect x="12" y="14" width="176" height="72" rx="8" fill="#eab308"/>
-      <text x="100" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#000000" text-anchor="middle">⚡ FLASH SALE</text>
-    </svg>`),
-  },
-  {
-    name: "Best Seller Star",
-    defaultSize: 16,
-    url: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">
-      <defs>
-        <linearGradient id="gb" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#1e3a8a"/>
-          <stop offset="100%" stop-color="#3b82f6"/>
-        </linearGradient>
-      </defs>
-      <rect x="6" y="8" width="188" height="84" rx="20" fill="url(#gb)" stroke="#fbbf24" stroke-width="3"/>
-      <text x="100" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="24" fill="#ffffff" text-anchor="middle">⭐ BEST SELLER</text>
-    </svg>`),
-  },
-  {
-    name: "Free Shipping Badge",
-    defaultSize: 16,
-    url: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">
-      <rect x="6" y="8" width="188" height="84" rx="42" fill="#047857" stroke="#ffffff" stroke-width="3"/>
-      <text x="100" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="22" fill="#ffffff" text-anchor="middle">🚚 FREE SHIPPING</text>
-    </svg>`),
-  },
-  {
-    name: "Special Offer Ribbon",
-    defaultSize: 17,
-    url: "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100">
-      <defs>
-        <linearGradient id="gso" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#7c3aed"/>
-          <stop offset="100%" stop-color="#db2777"/>
-        </linearGradient>
-      </defs>
-      <polygon points="10,12 190,12 178,50 190,88 10,88 22,50" fill="url(#gso)" stroke="#ffffff" stroke-width="2.5"/>
-      <text x="100" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="22" fill="#ffffff" text-anchor="middle">🏷️ SPECIAL OFFER</text>
-    </svg>`),
-  },
-];
-
-const PRESET_GRADIENTS = [
-  { name: "Centelon Dark", grad: "linear-gradient(135deg, #0B2830 0%, #163B45 50%, #051419 100%)", c1: "#0B2830", c2: "#051419" },
-  { name: "Midnight Onyx", grad: "linear-gradient(135deg, #18181B 0%, #27272A 60%, #09090B 100%)", c1: "#18181B", c2: "#09090B" },
-  { name: "Deep Slate", grad: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #020617 100%)", c1: "#0f172a", c2: "#020617" },
-  { name: "Teal Aqua", grad: "linear-gradient(135deg, #11B5BB 0%, #0B6B6F 60%, #06393B 100%)", c1: "#11B5BB", c2: "#06393B" },
-  { name: "Sunset Ember", grad: "linear-gradient(135deg, #F05A28 0%, #DC4B1D 60%, #871900 100%)", c1: "#F05A28", c2: "#871900" },
-  { name: "Royal Indigo", grad: "linear-gradient(135deg, #4338CA 0%, #312E81 60%, #1E1B4B 100%)", c1: "#4338CA", c2: "#1E1B4B" },
-  { name: "Emerald Forest", grad: "linear-gradient(135deg, #065f46 0%, #047857 50%, #022c22 100%)", c1: "#065f46", c2: "#022c22" },
-  { name: "Crimson Velvet", grad: "linear-gradient(135deg, #991b1b 0%, #7f1d1d 60%, #450a0a 100%)", c1: "#991b1b", c2: "#450a0a" },
-  { name: "Cyber Purple", grad: "linear-gradient(135deg, #6b21a8 0%, #581c87 60%, #3b0764 100%)", c1: "#6b21a8", c2: "#3b0764" },
-];
-
-const PRESET_SOLID_COLORS = [
-  { name: "Centelon Dark", color: "#0B2830" },
-  { name: "Midnight Black", color: "#09090B" },
-  { name: "Deep Slate", color: "#0f172a" },
-  { name: "Dark Navy", color: "#0b192c" },
-  { name: "Clean White", color: "#ffffff" },
-  { name: "Forest Green", color: "#064e3b" },
-  { name: "Crimson Red", color: "#7f1d1d" },
-  { name: "Charcoal Gray", color: "#1e293b" },
-];
-
-const OFFER_TYPES = [
-  "Flash Sale",
-  "Percentage Discount",
-  "Flat Rate Off",
-  "Buy 1 Get 1 (BOGO)",
-  "Weekend Special",
-  "Clearance Sale",
-  "Festive Offer",
-  "New Arrival Spotlight",
-  "Member Exclusive",
-];
-
-const AI_STYLES = [
-  "Premium commercial",
-  "Luxury",
-  "Minimal",
-  "Natural / organic",
-  "Vibrant / colorful",
-  "Soft lifestyle",
-  "Studio product shot",
-  "Funny / playful",
-  "Elegant",
-  "Bold retail",
-];
-
-const AI_COLOR_THEMES = [
-  "None (natural colors)",
-  "Warm neutrals",
-  "Cool neutrals",
-  "Black & white",
-  "Gold",
-  "Rose gold",
-  "Silver",
-  "Emerald",
-  "Purple",
-  "Red",
-  "Blue",
-  "Pink",
-  "Orange",
-  "Earth tones",
-];
-
-export interface TemplateEditorProps {
-  onNavigate?: (view: any, extra?: any) => void;
-  initialTemplateId?: string;
-  initialRatio?: AspectRatio;
-}
-
-
-
-// ─── Live Animated Preview Canvas for Create Template Modal ─────────────────
+// ─── Live Animated Preview Canvas for Create Modal ──────────────────────────
 const CreateModalPreviewCanvas: React.FC<{
   ratio: AspectRatio;
   duration: number;
@@ -673,149 +113,72 @@ const CreateModalPreviewCanvas: React.FC<{
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const spec = ASPECT_SPECS[ratio] || ASPECT_SPECS["16:9"];
+    const spec = ASPECT_SPECS[ratio];
+    canvas.width = spec.width;
+    canvas.height = spec.height;
     const W = spec.width;
     const H = spec.height;
-    canvas.width = W;
-    canvas.height = H;
-
     const t = playbackTime;
-    const layers = DEFAULT_LAYERS[ratio];
 
-    // Background gradient
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, PRESET_GRADIENTS[0].c1);
-    grad.addColorStop(1, PRESET_GRADIENTS[0].c2);
-    ctx.fillStyle = grad;
+    // Draw modern dark studio backdrop
+    ctx.fillStyle = "#0f172a";
     ctx.fillRect(0, 0, W, H);
 
-    const radial = ctx.createRadialGradient(W / 2, H * 0.35, 50, W / 2, H * 0.35, W * 0.85);
-    radial.addColorStop(0, "rgba(255, 255, 255, 0.08)");
-    radial.addColorStop(1, "rgba(0, 0, 0, 0.42)");
-    ctx.fillStyle = radial;
+    // Subtle center highlight
+    const rad = ctx.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.7);
+    rad.addColorStop(0, "rgba(255,255,255,0.06)");
+    rad.addColorStop(1, "rgba(0,0,0,0.3)");
+    ctx.fillStyle = rad;
     ctx.fillRect(0, 0, W, H);
 
-    const getProgress = (start = 0, end = 1) => {
-      if (t < start) return 0;
-      if (t >= end) return 1;
-      const p = (t - start) / (end - start);
-      return 1 - Math.pow(1 - p, 3);
-    };
+    // Draw dummy product
+    const pProg = Math.min(1, Math.max(0, (t - 0.2) / 1.0));
+    ctx.save();
+    ctx.globalAlpha = pProg;
+    const pSize = Math.round(W * 0.42);
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(W * 0.3 - pSize / 2, H * 0.5 - pSize / 2, pSize, pSize, 24);
+    else ctx.rect(W * 0.3 - pSize / 2, H * 0.5 - pSize / 2, pSize, pSize);
+    ctx.fill();
+    ctx.fillStyle = "#0f172a";
+    ctx.font = `bold ${Math.round(pSize * 0.12)}px Inter, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("PRODUCT IMAGE", W * 0.3, H * 0.5);
+    ctx.restore();
 
-    // Product placeholder with motion
-    if (layers.product) {
-      const pL = layers.product;
-      const prog = getProgress(pL.animStart || 0.2, pL.animEnd || 1.2);
-      const maxDim = Math.round(W * (pL.size / 100));
-      const pTransY = (1 - prog) * (H * 0.08);
+    // Draw headline
+    const hProg = Math.min(1, Math.max(0, (t - 0.8) / 0.8));
+    ctx.save();
+    ctx.globalAlpha = hProg;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.round(W * 0.045)}px Inter, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(templateName || "Special Store Offer", W * 0.68, H * 0.35);
 
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, prog));
-      const cx = Math.round(pL.x * W);
-      const cy = Math.round(pL.y * H + pTransY);
-      ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-      ctx.lineWidth = 2;
-      ctx.fillRect(cx - maxDim / 2, cy - maxDim / 2, maxDim, maxDim);
-      ctx.strokeRect(cx - maxDim / 2, cy - maxDim / 2, maxDim, maxDim);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${Math.round(W * 0.03)}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("PRODUCT IMAGE", cx, cy);
-      ctx.restore();
-    }
+    // Draw offer badge
+    const bProg = Math.min(1, Math.max(0, (t - 0.5) / 0.7));
+    ctx.globalAlpha = bProg;
+    ctx.fillStyle = "#ffc700";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(W * 0.48 - 140, H * 0.45 - 45, 280, 90, 16);
+    else ctx.rect(W * 0.48 - 140, H * 0.45 - 45, 280, 90);
+    ctx.fill();
+    ctx.fillStyle = "#1e1b4b";
+    ctx.font = `900 ${Math.round(W * 0.055)}px Inter, sans-serif`;
+    ctx.fillText("50% OFF", W * 0.48, H * 0.45 + 10);
 
-    // Logo placeholder
-    if (layers.logo) {
-      const lL = layers.logo;
-      const prog = getProgress(lL.animStart || 0.1, lL.animEnd || 0.8);
-      const logoSize = Math.round(Math.min(W, H) * (lL.size / 100));
-      ctx.save();
-      ctx.globalAlpha = prog;
-      const cx = Math.round(lL.x * W);
-      const cy = Math.round(lL.y * H);
-      ctx.fillStyle = "#11B5BB";
-      ctx.beginPath();
-      ctx.arc(cx, cy, logoSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${Math.round(logoSize * 0.4)}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("LOGO", cx, cy);
-      ctx.restore();
-    }
-
-    // Text layers
-    const textKeys: LayerKey[] = [
-      "discount", "headline", "description", "validity", "cta"
-    ];
-
-    for (const k of textKeys) {
-      const L = layers[k];
-      if (!L || !L.text) continue;
-      const prog = getProgress(L.animStart || 0.5, L.animEnd || 1.5);
-      const cx = Math.round(L.x * W);
-      const cy = Math.round(L.y * H);
-
-      let transX = 0, transY = 0, scale = 1;
-      const animStyle = L.animation || (k === "discount" ? "zoom_bounce" : k === "cta" ? "pulse" : "fade_in");
-      if (animStyle === "zoom_bounce") {
-        if (prog < 1) {
-          scale = prog === 0 ? 0 : Math.sin(prog * Math.PI * 0.7) * 1.16;
-          if (prog > 0.8) scale = 1.16 - ((prog - 0.8) / 0.2) * 0.16;
-        } else {
-          scale = 1;
-        }
-      } else if (animStyle === "slide_up" || animStyle === "fade_up") {
-        transY = (1 - prog) * (H * 0.08);
-      } else if (animStyle === "pulse") {
-        if (t >= (L.animStart || 0)) {
-          scale = 1 + Math.sin((t - (L.animStart || 0)) * 5) * 0.04;
-        }
-      }
-
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, prog));
-      if (transX !== 0 || transY !== 0 || scale !== 1) {
-        ctx.translate(cx + transX, cy + transY);
-        ctx.scale(scale, scale);
-        ctx.translate(-cx, -cy);
-      }
-
-      const fontSize = Math.round(W * ((L.size || 3) / 100));
-      ctx.font = `bold ${fontSize}px ${L.font || "Arial"}, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const textW = ctx.measureText(L.text).width;
-      const textH = fontSize * 1.3;
-
-      if (L.shape === "rounded") {
-        const pw = textW + fontSize * 1.1;
-        const ph = textH + fontSize * 0.45;
-        const rx = Math.max(6, Math.round(fontSize * 0.35));
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, rx);
-        else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-        ctx.fillStyle = L.bgColor || "#ffc700";
-        ctx.fill();
-      } else if (L.shape === "pill") {
-        const pw = textW + fontSize * 1.3;
-        const ph = textH + fontSize * 0.5;
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
-        else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-        ctx.fillStyle = L.bgColor || "#ffffff";
-        ctx.fill();
-      }
-
-      ctx.fillStyle = L.fontColor || "#ffffff";
-      ctx.fillText(L.text, cx, cy);
-      ctx.restore();
-    }
-  }, [ratio, duration, playbackTime, offerType, templateName]);
+    // CTA
+    ctx.fillStyle = "#ef4444";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(W * 0.68 - 120, H * 0.75 - 32, 240, 64, 32);
+    else ctx.rect(W * 0.68 - 120, H * 0.75 - 32, 240, 64);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.round(W * 0.026)}px Inter, sans-serif`;
+    ctx.fillText("VISIT STORE ➔", W * 0.68, H * 0.75 + 8);
+    ctx.restore();
+  }, [ratio, playbackTime, templateName, offerType]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -825,20 +188,21 @@ const CreateModalPreviewCanvas: React.FC<{
           maxWidth: "100%",
           maxHeight: "100%",
           objectFit: "contain",
-          borderRadius: "4px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+          borderRadius: "8px",
+          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.25)",
         }}
       />
       <div
         style={{
           position: "absolute",
-          bottom: "6px",
-          left: "8px",
-          background: "rgba(0,0,0,0.6)",
-          padding: "2px 6px",
-          borderRadius: "4px",
-          fontSize: "10px",
-          color: "#11B5BB",
+          bottom: "8px",
+          left: "12px",
+          background: "rgba(15, 23, 42, 0.75)",
+          backdropFilter: "blur(4px)",
+          padding: "3px 8px",
+          borderRadius: "6px",
+          fontSize: "11px",
+          color: "#f8fafc",
           fontFamily: "monospace",
           fontWeight: 700,
         }}
@@ -848,15 +212,15 @@ const CreateModalPreviewCanvas: React.FC<{
       <div
         style={{
           position: "absolute",
-          top: "6px",
-          right: "8px",
-          background: "rgba(34,197,94,0.2)",
-          border: "1px solid #22c55e",
-          padding: "2px 6px",
-          borderRadius: "4px",
-          fontSize: "10px",
-          color: "#22c55e",
+          top: "8px",
+          right: "12px",
+          background: "rgba(16, 185, 129, 0.9)",
+          padding: "3px 8px",
+          borderRadius: "6px",
+          fontSize: "11px",
+          color: "#ffffff",
           fontWeight: 700,
+          boxShadow: "0 2px 8px rgba(16, 185, 129, 0.4)",
         }}
       >
         Live Motion Preview
@@ -865,7 +229,7 @@ const CreateModalPreviewCanvas: React.FC<{
   );
 };
 
-// ─── Interactive Animated Video Template Preview Modal ──────────────────────────────
+// ─── Interactive Animated Video Template Preview Modal ───────────────────────
 interface TemplateViewPreviewModalProps {
   template: SavedTemplateItem;
   onClose: () => void;
@@ -896,54 +260,12 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
     template.layers ||
     (DEFAULT_LAYERS[activeRatio] as LayersConfig);
 
-  // Background images / product images
-  const [bgImg, setBgImg] = useState<HTMLImageElement | null>(null);
-  const [productImg, setProductImg] = useState<HTMLImageElement | null>(null);
-  const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null);
-
-  useEffect(() => {
-    const bgUrl = (template.aspectBackgrounds && template.aspectBackgrounds[activeRatio]) || template.backgroundUrl;
-    if (bgUrl) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => setBgImg(img);
-      img.onerror = () => setBgImg(null);
-      img.src = bgUrl;
-    } else {
-      setBgImg(null);
-    }
-  }, [template, activeRatio]);
-
-  useEffect(() => {
-    if (template.productUrl) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => setProductImg(img);
-      img.onerror = () => setProductImg(null);
-      img.src = template.productUrl;
-    } else {
-      setProductImg(null);
-    }
-  }, [template.productUrl]);
-
-  useEffect(() => {
-    if (template.logoUrl) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => setLogoImg(img);
-      img.onerror = () => setLogoImg(null);
-      img.src = template.logoUrl;
-    } else {
-      setLogoImg(null);
-    }
-  }, [template.logoUrl]);
-
-  // Animation Loop (60fps)
   useEffect(() => {
     if (!isPlaying) {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       return;
     }
+    startRef.current = null;
     const animate = (timestamp: number) => {
       if (!startRef.current) startRef.current = timestamp - playbackTime * 1000;
       const elapsed = (timestamp - startRef.current) / 1000;
@@ -959,640 +281,176 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [isPlaying, duration, playbackTime]);
+  }, [isPlaying, duration]);
 
-  // Draw frame on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const spec = ASPECT_SPECS[activeRatio] || ASPECT_SPECS["16:9"];
+    const spec = ASPECT_SPECS[activeRatio];
+    canvas.width = spec.width;
+    canvas.height = spec.height;
     const W = spec.width;
     const H = spec.height;
-    canvas.width = W;
-    canvas.height = H;
-
     const t = playbackTime;
-    const bgType = (template as any).bgType || (template.backgroundUrl ? "image" : "gradient");
-    const bgColor = (template as any).bgColor || "#0B2830";
-    const bgGradIndex = typeof (template as any).bgGradIndex === "number" ? (template as any).bgGradIndex : 0;
 
-    // 1. Draw Background
-    if (bgType === "image" && bgImg) {
-      const imgRatio = bgImg.width / bgImg.height;
-      const cRatio = W / H;
-      let dw = W, dh = H, dx = 0, dy = 0;
-      if (imgRatio > cRatio) {
-        dh = H;
-        dw = H * imgRatio;
-        dx = (W - dw) / 2;
-      } else {
-        dw = W;
-        dh = W / imgRatio;
-        dy = (H - dh) / 2;
-      }
-      ctx.drawImage(bgImg, dx, dy, dw, dh);
-    } else if (bgType === "color") {
-      ctx.fillStyle = bgColor;
+    // Background
+    const bgUrl = (template.aspectBackgrounds && template.aspectBackgrounds[activeRatio]) || template.backgroundUrl;
+    if (bgUrl) {
+      ctx.fillStyle = "#1e293b";
       ctx.fillRect(0, 0, W, H);
     } else {
-      const gradSpec = PRESET_GRADIENTS[bgGradIndex] || PRESET_GRADIENTS[0];
       const grd = ctx.createLinearGradient(0, 0, W, H);
-      grd.addColorStop(0, gradSpec.c1);
-      grd.addColorStop(1, gradSpec.c2);
+      grd.addColorStop(0, "#0F172A");
+      grd.addColorStop(1, "#1E293B");
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, W, H);
-
-      const radial = ctx.createRadialGradient(W / 2, H * 0.35, 50, W / 2, H * 0.35, W * 0.85);
-      radial.addColorStop(0, "rgba(255, 255, 255, 0.08)");
-      radial.addColorStop(1, "rgba(0, 0, 0, 0.42)");
-      ctx.fillStyle = radial;
-      ctx.fillRect(0, 0, W, H);
     }
 
-    const getProgress = (start = 0, end = 1) => {
-      if (t < start) return 0;
-      if (t >= end) return 1;
-      const p = (t - start) / (end - start);
-      return 1 - Math.pow(1 - p, 3);
-    };
-
-    // 2. Draw Product
-    if (layersConfig.product) {
-      const pL = layersConfig.product;
-      const prog = getProgress(pL.animStart || 0.2, pL.animEnd || 1.2);
-      const maxDim = Math.round(W * (pL.size / 100));
-
-      let pTransY = 0;
-      let pScale = 1;
-      if (pL.animation === "zoom_bounce") {
-        pScale = prog === 0 ? 0 : Math.sin(prog * Math.PI * 0.7) * 1.12;
-        if (prog > 0.8) pScale = 1.12 - ((prog - 0.8) / 0.2) * 0.12;
-      } else {
-        pTransY = (1 - prog) * (H * 0.08);
-      }
-
+    // Render layers
+    Object.entries(layersConfig).forEach(([key, layer]: [string, any]) => {
+      if (!layer || layer.hidden) return;
+      const start = layer.animStart ?? 0.5;
+      const end = layer.animEnd ?? 1.5;
+      if (t < start) return;
+      const p = Math.min(1, Math.max(0, (t - start) / (end - start)));
       ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, prog));
-      const cx = Math.round(pL.x * W);
-      const cy = Math.round(pL.y * H + pTransY);
-      if (pScale !== 1) {
-        ctx.translate(cx, cy);
-        ctx.scale(pScale, pScale);
-        ctx.translate(-cx, -cy);
-      }
+      ctx.globalAlpha = p;
+      const cx = (layer.x ?? 0.5) * W;
+      const cy = (layer.y ?? 0.5) * H;
+      const fontSize = Math.round(W * ((layer.size || 3.5) / 100));
 
-      if (productImg) {
-        const aspect = productImg.width / productImg.height;
-        let pw = maxDim, ph = maxDim / aspect;
-        if (ph > maxDim) { ph = maxDim; pw = maxDim * aspect; }
-
-        let r = 0;
-        if (pL.shape === "circle") {
-          r = Math.min(pw, ph) / 2;
-        } else if (typeof pL.borderRadius === "number" && pL.borderRadius > 0) {
-          r = pL.borderRadius <= 50 ? (pL.borderRadius / 100) * Math.min(pw, ph) : Math.min(pL.borderRadius, pw / 2, ph / 2);
-        } else if (pL.shape === "rounded") {
-          r = Math.min(pw, ph) * 0.12;
-        }
-
-        ctx.save();
-        if (pL.shadow) {
-          ctx.shadowColor = "rgba(0,0,0,0.35)";
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetY = 4;
-        }
-        if (r > 0) {
-          ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, r);
-          else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-          ctx.clip();
-          ctx.drawImage(productImg, cx - pw / 2, cy - ph / 2, pw, ph);
-          ctx.restore();
-
-          if (pL.border === "1" || (pL.borderWidth && pL.borderWidth > 0)) {
-            ctx.save();
-            ctx.strokeStyle = pL.borderColor || "#ffffff";
-            ctx.lineWidth = pL.borderWidth || 2;
-            ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, r);
-            else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-            ctx.stroke();
-            ctx.restore();
-          }
-        } else {
-          ctx.drawImage(productImg, cx - pw / 2, cy - ph / 2, pw, ph);
-          ctx.restore();
-          if (pL.border === "1" || (pL.borderWidth && pL.borderWidth > 0)) {
-            ctx.save();
-            ctx.strokeStyle = pL.borderColor || "#ffffff";
-            ctx.lineWidth = pL.borderWidth || 2;
-            ctx.strokeRect(cx - pw / 2, cy - ph / 2, pw, ph);
-            ctx.restore();
-          }
-        }
-      } else {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.fillRect(cx - maxDim / 2, cy - maxDim / 2, maxDim, maxDim);
-        ctx.strokeRect(cx - maxDim / 2, cy - maxDim / 2, maxDim, maxDim);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = `bold ${Math.round(W * 0.03)}px Arial`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("PRODUCT", cx, cy);
-      }
-      ctx.restore();
-    }
-
-    // 3. Draw Logo
-    if (layersConfig.logo) {
-      const lL = layersConfig.logo;
-      const prog = getProgress(lL.animStart || 0.1, lL.animEnd || 0.8);
-      const logoSize = Math.round(Math.min(W, H) * (lL.size / 100));
-      ctx.save();
-      ctx.globalAlpha = prog;
-      const cx = Math.round(lL.x * W);
-      const cy = Math.round(lL.y * H);
-      if (logoImg) {
-        const lAspect = logoImg.width / logoImg.height;
-        let lw = logoSize, lh = logoSize / lAspect;
-        ctx.drawImage(logoImg, cx - lw / 2, cy - lh / 2, lw, lh);
-      } else {
-        ctx.fillStyle = "rgba(17, 181, 187, 0.9)";
+      if (key === "product") {
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        const sz = Math.round(W * ((layer.size || 40) / 100));
         ctx.beginPath();
-        ctx.arc(cx, cy, logoSize / 2, 0, Math.PI * 2);
+        if (ctx.roundRect) ctx.roundRect(cx - sz / 2, cy - sz / 2, sz, sz, 16);
+        else ctx.rect(cx - sz / 2, cy - sz / 2, sz, sz);
         ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.font = `bold ${Math.round(logoSize * 0.4)}px Arial`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("LOGO", cx, cy);
-      }
-      ctx.restore();
-    }
-
-    // 4. Draw Text & Badges
-    const textKeys: LayerKey[] = [
-      "discount", "headline", "description", "price", "oldPrice", "validity", "cta", "qrCode", "storeName", "footer"
-    ];
-
-    for (const k of textKeys) {
-      const L = (layersConfig as any)[k];
-      if (!L || !L.text || L.hidden) continue;
-
-      const prog = getProgress(L.animStart || 0.5, L.animEnd || 1.5);
-      const cx = Math.round(L.x * W);
-      const cy = Math.round(L.y * H);
-
-      let transX = 0, transY = 0, scale = 1;
-      const animStyle = L.animation || (k === "discount" ? "zoom_bounce" : k === "cta" ? "pulse" : "fade_in");
-      if (animStyle === "zoom_bounce") {
-        if (prog < 1) {
-          scale = prog === 0 ? 0 : Math.sin(prog * Math.PI * 0.7) * 1.16;
-          if (prog > 0.8) scale = 1.16 - ((prog - 0.8) / 0.2) * 0.16;
+      } else if (layer.text) {
+        if (layer.shape === "origami" || key === "discount") {
+          ctx.fillStyle = layer.bgColor || "#ffc700";
+          ctx.beginPath();
+          if (ctx.roundRect) ctx.roundRect(cx - 130, cy - 45, 260, 90, 16);
+          else ctx.rect(cx - 130, cy - 45, 260, 90);
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(layer.text, cx, cy);
         } else {
-          scale = 1;
-        }
-      } else if (animStyle === "slide_up" || animStyle === "fade_up") {
-        transY = (1 - prog) * (H * 0.08);
-      } else if (animStyle === "slide_left") {
-        transX = (1 - prog) * (W * 0.10);
-      } else if (animStyle === "slide_right") {
-        transX = -(1 - prog) * (W * 0.10);
-      } else if (animStyle === "pulse") {
-        if (t >= (L.animStart || 0)) {
-          scale = 1 + Math.sin((t - (L.animStart || 0)) * 5) * 0.04;
+          ctx.fillStyle = layer.fontColor || "#ffffff";
+          ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(layer.text, cx, cy);
         }
       }
-
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, prog));
-      if (transX !== 0 || transY !== 0 || scale !== 1) {
-        ctx.translate(cx + transX, cy + transY);
-        ctx.scale(scale, scale);
-        ctx.translate(-cx, -cy);
-      }
-
-      const fontSize = Math.round(W * ((L.size || 3) / 100));
-      const fWeight = L.fontWeight || "bold";
-      const fStyle = L.fontStyle || "normal";
-      ctx.font = `${fStyle} ${fWeight} ${fontSize}px ${L.font || "Arial"}, sans-serif`;
-      ctx.textAlign = (L.textAlign as CanvasTextAlign) || "center";
-      ctx.textBaseline = "middle";
-
-      const textLines = (L.text || "").split("\n");
-      const lineHeight = fontSize * 1.25;
-      let textW = 0;
-      for (const line of textLines) {
-        const w = ctx.measureText(line).width;
-        if (w > textW) textW = w;
-      }
-      const textH = Math.max(fontSize * 1.2, textLines.length * lineHeight);
-
-      const isOrigami = !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
-      const isTransparent = (L.shape === "none" || (!L.shape && L.bgMode === "transparent"));
-
-      if (!isTransparent && L.badgeImageUrl) {
-        let bImg = globalBadgeImagesCache.get(L.badgeImageUrl);
-        if (!bImg) {
-          bImg = new Image();
-          bImg.crossOrigin = "anonymous";
-          bImg.src = L.badgeImageUrl;
-          globalBadgeImagesCache.set(L.badgeImageUrl, bImg);
-        }
-        if (bImg.complete && bImg.naturalWidth > 0) {
-          const bw = Math.max(textW + fontSize * 1.5, fontSize * 3.5);
-          const bh = Math.max(textH + fontSize * 0.8, fontSize * 1.8);
-          ctx.save();
-          ctx.drawImage(bImg, cx - bw / 2, cy - bh / 2, bw, bh);
-          ctx.restore();
-        }
-      } else if (!isTransparent) {
-        if (L.shape === "rounded") {
-          const pw = textW + fontSize * 1.1;
-          const ph = textH + fontSize * 0.45;
-          const rx = Math.max(8, Math.round(fontSize * 0.35));
-          ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, rx);
-          else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-          ctx.fillStyle = L.bgColor || "#ffc700";
-          ctx.fill();
-          if (L.border === "1") {
-            ctx.strokeStyle = L.borderColor || "#000000";
-            ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
-            ctx.stroke();
-          }
-        } else if (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram") {
-          const tiltDeg = -7;
-          const tiltRad = (tiltDeg * Math.PI) / 180;
-          const pw = textW + fontSize * 1.5;
-          const ph = textH + fontSize * 0.75;
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(tiltRad);
-
-          // 1. Folded green shadow flap
-          const foldW = fontSize * 0.95;
-          const foldH = fontSize * 0.85;
-          ctx.beginPath();
-          ctx.moveTo(-pw / 2 + 12, ph / 2 - 2);
-          ctx.lineTo(-pw / 2 - foldW * 0.45, ph / 2 + foldH);
-          ctx.lineTo(-pw / 2 + foldW * 0.7, ph / 2 - 2);
-          ctx.closePath();
-          ctx.fillStyle = L.borderColor || "#047857";
-          ctx.fill();
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
-          ctx.stroke();
-
-          // 2. Main Yellow Rounded Box
-          const rx = Math.max(8, Math.round(fontSize * 0.22));
-          ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(-pw / 2, -ph / 2, pw, ph, rx);
-          else ctx.rect(-pw / 2, -ph / 2, pw, ph);
-          ctx.fillStyle = L.bgColor || "#ffc700";
-          ctx.fill();
-
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = Math.max(3, Math.round(fontSize * 0.12));
-          ctx.stroke();
-
-          // 3. Confetti triangles
-          const drawTriangle = (tx: number, ty: number, tSize: number, rot: number, color: string) => {
-            ctx.save();
-            ctx.translate(tx, ty);
-            ctx.rotate(rot);
-            ctx.beginPath();
-            ctx.moveTo(0, -tSize);
-            ctx.lineTo(tSize * 0.85, tSize * 0.85);
-            ctx.lineTo(-tSize * 0.85, tSize * 0.85);
-            ctx.closePath();
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.restore();
-          };
-          const cs = Math.max(5, Math.round(fontSize * 0.22));
-          drawTriangle(-pw / 2 - cs * 1.5, -ph / 2 + cs, cs * 1.1, 0.4, "#ef4444");
-          drawTriangle(-pw / 2 - cs * 0.8, -ph / 2 - cs * 1.4, cs, -0.6, "#facc15");
-          drawTriangle(pw / 2 + cs * 1.2, -ph / 2 - cs * 0.8, cs * 1.1, -0.4, "#facc15");
-          drawTriangle(pw / 2 + cs * 2.2, -ph / 2 + cs * 1.5, cs * 0.85, 0.7, "#ef4444");
-          drawTriangle(pw / 2 + cs * 1.6, ph / 2 + cs * 0.8, cs * 0.9, 0.3, "#facc15");
-          drawTriangle(-pw / 2 - cs * 1.8, ph / 2 + cs * 0.6, cs * 1.1, -0.7, "#ef4444");
-
-          ctx.restore();
-        } else if (L.shape === "circle") {
-          const radius = Math.max(textW, textH) / 2 + fontSize * 0.4;
-          ctx.beginPath();
-          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-          ctx.fillStyle = L.bgColor || "#ffc700";
-          ctx.fill();
-        } else if (L.shape === "pill") {
-          const pw = textW + fontSize * 1.4;
-          const ph = textH + fontSize * 0.6;
-          ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
-          else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-          ctx.fillStyle = L.bgColor || "#ffc700";
-          ctx.fill();
-        } else if (L.shape === "rect") {
-          const pw = textW + fontSize * 0.8;
-          const ph = textH + fontSize * 0.4;
-          ctx.fillStyle = L.bgColor || "#ffffff";
-          ctx.fillRect(cx - pw / 2, cy - ph / 2, pw, ph);
-        }
-      }
-
-      if (!isTransparent && L.badgeImageUrl && L.overlayText === false) {
-        // Pure sticker graphic mode without text overlay
-      } else {
-        const isOrigamiBadge = !isTransparent && !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
-        if (isOrigamiBadge) {
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate((-7 * Math.PI) / 180);
-          ctx.translate(-cx, -cy);
-        }
-
-        ctx.fillStyle = L.fontColor || "#ffffff";
-        const textAlign = (L.textAlign as CanvasTextAlign) || "center";
-        ctx.textAlign = textAlign;
-        const startY = cy - ((textLines.length - 1) * lineHeight) / 2;
-        textLines.forEach((line: string, idx: number) => {
-          let lineX = cx;
-          if (textAlign === "left") {
-            lineX = cx - textW / 2;
-          } else if (textAlign === "right") {
-            lineX = cx + textW / 2;
-          }
-          ctx.fillText(line, lineX, startY + idx * lineHeight);
-        });
-
-        if (isOrigamiBadge) {
-          ctx.restore();
-        }
-      }
-
-      if (k === "oldPrice") {
-        ctx.strokeStyle = L.fontColor || "#EF4444";
-        ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.1));
-        ctx.beginPath();
-        ctx.moveTo(cx - textW / 2 - 4, cy);
-        ctx.lineTo(cx + textW / 2 + 4, cy);
-        ctx.stroke();
-      }
-
       ctx.restore();
-    }
-
-    // 5. Draw Decorations in Preview Modal
-    const modalDecors = template.decorations || [];
-    if (Array.isArray(modalDecors) && modalDecors.length > 0) {
-      for (const dec of modalDecors) {
-        if (dec.hidden || !dec.url) continue;
-        const dImg = new Image();
-        dImg.crossOrigin = "anonymous";
-        dImg.src = dec.url;
-        if (dImg.complete && dImg.naturalWidth > 0) {
-          const cx = Math.round(dec.x * W);
-          const cy = Math.round(dec.y * H);
-          const baseDim = Math.min(W, H);
-          const dw = Math.round(baseDim * ((dec.size || 15) / 100));
-          const aspect = dImg.naturalWidth / dImg.naturalHeight;
-          const dh = Math.round(dw / (aspect || 1));
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.drawImage(dImg, -dw / 2, -dh / 2, dw, dh);
-          ctx.restore();
-        }
-      }
-    }
-  }, [activeRatio, playbackTime, template, layersConfig, bgImg, productImg, logoImg]);
+    });
+  }, [activeRatio, playbackTime, layersConfig, template]);
 
   return (
     <div className="ste-modal-overlay" onClick={onClose}>
-      <div
-        className="ste-modal ste-modal--wide"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: "860px", width: "95%" }}
-      >
+      <div className="ste-modal ste-modal--wide" onClick={(e) => e.stopPropagation()}>
         <div className="ste-modal__header">
           <div className="ste-modal__title-wrap">
-            <FaFilm className="ste-accent-icon" />
-            <h3>Live Video Preview: {template.templateName}</h3>
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontWeight: 700,
-                color: "#11B5BB",
-                background: "rgba(17,181,187,0.12)",
-                padding: "2px 8px",
-                borderRadius: "4px",
-                fontSize: "0.8rem",
-              }}
-            >
-              #{template.templateId || 1}
-            </span>
+            <FaVideo className="text-slate-700" />
+            <div>
+              <h3 className="text-slate-900 font-bold text-lg">{template.templateName}</h3>
+              <p className="text-slate-500 text-xs">Live Interactive Animation &amp; Motion Inspector</p>
+            </div>
           </div>
-          <button className="ste-modal__close" onClick={onClose}>
+          <button className="ste-modal__close" onClick={onClose} type="button">
             <FaXmark />
           </button>
         </div>
 
-        <div className="ste-modal__body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          {/* Ratio Selector Tabs */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+        <div className="ste-modal__body" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {/* Ratio bar */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: "8px 12px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "#475569" }}>Preview Aspect Ratio:</span>
             <div style={{ display: "flex", gap: "6px" }}>
               {(["16:9", "9:16", "1:1", "4:5"] as AspectRatio[]).map((r) => (
                 <button
                   key={r}
                   type="button"
-                  className={`ste-ratio-chip ${activeRatio === r ? "ste-ratio-chip--active" : ""}`}
                   onClick={() => setActiveRatio(r)}
-                  style={{ padding: "5px 12px", fontSize: "0.8rem", fontWeight: 700 }}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: activeRatio === r ? 700 : 500,
+                    background: activeRatio === r ? "#4f46e5" : "#ffffff",
+                    color: activeRatio === r ? "#ffffff" : "#475569",
+                    border: activeRatio === r ? "1px solid #4f46e5" : "1px solid #cbd5e1",
+                    cursor: "pointer",
+                  }}
                 >
-                  {r} {r === "16:9" ? "📺 Landscape" : r === "9:16" ? "📱 Vertical" : r === "1:1" ? "⏹️ Square" : "📸 Portrait"}
+                  {r}
                 </button>
               ))}
             </div>
-
-            <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
-              {ASPECT_SPECS[activeRatio].label} · {duration}s Duration
-            </span>
           </div>
 
-          {/* Animated Video Canvas Player Stage */}
+          {/* Canvas Viewport */}
           <div
             style={{
-              position: "relative",
               width: "100%",
               height: "360px",
-              background: "#030c0f",
-              borderRadius: "10px",
+              background: "#0f172a",
+              borderRadius: "12px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              position: "relative",
               overflow: "hidden",
-              border: "1px solid rgba(17, 181, 187, 0.25)",
+              boxShadow: "inset 0 2px 10px rgba(0,0,0,0.5)",
             }}
           >
-            <canvas
-              ref={canvasRef}
-              style={{
-                maxWidth: "100%",
-                maxHeight: "100%",
-                objectFit: "contain",
-                borderRadius: "6px",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
-              }}
-            />
+            <canvas ref={canvasRef} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
           </div>
 
-          {/* Playback Controls Toolbar */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "12px",
-              background: "rgba(11, 40, 48, 0.95)",
-              border: "1px solid rgba(17, 181, 187, 0.3)",
-              borderRadius: "10px",
-              padding: "10px 16px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  startRef.current = null;
-                  setIsPlaying(!isPlaying);
-                }}
-                style={{
-                  background: isPlaying ? "#ef4444" : "#f05a28",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "6px 14px",
-                  fontWeight: 700,
-                  fontSize: "0.82rem",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  boxShadow: isPlaying ? "0 0 12px rgba(239,68,68,0.4)" : "0 0 12px rgba(240,90,40,0.3)",
-                }}
-              >
-                {isPlaying ? <FaPause size={11} /> : <FaPlay size={11} />}
-                <span>{isPlaying ? "Pause" : "Play Preview"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  startRef.current = null;
-                  setPlaybackTime(0);
-                  if (!isPlaying) setIsPlaying(true);
-                }}
-                style={{
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "6px 10px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  fontSize: "0.8rem",
-                }}
-                title="Replay from start"
-              >
-                <FaRotateRight size={11} /> Replay
-              </button>
-            </div>
-
-            {/* Scrubber */}
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "10px", minWidth: "180px", maxWidth: "420px" }}>
-              <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#11B5BB", fontFamily: "monospace", minWidth: "35px" }}>
-                {playbackTime.toFixed(1)}s
-              </span>
-              <input
-                type="range"
-                min="0"
-                max={duration}
-                step="0.05"
-                value={playbackTime}
-                onChange={(e) => {
-                  setIsPlaying(false);
-                  startRef.current = null;
-                  setPlaybackTime(Number(e.target.value));
-                }}
-                style={{ flex: 1, accentColor: "#11B5BB", cursor: "pointer", height: "4px" }}
-              />
-              <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8", fontFamily: "monospace", minWidth: "30px" }}>
-                {duration}s
-              </span>
-            </div>
-
-            <span
+          {/* Scrubber Controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#f8fafc", padding: "10px 14px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+            <button
+              type="button"
+              onClick={() => setIsPlaying(!isPlaying)}
               style={{
-                fontSize: "11px",
-                color: isPlaying ? "#22c55e" : "#94a3b8",
-                fontWeight: 600,
+                background: isPlaying ? "#f59e0b" : "#4f46e5",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 14px",
+                fontWeight: 700,
+                fontSize: "12px",
                 display: "flex",
                 alignItems: "center",
-                gap: "5px",
-                background: "rgba(0,0,0,0.3)",
-                padding: "3px 8px",
-                borderRadius: "6px",
+                gap: "6px",
+                cursor: "pointer",
               }}
             >
-              <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: isPlaying ? "#22c55e" : "#64748b",
-                  display: "inline-block",
-                }}
-              />
-              {isPlaying ? "Playing 60fps" : "Paused"}
+              {isPlaying ? <FaPause size={12} /> : <FaPlay size={12} />}
+              <span>{isPlaying ? "Pause" : "Play"}</span>
+            </button>
+            <input
+              type="range"
+              min="0"
+              max={duration}
+              step="0.05"
+              value={playbackTime}
+              onChange={(e) => {
+                setIsPlaying(false);
+                setPlaybackTime(Number(e.target.value));
+              }}
+              style={{ flex: 1, accentColor: "#4f46e5", cursor: "pointer" }}
+            />
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "#334155", fontFamily: "monospace" }}>
+              {playbackTime.toFixed(1)}s / {duration}s
             </span>
-          </div>
-
-          {/* Layer animation breakdown chips */}
-          <div>
-            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              Configured Layer Entrance Animations:
-            </span>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
-              {Object.entries(layersConfig).map(([key, val]: [string, any]) => {
-                if (!val || val.hidden || (!val.text && key !== "product" && key !== "logo")) return null;
-                const isCurrent = playbackTime >= (val.animStart || 0) && playbackTime <= (val.animEnd || 1.5);
-                return (
-                  <span
-                    key={key}
-                    style={{
-                      fontSize: "11px",
-                      padding: "4px 8px",
-                      borderRadius: "6px",
-                      background: isCurrent ? "rgba(17, 181, 187, 0.25)" : "rgba(255, 255, 255, 0.05)",
-                      border: isCurrent ? "1px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.1)",
-                      color: isCurrent ? "#fff" : "#94a3b8",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <strong style={{ color: isCurrent ? "#11B5BB" : "#cbd5e1" }}>{key}:</strong>{" "}
-                    {val.animation || (key === "discount" ? "zoom_bounce" : "fade_in")} ({val.animStart ?? 0.5}s - {val.animEnd ?? 1.5}s)
-                  </span>
-                );
-              })}
-            </div>
           </div>
         </div>
 
@@ -1609,92 +467,26 @@ const TemplateViewPreviewModal: React.FC<TemplateViewPreviewModalProps> = ({
   );
 };
 
-/**
- * Advanced Canvas 2D Text Auto-Wrap Engine
- * Wraps text down to new lines when it reaches the specified maxWidth limit.
- * Supports both normal word boundary wrapping and long continuous string character wrapping.
- */
-function wrapTextCanvas(
-  ctx: CanvasRenderingContext2D | null,
-  text: string,
-  maxWidth: number,
-  fontSize: number
-): string[] {
-  if (!text) return [""];
-  const effectiveMaxW = Math.max(30, maxWidth);
-  const paras = String(text).split("\n");
-  const result: string[] = [];
-  const charW = fontSize * 0.58;
-
-  const measure = (str: string): number => {
-    if (ctx) return ctx.measureText(str).width;
-    return str.length * charW;
-  };
-
-  for (const para of paras) {
-    const trimmed = para.trim();
-    if (!trimmed) {
-      result.push("");
-      continue;
-    }
-    const words = trimmed.split(/\s+/);
-    let curLine = "";
-
-    for (const word of words) {
-      const wordW = measure(word);
-      // If a single word or unbroken string is wider than effectiveMaxW, break it into character chunks
-      if (wordW > effectiveMaxW) {
-        if (curLine) {
-          result.push(curLine);
-          curLine = "";
-        }
-        let chunk = "";
-        for (const char of word) {
-          const testChunk = chunk + char;
-          if (measure(testChunk) <= effectiveMaxW) {
-            chunk = testChunk;
-          } else {
-            if (chunk) result.push(chunk);
-            chunk = char;
-          }
-        }
-        if (chunk) {
-          curLine = chunk;
-        }
-        continue;
-      }
-
-      if (!curLine) {
-        curLine = word;
-      } else {
-        const testLine = curLine + " " + word;
-        if (measure(testLine) <= effectiveMaxW) {
-          curLine = testLine;
-        } else {
-          result.push(curLine);
-          curLine = word;
-        }
-      }
-    }
-    if (curLine) {
-      result.push(curLine);
-    }
-  }
-
-  return result.length > 0 ? result : [text];
-}
-
+// ─── Main Rebuilt Template Editor Studio ─────────────────────────────────────
 export default function TemplateEditorView({ onNavigate, initialTemplateId, initialRatio }: TemplateEditorProps) {
   // ── Mode Switcher: "studio" | "grid" | "library" ────────────────────────────
   const [activeTab, setActiveTab] = useState<"studio" | "grid" | "library">("studio");
 
+  // ── Section Switcher for Left Rail Options ──────────────────────────────────
+  // Sections: "canvas" | "content" | "badges" | "animation" | "music" | "ai"
+  const [activeSection, setActiveSection] = useState<"canvas" | "content" | "badges" | "animation" | "music">("canvas");
+
   // ── Template State ──────────────────────────────────────────────────────────
   const [templateName, setTemplateName] = useState("Custom Video Template");
   const [templateId, setTemplateId] = useState<string | null>(initialTemplateId || null);
-  const [activeTemplateNumber, setActiveTemplateNumber] = useState<number | null>(
-    initialTemplateId && !isNaN(Number(initialTemplateId)) ? Number(initialTemplateId) : null
-  );
-  const DEFAULT_COMMERCIAL_OFFER_TYPES: Array<{ offertypeId: string; offertypename: string }> = [
+  const [activeTemplateNumber, setActiveTemplateNumber] = useState<number>(() => {
+    if (initialTemplateId && !isNaN(Number(initialTemplateId)) && Number(initialTemplateId) > 0) {
+      return Number(initialTemplateId);
+    }
+    return Math.floor(10000 + Math.random() * 90000);
+  });
+
+  const DEFAULT_COMMERCIAL_OFFER_TYPES = [
     { offertypeId: "INDIVIDUAL_DISCOUNT", offertypename: "Individual Discount" },
     { offertypeId: "PERCENTAGE_DISCOUNT", offertypename: "Percentage Discount" },
     { offertypeId: "BUY_X_GET_Y", offertypename: "Buy X Get Y" },
@@ -1704,71 +496,13 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   ];
 
   const [offerType, setOfferType] = useState<string>("Individual Discount");
-  const [offerTypesList, setOfferTypesList] = useState<Array<{ offertypeId: string; offertypename: string }>>(DEFAULT_COMMERCIAL_OFFER_TYPES);
+  const [offerTypesList, setOfferTypesList] = useState(DEFAULT_COMMERCIAL_OFFER_TYPES);
   const [selectedOfferTypeId, setSelectedOfferTypeId] = useState<string>("INDIVIDUAL_DISCOUNT");
   const [selectedOfferTypeName, setSelectedOfferTypeName] = useState<string>("Individual Discount");
   const [showNewOfferTypeForm, setShowNewOfferTypeForm] = useState(false);
   const [inlineOfferTypeName, setInlineOfferTypeName] = useState("");
   const [inlineOfferTypeId, setInlineOfferTypeId] = useState("");
   const [creatingOfferType, setCreatingOfferType] = useState(false);
-
-  const handleCreateOfferTypeInline = async (customName?: string, customId?: string) => {
-    const nameToUse = (customName || inlineOfferTypeName).trim();
-    let idToUse = (customId || inlineOfferTypeId).trim();
-    if (!nameToUse) return;
-    if (!idToUse) {
-      idToUse = nameToUse.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-    }
-
-    setCreatingOfferType(true);
-    try {
-      let currentUserId = "";
-      try {
-        currentUserId = localStorage.getItem("userId") || "";
-        if (!currentUserId) {
-          const u = localStorage.getItem("user");
-          if (u) {
-            const parsed = JSON.parse(u);
-            currentUserId = parsed._id || parsed.id || parsed.userId || "";
-          }
-        }
-      } catch {}
-
-      const res = await fetch("/api/create-offer-type", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: currentUserId || undefined,
-          category: "offer",
-          offerTypes: [
-            {
-              offertypeId: idToUse,
-              offertypename: nameToUse,
-            },
-          ],
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const newOt = { offertypeId: idToUse, offertypename: nameToUse };
-        setOfferTypesList((prev) => {
-          const filtered = prev.filter((o) => o.offertypeId !== idToUse);
-          return [newOt, ...filtered];
-        });
-        setSelectedOfferTypeId(idToUse);
-        setSelectedOfferTypeName(nameToUse);
-        setOfferType(nameToUse);
-        setNewTplOfferType(nameToUse);
-        setShowNewOfferTypeForm(false);
-        setInlineOfferTypeName("");
-        setInlineOfferTypeId("");
-      }
-    } catch (err) {
-      console.error("Error creating offer type:", err);
-    } finally {
-      setCreatingOfferType(false);
-    }
-  };
 
   const [aiStyle, setAiStyle] = useState<string>("Premium commercial");
   const [aiColorTheme, setAiColorTheme] = useState<string>("None (natural colors)");
@@ -1786,7 +520,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [aspectLayers, setAspectLayers] = useState<Record<AspectRatio, LayersConfig>>(DEFAULT_LAYERS);
 
   // Assets
-  const [bgType, setBgType] = useState<"gradient" | "color" | "image">("gradient");
+  const [bgType, setBgType] = useState<"gradient" | "color" | "image">("color");
   const [bgGradIndex, setBgGradIndex] = useState(0);
   const [bgColor, setBgColor] = useState<string>("#0B2830");
   const [aspectBackgrounds, setAspectBackgrounds] = useState<Record<AspectRatio, string>>({
@@ -1811,8 +545,6 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [decorations, setDecorations] = useState<DecorItem[]>([]);
   const [selectedDecorId, setSelectedDecorId] = useState<string | null>(null);
   const [showAddImageModal, setShowAddImageModal] = useState<boolean>(false);
-  const decorImagesMap = useRef<Map<string, HTMLImageElement>>(new Map());
-  const badgeImagesMap = useRef<Map<string, HTMLImageElement>>(new Map());
   const [badgeUrlPromptOpen, setBadgeUrlPromptOpen] = useState<boolean>(false);
   const [badgeUrlInput, setBadgeUrlInput] = useState<string>("");
 
@@ -1825,99 +557,22 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [selectedLayer, setSelectedLayer] = useState<LayerKey | null>("discount");
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [resizingLayer, setResizingLayer] = useState<{
+    layerKey: LayerKey;
+    corner: "nw" | "ne" | "se" | "sw";
+    startSize: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
   const [isFullscreenStage, setIsFullscreenStage] = useState(false);
-  const [showFullscreenInspector, setShowFullscreenInspector] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
-
-  // Animation timeline state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-
-  // ── In-Place On-Canvas Crop & Delete Tool Engine ──────────────────────────
-  const [inPlaceCropLayer, setInPlaceCropLayer] = useState<LayerKey | null>(null);
-
-  const handleDeleteLayer = (key: LayerKey) => {
-    updateCurrentLayer(key, { hidden: true });
-    if (inPlaceCropLayer === key) setInPlaceCropLayer(null);
-    setSelectedLayer(null);
-    const friendlyName = key === "discount" ? "Offer Card (30% off)" : key === "product" ? "Product Image" : key.toUpperCase();
-    toast.success(`${friendlyName} removed from canvas`);
-  };
-
-  const handleRestoreLayer = (key: LayerKey) => {
-    updateCurrentLayer(key, { hidden: false });
-    setSelectedLayer(key);
-    const friendlyName = key === "discount" ? "Offer Card" : key === "product" ? "Product Image" : key.toUpperCase();
-    toast.success(`${friendlyName} restored to canvas`);
-  };
-
-  const resetCrop = (key: LayerKey) => {
-    updateCurrentLayer(key, { cropInset: { top: 0, right: 0, bottom: 0, left: 0 } });
-    toast.success("Crop reset to full dimensions");
-  };
-
-  const handleOfferBadgeImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file (PNG, SVG, JPG, WebP)");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      if (selectedLayer) {
-        updateCurrentLayer(selectedLayer, {
-          badgeImageUrl: dataUrl,
-          badgeStyle: "custom_upload",
-          shape: "sticker",
-        });
-        toast.success("Custom offer badge sticker applied!");
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const handleStartTransform = (
-    e: React.PointerEvent<HTMLDivElement>,
-    key: LayerKey,
-    mode: "move" | "resize" | "crop",
-    handle?: "nw" | "ne" | "se" | "sw" | "n" | "s" | "e" | "w"
-  ) => {
-    e.stopPropagation();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const L = currentLayers[key];
-    if (!L) return;
-
-    const currentInset = L.cropInset || { top: 0, right: 0, bottom: 0, left: 0 };
-    dragTrackingRef.current = {
-      layerKey: key,
-      mode,
-      handle,
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      startLayerX: L.x,
-      startLayerY: L.y,
-      startSize: L.size || 10,
-      startBoxHeight: L.boxHeight || L.size || 10,
-      startBoxWidth: L.boxWidth || L.size || 10,
-      startCropInset: { ...currentInset },
-      rectWidth: rect.width,
-      rectHeight: rect.height,
-    };
-    setIsDragging(true);
-    try {
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {}
-  };
   const [showGrid, setShowGrid] = useState<boolean>(false);
-  const [playbackTime, setPlaybackTime] = useState(10); // current preview time in seconds (defaults to complete frame)
-  const animFrameRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [playbackTime, setPlaybackTime] = useState(10);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Audio references
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -1939,44 +594,50 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
   const [renamingTemplate, setRenamingTemplate] = useState<SavedTemplateItem | null>(null);
   const [renameInput, setRenameInput] = useState("");
 
-  // Quick Rename Handler
-  const handleQuickRename = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!renamingTemplate || !renameInput.trim()) return;
-    const trimmed = renameInput.trim();
-    if (!renamingTemplate._id || renamingTemplate._id === "temp") {
-      setTemplateName(trimmed);
-      showToast(`✏️ Template name set to "${trimmed}"`);
-      setRenamingTemplate(null);
-      return;
-    }
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-      const res = await fetch(`/api/video-template/${renamingTemplate._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ templateName: trimmed }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (templateId === renamingTemplate._id) {
-          setTemplateName(trimmed);
-        }
-        showToast(`✏️ Renamed template to "${trimmed}"`);
-        setRenamingTemplate(null);
-        fetchTemplates();
-      } else {
-        showToast(data.message || "Failed to rename template");
-      }
-    } catch {
-      showToast("Network error while renaming template");
-    }
+  // UI status
+  const [saving, setSaving] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const [renderJobId, setRenderJobId] = useState<string | null>(null);
+  const [renderProgress, setRenderProgress] = useState<string>("");
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isAiOptimizing, setIsAiOptimizing] = useState(false);
+
+  // Canvases
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const gridCanvases = useRef<Record<AspectRatio, HTMLCanvasElement | null>>({
+    "9:16": null,
+    "16:9": null,
+    "1:1": null,
+    "4:5": null,
+  });
+
+  const stageContainerRef = useRef<HTMLDivElement | null>(null);
+  const [canvasFitSize, setCanvasFitSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    toast(msg);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Helper to determine next available 5-digit template ID (10000 - 99999)
+  // Current layers helper
+  const currentLayers = aspectLayers[activeRatio] || DEFAULT_LAYERS[activeRatio];
+
+  const updateCurrentLayer = (key: LayerKey, updates: Partial<LayerStyle>) => {
+    setAspectLayers((prev) => ({
+      ...prev,
+      [activeRatio]: {
+        ...prev[activeRatio],
+        [key]: {
+          ...(prev[activeRatio]?.[key] || {}),
+          ...updates,
+        },
+      },
+    }));
+  };
+
+  // Helper to determine next available 5-digit template ID
   const getNextTemplateId = useCallback(() => {
     const existingIds = new Set(
       savedTemplatesList
@@ -1993,309 +654,21 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     return max5 + 1;
   }, [savedTemplatesList]);
 
-  // Active loaded template's sequential display ID starting with 1
-  const activeTplMatch = savedTemplatesList.find(
-    (t) => String(t._id) === String(templateId) || (templateId && String(t.templateId) === String(templateId)) || (activeTemplateNumber !== null && Number(t.templateId) === Number(activeTemplateNumber))
-  );
-  const currentDisplayId =
-    (activeTemplateNumber !== null && activeTemplateNumber >= 10000 ? activeTemplateNumber : null) ??
-    (activeTplMatch?.templateId && Number(activeTplMatch.templateId) >= 10000 ? Number(activeTplMatch.templateId) : null) ??
-    (templateId && !isNaN(Number(templateId)) && Number(templateId) >= 10000 ? Number(templateId) : null) ??
-    (activeTplMatch?.templateId && Number(activeTplMatch.templateId) > 0 ? (10000 + Number(activeTplMatch.templateId)) : null) ??
-    getNextTemplateId();
-
-  // UI status
-  const [saving, setSaving] = useState(false);
-  const [rendering, setRendering] = useState(false);
-  const [renderJobId, setRenderJobId] = useState<string | null>(null);
-  const [renderProgress, setRenderProgress] = useState<string>("");
-  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Canvases
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const gridCanvases = useRef<Record<AspectRatio, HTMLCanvasElement | null>>({
-    "9:16": null,
-    "16:9": null,
-    "1:1": null,
-    "4:5": null,
-  });
-
-  // Responsive Canvas Sizing (Mathematically fits exact aspect ratio into available stage space)
-  const stageContainerRef = useRef<HTMLDivElement | null>(null);
-  const [canvasFitSize, setCanvasFitSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  // Active loaded template's sequential display ID (stable across re-renders and animation playback)
+  const currentDisplayId = activeTemplateNumber;
 
   useEffect(() => {
-    const container = stageContainerRef.current;
-    if (!container) return;
-
-    const updateFit = () => {
-      // 20px padding (10px on each side)
-      const cw = Math.max(60, container.clientWidth - 20);
-      const ch = Math.max(60, container.clientHeight - 20);
-
-      const spec = ASPECT_SPECS[activeRatio];
-      const targetAspect = spec.width / spec.height;
-      const containerAspect = cw / ch;
-
-      let fw = 0;
-      let fh = 0;
-      if (containerAspect > targetAspect) {
-        // Height constrained
-        fh = ch;
-        fw = Math.round(ch * targetAspect);
-      } else {
-        // Width constrained
-        fw = cw;
-        fh = Math.round(cw / targetAspect);
+    if (templateId && savedTemplatesList.length > 0) {
+      const match = savedTemplatesList.find(
+        (t) => String(t._id) === String(templateId) || String(t.templateId) === String(templateId)
+      );
+      if (match?.templateId && !isNaN(Number(match.templateId)) && Number(match.templateId) > 0) {
+        setActiveTemplateNumber(Number(match.templateId));
       }
-      setCanvasFitSize({ width: fw, height: fh });
-    };
-
-    updateFit();
-    const ro = new ResizeObserver(updateFit);
-    ro.observe(container);
-    window.addEventListener("resize", updateFit);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", updateFit);
-    };
-  }, [activeRatio, leftPanelOpen, rightPanelOpen, isFullscreenStage]);
-
-  // ── Toast Helper ────────────────────────────────────────────────────────────
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  // ── Image Preloading ────────────────────────────────────────────────────────
-  const loadImg = (url: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = url;
-    });
-  };
-
-  useEffect(() => {
-    if (productImageUrl) {
-      loadImg(productImageUrl)
-        .then(setProductImgObj)
-        .catch(() => setProductImgObj(null));
-    } else {
-      setProductImgObj(null);
     }
-  }, [productImageUrl]);
+  }, [templateId, savedTemplatesList]);
 
-  useEffect(() => {
-    if (logoImageUrl) {
-      loadImg(logoImageUrl)
-        .then(setLogoImgObj)
-        .catch(() => setLogoImgObj(null));
-    } else {
-      setLogoImgObj(null);
-    }
-  }, [logoImageUrl]);
-
-  useEffect(() => {
-    const curUrl = aspectBackgrounds[activeRatio] || bgImageUrl || "";
-    if (bgType === "image" && curUrl) {
-      loadImg(curUrl)
-        .then(setBgImgObj)
-        .catch(() => setBgImgObj(null));
-    } else {
-      setBgImgObj(null);
-    }
-  }, [activeRatio, aspectBackgrounds, bgImageUrl, bgType]);
-
-  // ── Fetch Saved Templates ───────────────────────────────────────────────────
-  const fetchTemplates = useCallback(async () => {
-    setLoadingList(true);
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-      const res = await fetch("/api/video-template", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        setSavedTemplatesList(data.data);
-        if (data.data.length > 0) {
-          if (initialTemplateId && activeTemplateNumber === null) {
-            const match = data.data.find((t: any) => String(t._id) === String(initialTemplateId) || String(t.templateId) === String(initialTemplateId));
-            if (match) {
-              setActiveTemplateNumber(match.templateId || 1);
-              if (!templateId) setTemplateId(match._id);
-            }
-          } else if (!templateId && !initialTemplateId) {
-            // New template creation mode by default: auto-assign next sequential ID
-            const validIds = data.data.map((t: any) => Number(t.templateId)).filter((n: number) => !isNaN(n) && n > 0);
-            const nextId = validIds.length > 0 ? Math.max(...validIds) + 1 : (data.data.length + 1 || 1);
-            setTemplateName((prev) => (!prev || prev === "Commercial Diagonal Retail Promo" || prev === "Custom Video Template" || prev.startsWith("Custom Video Template")) ? `Custom Video Template ${nextId}` : prev);
-          }
-        }
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoadingList(false);
-    }
-  }, [activeTemplateNumber, initialTemplateId, templateId]);
-
-  useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
-
-  // ── Fetch dynamic offer types from /api/offer-types ─────────────────────────
-  useEffect(() => {
-    const fetchOfferTypes = async () => {
-      try {
-        const userId = typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
-        const url = userId ? `/api/offer-types?userId=${userId}` : "/api/offer-types";
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-          const map = new Map<string, { offertypeId: string; offertypename: string }>();
-          DEFAULT_COMMERCIAL_OFFER_TYPES.forEach((ot) => map.set(ot.offertypeId, ot));
-          data.data.forEach((ot: any) => {
-            if (ot && ot.offertypeId) {
-              map.set(ot.offertypeId, {
-                offertypeId: ot.offertypeId,
-                offertypename: ot.offertypename || ot.offertypeId,
-              });
-            }
-          });
-          const merged = Array.from(map.values());
-          setOfferTypesList(merged);
-
-          // If no offer type is currently selected, select the first commercial one
-          setSelectedOfferTypeId((current) => {
-            if (current && map.has(current)) return current;
-            if (current) return current;
-            return "INDIVIDUAL_DISCOUNT";
-          });
-        }
-      } catch (err) {
-        console.warn("Could not fetch offer types:", err);
-      }
-    };
-    fetchOfferTypes();
-  }, []);
-
-
-
-
-  // ── Animation Playback Loop ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isPlaying) {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      return;
-    }
-
-    // If canvas animation begins, pause standalone demo tune preview
-    if (previewAudioRef.current && !previewAudioRef.current.paused) {
-      previewAudioRef.current.pause();
-      setPreviewingTuneId(null);
-    }
-
-    if (musicUrl && audioRef.current) {
-      audioRef.current.volume = musicVolume / 100;
-      audioRef.current.play().catch(() => {});
-    }
-
-    const animate = (timestamp: number) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp - playbackTime * 1000;
-      const elapsed = (timestamp - startTimeRef.current) / 1000;
-      if (elapsed >= duration) {
-        startTimeRef.current = timestamp; // loop
-        setPlaybackTime(0);
-        if (audioRef.current) audioRef.current.currentTime = 0;
-      } else {
-        setPlaybackTime(elapsed);
-      }
-      animFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animFrameRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    };
-  }, [isPlaying, duration, playbackTime, musicUrl, musicVolume]);
-
-  const togglePlay = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-    } else {
-      startTimeRef.current = null;
-      setIsPlaying(true);
-    }
-  };
-
-  const handleReplay = () => {
-    setPlaybackTime(0);
-    startTimeRef.current = null;
-    if (audioRef.current) audioRef.current.currentTime = 0;
-    if (!isPlaying) setIsPlaying(true);
-  };
-
-  // ── Active Layers Accessor & Updater ────────────────────────────────────────
-  const currentLayers = aspectLayers[activeRatio];
-
-  const updateCurrentLayer = (key: LayerKey, updates: Partial<LayerStyle>) => {
-    const isImage = key === "product" || key === "logo";
-    setAspectLayers((prev) => {
-      const updated = { ...prev };
-      // 1. Update the active ratio
-      updated[activeRatio] = {
-        ...prev[activeRatio],
-        [key]: {
-          ...prev[activeRatio][key],
-          ...updates,
-          ...(!isImage ? { cropInset: undefined } : {}),
-        },
-      };
-
-      // 2. Automatically sync text content, shape, and colors to all 4 ratios
-      if (
-        updates.text !== undefined ||
-        updates.shape !== undefined ||
-        updates.bgColor !== undefined ||
-        updates.fontColor !== undefined ||
-        updates.borderColor !== undefined ||
-        updates.border !== undefined ||
-        updates.textAlign !== undefined
-      ) {
-        (["9:16", "16:9", "1:1", "4:5"] as AspectRatio[]).forEach((r) => {
-          if (r === activeRatio) return;
-          if (updated[r] && updated[r][key]) {
-            updated[r] = {
-              ...updated[r],
-              [key]: {
-                ...updated[r][key],
-                ...(updates.text !== undefined ? { text: updates.text } : {}),
-                ...(updates.shape !== undefined ? { shape: updates.shape } : {}),
-                ...(updates.bgColor !== undefined ? { bgColor: updates.bgColor } : {}),
-                ...(updates.fontColor !== undefined ? { fontColor: updates.fontColor } : {}),
-                ...(updates.borderColor !== undefined ? { borderColor: updates.borderColor } : {}),
-                ...(updates.border !== undefined ? { border: updates.border } : {}),
-                ...(updates.textAlign !== undefined ? { textAlign: updates.textAlign } : {}),
-              },
-            };
-          }
-        });
-      }
-
-      return updated;
-    });
-  };
-
-  // ── Sync Text Content Across All 4 Ratios ────────────────────────────────────
-  // Copies the TEXT/COLOR values from the current ratio to all other ratios,
-  // but KEEPS each ratio's own x/y/size/shape/animation positions intact.
+  // ── Sync Text to All Ratios ───────────────────────────────────────────────
   const syncTextToAllRatios = () => {
     const source = aspectLayers[activeRatio];
     setAspectLayers((prev) => {
@@ -2306,7 +679,6 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         (Object.keys(source) as LayerKey[]).forEach((key) => {
           const srcLayer = source[key];
           if (!srcLayer) return;
-          // Only sync text content, colors, font — NOT positions/size/animation
           if ((srcLayer.type === "text" || (key !== "product" && key !== "logo")) && target[key]) {
             target[key] = {
               ...target[key],
@@ -2324,24 +696,13 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       });
       return updated;
     });
-    showToast(`✅ Text content synced from ${activeRatio} to all 4 aspect ratios!`);
+    showToast(`✅ Synced text content to all 4 ratios!`);
   };
 
-  // ── Reset a ratio back to its default layout ─────────────────────────────────
-  const resetRatioToDefault = (r: AspectRatio) => {
-    setAspectLayers((prev) => ({
-      ...prev,
-      [r]: DEFAULT_LAYERS[r],
-    }));
-    showToast(`🔄 Reset ${r} layout to default positions`);
-  };
-
-  // ── AI Auto-Optimize All 4 Aspect Ratios ──────────────────────────────────
-  const [isAiOptimizing, setIsAiOptimizing] = useState(false);
-
+  // ── AI Auto-Optimize All 4 Ratios ──────────────────────────────────────────
   const handleAiOptimizeAllRatios = async () => {
     setIsAiOptimizing(true);
-    const source = aspectLayers[activeRatio];
+    const source = aspectLayers[activeRatio] || DEFAULT_LAYERS[activeRatio];
 
     try {
       const res = await fetch("/api/video-template/ai-optimize", {
@@ -2358,15 +719,18 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       const data = await res.json().catch(() => null);
       if (data?.success && data?.aspectStore) {
         setAspectLayers(data.aspectStore);
-        showToast("✨ AI Auto-Optimized all 4 ratios (9:16, 16:9, 1:1, 4:5)! You can now freely edit any layer.");
+        if (selectedLayer && data.aspectStore[activeRatio]?.[selectedLayer]?.hidden) {
+          updateCurrentLayer(selectedLayer, { hidden: false });
+        }
+        showToast("AI Auto-Optimized all 4 ratios! Zero element collision.");
         setIsAiOptimizing(false);
         return;
       }
-    } catch (err) {
-      console.warn("[handleAiOptimizeAllRatios] Network error, applying instant client engine:", err);
+    } catch {
+      // client fallback below
     }
 
-    // Client-side fail-safe engine (guarantees zero errors)
+    // Client-side fail-safe engine with zero collision across all 4 ratios
     const headline = source.headline || {};
     const description = source.description || {};
     const discount = source.discount || {};
@@ -2380,11 +744,11 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     const logo = source.logo || {};
     const qrCode = source.qrCode || {};
 
-    const headlineText = headline.text || "Exclusive Offer!";
-    const descText = description.text || "";
-    const discountText = discount.text || "50% OFF";
+    const headlineText = headline.text || "Grab the crunch before it's gone!!";
+    const descText = description.text || "Ritz Crackers 300g available at an exclusive discount!!";
+    const discountText = discount.text || "75% OFF";
     const ctaText = cta.text || "VISIT STORE ➔";
-    const validityText = validity.text || "Limited Time Offer";
+    const validityText = validity.text || "Offer Validity: 1st Aug - 31st Dec 2026";
     const fontColor = headline.fontColor || "#ffffff";
     const font = headline.font || "Arial";
     const discountBg = discount.bgColor || "#ffc700";
@@ -2392,63 +756,63 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     const ctaBg = cta.bgColor || "#e51a24";
 
     const opt169: LayersConfig = {
-      product: { ...product, type: "product", x: 0.28, y: 0.50, size: 42, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
-      discount: { ...discount, type: "text", text: discountText, x: 0.44, y: 0.42, size: 7.2, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
-      headline: { ...headline, type: "text", text: headlineText, x: 0.74, y: 0.32, size: headlineText.length > 35 ? 3.4 : 3.8, boxWidth: 46, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
-      description: { ...description, type: "text", text: descText, x: 0.74, y: 0.52, size: 2.3, boxWidth: 42, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
-      price: { ...price, type: "text", x: 0.64, y: 0.66, size: 3.2, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      oldPrice: { ...oldPrice, type: "text", x: 0.84, y: 0.66, size: 2.6, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      validity: { ...validity, type: "text", text: validityText, x: 0.74, y: 0.76, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
-      cta: { ...cta, type: "text", text: ctaText, x: 0.74, y: 0.86, size: 2.4, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
-      qrCode: { ...qrCode, type: "text", x: 0.90, y: 0.84, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
-      storeName: { ...storeName, type: "text", x: 0.165, y: 0.05, size: 2.0, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-      footer: { ...footer, type: "text", x: 0.50, y: 0.96, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
-      logo: { ...logo, type: "logo", x: 0.165, y: 0.09, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      product:     { ...product, type: "product", x: 0.28, y: 0.52, size: 40, hidden: false, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount:    { ...discount, type: "text", text: discountText, x: 0.72, y: 0.35, size: 5.2, hidden: false, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline:    { ...headline, type: "text", text: headlineText, x: 0.72, y: 0.20, size: headlineText.length > 35 ? 3.3 : 3.6, boxWidth: 46, hidden: false, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.72, y: 0.49, size: 2.2, boxWidth: 44, hidden: false, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price:       { ...price, type: "text", x: 0.64, y: 0.64, size: 3.2, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice:    { ...oldPrice, type: "text", x: 0.82, y: 0.64, size: 2.6, hidden: false, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity:    { ...validity, type: "text", text: validityText, x: 0.72, y: 0.75, size: 2.0, hidden: false, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta:         { ...cta, type: "text", text: ctaText, x: 0.72, y: 0.86, size: 2.4, hidden: false, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode:      { ...qrCode, type: "text", x: 0.90, y: 0.86, size: 1.8, hidden: false, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName:   { ...storeName, type: "text", x: 0.14, y: 0.05, size: 2.0, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer:      { ...footer, type: "text", x: 0.50, y: 0.96, size: 1.3, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo:        { ...logo, type: "logo", x: 0.14, y: 0.09, size: 10, hidden: false, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
     };
 
     const opt916: LayersConfig = {
-      product: { ...product, type: "product", x: 0.50, y: 0.44, size: 62, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
-      discount: { ...discount, type: "text", text: discountText, x: 0.76, y: 0.30, size: 7.2, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
-      headline: { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.18, size: headlineText.length > 35 ? 3.4 : 3.8, boxWidth: 84, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
-      description: { ...description, type: "text", text: descText, x: 0.50, y: 0.66, size: 2.3, boxWidth: 80, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
-      price: { ...price, type: "text", x: 0.35, y: 0.74, size: 3.5, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      oldPrice: { ...oldPrice, type: "text", x: 0.65, y: 0.74, size: 2.8, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      validity: { ...validity, type: "text", text: validityText, x: 0.50, y: 0.81, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
-      cta: { ...cta, type: "text", text: ctaText, x: 0.50, y: 0.88, size: 2.5, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
-      qrCode: { ...qrCode, type: "text", x: 0.86, y: 0.90, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
-      storeName: { ...storeName, type: "text", x: 0.50, y: 0.05, size: 2.2, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-      footer: { ...footer, type: "text", x: 0.50, y: 0.95, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
-      logo: { ...logo, type: "logo", x: 0.50, y: 0.08, size: 11, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      product:     { ...product, type: "product", x: 0.50, y: 0.42, size: 48, hidden: false, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount:    { ...discount, type: "text", text: discountText, x: 0.76, y: 0.28, size: 5.4, hidden: false, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline:    { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.17, size: headlineText.length > 35 ? 3.3 : 3.5, boxWidth: 84, hidden: false, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.50, y: 0.65, size: 2.2, boxWidth: 80, hidden: false, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price:       { ...price, type: "text", x: 0.38, y: 0.74, size: 3.4, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice:    { ...oldPrice, type: "text", x: 0.62, y: 0.74, size: 2.7, hidden: false, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity:    { ...validity, type: "text", text: validityText, x: 0.50, y: 0.81, size: 1.9, hidden: false, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta:         { ...cta, type: "text", text: ctaText, x: 0.50, y: 0.88, size: 2.4, hidden: false, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode:      { ...qrCode, type: "text", x: 0.86, y: 0.88, size: 1.8, hidden: false, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName:   { type: "text", text: storeName.text || "URBAN RAIN", x: 0.50, y: 0.05, size: 2.1, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer:      { ...footer, type: "text", x: 0.50, y: 0.96, size: 1.3, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo:        { ...logo, type: "logo", x: 0.50, y: 0.09, size: 10, hidden: false, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
     };
 
     const opt11: LayersConfig = {
-      product: { ...product, type: "product", x: 0.38, y: 0.48, size: 48, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
-      discount: { ...discount, type: "text", text: discountText, x: 0.78, y: 0.34, size: 7.0, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
-      headline: { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.18, size: headlineText.length > 35 ? 3.2 : 3.6, boxWidth: 80, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
-      description: { ...description, type: "text", text: descText, x: 0.72, y: 0.52, size: 2.2, boxWidth: 42, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
-      price: { ...price, type: "text", x: 0.62, y: 0.62, size: 3.6, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      oldPrice: { ...oldPrice, type: "text", x: 0.82, y: 0.62, size: 2.6, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      validity: { ...validity, type: "text", text: validityText, x: 0.70, y: 0.70, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
-      cta: { ...cta, type: "text", text: ctaText, x: 0.70, y: 0.80, size: 2.4, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
-      qrCode: { ...qrCode, type: "text", x: 0.88, y: 0.88, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
-      storeName: { ...storeName, type: "text", x: 0.50, y: 0.05, size: 2.0, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-      footer: { ...footer, type: "text", x: 0.50, y: 0.95, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
-      logo: { ...logo, type: "logo", x: 0.18, y: 0.07, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      product:     { ...product, type: "product", x: 0.28, y: 0.52, size: 38, hidden: false, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount:    { ...discount, type: "text", text: discountText, x: 0.74, y: 0.30, size: 5.2, hidden: false, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline:    { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.15, size: headlineText.length > 35 ? 3.2 : 3.4, boxWidth: 84, hidden: false, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.74, y: 0.44, size: 2.1, boxWidth: 42, hidden: false, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price:       { ...price, type: "text", x: 0.65, y: 0.59, size: 3.2, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice:    { ...oldPrice, type: "text", x: 0.83, y: 0.59, size: 2.5, hidden: false, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity:    { ...validity, type: "text", text: validityText, x: 0.74, y: 0.71, size: 1.8, hidden: false, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta:         { ...cta, type: "text", text: ctaText, x: 0.74, y: 0.83, size: 2.3, hidden: false, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode:      { ...qrCode, type: "text", x: 0.90, y: 0.83, size: 1.8, hidden: false, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName:   { type: "text", text: storeName.text || "URBAN RAIN", x: 0.14, y: 0.05, size: 1.9, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer:      { ...footer, type: "text", x: 0.50, y: 0.96, size: 1.3, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo:        { ...logo, type: "logo", x: 0.14, y: 0.09, size: 9, hidden: false, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
     };
 
     const opt45: LayersConfig = {
-      product: { ...product, type: "product", x: 0.40, y: 0.46, size: 50, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
-      discount: { ...discount, type: "text", text: discountText, x: 0.78, y: 0.33, size: 7.0, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
-      headline: { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.18, size: headlineText.length > 35 ? 3.3 : 3.6, boxWidth: 82, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
-      description: { ...description, type: "text", text: descText, x: 0.70, y: 0.52, size: 2.2, boxWidth: 44, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
-      price: { ...price, type: "text", x: 0.36, y: 0.74, size: 4.0, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      oldPrice: { ...oldPrice, type: "text", x: 0.64, y: 0.74, size: 2.8, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
-      validity: { ...validity, type: "text", text: validityText, x: 0.70, y: 0.70, size: 2.0, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
-      cta: { ...cta, type: "text", text: ctaText, x: 0.70, y: 0.81, size: 2.4, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
-      qrCode: { ...qrCode, type: "text", x: 0.86, y: 0.90, size: 1.8, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
-      storeName: { ...storeName, type: "text", x: 0.50, y: 0.05, size: 2.1, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
-      footer: { ...footer, type: "text", x: 0.50, y: 0.95, size: 1.4, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
-      logo: { ...logo, type: "logo", x: 0.20, y: 0.07, size: 10, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      product:     { ...product, type: "product", x: 0.30, y: 0.50, size: 40, hidden: false, bgMode: "transparent", animation: product.animation || "slide_up", animStart: 0.2, animEnd: 1.2 },
+      discount:    { ...discount, type: "text", text: discountText, x: 0.74, y: 0.28, size: 5.2, hidden: false, shape: discount.shape || "origami", fontColor: discount.fontColor || "#ffffff", bgColor: discountBg, border: "1", borderColor: discountBorder, font, animation: discount.animation || "zoom_bounce", animStart: 0.6, animEnd: 1.4 },
+      headline:    { ...headline, type: "text", text: headlineText, x: 0.50, y: 0.13, size: headlineText.length > 35 ? 3.2 : 3.4, boxWidth: 84, hidden: false, shape: "none", fontColor, font, fontWeight: "bold", textAlign: "center", animation: headline.animation || "fade_in", animStart: 1.0, animEnd: 1.8 },
+      description: { ...description, type: "text", text: descText, x: 0.74, y: 0.42, size: 2.1, boxWidth: 42, hidden: false, shape: "none", fontColor, font, textAlign: "center", animation: description.animation || "fade_up", animStart: 1.4, animEnd: 2.2 },
+      price:       { ...price, type: "text", x: 0.65, y: 0.58, size: 3.2, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      oldPrice:    { ...oldPrice, type: "text", x: 0.83, y: 0.58, size: 2.5, hidden: false, shape: "none", fontColor: "#fca5a5", font, animation: "fade_in", animStart: 1.8, animEnd: 2.4 },
+      validity:    { ...validity, type: "text", text: validityText, x: 0.74, y: 0.70, size: 1.8, hidden: false, shape: "pill", fontColor: validity.fontColor || "#111111", bgColor: validity.bgColor || "#ffffff", border: "0", font, animation: "slide_up", animStart: 2.0, animEnd: 2.7 },
+      cta:         { ...cta, type: "text", text: ctaText, x: 0.74, y: 0.82, size: 2.3, hidden: false, shape: "pill", fontColor: cta.fontColor || "#ffffff", bgColor: ctaBg, border: "0", font, animation: "pulse", animStart: 2.2, animEnd: 3.0 },
+      qrCode:      { ...qrCode, type: "text", x: 0.90, y: 0.82, size: 1.8, hidden: false, shape: "rect", animation: "fade_in", animStart: 2.4, animEnd: 3.2 },
+      storeName:   { type: "text", text: storeName.text || "URBAN RAIN", x: 0.16, y: 0.05, size: 1.9, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
+      footer:      { ...footer, type: "text", x: 0.50, y: 0.96, size: 1.3, hidden: false, shape: "none", fontColor, font, animation: "fade_in", animStart: 2.6, animEnd: 3.2 },
+      logo:        { ...logo, type: "logo", x: 0.16, y: 0.08, size: 9, hidden: false, animation: "fade_in", animStart: 0.1, animEnd: 0.8 },
     };
 
     setAspectLayers({
@@ -2457,8 +821,54 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       "1:1": opt11,
       "4:5": opt45,
     });
+    if (selectedLayer && (opt11 as any)[selectedLayer]?.hidden) {
+      updateCurrentLayer(selectedLayer, { hidden: false });
+    }
     setIsAiOptimizing(false);
-    showToast("✨ AI Auto-Optimized all 4 ratios (9:16, 16:9, 1:1, 4:5)! You can now freely edit any layer.");
+    showToast("AI Auto-Optimized all 4 ratios! Zero element collision.");
+  };
+
+  // ── Quick Motion Stagger Presets ──────────────────────────────────────────
+  const applyMotionPreset = (preset: "cascade" | "simultaneous" | "snappy" | "cinematic") => {
+    const keys: LayerKey[] = ["storeName", "logo", "product", "discount", "headline", "description", "price", "oldPrice", "validity", "cta", "footer"];
+    setAspectLayers((prev) => {
+      const updated = { ...prev };
+      const current = { ...updated[activeRatio] };
+      if (preset === "cascade") {
+        let start = 0.1;
+        keys.forEach((k) => {
+          if (current[k]) {
+            current[k] = { ...current[k], animStart: Number(start.toFixed(1)), animEnd: Number((start + 0.9).toFixed(1)) };
+            start += 0.25;
+          }
+        });
+      } else if (preset === "simultaneous") {
+        keys.forEach((k) => {
+          if (current[k]) {
+            current[k] = { ...current[k], animStart: 0.3, animEnd: 1.2 };
+          }
+        });
+      } else if (preset === "snappy") {
+        let start = 0.1;
+        keys.forEach((k) => {
+          if (current[k]) {
+            current[k] = { ...current[k], animStart: Number(start.toFixed(1)), animEnd: Number((start + 0.4).toFixed(1)) };
+            start += 0.15;
+          }
+        });
+      } else if (preset === "cinematic") {
+        let start = 0.2;
+        keys.forEach((k) => {
+          if (current[k]) {
+            current[k] = { ...current[k], animation: "fade_in", animStart: Number(start.toFixed(1)), animEnd: Number((start + 1.8).toFixed(1)) };
+            start += 0.3;
+          }
+        });
+      }
+      updated[activeRatio] = current;
+      return updated;
+    });
+    showToast(`Applied "${preset.toUpperCase()}" motion preset to ${activeRatio}`);
   };
 
   // ── Canvas Rendering Engine ─────────────────────────────────────────────────
@@ -2482,7 +892,6 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
       // 1. Draw Background
       if (bgType === "image") {
         if (bgImgObj) {
-          // Draw uploaded background image cleanly
           const imgRatio = bgImgObj.width / bgImgObj.height;
           const cRatio = W / H;
           let dw = W, dh = H, dx = 0, dy = 0;
@@ -2497,25 +906,13 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           }
           ctx.drawImage(bgImgObj, dx, dy, dw, dh);
         } else {
-          // No image uploaded yet: clean neutral dark canvas (no default promo image!)
           ctx.fillStyle = "#0b1e24";
           ctx.fillRect(0, 0, W, H);
-          if (!isPlaying) {
-            ctx.save();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-            ctx.lineWidth = 2;
-            ctx.setLineDash([8, 8]);
-            ctx.strokeRect(20, 20, W - 40, H - 40);
-            ctx.setLineDash([]);
-            ctx.restore();
-          }
         }
       } else if (bgType === "color") {
-        // Clean solid color background
         ctx.fillStyle = bgColor || "#0B2830";
         ctx.fillRect(0, 0, W, H);
       } else {
-        // Clean linear gradient background with subtle lighting
         const gradSpec = PRESET_GRADIENTS[bgGradIndex] || PRESET_GRADIENTS[0];
         const grd = ctx.createLinearGradient(0, 0, W, H);
         grd.addColorStop(0, gradSpec.c1);
@@ -2530,10 +927,10 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         ctx.fillRect(0, 0, W, H);
       }
 
-      // Designer Alignment Grid overlay (helpful for responsive positioning)
+      // Alignment Grid
       if (showGrid) {
         ctx.save();
-        ctx.strokeStyle = "rgba(17, 181, 187, 0.16)";
+        ctx.strokeStyle = "rgba(99, 102, 241, 0.25)";
         ctx.lineWidth = 1;
         const stepX = Math.round(W / 10);
         for (let x = stepX; x < W; x += stepX) {
@@ -2549,8 +946,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           ctx.lineTo(W, y);
           ctx.stroke();
         }
-        // Center crosshairs
-        ctx.strokeStyle = "rgba(240, 90, 40, 0.4)";
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.45)";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 6]);
         ctx.beginPath();
@@ -2563,17 +959,15 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         ctx.restore();
       }
 
-      const layers = aspectLayers[ratio];
+      const layers = aspectLayers[ratio] || DEFAULT_LAYERS[ratio];
 
       const getAnimProgress = (start = 0, end = 1, isTarget = false) => {
-        // The selected layer in design mode (not playing) is always visible for drag/editing
         if (isTarget && !isPlaying && t === 0) return 1;
-        // In design / editing mode when not playing and at time 0, show all layers fully visible
         if (!isPlaying && t === 0) return 1;
         if (t < start) return 0;
         if (t >= end) return 1;
         const p = (t - start) / (end - start);
-        return 1 - Math.pow(1 - p, 3); // ease-out cubic
+        return 1 - Math.pow(1 - p, 3);
       };
 
       // 2. Draw Product Image
@@ -2611,38 +1005,8 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             ph = maxDim;
             pw = maxDim * aspect;
           }
-          if (pL.boxHeight) {
-            ph = Math.round(H * (pL.boxHeight / 100));
-          }
-          if (pL.boxWidth) {
-            pw = Math.round(W * (pL.boxWidth / 100));
-          }
-
-          // Product background card: only drawn IF user explicitly enabled a colored card shape
-          const hasProductBgCard = pL.bgMode === "color" && pL.bgColor && pL.bgColor !== "transparent" && pL.shape && pL.shape !== "none";
-          if (hasProductBgCard) {
-            const cardPad = Math.round(Math.min(pw, ph) * 0.08);
-            const cardW = pw + cardPad * 2;
-            const cardH = ph + cardPad * 2;
-            ctx.save();
-            ctx.fillStyle = pL.bgColor!;
-            ctx.shadowColor = "rgba(0,0,0,0.22)";
-            ctx.shadowBlur = 14;
-            ctx.shadowOffsetY = 4;
-            ctx.beginPath();
-            if (ctx.roundRect) {
-              ctx.roundRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 16);
-            } else {
-              ctx.rect(cx - cardW / 2, cy - cardH / 2, cardW, cardH);
-            }
-            ctx.fill();
-            if (pL.border === "1") {
-              ctx.strokeStyle = pL.borderColor || "rgba(0,0,0,0.08)";
-              ctx.lineWidth = 2;
-              ctx.stroke();
-            }
-            ctx.restore();
-          }
+          if (pL.boxHeight) ph = Math.round(H * (pL.boxHeight / 100));
+          if (pL.boxWidth) pw = Math.round(W * (pL.boxWidth / 100));
 
           const inset = pL.cropInset || { top: 0, right: 0, bottom: 0, left: 0 };
           const hasCrop = inset.top > 0 || inset.right > 0 || inset.bottom > 0 || inset.left > 0;
@@ -2651,71 +1015,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           const finalW = hasCrop ? Math.max(10, pw - ((inset.left + inset.right) / 100) * pw) : pw;
           const finalH = hasCrop ? Math.max(10, ph - ((inset.top + inset.bottom) / 100) * ph) : ph;
 
-          let r = 0;
-          if (pL.shape === "circle") {
-            r = Math.min(finalW, finalH) / 2;
-          } else if (typeof pL.borderRadius === "number" && pL.borderRadius > 0) {
-            r = pL.borderRadius <= 50 ? (pL.borderRadius / 100) * Math.min(finalW, finalH) : Math.min(pL.borderRadius, finalW / 2, finalH / 2);
-          } else if (pL.shape === "rounded") {
-            r = Math.min(finalW, finalH) * 0.12;
-          }
-
-          ctx.save();
-          if (pL.shadow) {
-            ctx.shadowColor = "rgba(0,0,0,0.45)";
-            ctx.shadowBlur = 16;
-            ctx.shadowOffsetY = 6;
-          }
-
-          if (r > 0) {
-            ctx.beginPath();
-            if (ctx.roundRect) {
-              ctx.roundRect(finalX, finalY, finalW, finalH, r);
-            } else {
-              ctx.rect(finalX, finalY, finalW, finalH);
-            }
-            ctx.clip();
-            ctx.drawImage(productImgObj, cx - pw / 2, cy - ph / 2, pw, ph);
-            ctx.restore();
-
-            if (pL.border === "1" || (pL.borderWidth && pL.borderWidth > 0)) {
-              ctx.save();
-              ctx.strokeStyle = pL.borderColor || "#ffffff";
-              ctx.lineWidth = pL.borderWidth || 3;
-              ctx.beginPath();
-              if (ctx.roundRect) ctx.roundRect(finalX, finalY, finalW, finalH, r);
-              else ctx.rect(finalX, finalY, finalW, finalH);
-              ctx.stroke();
-              ctx.restore();
-            }
-          } else if (hasCrop) {
-            ctx.beginPath();
-            ctx.rect(finalX, finalY, finalW, finalH);
-            ctx.clip();
-            ctx.drawImage(productImgObj, cx - pw / 2, cy - ph / 2, pw, ph);
-            ctx.restore();
-
-            if (pL.border === "1" || (pL.borderWidth && pL.borderWidth > 0)) {
-              ctx.save();
-              ctx.strokeStyle = pL.borderColor || "#ffffff";
-              ctx.lineWidth = pL.borderWidth || 3;
-              ctx.strokeRect(finalX, finalY, finalW, finalH);
-              ctx.restore();
-            }
-          } else {
-            ctx.drawImage(productImgObj, cx - pw / 2, cy - ph / 2, pw, ph);
-            ctx.restore();
-
-            if (pL.border === "1" || (pL.borderWidth && pL.borderWidth > 0)) {
-              ctx.save();
-              ctx.strokeStyle = pL.borderColor || "#ffffff";
-              ctx.lineWidth = pL.borderWidth || 3;
-              ctx.strokeRect(finalX, finalY, finalW, finalH);
-              ctx.restore();
-            }
-          }
-
-// Product highlight handled by interactive HTML overlay
+          ctx.drawImage(productImgObj, finalX, finalY, finalW, finalH);
         } else {
           ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
           ctx.strokeStyle = "#ffffff";
@@ -2723,11 +1023,9 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           ctx.fillRect(cx - maxDim / 2, cy - maxDim / 2, maxDim, maxDim);
           ctx.strokeRect(cx - maxDim / 2, cy - maxDim / 2, maxDim, maxDim);
           ctx.fillStyle = "#ffffff";
-          ctx.font = `bold ${Math.round(W * 0.03)}px Arial`;
+          ctx.font = `bold ${Math.round(W * 0.03)}px Inter, sans-serif`;
           ctx.textAlign = "center";
           ctx.fillText("PRODUCT IMAGE", cx, cy);
-
-// Product placeholder highlight handled by overlay
         }
         ctx.restore();
       }
@@ -2743,69 +1041,20 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         const cy = Math.round(lL.y * H);
 
         if (logoImgObj) {
-          const lLogo = (currentLayers as any).logo || {};
           const lAspect = logoImgObj.width / logoImgObj.height;
           let lw = logoSize;
           let lh = logoSize / lAspect;
-          const lx = cx - lw / 2;
-          const ly = cy - lh / 2;
-          const rad =
-            lLogo.shape === "circle"
-              ? Math.min(lw, lh) / 2
-              : lLogo.borderRadius && Number(lLogo.borderRadius) > 0
-              ? Math.min(lw, lh) * (Number(lLogo.borderRadius) / 100)
-              : 0;
-          ctx.save();
-          if (lLogo.bgMode === "color" || (lLogo.bgColor && lLogo.bgColor !== "transparent")) {
-            ctx.fillStyle = lLogo.bgColor || "#ffffff";
-            const pad = Math.round(Math.min(lw, lh) * 0.08);
-            const bx = lx - pad;
-            const by = ly - pad;
-            const bw = lw + pad * 2;
-            const bh = lh + pad * 2;
-            const bRad =
-              lLogo.shape === "circle"
-                ? Math.min(bw, bh) / 2
-                : lLogo.borderRadius !== undefined
-                ? Math.min(bw, bh) * (Number(lLogo.borderRadius) / 100)
-                : Math.min(bw, bh) * 0.12;
-            ctx.beginPath();
-            ctx.roundRect(bx, by, bw, bh, bRad);
-            ctx.fill();
-          }
-          if (rad > 0) {
-            ctx.beginPath();
-            ctx.roundRect(lx, ly, lw, lh, rad);
-            ctx.clip();
-          }
-          ctx.drawImage(logoImgObj, lx, ly, lw, lh);
-          ctx.restore();
-          const bWidth = Number(lLogo.borderWidth || (typeof lLogo.border === "number" ? lLogo.border : 0)) || 0;
-          if (bWidth > 0) {
-            ctx.save();
-            ctx.strokeStyle = lLogo.borderColor || "#ffffff";
-            ctx.lineWidth = bWidth;
-            ctx.beginPath();
-            ctx.roundRect(lx, ly, lw, lh, rad);
-            ctx.stroke();
-            ctx.restore();
-          }
+          ctx.drawImage(logoImgObj, cx - lw / 2, cy - lh / 2, lw, lh);
         } else {
-          ctx.fillStyle = "rgba(17, 181, 187, 0.85)";
+          ctx.fillStyle = "rgba(99, 102, 241, 0.85)";
           ctx.beginPath();
           ctx.arc(cx, cy, logoSize / 2, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = "#ffffff";
-          ctx.font = `bold ${Math.round(logoSize * 0.4)}px Arial`;
+          ctx.font = `bold ${Math.round(logoSize * 0.4)}px Inter, sans-serif`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText("LOGO", cx, cy);
-        }
-
-        if (highlightKey === "logo") {
-          ctx.strokeStyle = "#11B5BB";
-          ctx.lineWidth = 3;
-          ctx.strokeRect(cx - logoSize / 2 - 6, cy - logoSize / 2 - 6, logoSize + 12, logoSize + 12);
         }
         ctx.restore();
       }
@@ -2826,11 +1075,9 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
       for (const k of textKeys) {
         const L = layers[k];
-        if (!L || !L.text) continue;
+        if (!L || !L.text || L.hidden) continue;
 
         const progress = getAnimProgress(L.animStart, L.animEnd, highlightKey === k);
-        if (L.hidden) continue;
-
         const cx = Math.round(L.x * W);
         const cy = Math.round(L.y * H);
 
@@ -2845,7 +1092,6 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
               scale = progress === 0 ? 0 : Math.sin(progress * Math.PI * 0.7) * 1.18;
               if (progress > 0.8) scale = 1.18 - ((progress - 0.8) / 0.2) * 0.18;
             } else {
-              // Continuous retail breathing pulse animation
               scale = 1 + Math.sin(t * 4.5) * 0.035;
             }
           } else if (animStyle === "slide_up" || animStyle === "fade_up") {
@@ -2871,16 +1117,14 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         const fontSize = Math.round(W * (L.size / 100));
         const fWeight = L.fontWeight || "bold";
         const fStyle = L.fontStyle || "normal";
-        ctx.font = `${fStyle} ${fWeight} ${fontSize}px ${L.font || "Arial"}, sans-serif`;
+        ctx.font = `${fStyle} ${fWeight} ${fontSize}px ${L.font || "Inter"}, sans-serif`;
         ctx.textAlign = (L.textAlign as CanvasTextAlign) || "center";
         ctx.textBaseline = "middle";
 
-        // Minimum clamped boxWidth so text never collapses into a needle
         const effectiveBoxWidth = L.boxWidth ? Math.max(18, L.boxWidth) : undefined;
         let customBoxH = L.boxHeight ? (L.boxHeight / 100) * H : 0;
         let customBoxW = effectiveBoxWidth ? (effectiveBoxWidth / 100) * W : 0;
 
-        // Auto-wrap words down to next line when reaching boxWidth limit
         const maxWrapW = customBoxW ? Math.max(220, customBoxW - fontSize * 0.8) : Math.max(260, W * 0.45);
         const textLines = wrapTextCanvas(ctx, L.text || "", maxWrapW, fontSize);
         const lineHeight = fontSize * 1.30;
@@ -2910,9 +1154,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
           if (bImg.complete && bImg.naturalWidth > 0) {
             const bw = customBoxW ? Math.max(customBoxW, textW + 36) : Math.max(textW + fontSize * 1.5, fontSize * 3.5);
             const bh = customBoxH ? Math.max(customBoxH, textH + 20) : Math.max(textH + fontSize * 0.8, fontSize * 1.8);
-            ctx.save();
             ctx.drawImage(bImg, cx - bw / 2, cy - bh / 2, bw, bh);
-            ctx.restore();
           }
         } else if (!isTransparent) {
           if (L.shape === "rounded") {
@@ -2920,20 +1162,11 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             const ph = customBoxH ? Math.max(textH + 10, customBoxH) : textH + fontSize * 0.45;
             const rx = Math.max(8, Math.round(fontSize * 0.35));
             ctx.beginPath();
-            if (ctx.roundRect) {
-              ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, rx);
-            } else {
-              ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-            }
+            if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, rx);
+            else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
             ctx.fillStyle = L.bgColor || "#ffc700";
             ctx.fill();
-            if (L.border === "1") {
-              ctx.strokeStyle = L.borderColor || "#000000";
-              ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
-              ctx.stroke();
-            }
           } else if (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram") {
-            // ── 3D Origami Folded Retail Banner Badge (Image 2 style) ──
             const tiltDeg = -7;
             const tiltRad = (tiltDeg * Math.PI) / 180;
             const pw = customBoxW ? Math.max(textW + 36, customBoxW) : textW + fontSize * 1.5;
@@ -2943,240 +1176,74 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             ctx.translate(cx, cy);
             ctx.rotate(tiltRad);
 
-            // 1. Folded 3D green origami ribbon flap underneath at bottom-left
-            const foldW = fontSize * 0.95;
-            const foldH = fontSize * 0.85;
+            // Fold flap
             ctx.beginPath();
             ctx.moveTo(-pw / 2 + 12, ph / 2 - 2);
-            ctx.lineTo(-pw / 2 - foldW * 0.45, ph / 2 + foldH);
-            ctx.lineTo(-pw / 2 + foldW * 0.7, ph / 2 - 2);
+            ctx.lineTo(-pw / 2 - 14, ph / 2 + 20);
+            ctx.lineTo(-pw / 2 + 48, ph / 2 - 2);
             ctx.closePath();
-            ctx.fillStyle = L.borderColor || "#047857"; // Deep green fold shadow
+            ctx.fillStyle = L.borderColor || "#047857";
             ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
-            ctx.stroke();
 
-            // 2. Main Angled Banner Box with Rounded Corners & Drop Shadow
-            ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
-            ctx.shadowBlur = Math.round(fontSize * 0.35);
-            ctx.shadowOffsetX = -2;
-            ctx.shadowOffsetY = 6;
-
-            const rx = Math.max(8, Math.round(fontSize * 0.22));
+            // Main origami badge
+            ctx.fillStyle = L.bgColor || "#ffc700";
             ctx.beginPath();
-            if (ctx.roundRect) {
-              ctx.roundRect(-pw / 2, -ph / 2, pw, ph, rx);
-            } else {
-              ctx.rect(-pw / 2, -ph / 2, pw, ph);
-            }
-            ctx.fillStyle = L.bgColor || "#ffc700"; // Vibrant golden yellow
+            if (ctx.roundRect) ctx.roundRect(-pw / 2, -ph / 2, pw, ph, 14);
+            else ctx.rect(-pw / 2, -ph / 2, pw, ph);
             ctx.fill();
-
-            // Reset shadow for crisp borders
-            ctx.shadowColor = "transparent";
-
-            // Crisp White Outline Border
             ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = Math.max(3, Math.round(fontSize * 0.12));
+            ctx.lineWidth = 4;
             ctx.stroke();
 
-            // 3. Festive Confetti Burst Triangles (around the badge like Image 2)
-            const drawTriangle = (tx: number, ty: number, tSize: number, rot: number, color: string) => {
-              ctx.save();
-              ctx.translate(tx, ty);
-              ctx.rotate(rot);
-              ctx.beginPath();
-              ctx.moveTo(0, -tSize);
-              ctx.lineTo(tSize * 0.85, tSize * 0.85);
-              ctx.lineTo(-tSize * 0.85, tSize * 0.85);
-              ctx.closePath();
-              ctx.fillStyle = color;
-              ctx.fill();
-              ctx.restore();
-            };
-
-            const cs = Math.max(5, Math.round(fontSize * 0.22));
-            // Top-left confetti: red, yellow, green
-            drawTriangle(-pw / 2 - cs * 1.5, -ph / 2 + cs, cs * 1.1, 0.4, "#ef4444");
-            drawTriangle(-pw / 2 - cs * 0.8, -ph / 2 - cs * 1.4, cs, -0.6, "#facc15");
-            drawTriangle(-pw / 2 + cs * 1.2, -ph / 2 - cs * 1.8, cs * 0.9, 0.8, "#10b981");
-
-            // Top-right confetti: yellow & red
-            drawTriangle(pw / 2 + cs * 1.2, -ph / 2 - cs * 0.8, cs * 1.1, -0.4, "#facc15");
-            drawTriangle(pw / 2 + cs * 2.2, -ph / 2 + cs * 1.5, cs * 0.85, 0.7, "#ef4444");
-
-            // Bottom-right confetti: yellow & green
-            drawTriangle(pw / 2 + cs * 1.6, ph / 2 + cs * 0.8, cs * 0.9, 0.3, "#facc15");
-            drawTriangle(pw / 2 - cs * 1.2, ph / 2 + cs * 1.8, cs * 1.0, -0.5, "#10b981");
-
-            // Bottom-left confetti: red
-            drawTriangle(-pw / 2 - cs * 1.8, ph / 2 + cs * 0.6, cs * 1.1, -0.7, "#ef4444");
-
+            // Text
+            ctx.fillStyle = L.fontColor || "#ffffff";
+            ctx.fillText(L.text, 0, 0);
             ctx.restore();
-          } else if (L.shape === "circle") {
-            const radius = Math.max(textW, textH) / 2 + fontSize * 0.4;
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.fillStyle = L.bgColor || "#F05A28";
-            ctx.fill();
-            if (L.border === "1") {
-              ctx.strokeStyle = L.borderColor || "#ffffff";
-              ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
-              ctx.stroke();
-            }
+            ctx.restore();
+            continue;
           } else if (L.shape === "pill") {
-            const pw = customBoxW ? Math.max(textW + 20, customBoxW) : textW + fontSize * 1.2;
-            const ph = customBoxH ? Math.max(textH + 10, customBoxH) : textH + fontSize * 0.4;
-            const r = ph / 2;
+            const pw = customBoxW ? Math.max(textW + 30, customBoxW) : textW + fontSize * 1.4;
+            const ph = customBoxH ? Math.max(textH + 12, customBoxH) : textH + fontSize * 0.5;
+            const rx = ph / 2;
             ctx.beginPath();
-            if (ctx.roundRect) {
-              ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, r);
-            } else {
-              ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
-            }
-            ctx.fillStyle = L.bgColor || "#ffffff";
+            if (ctx.roundRect) ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, rx);
+            else ctx.rect(cx - pw / 2, cy - ph / 2, pw, ph);
+            ctx.fillStyle = L.bgColor || "#e51a24";
             ctx.fill();
-            if (L.border === "1") {
-              ctx.strokeStyle = L.borderColor || "#000000";
-              ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
-              ctx.stroke();
-            }
-          } else if (L.shape === "rect") {
-            const pw = customBoxW ? Math.max(textW + 20, customBoxW) : textW + fontSize * 0.8;
-            const ph = customBoxH ? Math.max(textH + 10, customBoxH) : textH + fontSize * 0.4;
-            ctx.fillStyle = L.bgColor || "#ffffff";
-            ctx.fillRect(cx - pw / 2, cy - ph / 2, pw, ph);
-            if (L.border === "1") {
-              ctx.strokeStyle = L.borderColor || "#000000";
-              ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.08));
-              ctx.strokeRect(cx - pw / 2, cy - ph / 2, pw, ph);
-            }
           }
         }
 
-        // Production-ready text rendering: perfectly centered, crisp, unclipped
-        if (L.badgeImageUrl && L.overlayText === false) {
-          // Pure graphic sticker without text overlay
-        } else {
-          const isOrigamiBadge = !L.badgeImageUrl && (L.shape === "origami" || L.shape === "ribbon" || L.shape === "parallelogram");
-          if (isOrigamiBadge) {
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate((-7 * Math.PI) / 180);
-            ctx.translate(-cx, -cy);
-          }
-
-          ctx.fillStyle = L.fontColor || "#ffffff";
-          const textAlign = (L.textAlign as CanvasTextAlign) || "center";
-          ctx.textAlign = textAlign;
-          ctx.textBaseline = "middle";
-
-          const padX = fontSize * 0.6;
-          const pw = customBoxW ? Math.max(textW + padX * 2, customBoxW) : textW + padX * 2;
-
-          const startY = cy - ((textLines.length - 1) * lineHeight) / 2;
-          textLines.forEach((line: string, idx: number) => {
-            let lineX = cx;
-            if (textAlign === "left") {
-              lineX = cx - pw / 2 + padX;
-            } else if (textAlign === "right") {
-              lineX = cx + pw / 2 - padX;
-            }
-            ctx.fillText(line, lineX, startY + idx * lineHeight);
-          });
-
-          if (isOrigamiBadge) {
-            ctx.restore();
-          }
+        // Draw normal text lines
+        ctx.fillStyle = L.fontColor || "#ffffff";
+        const totalHeight = (textLines.length - 1) * lineHeight;
+        let startY = cy - totalHeight / 2;
+        for (let i = 0; i < textLines.length; i++) {
+          ctx.fillText(textLines[i], cx, startY + i * lineHeight);
         }
-
-        // Strikethrough line for old price
-        if (k === "oldPrice") {
-          ctx.strokeStyle = L.fontColor || "#EF4444";
-          ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.1));
-          ctx.beginPath();
-          ctx.moveTo(cx - textW / 2 - 4, cy);
-          ctx.lineTo(cx + textW / 2 + 4, cy);
-          ctx.stroke();
-        }
-
-        // Target brackets for QR Code badge
-        if (k === "qrCode") {
-          const qSize = Math.max(textW, fontSize * 2.2);
-          ctx.strokeStyle = L.borderColor || "#11B5BB";
-          ctx.lineWidth = 2;
-          const bl = 7;
-          ctx.beginPath();
-          ctx.moveTo(cx - qSize / 2, cy - qSize / 2 + bl);
-          ctx.lineTo(cx - qSize / 2, cy - qSize / 2);
-          ctx.lineTo(cx - qSize / 2 + bl, cy - qSize / 2);
-          ctx.moveTo(cx + qSize / 2 - bl, cy - qSize / 2);
-          ctx.lineTo(cx + qSize / 2, cy - qSize / 2);
-          ctx.lineTo(cx + qSize / 2, cy - qSize / 2 + bl);
-          ctx.moveTo(cx - qSize / 2, cy + qSize / 2 - bl);
-          ctx.lineTo(cx - qSize / 2, cy + qSize / 2);
-          ctx.lineTo(cx - qSize / 2 + bl, cy + qSize / 2);
-          ctx.moveTo(cx + qSize / 2 - bl, cy + qSize / 2);
-          ctx.lineTo(cx + qSize / 2, cy + qSize / 2);
-          ctx.lineTo(cx + qSize / 2, cy + qSize / 2 - bl);
-          ctx.stroke();
-        }
-
-// Highlight handled cleanly by interactive HTML overlay
-
         ctx.restore();
       }
 
-      // 5. Draw Custom Added Images & Stickers (Decorations)
-      if (decorations && decorations.length > 0) {
-        for (const dec of decorations) {
-          if (dec.hidden || !dec.url) continue;
-          let img = decorImagesMap.current.get(dec.url);
-          if (!img) {
-            img = new Image();
-            img.crossOrigin = "anonymous";
-            img.src = dec.url;
-            decorImagesMap.current.set(dec.url, img);
-            img.onload = () => {
-              if (canvasRef.current) renderFrameOnCanvas(canvasRef.current, activeRatio, playbackTime, selectedLayer);
-            };
-          }
-          if (img.complete && img.naturalWidth > 0) {
-            const cx = Math.round(dec.x * W);
-            const cy = Math.round(dec.y * H);
-            const baseDim = Math.min(W, H);
-            const dw = Math.round(baseDim * ((dec.size || 15) / 100));
-            const aspect = img.naturalWidth / img.naturalHeight;
-            const dh = Math.round(dw / (aspect || 1));
+      // 5. Draw Decorations / Stickers
+      for (const dec of decorations) {
+        if (dec.hidden) continue;
+        const cx = dec.x * W;
+        const cy = dec.y * H;
+        const dw = Math.round(W * (dec.size / 100));
 
-            ctx.save();
-            ctx.translate(cx, cy);
-            let dr = 0;
-            if (dec.shape === "circle") {
-              dr = Math.min(dw, dh) / 2;
-            } else if (typeof dec.borderRadius === "number" && dec.borderRadius > 0) {
-              dr = dec.borderRadius <= 50 ? (dec.borderRadius / 100) * Math.min(dw, dh) : Math.min(dec.borderRadius, dw / 2, dh / 2);
-            }
-            if (dr > 0) {
-              ctx.save();
-              ctx.beginPath();
-              if (ctx.roundRect) ctx.roundRect(-dw / 2, -dh / 2, dw, dh, dr);
-              else ctx.rect(-dw / 2, -dh / 2, dw, dh);
-              ctx.clip();
-              ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
-              ctx.restore();
-            } else {
-              ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
-            }
-
-            if (selectedDecorId === dec.id) {
-              ctx.strokeStyle = "#11B5BB";
-              ctx.lineWidth = 3;
-              ctx.strokeRect(-dw / 2 - 4, -dh / 2 - 4, dw + 8, dh + 8);
-            }
-            ctx.restore();
-          }
+        let img = globalBadgeImagesCache.get(dec.url);
+        if (!img) {
+          img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = dec.url;
+          globalBadgeImagesCache.set(dec.url, img);
+          img.onload = () => {
+            if (canvasRef.current) renderFrameOnCanvas(canvasRef.current, activeRatio, playbackTime, selectedLayer);
+          };
+        }
+        if (img.complete && img.naturalWidth > 0) {
+          const aspect = img.naturalWidth / img.naturalHeight;
+          const dh = Math.round(dw / (aspect || 1));
+          ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
         }
       }
     },
@@ -3200,437 +1267,183 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     }
   }, [renderFrameOnCanvas, activeTab, playbackTime]);
 
-  // ── Drag & Drop Interaction Engine ──────────────────────────────────────────
-  const checkKeys: LayerKey[] = [
-    "discount",
-    "headline",
-    "description",
-    "price",
-    "oldPrice",
-    "validity",
-    "cta",
-    "qrCode",
-    "storeName",
-    "footer",
-    "logo",
-    "product",
-  ];
+  // Responsive Canvas fitting in container
+  useEffect(() => {
+    const container = stageContainerRef.current;
+    if (!container) return;
 
-  const dragTrackingRef = useRef<{
-    layerKey: LayerKey;
-    mode: "move" | "resize" | "crop";
-    handle?: "nw" | "ne" | "se" | "sw" | "n" | "s" | "e" | "w";
-    startClientX: number;
-    startClientY: number;
-    startLayerX: number;
-    startLayerY: number;
-    startSize: number;
-    startBoxHeight: number;
-    startBoxWidth: number;
-    startCropInset: { top: number; right: number; bottom: number; left: number };
-    rectWidth: number;
-    rectHeight: number;
-  } | null>(null);
+    const updateFit = () => {
+      const cw = Math.max(60, container.clientWidth - 32);
+      const ch = Math.max(60, container.clientHeight - 32);
 
-  const [hoveredLayer, setHoveredLayer] = useState<LayerKey | null>(null);
+      const spec = ASPECT_SPECS[activeRatio];
+      const targetAspect = spec.width / spec.height;
+      const containerAspect = cw / ch;
 
-  // Exact rectangular bounding box calculation for every element type
-  const getLayerBounds = useCallback(
-    (
-      key: LayerKey,
-      W: number,
-      H: number,
-      layers: LayersConfig
-    ) => {
-      const L = layers[key];
-      if (!L || L.hidden) return null;
-      const cx = L.x * W;
-      const cy = L.y * H;
-
-      if (key === "product") {
-        const maxDim = Math.round(W * (L.size / 100));
-        let pw = maxDim;
-        let ph = maxDim;
-        if (productImgObj && productImgObj.width && productImgObj.height) {
-          const aspect = productImgObj.width / productImgObj.height;
-          if (aspect > 1) {
-            pw = maxDim;
-            ph = maxDim / aspect;
-          } else {
-            ph = maxDim;
-            pw = maxDim * aspect;
-          }
-        }
-        if (L.boxHeight) {
-          ph = Math.max(20, Math.round(H * (L.boxHeight / 100)));
-        }
-        if (L.boxWidth) {
-          pw = Math.max(20, Math.round(W * (L.boxWidth / 100)));
-        }
-        const inset = L.cropInset || { top: 0, right: 0, bottom: 0, left: 0 };
-        const cLeft = (inset.left / 100) * pw;
-        const cTop = (inset.top / 100) * ph;
-        const cRight = (inset.right / 100) * pw;
-        const cBottom = (inset.bottom / 100) * ph;
-        const finalLeft = cx - pw / 2 + cLeft;
-        const finalTop = cy - ph / 2 + cTop;
-        const finalW = Math.max(20, pw - cLeft - cRight);
-        const finalH = Math.max(20, ph - cTop - cBottom);
-        return {
-          left: finalLeft,
-          top: finalTop,
-          right: finalLeft + finalW,
-          bottom: finalTop + finalH,
-          width: finalW,
-          height: finalH,
-          cx,
-          cy,
-          rawW: pw,
-          rawH: ph,
-        };
+      let fw = 0;
+      let fh = 0;
+      if (containerAspect > targetAspect) {
+        fh = ch;
+        fw = Math.round(ch * targetAspect);
+      } else {
+        fw = cw;
+        fh = Math.round(cw / targetAspect);
       }
+      setCanvasFitSize({ width: fw, height: fh });
+    };
 
-      if (key === "logo") {
-        const logoSize = Math.round(Math.min(W, H) * (L.size / 100));
-        return {
-          left: cx - logoSize / 2,
-          top: cy - logoSize / 2,
-          right: cx + logoSize / 2,
-          bottom: cy + logoSize / 2,
-          width: logoSize,
-          height: logoSize,
-          cx,
-          cy,
-        };
-      }
+    updateFit();
+    window.addEventListener("resize", updateFit);
+    return () => window.removeEventListener("resize", updateFit);
+  }, [activeRatio, activeTab, leftPanelOpen, rightPanelOpen, isFullscreenStage]);
 
-      // Text layers with dynamic line wrapping down
-      const fontSize = Math.round(W * (L.size / 100));
-      const textStr = L.text || "";
-      const effectiveBoxW = L.boxWidth ? Math.max(18, L.boxWidth) : undefined;
-      const maxWrapW = effectiveBoxW ? Math.max(220, (effectiveBoxW / 100) * W - fontSize * 0.8) : Math.max(260, W * 0.45);
-      const textLines = wrapTextCanvas(null, textStr, maxWrapW, fontSize);
-      const lineHeight = fontSize * 1.30;
-      const totalTextH = Math.max(fontSize * 1.2, textLines.length * lineHeight);
-
-      let maxLineChars = 1;
-      for (const l of textLines) {
-        if (l.length > maxLineChars) maxLineChars = l.length;
-      }
-      const approxTextW = maxLineChars * fontSize * 0.58;
-
-      const padX = fontSize * 0.6;
-      const padY = fontSize * 0.4;
-
-      let hitW = effectiveBoxW ? Math.max(approxTextW + padX * 2, (effectiveBoxW / 100) * W) : approxTextW + padX * 2;
-      let hitH = L.boxHeight ? Math.max(totalTextH + padY * 2, (L.boxHeight / 100) * H) : totalTextH + padY * 2;
-
-      hitW = Math.max(200, hitW);
-      hitH = Math.max(40, hitH);
-
-      // Text bounds are always cleanly centered on (cx, cy)
-      const finalLeft = cx - hitW / 2;
-      const finalTop = cy - hitH / 2;
-
-      return {
-        left: finalLeft,
-        top: finalTop,
-        right: finalLeft + hitW,
-        bottom: finalTop + hitH,
-        width: hitW,
-        height: hitH,
-        cx,
-        cy,
-        rawW: hitW,
-        rawH: hitH,
-      };
-    },
-    [productImgObj]
-  );
-
-  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    const clickX = (e.clientX - rect.left) * scaleX;
-    const clickY = (e.clientY - rect.top) * scaleY;
-
-    const W = canvas.width;
-    const H = canvas.height;
-
-    // Check if clicked on any decor image / sticker first
-    let hitDecor: DecorItem | null = null;
-    if (decorations && decorations.length > 0) {
-      for (let i = decorations.length - 1; i >= 0; i--) {
-        const dec = decorations[i];
-        if (dec.hidden || !dec.url) continue;
-        const baseDim = Math.min(W, H);
-        const dw = Math.round(baseDim * ((dec.size || 15) / 100));
-        const dh = dw;
-        const dcx = dec.x * W;
-        const dcy = dec.y * H;
-        if (clickX >= dcx - dw / 2 && clickX <= dcx + dw / 2 && clickY >= dcy - dh / 2 && clickY <= dcy + dh / 2) {
-          hitDecor = dec;
-          break;
-        }
-      }
+  // Load product & logo image objects
+  useEffect(() => {
+    if (productImageUrl) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => setProductImgObj(img);
+      img.src = productImageUrl;
     }
+  }, [productImageUrl]);
 
-    if (hitDecor) {
-      setSelectedDecorId(hitDecor.id);
-      setSelectedLayer(null);
-      setRightPanelOpen(true);
-      return;
-    }
-
-    const hitKey = checkKeys.find((key) => {
-      const bounds = getLayerBounds(key, W, H, currentLayers);
-      if (!bounds) return false;
-      return (
-        clickX >= bounds.left &&
-        clickX <= bounds.right &&
-        clickY >= bounds.top &&
-        clickY <= bounds.bottom
-      );
-    });
-
-    if (hitKey) {
-      setSelectedDecorId(null);
-    }
-
-    if (hitKey) {
-      const L = currentLayers[hitKey];
-      setSelectedLayer(hitKey);
-      setRightPanelOpen(true);
-      setIsDragging(true);
-      dragTrackingRef.current = {
-        layerKey: hitKey,
-        mode: "move",
-        startSize: L.size || 10,
-        startBoxHeight: L.boxHeight || L.size || 10,
-        startBoxWidth: L.boxWidth || L.size || 10,
-        startCropInset: L.cropInset || { top: 0, right: 0, bottom: 0, left: 0 },
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startLayerX: L.x,
-        startLayerY: L.y,
-        rectWidth: rect.width,
-        rectHeight: rect.height,
-      };
-      try {
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      } catch {}
+  useEffect(() => {
+    if (logoImageUrl) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => setLogoImgObj(img);
+      img.src = logoImageUrl;
     } else {
-      setSelectedLayer(null);
+      setLogoImgObj(null);
     }
-  };
+  }, [logoImageUrl]);
 
-  // Window-level pointer listeners for 60fps tracking across all screen sizes and fullscreen
   useEffect(() => {
-    const handleWindowPointerMove = (e: PointerEvent) => {
-      const tracking = dragTrackingRef.current;
-      if (!tracking) {
-        // Hover detection when not dragging
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const rect = canvas.getBoundingClientRect();
-          if (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            e.clientX >= rect.left &&
-            e.clientX <= rect.right &&
-            e.clientY >= rect.top &&
-            e.clientY <= rect.bottom
-          ) {
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const px = (e.clientX - rect.left) * scaleX;
-            const py = (e.clientY - rect.top) * scaleY;
-            const hoverKey = checkKeys.find((k) => {
-              const b = getLayerBounds(k, canvas.width, canvas.height, currentLayers);
-              return b && px >= b.left && px <= b.right && py >= b.top && py <= b.bottom;
-            });
-            setHoveredLayer(hoverKey || null);
-          } else {
-            setHoveredLayer(null);
-          }
-        }
-        return;
-      }
+    const currentBg = aspectBackgrounds[activeRatio] || bgImageUrl;
+    if (bgType === "image" && currentBg) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => setBgImgObj(img);
+      img.src = currentBg;
+    } else {
+      setBgImgObj(null);
+    }
+  }, [bgType, bgImageUrl, aspectBackgrounds, activeRatio]);
 
-      // Actively dragging (Move, Resize, or Crop)
-      const dx = (e.clientX - tracking.startClientX) / tracking.rectWidth;
-      const dy = (e.clientY - tracking.startClientY) / tracking.rectHeight;
-
-      if (tracking.mode === "move") {
-        const newX = Math.max(0.04, Math.min(0.96, Number((tracking.startLayerX + dx).toFixed(4))));
-        const newY = Math.max(0.04, Math.min(0.96, Number((tracking.startLayerY + dy).toFixed(4))));
-        updateCurrentLayer(tracking.layerKey, { x: newX, y: newY });
-      } else if (tracking.mode === "resize") {
-        if (tracking.handle === "e" || tracking.handle === "w") {
-          // Horizontal edge handles: ONLY resize boxWidth! Font size remains unchanged
-          const widthDelta = (tracking.handle === "e" ? dx : -dx) * 70;
-          const currentBW = tracking.startBoxWidth || 45;
-          const newBW = Math.max(18, Math.min(95, Number((currentBW + widthDelta).toFixed(1))));
-          updateCurrentLayer(tracking.layerKey, { boxWidth: newBW });
-        } else if (tracking.handle === "s" || tracking.handle === "n") {
-          // Vertical edge handles: ONLY resize boxHeight! Font size remains unchanged
-          const heightDelta = (tracking.handle === "s" ? dy : -dy) * 70;
-          const currentBH = tracking.startBoxHeight || 20;
-          const newBH = Math.max(6, Math.min(95, Number((currentBH + heightDelta).toFixed(1))));
-          updateCurrentLayer(tracking.layerKey, { boxHeight: newBH });
-        } else {
-          // Corner handles ("se", "sw", "ne", "nw"): scale Font Size
-          let delta = 0;
-          if (tracking.handle === "se") delta = (dx + dy) / 2;
-          else if (tracking.handle === "sw") delta = (-dx + dy) / 2;
-          else if (tracking.handle === "ne") delta = (dx - dy) / 2;
-          else if (tracking.handle === "nw") delta = (-dx - dy) / 2;
-          else delta = (dx + dy) / 2;
-
-          const scaleFactor = delta * 40;
-          const newSize = Math.max(0.5, Math.min(70, Number((tracking.startSize + scaleFactor).toFixed(1))));
-          updateCurrentLayer(tracking.layerKey, { size: newSize });
-        }
-      } else if (tracking.mode === "crop") {
-        const inset = { ...tracking.startCropInset };
-        const pctX = dx * 100;
-        const pctY = dy * 100;
-        if (tracking.handle === "e") {
-          inset.right = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.right - pctX)));
-        } else if (tracking.handle === "w") {
-          inset.left = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.left + pctX)));
-        } else if (tracking.handle === "s") {
-          inset.bottom = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.bottom - pctY)));
-        } else if (tracking.handle === "n") {
-          inset.top = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.top + pctY)));
-        } else if (tracking.handle === "se") {
-          inset.right = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.right - pctX)));
-          inset.bottom = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.bottom - pctY)));
-        } else if (tracking.handle === "sw") {
-          inset.left = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.left + pctX)));
-          inset.bottom = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.bottom - pctY)));
-        } else if (tracking.handle === "ne") {
-          inset.right = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.right - pctX)));
-          inset.top = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.top + pctY)));
-        } else if (tracking.handle === "nw") {
-          inset.left = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.left + pctX)));
-          inset.top = Math.max(0, Math.min(85, Math.round(tracking.startCropInset.top + pctY)));
-        }
-        updateCurrentLayer(tracking.layerKey, { cropInset: inset });
-      }
-    };
-
-    const handleWindowPointerUp = () => {
-      if (dragTrackingRef.current) {
-        dragTrackingRef.current = null;
-        setIsDragging(false);
-      }
-    };
-
-    window.addEventListener("pointermove", handleWindowPointerMove);
-    window.addEventListener("pointerup", handleWindowPointerUp);
-    window.addEventListener("pointercancel", handleWindowPointerUp);
-
-    return () => {
-      window.removeEventListener("pointermove", handleWindowPointerMove);
-      window.removeEventListener("pointerup", handleWindowPointerUp);
-      window.removeEventListener("pointercancel", handleWindowPointerUp);
-    };
-  }, [currentLayers, activeRatio, getLayerBounds]);
-
-  // Press ESC to exit Fullscreen Stage Mode
+  // Animation preview loop
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isFullscreenStage) {
-        setIsFullscreenStage(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFullscreenStage]);
+    if (!isPlaying) return;
+    let startTimestamp: number | null = null;
+    let animId: number;
 
-  // Auto-collapse sidebars on narrower displays so stage has generous room
-  useEffect(() => {
-    const handleResize = () => {
-      if (typeof window !== "undefined") {
-        if (window.innerWidth < 1250) {
-          setLeftPanelOpen(false);
-        }
-        if (window.innerWidth < 960) {
-          setRightPanelOpen(false);
-        }
+    const loop = (ts: number) => {
+      if (!startTimestamp) startTimestamp = ts - playbackTime * 1000;
+      const elapsed = (ts - startTimestamp) / 1000;
+      if (elapsed >= duration) {
+        setPlaybackTime(0);
+        startTimestamp = ts;
+      } else {
+        setPlaybackTime(elapsed);
       }
+      animId = requestAnimationFrame(loop);
     };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [isPlaying, duration]);
+
+  // ── Fetch Templates ─────────────────────────────────────────────────────────
+  const fetchTemplates = useCallback(async () => {
+    try {
+      setLoadingList(true);
+      const res = await fetch("/api/video-template");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setSavedTemplatesList(data.data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingList(false);
+    }
   }, []);
 
-  // ── Save Template (All 4 Aspect Ratios Together) ─────────────────────────────
-  const handleSaveTemplate = async (isSaveAsNew = false) => {
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  // ── Load Template for Editing ───────────────────────────────────────────────
+  const handleEditTemplate = (tpl: SavedTemplateItem, forceRatio?: AspectRatio) => {
+    setTemplateId(tpl._id);
+    if (tpl.templateId) setActiveTemplateNumber(Number(tpl.templateId));
+    setTemplateName(tpl.templateName || "Custom Video Template");
+    const targetRatio = forceRatio || (tpl.defaultAspectRatio as AspectRatio) || (tpl.aspectRatio as AspectRatio) || "16:9";
+    setActiveRatio(targetRatio);
+    setDefaultRatio(targetRatio);
+    if (tpl.videoDuration) setDuration(tpl.videoDuration);
+
+    if (tpl.aspectStore && typeof tpl.aspectStore === "object") {
+      setAspectLayers({
+        "9:16": tpl.aspectStore["9:16"] || DEFAULT_LAYERS["9:16"],
+        "16:9": tpl.aspectStore["16:9"] || DEFAULT_LAYERS["16:9"],
+        "1:1":  tpl.aspectStore["1:1"]  || DEFAULT_LAYERS["1:1"],
+        "4:5":  tpl.aspectStore["4:5"]  || DEFAULT_LAYERS["4:5"],
+      });
+    } else if (tpl.layers) {
+      setAspectLayers((prev) => ({
+        ...prev,
+        [targetRatio]: { ...prev[targetRatio], ...tpl.layers },
+      }));
+    }
+
+    if (tpl.backgroundUrl) {
+      setBgImageUrl(tpl.backgroundUrl);
+      setBgType("image");
+    }
+    if (tpl.productUrl) setProductImageUrl(tpl.productUrl);
+    if (tpl.logoUrl) setLogoImageUrl(tpl.logoUrl);
+    if (tpl.musicUrl) setMusicUrl(tpl.musicUrl);
+
+    setActiveTab("studio");
+    showToast(`Loaded "${tpl.templateName}"`);
+  };
+
+  // ── Save or Duplicate Template ──────────────────────────────────────────────
+  const handleSaveTemplate = async (isCopy = false) => {
     setSaving(true);
-    showToast("💾 Saving all 4 aspect ratios together...");
+    const targetId = isCopy ? null : templateId;
+    const finalId = isCopy ? getNextTemplateId() : activeTemplateNumber || getNextTemplateId();
+    const finalName = isCopy ? `${templateName} (Copy)` : templateName;
+
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
       const userId = typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
 
-      const nameToSave = isSaveAsNew ? `${templateName} (Copy)` : templateName;
-      const targetNumericId: number = isSaveAsNew
-        ? getNextTemplateId()
-        : (typeof currentDisplayId === "number" && currentDisplayId >= 10000 ? currentDisplayId : Number(currentDisplayId) || getNextTemplateId());
-      if (isSaveAsNew) {
-        setActiveTemplateNumber(targetNumericId);
-      }
-
-      // Always save all 4 ratio configs together under this template ID
       const payload = {
-        templateName: nameToSave,
-        templateId: targetNumericId,
-        aspectRatio: defaultRatio || activeRatio,       // primary/default ratio
-        defaultAspectRatio: defaultRatio || activeRatio, // explicit default aspect ratio for preview GIF & video creation
-        videoDuration: duration || 10,
-        musicUrl: musicMode === "none" ? "" : (musicUrl || `/audio/presets/${selectedPresetId}.mp3`),
-        fps,
-        resolution,
-        layers: currentLayers,          // active ratio layers (for backward compat)
-        aspectStore: aspectLayers,      // ← ALL 4 ratios: 9:16, 16:9, 1:1, 4:5
+        templateName: finalName,
+        templateId: finalId,
+        aspectRatio: activeRatio,
+        defaultAspectRatio: defaultRatio,
+        videoDuration: duration,
+        offerType,
+        offertypeId: selectedOfferTypeId,
+        offertypename: selectedOfferTypeName || offerType,
+        animationStyle,
+        layers: currentLayers,
+        aspectStore: aspectLayers,
         backgroundUrl: aspectBackgrounds[activeRatio] || bgImageUrl,
         aspectBackgrounds,
-        bgType,
-        bgColor,
-        bgGradIndex,
-        logoUrl: logoImageUrl,
         productUrl: productImageUrl,
-        offerType: selectedOfferTypeName || offerType,
-        offertypeId: selectedOfferTypeId || "INDIVIDUAL_DISCOUNT",
-        offertypename: selectedOfferTypeName || offerType,
-        offer_type: {
-          id: selectedOfferTypeId || "INDIVIDUAL_DISCOUNT",
-          name: selectedOfferTypeName || offerType,
-          offertypeId: selectedOfferTypeId || "INDIVIDUAL_DISCOUNT",
-          offertypename: selectedOfferTypeName || offerType,
-        },
-        animationStyle,
-        animation: { enabled: animationStyle !== "static", style: animationStyle },
-        aiStyle,
-        aiColorTheme,
-        decorations,
+        logoUrl: logoImageUrl,
+        musicUrl,
         status: "Active",
         userId,
       };
 
-      const targetId = isSaveAsNew ? null : templateId;
+      const endpoint = targetId ? `/api/video-template/${targetId}` : "/api/video-template";
       const method = targetId ? "PUT" : "POST";
-      const url = targetId ? `/api/video-template/${targetId}` : "/api/video-template";
 
-      const res = await fetch(url, {
+      const res = await fetch(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -3641,301 +1454,51 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
       const data = await res.json();
       if (data.success) {
-        if (data.data?._id) setTemplateId(data.data._id);
-        else if (data.templateId) setTemplateId(data.templateId);
-        const assignedId = Number(data.data?.templateId || data.id || targetNumericId);
-        setActiveTemplateNumber(assignedId);
-        if (isSaveAsNew) setTemplateName(nameToSave);
-        showToast(
-          isSaveAsNew
-            ? `✨ Saved as new template #${assignedId} with all 4 aspect ratios!`
-            : `✅ Template #${assignedId} updated — all 4 ratios saved`
-        );
+        showToast(`Successfully saved template #${finalId}!`);
+        if (isCopy && data.data?._id) {
+          setTemplateId(data.data._id);
+          setActiveTemplateNumber(finalId);
+          setTemplateName(finalName);
+        }
         fetchTemplates();
       } else {
         showToast(data.message || "Failed to save template");
       }
     } catch {
-      showToast("Network error while saving template");
+      showToast("Error saving template");
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Load Template for Editing ───────────────────────────────────────────────
-  const handleEditTemplate = (tpl: SavedTemplateItem, preferRatio?: AspectRatio) => {
-    setTemplateId(tpl._id);
-    setActiveTemplateNumber(tpl.templateId ? Number(tpl.templateId) : (savedTemplatesList.indexOf(tpl) + 1));
-    setTemplateName(tpl.templateName);
-    const tplOtId = tpl.offertypeId || (tpl.offer_type && (tpl.offer_type.id || tpl.offer_type.offertypeId)) || tpl.offerType || "INDIVIDUAL_DISCOUNT";
-    const tplOtName = tpl.offertypename || (tpl.offer_type && (tpl.offer_type.name || tpl.offer_type.offertypename)) || tpl.offerType || "Individual Discount";
-    setSelectedOfferTypeId(tplOtId);
-    setSelectedOfferTypeName(tplOtName);
-    setOfferType(tplOtName);
-    if (tpl.decorations && Array.isArray(tpl.decorations)) setDecorations(tpl.decorations);
-    else setDecorations([]);
-    const tplDur = Number(tpl.videoDuration || (tpl as any).video_duration || (tpl as any).duration);
-    if (tplDur && !isNaN(tplDur)) setDuration(tplDur);
-
-    const tplDefRatio: AspectRatio = ((tpl as any).defaultAspectRatio || (tpl.aspectRatio && ["9:16", "16:9", "1:1", "4:5"].includes(tpl.aspectRatio) ? tpl.aspectRatio as AspectRatio : "16:9"));
-    setDefaultRatio(tplDefRatio);
-    const targetRatio: AspectRatio = preferRatio || initialRatio || tplDefRatio;
-    setActiveRatio(targetRatio);
-
-    // Helper to deeply sanitize and merge layers ensuring type: "text" is never missing
-    const sanitizeLayers = (layersObj: any, ratio: AspectRatio): LayersConfig => {
-      const base = { ...DEFAULT_LAYERS[ratio] };
-      const merged: any = { ...base };
-      if (layersObj && typeof layersObj === "object") {
-        for (const [key, val] of Object.entries(layersObj)) {
-          if (val && typeof val === "object") {
-            const def = (base as any)[key] || {};
-            const layerType = (val as any).type || def.type || (key === "product" ? "product" : key === "logo" ? "logo" : "text");
-            const cleanedVal: any = { ...val };
-            if (key === "product") {
-              // Strip legacy white card background on product so product photo is clean and unboxed
-              if (cleanedVal.bgColor === "#ffffff" || cleanedVal.shape === "rounded") {
-                cleanedVal.shape = "none";
-                cleanedVal.bgMode = "transparent";
-                cleanedVal.bgColor = "transparent";
-              }
-            }
-            merged[key] = {
-              ...def,
-              ...cleanedVal,
-              type: layerType,
-            };
-          }
-        }
-      }
-
-      // Fallback top-level fields from template into layers if present
-      const tplAny = tpl as any;
-      if (tplAny.offerTitle && merged.headline) {
-        if (!merged.headline.text || merged.headline.text.includes("Grab the crunch")) {
-          merged.headline.text = tplAny.offerTitle;
-        }
-      }
-      if (tplAny.offerDescription && merged.description) {
-        if (!merged.description.text || merged.description.text.includes("Ritz Crackers")) {
-          merged.description.text = tplAny.offerDescription;
-        }
-      }
-      if (tplAny.ctaButtonText && merged.cta) {
-        merged.cta.text = tplAny.ctaButtonText;
-      }
-      if (tplAny.discountLabel && merged.discount) {
-        merged.discount.text = tplAny.discountLabel;
-      }
-      if (tplAny.priceLabel && merged.price) {
-        merged.price.text = tplAny.priceLabel;
-      }
-      if (tplAny.footerText && merged.footer) {
-        merged.footer.text = sanitizeFooter(tplAny.footerText);
-      } else if (merged.footer) {
-        merged.footer.text = sanitizeFooter(merged.footer.text);
-      }
-
-      return merged as LayersConfig;
-    };
-
-    // Merge saved aspectStore with DEFAULT_LAYERS to guarantee every ratio has complete layout positions & layer types
-    if (tpl.aspectStore && typeof tpl.aspectStore === 'object') {
-      const merged: Record<AspectRatio, LayersConfig> = {
-        "9:16": sanitizeLayers(tpl.aspectStore["9:16"], "9:16"),
-        "16:9": sanitizeLayers(tpl.aspectStore["16:9"], "16:9"),
-        "1:1":  sanitizeLayers(tpl.aspectStore["1:1"],  "1:1"),
-        "4:5":  sanitizeLayers(tpl.aspectStore["4:5"],  "4:5"),
-      };
-      setAspectLayers(merged);
-    } else if (tpl.layers) {
-      setAspectLayers((prev) => ({
-        ...prev,
-        [targetRatio]: sanitizeLayers({ ...prev[targetRatio], ...tpl.layers }, targetRatio),
-      }));
-    } else {
-      const merged: Record<AspectRatio, LayersConfig> = {
-        "9:16": sanitizeLayers({}, "9:16"),
-        "16:9": sanitizeLayers({}, "16:9"),
-        "1:1":  sanitizeLayers({},  "1:1"),
-        "4:5":  sanitizeLayers({},  "4:5"),
-      };
-      setAspectLayers(merged);
-    }
-
-    if ((tpl as any).bgType) setBgType((tpl as any).bgType);
-    if ((tpl as any).bgColor) setBgColor((tpl as any).bgColor);
-    if (typeof (tpl as any).bgGradIndex === "number") setBgGradIndex((tpl as any).bgGradIndex);
-
-    const rawBg = tpl.backgroundUrl || (tpl as any).thumbnail_url || (tpl as any).thumbnail || (tpl as any).preview_url || (tpl as any).previewUrl || (tpl as any).bgImage || "";
-    const aspectBgs = (tpl.aspectBackgrounds && typeof tpl.aspectBackgrounds === "object") ? { ...tpl.aspectBackgrounds } : null;
-
-    const resolvedAspectBgs: Record<AspectRatio, string> = {
-      "9:16": aspectBgs?.["9:16"] || rawBg || "",
-      "16:9": aspectBgs?.["16:9"] || rawBg || "",
-      "1:1":  aspectBgs?.["1:1"]  || rawBg || "",
-      "4:5":  aspectBgs?.["4:5"]  || rawBg || "",
-    };
-
-    const currentRatioBg = resolvedAspectBgs[targetRatio] || rawBg || "";
-    setAspectBackgrounds(resolvedAspectBgs);
-    setBgImageUrl(currentRatioBg);
-    if (currentRatioBg) {
-      setBgType("image");
-    } else if ((tpl as any).bgType) {
-      setBgType((tpl as any).bgType);
-    }
-
-    const rawLogo =
-      tpl.logoUrl ||
-      (tpl as any).logoImageUrl ||
-      (tpl as any).logo_url ||
-      (tpl as any).layers?.logo?.url ||
-      (tpl as any).layers?.logo?.image ||
-      "";
-    setLogoImageUrl(rawLogo);
-
-    const rawProduct =
-      tpl.productUrl ||
-      (tpl as any).productImageUrl ||
-      (tpl as any).product_image ||
-      (tpl as any).layers?.product?.url ||
-      (tpl as any).layers?.product?.image ||
-      "";
-    setProductImageUrl(rawProduct);
-    const tplMusic = tpl.musicUrl || (tpl as any).music_url || "";
-    if (tplMusic) {
-      setMusicUrl(tplMusic);
-      const matched = DEMO_AUDIO_TUNES.find(d => d.url === tplMusic || tplMusic.includes(d.id));
-      if (matched) {
-        setMusicMode("preset");
-        setSelectedPresetId(matched.id);
-      } else {
-        setMusicMode("upload");
-      }
-    } else {
-      setMusicMode("preset");
-      setSelectedPresetId("upbeat_retail");
-      setMusicUrl("/audio/presets/upbeat_retail.mp3");
-    }
-    if (tpl.animationStyle) setAnimationStyle(tpl.animationStyle);
-    else if (tpl.animation && tpl.animation.style) setAnimationStyle(tpl.animation.style);
-
-    setActiveTab("studio");
-    showToast(`✏️ Loaded "${tpl.templateName}" into visual editor!`);
-  };
-
-  useEffect(() => {
-    const queryId = typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("templateId") || new URLSearchParams(window.location.search).get("id")) : null;
-    const queryRatio = typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("ratio") as AspectRatio) : undefined;
-    const targetId = initialTemplateId || queryId;
-    const targetRatio = initialRatio || queryRatio;
-
-    if (!targetId) return;
-
-    // Fetch directly by ID or numeric templateId to ensure full fresh data from DB is loaded
-    const fetchDirect = async () => {
-      try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-        const res = await fetch(`/api/video-template/${targetId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (data.success && data.data) {
-          handleEditTemplate(data.data, targetRatio);
-          return;
-        }
-      } catch {
-        // ignore
-      }
-
-      if (savedTemplatesList.length > 0) {
-        const match = savedTemplatesList.find(
-          (x) => x._id === targetId || String(x.templateId) === String(targetId)
-        );
-        if (match) {
-          handleEditTemplate(match, targetRatio);
-        }
-      }
-    };
-    fetchDirect();
-  }, [initialTemplateId, initialRatio]);
-
-  // ── Delete Template ─────────────────────────────────────────────────────────
-  const handleDeleteTemplate = async (tpl: SavedTemplateItem) => {
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-      const res = await fetch(`/api/video-template/${tpl._id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(`🗑️ Template "${tpl.templateName}" deleted.`);
-        setDeletingTemplate(null);
-        if (templateId === tpl._id) {
-          setTemplateId(null);
-          setTemplateName("New Untitled Template");
-        }
-        fetchTemplates();
-      } else {
-        showToast(data.message || "Failed to delete template");
-      }
-    } catch {
-      showToast("Network error while deleting template");
-    }
-  };
-
-  // ── Open Create Template Modal ─────────────────────────────────────────────
-    // ── Start Fresh New Template Session (Auto-assigns next sequential ID) ──
-  const handleStartNewTemplateSession = () => {
-    const nextId = getNextTemplateId();
-    setTemplateId(null);
-    setActiveTemplateNumber(nextId);
-    setTemplateName(`Custom Video Template ${nextId}`);
-    setAspectLayers(DEFAULT_LAYERS);
-    setDecorations([]);
-    setSelectedLayer(null);
-    setSelectedDecorId(null);
-    setActiveTab("studio");
-    showToast(`✨ Started Template #${nextId}. Click "+ Save As New (#${nextId})" when ready!`);
-  };
-
+  // ── Create New Template Modal Actions ──────────────────────────────────────
   const handleOpenCreateModal = () => {
     const nextId = getNextTemplateId();
     setNewTplName(`Custom Video Template ${nextId}`);
     setNewTplDuration(10);
-    setNewTplRatio("9:16");
-    const initOt = offerTypesList[0] || { offertypeId: "INDIVIDUAL_DISCOUNT", offertypename: "Individual Discount" };
-    setSelectedOfferTypeId(initOt.offertypeId);
-    setSelectedOfferTypeName(initOt.offertypename);
-    setNewTplOfferType(initOt.offertypename);
+    setNewTplRatio("16:9");
+    setNewTplOfferType("Flash Sale");
     setShowCreateModal(true);
   };
 
-  // ── Confirm Create Template (User Enters Name & Duration) ───────────────────
   const handleConfirmCreateTemplate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const nextId = getNextTemplateId();
     const finalName = newTplName.trim() || `Custom Video Template ${nextId}`;
     setShowCreateModal(false);
 
-    // Immediately update active display ID to the newly created template's sequential ID!
     setActiveTemplateNumber(nextId);
     setTemplateId(null);
     setTemplateName(finalName);
     setDuration(newTplDuration);
     setActiveRatio(newTplRatio);
-    setDefaultRatio(newTplRatio);
     setOfferType(newTplOfferType);
     setAspectLayers(DEFAULT_LAYERS);
     setBgImageUrl("");
-    setBgType("gradient");
+    setBgType("color");
     setLogoImageUrl("");
     setActiveTab("studio");
 
-    // Auto-persist to backend with the assigned sequential templateId
-    // All 4 aspect ratio layouts (9:16, 16:9, 1:1, 4:5) are saved together
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
       const userId = typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
@@ -3948,22 +1511,13 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         body: JSON.stringify({
           templateName: finalName,
           templateId: nextId,
-          aspectRatio: newTplRatio,          // primary ratio
-          defaultAspectRatio: newTplRatio,
+          aspectRatio: newTplRatio,
           videoDuration: newTplDuration,
           offerType: newTplOfferType,
-          offertypeId: selectedOfferTypeId,
-          offertypename: selectedOfferTypeName || newTplOfferType,
-          offer_type: {
-            id: selectedOfferTypeId,
-            name: selectedOfferTypeName || newTplOfferType,
-            offertypeId: selectedOfferTypeId,
-            offertypename: selectedOfferTypeName || newTplOfferType,
-          },
           animationStyle,
           animation: { enabled: animationStyle !== "static", style: animationStyle },
-          layers: DEFAULT_LAYERS[newTplRatio], // active ratio layers
-          aspectStore: DEFAULT_LAYERS,          // ← ALL 4 default ratio layouts
+          layers: DEFAULT_LAYERS[newTplRatio],
+          aspectStore: DEFAULT_LAYERS,
           status: "Active",
           userId,
         }),
@@ -3973,20 +1527,20 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         setTemplateId(data.data._id);
         const assignedId = Number(data.data.templateId || data.id || nextId);
         setActiveTemplateNumber(assignedId);
-        showToast(`✨ Created "${finalName}" #${assignedId} — All 4 ratios initialized (9:16 · 16:9 · 1:1 · 4:5)`);
+        showToast(`Created "${finalName}" #${assignedId}`);
         fetchTemplates();
       } else {
-        showToast(`✨ Started "${finalName}" #${nextId} — 4 ratio layouts ready`);
+        showToast(`Started "${finalName}" #${nextId}`);
       }
     } catch {
-      showToast(`✨ Started "${finalName}" #${nextId} — 4 ratio layouts ready`);
+      showToast(`Started "${finalName}" #${nextId}`);
     }
   };
 
-  // ── Direct Video Render ─────────────────────────────────────────────────────
-  const handleRenderVideo = async (renderPack = false) => {
+  // ── Generate MP4 Video ──────────────────────────────────────────────────────
+  const handleRenderVideo = async () => {
     setRendering(true);
-    setRenderProgress("Queuing render job...");
+    setRenderProgress("Preparing video encode...");
     setRenderedVideoUrl(null);
 
     try {
@@ -3995,7 +1549,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
 
       const currentBg = aspectBackgrounds[activeRatio] || bgImageUrl || "";
       const payload = {
-        template_id: templateId || (activeTemplateNumber ? String(activeTemplateNumber) : "1"),
+        template_id: templateId || String(currentDisplayId),
         userId,
         product_url: productImageUrl,
         logo_url: logoImageUrl,
@@ -4003,17 +1557,16 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         background_url: currentBg,
         aspect_backgrounds: aspectBackgrounds,
         aspect_store: aspectLayers,
-        headline: currentLayers.headline?.text || "Mega Weekend Flash Sale",
+        headline: currentLayers.headline?.text || "Exclusive Offer!",
         discount: currentLayers.discount?.text || "50% OFF",
-        description: currentLayers.description?.text || "Exclusive In-Store Deals",
-        validity: currentLayers.validity?.text || "Valid Till Sunday",
+        description: currentLayers.description?.text || "",
+        validity: currentLayers.validity?.text || "",
         footer: sanitizeFooter(currentLayers.footer?.text),
         ratio: activeRatio,
         duration,
         resolution,
         fps,
         music_volume: musicVolume,
-        batchSpawn: renderPack, // render all 4 ratios if pack is requested
         layers: currentLayers,
         decorations,
         price: currentLayers.price?.text || "",
@@ -4050,7 +1603,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             clearInterval(pollTimer);
             setRendering(false);
             setRenderedVideoUrl(pollData.url);
-            showToast("🎉 Video successfully rendered!");
+            showToast("Video successfully rendered!");
           } else if (pollData.status === "failed") {
             clearInterval(pollTimer);
             setRendering(false);
@@ -4102,13 +1655,13 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
             [activeRatio]: data.url,
           }));
           setBgType("image");
-          showToast(`✅ Background image updated for ${activeRatio}!`);
+          showToast(`✅ Background updated for ${activeRatio}!`);
         }
         if (type === "music") setMusicUrl(data.url);
         if (type === "decor") {
           setDecorations((prev) => [
             ...prev,
-            { id: `dec_${Date.now()}`, url: data.url, x: 0.85, y: 0.15, size: 14 },
+            { id: `dec_${Date.now()}`, url: data.url, x: 0.5, y: 0.5, size: 16 },
           ]);
         }
         showToast(`✅ ${type} uploaded!`);
@@ -4120,12 +1673,148 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
     }
   };
 
+  // ── Drag & Drop Pointer Handlers ────────────────────────────────────────────
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const clickX = ((e.clientX - rect.left) / rect.width) * canvas.width;
+    const clickY = ((e.clientY - rect.top) / rect.height) * canvas.height;
+
+    // Check layer hits
+    const keys: LayerKey[] = ["discount", "headline", "description", "price", "oldPrice", "validity", "cta", "storeName", "product", "logo", "footer", "qrCode"];
+    let hit: LayerKey | null = null;
+    for (const k of keys) {
+      const L = currentLayers[k];
+      if (!L || L.hidden) continue;
+      const lx = L.x * canvas.width;
+      const ly = L.y * canvas.height;
+      const sz = Math.round(canvas.width * (L.size / 100));
+      if (Math.abs(clickX - lx) < sz * 1.5 && Math.abs(clickY - ly) < sz * 0.8) {
+        hit = k;
+        break;
+      }
+    }
+
+    if (hit) {
+      setSelectedLayer(hit);
+      setSelectedDecorId(null);
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      setRightPanelOpen(true);
+    } else {
+      setSelectedLayer(null);
+    }
+  };
+
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDragging || !selectedLayer || !dragStart || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+
+    const dx = (e.clientX - dragStart.x) / rect.width;
+    const dy = (e.clientY - dragStart.y) / rect.height;
+
+    const cur = currentLayers[selectedLayer];
+    if (!cur) return;
+
+    let newX = Math.max(0.02, Math.min(0.98, Number((cur.x + dx).toFixed(3))));
+    let newY = Math.max(0.02, Math.min(0.98, Number((cur.y + dy).toFixed(3))));
+
+    // Snap to horizontal center if within 2%
+    if (Math.abs(newX - 0.50) < 0.02) {
+      newX = 0.50;
+    }
+
+    updateCurrentLayer(selectedLayer, { x: newX, y: newY });
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  // Bounding box size calculator for each layer type
+  const getLayerBBoxSize = useCallback((key: LayerKey, layer: LayerStyle, ratio: AspectRatio) => {
+    const isLandscape = ratio === "16:9";
+    if (key === "product") {
+      return { w: layer.size, h: layer.size * (isLandscape ? 1.4 : 0.9) };
+    }
+    if (key === "logo") {
+      return { w: layer.size * 1.6, h: layer.size * (isLandscape ? 1.2 : 0.8) };
+    }
+    if (key === "discount") {
+      return { w: Math.max(16, layer.size * 2.8), h: Math.max(7, layer.size * 1.4) };
+    }
+    if (key === "headline") {
+      return { w: layer.boxWidth || (isLandscape ? 45 : 82), h: Math.max(7, layer.size * 2.2) };
+    }
+    if (key === "description") {
+      return { w: layer.boxWidth || (isLandscape ? 42 : 80), h: Math.max(5, layer.size * 1.8) };
+    }
+    if (key === "price" || key === "oldPrice") {
+      return { w: Math.max(12, layer.size * 3.4), h: Math.max(5, layer.size * 1.5) };
+    }
+    if (key === "cta") {
+      return { w: Math.max(18, layer.size * 4.2), h: Math.max(5, layer.size * 1.6) };
+    }
+    if (key === "validity") {
+      return { w: Math.max(22, layer.size * 5.8), h: Math.max(4, layer.size * 1.4) };
+    }
+    if (key === "qrCode") {
+      return { w: Math.max(8, layer.size * 2.2), h: Math.max(8, layer.size * 2.2) };
+    }
+    if (key === "storeName") {
+      return { w: Math.max(16, layer.size * 4.2), h: Math.max(4, layer.size * 1.4) };
+    }
+    if (key === "footer") {
+      return { w: 75, h: Math.max(4, layer.size * 1.3) };
+    }
+    return { w: Math.max(14, layer.size * 2.0), h: Math.max(6, layer.size * 1.2) };
+  }, []);
+
+  const handleResizeHandlePointerDown = (e: React.PointerEvent, corner: "nw" | "ne" | "se" | "sw") => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!selectedLayer || !currentLayers[selectedLayer]) return;
+    setResizingLayer({
+      layerKey: selectedLayer,
+      corner,
+      startSize: currentLayers[selectedLayer].size,
+      startX: e.clientX,
+      startY: e.clientY,
+    });
+  };
+
+  const handleContainerPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (resizingLayer && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const deltaX = (e.clientX - resizingLayer.startX) / rect.width;
+      const isRight = resizingLayer.corner === "ne" || resizingLayer.corner === "se";
+      const sign = isRight ? 1 : -1;
+      const scaleMultiplier = Math.max(0.2, 1 + (sign * deltaX * 2.5));
+      const newSize = Math.max(1, Math.min(100, Number((resizingLayer.startSize * scaleMultiplier).toFixed(1))));
+      updateCurrentLayer(resizingLayer.layerKey, { size: newSize });
+    }
+  };
+
+  const handleContainerPointerUp = () => {
+    if (resizingLayer) {
+      setResizingLayer(null);
+    }
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
+  const handleCanvasPointerUp = () => {
+    if (resizingLayer) {
+      setResizingLayer(null);
+    }
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
   const selectedLayerData = selectedLayer ? currentLayers[selectedLayer] : null;
-  const isTextLayer = Boolean(selectedLayer && selectedLayer !== "product" && selectedLayer !== "logo");
 
   return (
-    <div className="ste-root">
-      {/* ── Audio elements for music ── */}
+    <div className="ste-root-light">
+      {/* Audio tags */}
       {musicUrl && <audio ref={audioRef} src={musicUrl} loop />}
       <audio
         ref={previewAudioRef}
@@ -4136,510 +1825,321 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         }}
       />
 
-      {/* ── Toast ── */}
-      {toastMessage && <div className="ste-toast">{toastMessage}</div>}
-      {/* ── Header Topbar ── */}
-      <header className="ste-topbar">
-        <div className="ste-topbar__left" style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 auto", minWidth: 0, flexWrap: "wrap" }}>
+      {/* Floating Notification Toast */}
+      {toastMessage && (
+        <div className="ste-toast-light">
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* ── Studio Top Header Bar ── */}
+      <header className="ste-header-light">
+        <div className="ste-header-left">
           {onNavigate && (
             <button
-              className="ste-back-btn"
+              type="button"
+              className="ste-btn-icon-light"
               onClick={() => onNavigate("dashboard")}
               title="Back to Dashboard"
-              style={{ width: "32px", height: "32px", borderRadius: "6px", flexShrink: 0 }}
             >
               <FaArrowLeft size={13} />
             </button>
           )}
 
-          <div className="ste-title-group" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", flexShrink: 1, minWidth: 0 }}>
-            <span className="ste-badge" style={{ whiteSpace: "nowrap", flexShrink: 0, padding: "4px 8px", fontSize: "0.70rem" }}>
-              STORESPARC STUDIO
-            </span>
+          <div className="ste-tpl-badge">
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">TPL</span>
+            <span className="font-mono font-bold text-slate-800 text-xs tabular-nums">#{currentDisplayId}</span>
+          </div>
 
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-                background: "rgba(17, 181, 187, 0.15)",
-                border: "1px solid rgba(17, 181, 187, 0.4)",
-                padding: "3px 8px",
-                borderRadius: "6px",
-                fontSize: "0.76rem",
-                fontFamily: "monospace",
-                color: "#11B5BB",
-                fontWeight: 800,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                lineHeight: 1,
-              }}
-              title="Current Template ID"
-            >
-              Template #{currentDisplayId}
-            </span>
-
-            <div className="ste-topbar-name-block" style={{ display: "flex", alignItems: "center", gap: "5px", flex: "1 1 auto", minWidth: "120px" }}>
-              <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#11B5BB", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "3px" }}>
-                <FaPen size={9} /> Name:
-              </span>
-              <input
-                type="text"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                className="ste-template-name-input"
-                style={{ height: "28px", padding: "3px 8px", fontSize: "0.80rem", width: "150px", maxWidth: "200px", borderRadius: "6px" }}
-                placeholder="Enter template name..."
-                title="Click to edit template name"
-              />
-            </div>
+          <div className="ste-name-input-wrap">
+            <input
+              type="text"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              className="ste-name-input"
+              placeholder="Template Name..."
+              title="Click to rename template"
+            />
           </div>
         </div>
 
-        {/* Studio Tabs — Clean pills */}
-        <div className="ste-mode-tabs" style={{ display: "flex", alignItems: "center", gap: "3px", padding: "3px", borderRadius: "8px", flexShrink: 0 }}>
+        {/* Center Mode Tabs */}
+        <nav className="ste-tabs-segmented" aria-label="Editor View Modes">
           <button
-            className={`ste-mode-tab ${activeTab === "studio" ? "active" : ""}`}
+            type="button"
+            className={`ste-tab-pill ${activeTab === "studio" ? "active" : ""}`}
             onClick={() => setActiveTab("studio")}
-            style={{ whiteSpace: "nowrap", padding: "5px 10px", fontSize: "0.76rem" }}
           >
-            <FaPen size={11} /> <span>Canvas Editor</span>
+            Canvas
           </button>
           <button
-            className={`ste-mode-tab ${activeTab === "grid" ? "active" : ""}`}
-            onClick={() => { syncTextToAllRatios(); setActiveTab("grid"); }}
-            style={{ whiteSpace: "nowrap", padding: "5px 10px", fontSize: "0.76rem" }}
+            type="button"
+            className={`ste-tab-pill ${activeTab === "grid" ? "active" : ""}`}
+            onClick={() => {
+              syncTextToAllRatios();
+              setActiveTab("grid");
+            }}
           >
-            <FaTableCells size={11} /> <span>4 Ratios Grid</span>
+            All Ratios Grid
           </button>
           <button
-            className={`ste-mode-tab ${activeTab === "library" ? "active" : ""}`}
+            type="button"
+            className={`ste-tab-pill ${activeTab === "library" ? "active" : ""}`}
             onClick={() => {
               setActiveTab("library");
               fetchTemplates();
             }}
-            style={{ whiteSpace: "nowrap", padding: "5px 10px", fontSize: "0.76rem" }}
           >
-            <FaBookOpen size={11} /> <span>Library ({savedTemplatesList.length})</span>
+            Library
+            {savedTemplatesList.length > 0 && (
+              <span className="ste-tab-badge">{savedTemplatesList.length}</span>
+            )}
           </button>
-        </div>
+        </nav>
 
-        {/* Action Buttons — Fully responsive, Save button prominent & NEVER framed out */}
-        <div className="ste-topbar__right" style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 1, flexWrap: "wrap", marginLeft: "auto" }}>
+        {/* Right Topbar Actions */}
+        <div className="ste-header-right">
           {/* AI Auto-Optimize Button */}
           <button
             type="button"
-            className="ste-btn ste-topbar-btn"
             onClick={handleAiOptimizeAllRatios}
             disabled={isAiOptimizing}
-            title="AI Auto-Optimize all 4 aspect ratios (9:16, 16:9, 1:1, 4:5)"
-            style={{
-              background: "linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)",
-              color: "#ffffff",
-              fontWeight: 700,
-              padding: "5px 10px",
-              fontSize: "0.76rem",
-              whiteSpace: "nowrap",
-              border: "1px solid rgba(255,255,255,0.3)",
-              boxShadow: "0 0 10px rgba(139, 92, 246, 0.4)",
-              gap: "5px",
-              display: "flex",
-              alignItems: "center",
-            }}
+            className="ste-hdr-btn-ai"
+            title="AI Magic Layout Auto-Optimizer with zero element collision"
           >
-            {isAiOptimizing ? <FaSpinner className="ste-spin" size={11} /> : <FaWandMagicSparkles size={11} />}
-            <span className="ste-btn-label">{isAiOptimizing ? "Optimizing…" : "AI Optimize"}</span>
+            {isAiOptimizing ? <FaSpinner className="animate-spin" size={13} /> : <FaWandMagicSparkles size={13} />}
+            <span>{isAiOptimizing ? "Optimizing..." : "AI Auto-Layout"}</span>
           </button>
 
-          {/* Preview Play/Pause Button */}
+          {/* Video Preview Toggle */}
           <button
             type="button"
-            className={`ste-btn ste-topbar-btn ${isPlaying ? "ste-btn--danger" : "ste-btn--accent"}`}
-            onClick={togglePlay}
-            title={isPlaying ? "Pause Preview Animation (Space)" : "Play Live Video Preview with Setted Animations"}
-            style={{
-              fontWeight: 700,
-              gap: "5px",
-              padding: "5px 11px",
-              fontSize: "0.76rem",
-              whiteSpace: "nowrap",
-              boxShadow: isPlaying ? "0 0 10px rgba(239, 68, 68, 0.4)" : "0 0 10px rgba(240, 90, 40, 0.35)",
-            }}
+            onClick={() => setIsPlaying(!isPlaying)}
+            className={`ste-hdr-btn-ghost ${isPlaying ? "playing" : ""}`}
+            title={isPlaying ? "Pause Preview (Space)" : "Play Live Video Preview (Space)"}
           >
-            {isPlaying ? <FaPause size={10} /> : <FaPlay size={10} />}
-            <span className="ste-btn-label">{isPlaying ? "Pause" : "Preview"}</span>
+            {isPlaying ? <FaPause size={12} /> : <FaPlay size={12} />}
+            <span>{isPlaying ? "Pause" : "Preview"}</span>
           </button>
 
-          {/* PRIMARY SAVE / UPDATE BUTTON ── High-visibility, prominent, never framed out */}
+          {/* Single Primary Save Template Button */}
           <button
             type="button"
-            className="ste-btn ste-topbar-btn ste-btn--save-hero"
             onClick={() => handleSaveTemplate(false)}
             disabled={saving}
-            title={templateId ? `Update Template #${currentDisplayId} with all changes` : `Save as Template #${currentDisplayId}`}
-            style={{
-              background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-              color: "#ffffff",
-              fontWeight: 800,
-              padding: "5px 13px",
-              fontSize: "0.78rem",
-              whiteSpace: "nowrap",
-              border: "1px solid rgba(16, 185, 129, 0.5)",
-              boxShadow: "0 0 12px rgba(16, 185, 129, 0.45)",
-              gap: "6px",
-              display: "flex",
-              alignItems: "center",
-              cursor: "pointer",
-            }}
+            className="ste-hdr-btn-primary"
+            title="Save all changes to template"
           >
-            {saving ? <FaSpinner className="ste-spin" size={11} /> : <FaFloppyDisk size={11} />}
-            <span className="ste-btn-label">{saving ? "Saving..." : (templateId ? `Update #${currentDisplayId}` : `Save #${currentDisplayId}`)}</span>
-          </button>
-
-          {/* Save As Copy Button */}
-          <button
-            type="button"
-            className="ste-btn ste-topbar-btn ste-btn--primary"
-            onClick={() => handleSaveTemplate(true)}
-            disabled={saving}
-            title={`Save as a brand new template copy with ID #${getNextTemplateId()}`}
-            style={{ fontWeight: 600, padding: "5px 10px", fontSize: "0.76rem", whiteSpace: "nowrap" }}
-          >
-            <FaCopy size={10} />
-            <span className="ste-btn-label">Save Copy</span>
-          </button>
-
-          {/* Generate MP4 Video Button */}
-          <button
-            type="button"
-            className="ste-btn ste-topbar-btn ste-btn--accent"
-            onClick={() => handleRenderVideo(false)}
-            disabled={rendering}
-            title="Generate & Render MP4 Video"
-            style={{ padding: "5px 11px", fontSize: "0.76rem", whiteSpace: "nowrap" }}
-          >
-            {rendering ? <FaSpinner className="ste-spin" size={10} /> : <FaVideo size={10} />}
-            <span className="ste-btn-label">{rendering ? renderProgress : "Generate MP4"}</span>
+            {saving ? <FaSpinner className="animate-spin" size={13} /> : <FaFloppyDisk size={13} />}
+            <span>{saving ? "Saving..." : "Save Template"}</span>
           </button>
         </div>
       </header>
 
       {/* ── Main Workspace ── */}
       {activeTab === "library" ? (
-        /* ══════════════ TAB: SAVED TEMPLATES LIBRARY ══════════════ */
-        <div className="ste-library-view">
-          <div className="ste-library-header">
+        /* ══════════════ TAB: TEMPLATE LIBRARY ══════════════ */
+        <div className="ste-library-container-light">
+          <div className="ste-library-top-bar">
             <div>
-              <h2>Template Library</h2>
-              <p>Browse, preview, edit, duplicate, or delete your custom video templates</p>
+              <h2 className="text-xl font-bold text-slate-900">Custom Video Template Library</h2>
+              <p className="text-xs text-slate-500">Manage, preview, load, duplicate, or delete your branded promotional templates</p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, maxWidth: "360px", margin: "0 20px" }}>
+            <div className="flex items-center gap-3">
               <input
                 type="text"
-                placeholder="🔍 Search templates by name, offer..."
+                placeholder="Search templates..."
                 value={librarySearch}
                 onChange={(e) => setLibrarySearch(e.target.value)}
-                className="ste-input"
-                style={{ padding: "8px 14px", borderRadius: "8px" }}
+                className="ste-input-light w-64 text-xs"
               />
-              {librarySearch && (
-                <button
-                  className="ste-btn ste-btn--ghost ste-btn--sm"
-                  onClick={() => setLibrarySearch("")}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button className="ste-btn ste-btn--secondary" onClick={fetchTemplates}>
-                <FaRotateRight /> Refresh List
-              </button>
-              <button className="ste-btn ste-btn--primary" onClick={handleOpenCreateModal}>
-                <FaPlus /> Create New Template
+              <button
+                type="button"
+                className="ste-btn-primary-light"
+                onClick={() => handleOpenCreateModal()}
+              >
+                <FaPlus size={12} />
+                <span>Create New</span>
               </button>
             </div>
           </div>
 
-          {loadingList ? (
-            <div className="ste-loading-wrap">
-              <FaSpinner className="ste-spin" style={{ fontSize: "2rem", color: "#11B5BB" }} />
-              <p>Loading your templates...</p>
-            </div>
-          ) : savedTemplatesList.length === 0 ? (
-            <div className="ste-empty-box">
-              <FaBookOpen style={{ fontSize: "3rem", opacity: 0.4 }} />
-              <h3>No templates found</h3>
-              <p>Create your first custom video template by entering a template name and duration.</p>
-              <button className="ste-btn ste-btn--primary" onClick={handleOpenCreateModal}>
-                <FaPlus /> Start First Template
-              </button>
-            </div>
-          ) : (
-            <div className="ste-table-wrap">
-              <table className="ste-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "120px" }}>Template ID</th>
-                    <th>Template Name</th>
-                    <th>Aspect Ratio</th>
-                    <th>Duration</th>
-                    <th>Offer Type</th>
-                    <th>Status</th>
-                    <th>Last Modified</th>
-                    <th style={{ textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {savedTemplatesList
-                    .filter((tpl) => {
-                      if (!librarySearch.trim()) return true;
-                      const q = librarySearch.toLowerCase();
-                      return (
-                        tpl.templateName.toLowerCase().includes(q) ||
-                        (tpl.offerType || "").toLowerCase().includes(q) ||
-                        (tpl.templateDescription || "").toLowerCase().includes(q) ||
-                        (tpl.aspectRatio || "").toLowerCase().includes(q) ||
-                        String(tpl.templateId || "").includes(q)
-                      );
-                    })
-                    .map((tpl, idx) => {
-                      const displayId = tpl.templateId || (10000 + idx + 1);
-                      const isCurrent = templateId === tpl._id || String(templateId) === String(displayId);
-                      return (
-                        <tr key={tpl._id} className={isCurrent ? "is-active-row" : ""}>
-                          <td>
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "5px",
-                                background: "rgba(17, 181, 187, 0.15)",
-                                border: "1px solid rgba(17, 181, 187, 0.4)",
-                                padding: "4px 9px",
-                                borderRadius: "6px",
-                                fontSize: "0.82rem",
-                                fontFamily: "monospace",
-                                color: "#11B5BB",
-                                fontWeight: 800,
-                                cursor: "pointer",
-                              }}
+          <div className="ste-library-table-card">
+            <table className="ste-table-light">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Template Name</th>
+                  <th>Ratio</th>
+                  <th>Duration</th>
+                  <th>Offer Type</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {savedTemplatesList
+                  .filter((tpl) => {
+                    if (!librarySearch) return true;
+                    const q = librarySearch.toLowerCase();
+                    return (
+                      tpl.templateName.toLowerCase().includes(q) ||
+                      (tpl.offerType || "").toLowerCase().includes(q) ||
+                      String(tpl.templateId || "").includes(q)
+                    );
+                  })
+                  .map((tpl, idx) => {
+                    const displayId = tpl.templateId || 10000 + idx + 1;
+                    const isCurrent = templateId === tpl._id || String(templateId) === String(displayId);
+                    return (
+                      <tr key={tpl._id} className={isCurrent ? "bg-slate-100" : ""}>
+                        <td>
+                          <span className="ste-id-badge">#{displayId}</span>
+                        </td>
+                        <td>
+                          <div className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                            <span>{tpl.templateName}</span>
+                            {isCurrent && (
+                              <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded-full">
+                                Active in Editor
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="ste-ratio-pill-table">{tpl.aspectRatio || "16:9"}</span>
+                        </td>
+                        <td>
+                          <span className="font-medium text-slate-700">{tpl.videoDuration || 10}s</span>
+                        </td>
+                        <td>
+                          <span className="text-slate-600 text-xs font-medium">{tpl.offerType || "Flash Sale"}</span>
+                        </td>
+                        <td>
+                          <span className="ste-status-badge">Active</span>
+                        </td>
+                        <td className="text-slate-500 text-xs">
+                          {tpl.updatedAt ? new Date(tpl.updatedAt).toLocaleDateString() : "—"}
+                        </td>
+                        <td>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              className="ste-table-action-btn"
+                              title="Watch rendered video"
+                              onClick={() => setViewingTemplate(tpl)}
+                            >
+                              <FaEye size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="ste-table-action-btn primary"
+                              title="Edit in visual editor"
+                              onClick={() => handleEditTemplate(tpl)}
+                            >
+                              <FaPen size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="ste-table-action-btn"
+                              title="Duplicate template"
                               onClick={() => {
-                                navigator.clipboard.writeText(String(displayId));
-                                showToast(`Copied Template ID: #${displayId}`);
+                                handleEditTemplate(tpl);
+                                handleSaveTemplate(true);
                               }}
-                              title="Click to copy Template ID"
                             >
-                              <span>#{displayId}</span>
-                              <FaCopy size={10} />
-                            </span>
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <strong style={{ color: "#fff", fontSize: "0.95rem" }}>
-                                  {tpl.templateName}
-                                </strong>
-                                <button
-                                  className="ste-btn ste-btn--ghost ste-btn--sm"
-                                  style={{ padding: "2px 6px", fontSize: "0.7rem", color: "#11B5BB" }}
-                                  onClick={() => {
-                                    setRenamingTemplate(tpl);
-                                    setRenameInput(tpl.templateName);
-                                  }}
-                                  title="Rename this template"
-                                >
-                                  <FaPen size={9} /> Rename
-                                </button>
-                              </div>
-                              {isCurrent && (
-                                <span style={{ fontSize: "0.7rem", color: "#11B5BB", fontWeight: 700 }}>
-                                  ● Currently Loaded in Canvas Editor
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <span className="ste-badge-chip">{tpl.aspectRatio || "9:16"}</span>
-                          </td>
-                          <td>
-                            <strong style={{ color: "#fff" }}>{tpl.videoDuration || 10}s</strong>
-                          </td>
-                      <td>{tpl.offerType || "Flash Sale"}</td>
-                      <td>
-                        <span className="ste-badge-soft">{tpl.status || "Active"}</span>
-                      </td>
-                      <td style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
-                        {tpl.updatedAt ? new Date(tpl.updatedAt).toLocaleDateString() : "—"}
-                      </td>
-                      <td>
-                        <div className="ste-actions-cell">
-                          {/* 1. View Option */}
-                          {tpl.lastRenderedVideoUrl && (
-                            <button
-                              className="ste-action-btn"
-                              style={{ background: "rgba(240, 90, 40, 0.2)", color: "#F05A28", border: "1px solid rgba(240, 90, 40, 0.4)", fontWeight: 700 }}
-                              title="Watch Latest Rendered Ad Video"
-                              onClick={() => setRenderedVideoUrl(tpl.lastRenderedVideoUrl || null)}
-                            >
-                              <FaPlay /> <span>Ad Video</span>
+                              <FaCopy size={12} />
                             </button>
-                          )}
-                          <button
-                            className="ste-action-btn ste-action-btn--view"
-                            title="View Full Template Configuration"
-                            onClick={() => setViewingTemplate(tpl)}
-                          >
-                            <FaEye /> <span>View</span>
-                          </button>
-
-                          {/* 2. Edit Option */}
-                          <button
-                            className="ste-action-btn ste-action-btn--edit"
-                            title="Load and Edit in Canvas Studio"
-                            onClick={() => handleEditTemplate(tpl)}
-                          >
-                            <FaPen /> <span>Edit</span>
-                          </button>
-
-                          {/* 3. Social Media Schedule */}
-                          {onNavigate && (
                             <button
-                              className="ste-action-btn"
-                              style={{ background: "rgba(37, 99, 235, 0.2)", color: "#93C5FD", border: "1px solid rgba(147, 197, 253, 0.3)" }}
-                              title="Schedule to Social Media"
-                              onClick={() => onNavigate("socialScheduler", { templateId: tpl._id })}
+                              type="button"
+                              className="ste-table-action-btn danger"
+                              title="Delete template"
+                              onClick={() => setDeletingTemplate(tpl)}
                             >
-                              <FaCalendarDays /> <span>Social</span>
+                              <FaTrash size={12} />
                             </button>
-                          )}
-
-                          {/* Rename Option */}
-                          <button
-                            className="ste-action-btn"
-                            style={{ background: "rgba(17, 181, 187, 0.12)", color: "#11B5BB" }}
-                            title="Rename Template"
-                            onClick={() => {
-                              setRenamingTemplate(tpl);
-                              setRenameInput(tpl.templateName);
-                            }}
-                          >
-                            <FaPen /> <span>Rename</span>
-                          </button>
-
-                          {/* 4. Duplicate Option */}
-                          <button
-                            className="ste-action-btn"
-                            style={{ background: "rgba(255,255,255,0.08)", color: "#cbd5e1" }}
-                            title="Duplicate this template"
-                            onClick={() => {
-                              handleEditTemplate(tpl);
-                              handleSaveTemplate(true);
-                            }}
-                          >
-                            <FaCopy /> <span>Copy</span>
-                          </button>
-
-                          {/* 5. Delete Option */}
-                          <button
-                            className="ste-action-btn ste-action-btn--delete"
-                            title="Delete Template Permanently"
-                            onClick={() => setDeletingTemplate(tpl)}
-                          >
-                            <FaTrash /> <span>Delete</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : activeTab === "grid" ? (
-        /* ══════════════ TAB: ALL 4 RATIOS SYNCHRONIZED GRID ══════════════ */
-        <div className="ste-grid-view">
-          <div className="ste-grid-toolbar">
+        /* ══════════════ TAB: 4 RATIOS GRID ══════════════ */
+        <div className="ste-grid-container-light">
+          <div className="ste-grid-header-light">
             <div>
-              <h3>All 4 Aspect Ratios (Synchronized Preview)</h3>
-              <p>Watch your animation playback simultaneously across all screen formats</p>
+              <h2 className="text-xl font-bold text-slate-900">Synchronized 4 Aspect Ratios Preview</h2>
+              <p className="text-xs text-slate-500">Live synchronized playback across all screen formats (16:9 · 9:16 · 1:1 · 4:5)</p>
             </div>
-            <div className="ste-playback-controls" style={{ background: "#0B2830", padding: "8px 16px", borderRadius: "10px" }}>
+            <div className="flex items-center gap-3">
               <button
-                className="ste-ctrl-btn ste-ctrl-btn--play"
-                onClick={togglePlay}
-                title={isPlaying ? "Pause" : "Play Animations"}
+                type="button"
+                className="ste-btn-secondary-light text-slate-800 border-slate-300 hover:bg-slate-100 font-semibold"
+                onClick={handleAiOptimizeAllRatios}
+                disabled={isAiOptimizing}
+                title="AI Magic Layout Auto-Optimizer with zero element collision for all 4 ratios"
               >
-                {isPlaying ? <FaPause /> : <FaPlay />}
+                {isAiOptimizing ? <FaSpinner className="animate-spin" size={12} /> : <FaWandMagicSparkles size={12} />}
+                <span>{isAiOptimizing ? "Optimizing..." : "AI Auto-Optimize All"}</span>
               </button>
-              <button className="ste-ctrl-btn" onClick={handleReplay} title="Replay">
-                <FaRotateRight />
+              <button
+                type="button"
+                className="ste-btn-primary-light"
+                onClick={() => setIsPlaying(!isPlaying)}
+              >
+                {isPlaying ? <FaPause size={12} /> : <FaPlay size={12} />}
+                <span>{isPlaying ? "Pause All" : "Play All"}</span>
               </button>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "220px" }}>
-                <span className="ste-time-label">{playbackTime.toFixed(1)}s</span>
-                <input
-                  type="range"
-                  min="0"
-                  max={duration}
-                  step="0.05"
-                  value={playbackTime}
-                  onChange={(e) => {
-                    setIsPlaying(false);
-                    setPlaybackTime(Number(e.target.value));
-                  }}
-                  className="ste-scrub-input"
-                />
-                <span className="ste-time-label">{duration}s</span>
+              <button
+                type="button"
+                className="ste-btn-secondary-light"
+                onClick={() => setPlaybackTime(0)}
+              >
+                <FaRotateRight size={12} />
+                <span>Restart</span>
+              </button>
+              <div className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                {playbackTime.toFixed(1)}s / {duration}s
               </div>
             </div>
           </div>
 
-          <div className="ste-aspect-tiles-grid">
+          <div className="ste-aspect-cards-grid">
             {(["16:9", "9:16", "1:1", "4:5"] as AspectRatio[]).map((r) => (
-              <div key={r} className="ste-aspect-tile-card">
-                <div className="ste-aspect-tile-head">
-                  <span className="ste-aspect-tile-label">{ASPECT_SPECS[r].label}</span>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      className="ste-btn ste-btn--secondary ste-btn--sm"
-                      onClick={() => {
-                        setActiveRatio(r);
-                        setActiveTab("studio");
-                        setIsFullscreenStage(false);
-                      }}
-                      title="Edit in Studio Editor"
-                    >
-                      <FaPen /> Edit
-                    </button>
-                    <button
-                      className="ste-btn ste-btn--primary ste-btn--sm"
-                      onClick={() => {
-                        setActiveRatio(r);
-                        setActiveTab("studio");
-                        setIsFullscreenStage(true);
-                      }}
-                      title="Edit in Fullscreen Responsive Stage"
-                    >
-                      <FaExpand /> Full Screen
-                    </button>
+              <div key={r} className="ste-aspect-card-light">
+                <div className="ste-aspect-card-header">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800 text-sm">{ASPECT_SPECS[r].label}</span>
+                    {defaultRatio === r && (
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <FaStar size={8} /> Default
+                      </span>
+                    )}
                   </div>
-                </div>
-                <div className="ste-tile-canvas-wrap">
-                  <div
-                    className="ste-tile-canvas-viewport"
-                    style={{
-                      aspectRatio: `${ASPECT_SPECS[r].width} / ${ASPECT_SPECS[r].height}`,
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveRatio(r);
+                      setActiveTab("studio");
                     }}
+                    className="ste-btn-secondary-light text-xs py-1 px-2.5"
                   >
-                    <canvas
-                      ref={(el) => {
-                        gridCanvases.current[r] = el;
-                      }}
-                      className="ste-tile-canvas"
-                    />
-                  </div>
+                    <FaPen size={10} />
+                    <span>Edit this</span>
+                  </button>
+                </div>
+                <div className="ste-aspect-card-canvas-wrap">
+                  <canvas
+                    ref={(el) => {
+                      gridCanvases.current[r] = el;
+                    }}
+                    className="ste-grid-canvas"
+                  />
                 </div>
               </div>
             ))}
@@ -4647,2187 +2147,1161 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         </div>
       ) : (
         /* ══════════════ TAB: CANVAS STUDIO ══════════════ */
-        <div className="ste-workspace">
-          {/* ── Left Rail: Storesparc Video Controls ── */}
-          <aside className={`ste-panel ste-panel--assets ${!leftPanelOpen ? "ste-panel--collapsed" : ""}`}>
-            <div className="ste-panel__header">
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <FaLayerGroup />
-                <h4>Template Specifications</h4>
-              </div>
+        <div className="ste-studio-body">
+          {/* ── Left Rail: Section Navigation + Panel ── */}
+          <div className={`ste-left-rail ${!leftPanelOpen ? "collapsed" : ""}`}>
+            {/* Vertical Section Nav Tabs */}
+            <aside className="ste-section-nav">
               <button
-                className="ste-panel-collapse-btn"
-                onClick={() => setLeftPanelOpen(false)}
-                title="Collapse Specifications Panel"
+                type="button"
+                className={`ste-section-nav-item ${activeSection === "canvas" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSection("canvas");
+                  setLeftPanelOpen(true);
+                }}
+                title="Canvas & Specs"
               >
-                <FaChevronLeft size={11} />
+                <FaShapes size={16} />
+                <span>Canvas</span>
               </button>
-            </div>
 
-            <div className="ste-panel__body">
-              {/* Template Name & ID */}
-              <div className="ste-field-group">
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <label className="ste-label">Template Name</label>
-                  <span style={{ fontSize: "0.72rem", color: "#11B5BB", fontWeight: 800, fontFamily: "monospace" }}>
-                    ID: #{currentDisplayId}
-                  </span>
-                </div>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type="text"
-                    className="ste-input"
-                    style={{ paddingRight: "30px", fontWeight: 600, color: "#fff", background: "#06181d", borderColor: "rgba(17,181,187,0.4)" }}
-                    placeholder="Enter template name..."
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                  />
-                  <FaPen
-                    size={11}
-                    style={{
-                      position: "absolute",
-                      right: "10px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      color: "#11B5BB",
-                      pointerEvents: "none",
-                      opacity: 0.8,
-                    }}
-                  />
-                </div>
-                <span className="ste-sublabel">Enter or edit the name for this video template.</span>
-                <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+              <button
+                type="button"
+                className={`ste-section-nav-item ${activeSection === "content" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSection("content");
+                  setLeftPanelOpen(true);
+                }}
+                title="Content & Copy"
+              >
+                <FaFont size={16} />
+                <span>Content</span>
+              </button>
+
+              <button
+                type="button"
+                className={`ste-section-nav-item ${activeSection === "badges" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSection("badges");
+                  setLeftPanelOpen(true);
+                }}
+                title="Badges & Stickers"
+              >
+                <FaImage size={16} />
+                <span>Badges</span>
+              </button>
+
+              <button
+                type="button"
+                className={`ste-section-nav-item ${activeSection === "animation" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSection("animation");
+                  setLeftPanelOpen(true);
+                }}
+                title="Animation & Timing"
+              >
+                <FaClock size={16} />
+                <span>Motion</span>
+              </button>
+
+              <button
+                type="button"
+                className={`ste-section-nav-item ${activeSection === "music" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSection("music");
+                  setLeftPanelOpen(true);
+                }}
+                title="Audio & Music"
+              >
+                <FaMusic size={16} />
+                <span>Music</span>
+              </button>
+
+            </aside>
+
+            {/* Section Panel Body */}
+            {leftPanelOpen && (
+              <div className="ste-section-panel">
+                <div className="ste-section-panel-header">
+                  <h4 className="font-bold text-slate-900 text-sm capitalize">
+                    {activeSection === "canvas" && "Canvas & Layout"}
+                    {activeSection === "content" && "Content & Copywriting"}
+                    {activeSection === "badges" && "Promotional Badges & Stickers"}
+                    {activeSection === "animation" && "Motion & Animation Duration"}
+                    {activeSection === "music" && "Background Music & Audio"}
+                  </h4>
                   <button
                     type="button"
-                    className="ste-btn ste-btn--secondary ste-btn--sm"
-                    style={{ width: "100%", padding: "5px 10px", fontSize: "0.75rem", color: "#11B5BB", justifyContent: "center" }}
-                    onClick={() => {
-                      showToast(`Template name saved as "${templateName}"`);
-                    }}
+                    onClick={() => setLeftPanelOpen(false)}
+                    className="ste-btn-icon-light text-slate-400 hover:text-slate-700"
+                    title="Collapse Panel"
                   >
-                    <FaCheck size={10} /> Set Name
-                  </button>
-                </div>
-              </div>
-
-              {/* Ratio Selector — All 4 saved together */}
-              <div className="ste-field-group">
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <label className="ste-label" style={{ margin: 0 }}>Active Aspect Ratio</label>
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: "4px",
-                    background: "rgba(17,181,187,0.15)", border: "1px solid rgba(17,181,187,0.35)",
-                    borderRadius: "5px", padding: "2px 7px", fontSize: "0.62rem",
-                    color: "#11B5BB", fontWeight: 800, letterSpacing: "0.03em"
-                  }} title="All 4 aspect ratios are saved together under this template ID">
-                    ✦ All 4 Saved Together
-                  </span>
-                </div>
-                <div className="ste-ratio-chips" style={{ width: "100%", justifyContent: "space-between" }}>
-                  {(["9:16", "16:9", "1:1", "4:5"] as AspectRatio[]).map((r) => (
-                    <button
-                      key={r}
-                      className={`ste-ratio-chip ${activeRatio === r ? "ste-ratio-chip--active" : ""}`}
-                      onClick={() => setActiveRatio(r)}
-                      title={`Edit ${r} layout — ${ASPECT_SPECS[r].label}${defaultRatio === r ? " (Default Aspect Ratio)" : ""}`}
-                    >
-                      {defaultRatio === r ? `★ ${r}` : r}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Default Aspect Ratio Selection */}
-                <div style={{ marginTop: "8px", padding: "8px 10px", background: "rgba(255, 255, 255, 0.04)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "0.72rem", color: "#A4B6B9", fontWeight: 700 }}>
-                      ⭐ Default Aspect Ratio
-                    </span>
-                    <span style={{ fontSize: "0.65rem", color: "#F59E0B", fontWeight: 800 }}>
-                      {defaultRatio} (Default Preview &amp; Output)
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    {(["16:9", "9:16", "1:1", "4:5"] as AspectRatio[]).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => {
-                          setDefaultRatio(r);
-                          showToast(`⭐ Set ${r} as Default Aspect Ratio for preview GIF & video output`);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: "5px 4px",
-                          fontSize: "0.72rem",
-                          fontWeight: 700,
-                          borderRadius: "6px",
-                          border: defaultRatio === r ? "1px solid #F59E0B" : "1px solid rgba(255, 255, 255, 0.12)",
-                          background: defaultRatio === r ? "rgba(245, 158, 11, 0.2)" : "rgba(255, 255, 255, 0.03)",
-                          color: defaultRatio === r ? "#FBBF24" : "#94A3B8",
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
-                        }}
-                        title={`Make ${r} the default aspect ratio for preview GIF and primary video creation`}
-                      >
-                        {defaultRatio === r ? `★ ${r}` : r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* AI Auto-Optimize all ratios */}
-                <button
-                  type="button"
-                  onClick={handleAiOptimizeAllRatios}
-                  disabled={isAiOptimizing}
-                  style={{
-                    marginTop: "8px",
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    padding: "8px 10px",
-                    background: "linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)",
-                    border: "1px solid rgba(139, 92, 246, 0.6)",
-                    borderRadius: "7px",
-                    color: "#c084fc",
-                    fontSize: "0.76rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    boxShadow: "0 0 10px rgba(139, 92, 246, 0.2)",
-                  }}
-                  title="Intelligently optimize hierarchy and layout across 9:16, 16:9, 1:1, and 4:5. You can freely edit afterwards!"
-                >
-                  {isAiOptimizing ? <FaSpinner className="ste-spin" size={12} /> : <FaWandMagicSparkles size={12} />}
-                  {isAiOptimizing ? "Optimizing All Ratios…" : "✨ AI Auto-Optimize All 4 Ratios"}
-                </button>
-                {/* Sync text content from current ratio to all other ratios */}
-                <button
-                  type="button"
-                  onClick={syncTextToAllRatios}
-                  style={{
-                    marginTop: "8px",
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    padding: "6px 10px",
-                    background: "rgba(17,181,187,0.12)",
-                    border: "1px dashed rgba(17,181,187,0.5)",
-                    borderRadius: "7px",
-                    color: "#11B5BB",
-                    fontSize: "0.74rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  title={`Copy text content from ${activeRatio} to all other ratios (keeps each ratio's own positions)`}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(17,181,187,0.22)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(17,181,187,0.12)"; }}
-                >
-                  <FaArrowUpRightFromSquare size={11} />
-                  Sync Text to All Ratios ({activeRatio} → others)
-                </button>
-                {/* Reset individual ratio */}
-                <button
-                  type="button"
-                  onClick={() => resetRatioToDefault(activeRatio)}
-                  style={{
-                    marginTop: "5px",
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    padding: "5px 10px",
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px dashed rgba(255,255,255,0.15)",
-                    borderRadius: "7px",
-                    color: "#94a3b8",
-                    fontSize: "0.72rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                  title={`Reset ${activeRatio} layout to default positions`}
-                >
-                  <FaRotateRight size={10} />
-                  Reset {activeRatio} to Default
-                </button>
-              </div>
-
-              {/* Offer Type Dropdown from /api/offer-types */}
-              <div className="ste-field-group">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <label className="ste-label" style={{ margin: 0 }}>Offer Type</label>
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                    {selectedOfferTypeId && (
-                      <span style={{ fontSize: "0.68rem", color: "#11B5BB", background: "rgba(17,181,187,0.12)", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>
-                        {selectedOfferTypeId}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowNewOfferTypeForm(!showNewOfferTypeForm)}
-                      style={{
-                        background: showNewOfferTypeForm ? "rgba(239, 68, 68, 0.2)" : "rgba(17, 181, 187, 0.15)",
-                        border: "1px solid " + (showNewOfferTypeForm ? "rgba(239, 68, 68, 0.4)" : "rgba(17, 181, 187, 0.4)"),
-                        color: showNewOfferTypeForm ? "#f87171" : "#11B5BB",
-                        fontSize: "0.68rem",
-                        padding: "2px 7px",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {showNewOfferTypeForm ? "✕ Cancel" : "+ New"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Select Dropdown always visible */}
-                <select
-                  value={selectedOfferTypeId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "__NEW__") {
-                      setShowNewOfferTypeForm(true);
-                      return;
-                    }
-                    setSelectedOfferTypeId(val);
-                    const found = offerTypesList.find(o => o.offertypeId === val);
-                    const name = found ? found.offertypename : val;
-                    setSelectedOfferTypeName(name);
-                    setOfferType(name);
-                  }}
-                  className="ste-select"
-                  style={{ marginBottom: showNewOfferTypeForm ? "6px" : "0" }}
-                >
-                  {/* Fallback option if current selectedOfferTypeId is not yet in offerTypesList */}
-                  {selectedOfferTypeId && !offerTypesList.some(o => o.offertypeId === selectedOfferTypeId) && (
-                    <option value={selectedOfferTypeId}>
-                      {selectedOfferTypeName || selectedOfferTypeId} ({selectedOfferTypeId})
-                    </option>
-                  )}
-                  {offerTypesList.length > 0 ? (
-                    offerTypesList.map((ot) => (
-                      <option key={ot.offertypeId} value={ot.offertypeId}>
-                        {ot.offertypename} ({ot.offertypeId})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>No offer types created yet. Click + New</option>
-                  )}
-                  <option value="__NEW__">+ Create New Offer Type...</option>
-                </select>
-
-                {/* Inline Creation Box if + New or + Create New Offer Type is selected */}
-                {showNewOfferTypeForm && (
-                  <div style={{
-                    background: "rgba(11, 40, 48, 0.95)",
-                    border: "1px solid rgba(17, 181, 187, 0.45)",
-                    borderRadius: "6px",
-                    padding: "8px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "6px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.72rem", color: "#11B5BB", fontWeight: 700 }}>+ Create New Offer Type</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowNewOfferTypeForm(false)}
-                        style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "0.75rem" }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Offer Name (e.g. Spring Clearance)"
-                      className="ste-input"
-                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
-                      value={inlineOfferTypeName}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setInlineOfferTypeName(val);
-                        if (!inlineOfferTypeId || inlineOfferTypeId === inlineOfferTypeName.toUpperCase().replace(/[^A-Z0-9]/g, "_")) {
-                          setInlineOfferTypeId(val.toUpperCase().replace(/[^A-Z0-9]/g, "_"));
-                        }
-                      }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Offer ID (e.g. SPRING_CLEARANCE)"
-                      className="ste-input"
-                      style={{ fontSize: "0.75rem", padding: "4px 8px", textTransform: "uppercase" }}
-                      value={inlineOfferTypeId}
-                      onChange={(e) => setInlineOfferTypeId(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "_"))}
-                    />
-                    <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", marginTop: "2px" }}>
-                      <button
-                        type="button"
-                        className="ste-btn ste-btn--secondary"
-                        style={{ fontSize: "0.70rem", padding: "3px 8px" }}
-                        onClick={() => setShowNewOfferTypeForm(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="ste-btn ste-btn--primary"
-                        style={{ fontSize: "0.70rem", padding: "3px 10px" }}
-                        disabled={creatingOfferType || !inlineOfferTypeName.trim()}
-                        onClick={() => handleCreateOfferTypeInline()}
-                      >
-                        {creatingOfferType ? "Saving..." : "Save Offer Type"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* AI Product Defaults Accordion */}
-              <details className="ste-accordion">
-                <summary className="ste-accordion__summary">
-                  <FaWandMagicSparkles style={{ color: "#11B5BB" }} />
-                  <span>AI Product Defaults</span>
-                </summary>
-                <div className="ste-accordion__content">
-                  <div className="ste-field-group">
-                    <label className="ste-label">Style</label>
-                    <select
-                      value={aiStyle}
-                      onChange={(e) => setAiStyle(e.target.value)}
-                      className="ste-select"
-                    >
-                      {AI_STYLES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="ste-field-group" style={{ marginTop: "10px" }}>
-                    <label className="ste-label">Color Theme</label>
-                    <select
-                      value={aiColorTheme}
-                      onChange={(e) => setAiColorTheme(e.target.value)}
-                      className="ste-select"
-                    >
-                      {AI_COLOR_THEMES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <input
-                      type="checkbox"
-                      id="ai-trans-bg"
-                      checked={aiTransparentBg}
-                      onChange={(e) => setAiTransparentBg(e.target.checked)}
-                      style={{ accentColor: "#11B5BB" }}
-                    />
-                    <label htmlFor="ai-trans-bg" style={{ fontSize: "0.8rem", color: "#cbd5e1", cursor: "pointer" }}>
-                      Transparent background
-                    </label>
-                  </div>
-                </div>
-              </details>
-
-              {/* Background Controls: Gradients | Solid Color | Background Image */}
-              <div className="ste-field-group">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label className="ste-label" style={{ margin: 0 }}>
-                    <FaImage /> Background
-                  </label>
-                  <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>
-                    {bgType === "image" ? `Image (${activeRatio})` : (bgType === "color" ? "Solid Color" : "Gradient")}
-                  </span>
-                </div>
-
-                {/* 3 Mode Switcher */}
-                <div className="ste-btn-toggle" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", marginBottom: "10px" }}>
-                  <button
-                    className={`ste-btn-toggle__btn ${bgType === "gradient" ? "active" : ""}`}
-                    onClick={() => setBgType("gradient")}
-                    style={{ fontSize: "11px", padding: "6px 4px" }}
-                  >
-                    Gradients
-                  </button>
-                  <button
-                    className={`ste-btn-toggle__btn ${bgType === "color" ? "active" : ""}`}
-                    onClick={() => setBgType("color")}
-                    style={{ fontSize: "11px", padding: "6px 4px" }}
-                  >
-                    Solid Color
-                  </button>
-                  <button
-                    className={`ste-btn-toggle__btn ${bgType === "image" ? "active" : ""}`}
-                    onClick={() => setBgType("image")}
-                    style={{ fontSize: "11px", padding: "6px 4px" }}
-                  >
-                    Add BG Image
+                    <FaChevronLeft size={11} />
                   </button>
                 </div>
 
-                {/* Mode 1: Gradients */}
-                {bgType === "gradient" && (
-                  <div>
-                    <div className="ste-gradient-presets" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-                      {PRESET_GRADIENTS.map((p, idx) => (
-                        <div
-                          key={p.name}
-                          className={`ste-grad-thumb ${bgGradIndex === idx ? "active" : ""}`}
-                          style={{
-                            background: p.grad,
-                            height: "44px",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                            border: bgGradIndex === idx ? "2px solid #11B5BB" : "1px solid rgba(255,255,255,0.12)",
-                            boxShadow: bgGradIndex === idx ? "0 0 10px rgba(17,181,187,0.4)" : "none",
-                            transition: "all 0.2s"
-                          }}
-                          onClick={() => setBgGradIndex(idx)}
-                          title={p.name}
-                        />
-                      ))}
-                    </div>
-                    <div style={{ marginTop: "6px", fontSize: "11px", color: "#94a3b8", textAlign: "center" }}>
-                      Selected: <strong style={{ color: "#11B5BB" }}>{PRESET_GRADIENTS[bgGradIndex]?.name}</strong>
-                    </div>
-                  </div>
-                )}
-
-                {/* Mode 2: Solid Color */}
-                {bgType === "color" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <input
-                        type="color"
-                        value={bgColor}
-                        onChange={(e) => setBgColor(e.target.value)}
-                        style={{
-                          width: "48px",
-                          height: "38px",
-                          border: "none",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                          background: "transparent"
-                        }}
-                      />
-                      <input
-                        type="text"
-                        value={bgColor}
-                        onChange={(e) => setBgColor(e.target.value)}
-                        className="ste-input"
-                        style={{ flex: 1, fontFamily: "monospace", textTransform: "uppercase" }}
-                        placeholder="#0B2830"
-                      />
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
-                      {PRESET_SOLID_COLORS.map((c) => (
-                        <button
-                          key={c.color}
-                          type="button"
-                          onClick={() => setBgColor(c.color)}
-                          style={{
-                            height: "30px",
-                            borderRadius: "5px",
-                            background: c.color,
-                            border: bgColor.toLowerCase() === c.color.toLowerCase() ? "2px solid #11B5BB" : "1px solid rgba(255,255,255,0.2)",
-                            cursor: "pointer",
-                          }}
-                          title={c.name}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Mode 3: Background Image with Per-Aspect-Ratio Support */}
-                {bgType === "image" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {/* Active Ratio Preview */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        padding: "8px",
-                        background: "rgba(0,0,0,0.35)",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "56px",
-                          height: "36px",
-                          borderRadius: "4px",
-                          overflow: "hidden",
-                          background: "#1e293b",
-                          flexShrink: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {aspectBackgrounds[activeRatio] || bgImageUrl ? (
-                          <img
-                            src={aspectBackgrounds[activeRatio] || bgImageUrl}
-                            alt="BG"
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: "9px", color: "#94a3b8" }}>No Image</span>
-                        )}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#ffffff" }}>
-                          {activeRatio} Background Image
+                <div className="ste-section-panel-content">
+                  {/* ───────────────── SECTION 1: CANVAS & SPECS ───────────────── */}
+                  {activeSection === "canvas" && (
+                    <div className="space-y-4">
+                      {/* Canvas Background Settings */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Background Style</label>
+                        <div className="ste-segmented-2">
+                          <button
+                            type="button"
+                            className={bgType === "color" ? "active" : ""}
+                            onClick={() => setBgType("color")}
+                          >
+                            Solid Color
+                          </button>
+                          <button
+                            type="button"
+                            className={bgType === "image" ? "active" : ""}
+                            onClick={() => setBgType("image")}
+                          >
+                            Background Image
+                          </button>
                         </div>
-                        <div style={{ fontSize: "10px", color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {aspectBackgrounds[activeRatio] || bgImageUrl || "None (transparent/gradient)"}
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* File Upload Box */}
-                    <div className="ste-upload-box" style={{ padding: "8px" }}>
-                      <input
-                        type="file"
-                        accept="image/*,.gif"
-                        onChange={(e) => handleUploadFile(e, "background")}
-                        id="ste-bg-upload"
-                      />
-                      <label htmlFor="ste-bg-upload" className="ste-upload-label" style={{ fontSize: "12px", gap: "6px" }}>
-                        <FaImage /> Choose BG Image for {activeRatio}
-                      </label>
-                    </div>
-
-                    {/* URL Input */}
-                    <input
-                      type="text"
-                      placeholder="Or enter Image URL (https://...)"
-                      value={aspectBackgrounds[activeRatio] || ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setAspectBackgrounds((prev) => ({ ...prev, [activeRatio]: val }));
-                        setBgImageUrl(val);
-                      }}
-                      className="ste-input"
-                      style={{ fontSize: "11px" }}
-                    />
-
-                    {/* Action Buttons: Remove & Apply All */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAspectBackgrounds((prev) => ({ ...prev, [activeRatio]: "" }));
-                          setBgImageUrl("");
-                          setBgImgObj(null);
-                          showToast(`🗑️ Background image removed for ${activeRatio}!`);
-                        }}
-                        style={{
-                          padding: "7px 8px",
-                          fontSize: "11px",
-                          background: "rgba(239, 68, 68, 0.18)",
-                          color: "#ef4444",
-                          border: "1px solid rgba(239, 68, 68, 0.4)",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "5px",
-                        }}
-                      >
-                        <FaTrash size={10} /> Clear Image
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const currentBg = aspectBackgrounds[activeRatio] || bgImageUrl || "";
-                          setAspectBackgrounds({
-                            "9:16": currentBg,
-                            "16:9": currentBg,
-                            "1:1": currentBg,
-                            "4:5": currentBg,
-                          });
-                          showToast("✦ Background image applied to all 4 ratios!");
-                        }}
-                        style={{
-                          padding: "7px 8px",
-                          fontSize: "11px",
-                          background: "rgba(255, 255, 255, 0.06)",
-                          color: "#ffffff",
-                          border: "1px solid rgba(255, 255, 255, 0.15)",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                          fontWeight: 600,
-                        }}
-                        title="Copy this background image across 9:16, 16:9, 1:1, 4:5"
-                      >
-                        Apply to All Ratios
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Product Image */}
-              <div className="ste-field-group">
-                <label className="ste-label">Product Image</label>
-                <div className="ste-upload-box">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleUploadFile(e, "product")}
-                    id="ste-prod-upload"
-                  />
-                  <label htmlFor="ste-prod-upload" className="ste-upload-label">
-                    <FaImage /> Upload Product Image
-                  </label>
-                  {productImageUrl && (
-                    <div className="ste-asset-preview">
-                      <img src={productImageUrl} alt="Product" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Brand Logo */}
-              <div className="ste-field-group">
-                <label className="ste-label">Brand Logo</label>
-                <div className="ste-upload-box">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleUploadFile(e, "logo")}
-                    id="ste-logo-upload"
-                  />
-                  <label htmlFor="ste-logo-upload" className="ste-upload-label">
-                    <FaImage /> Upload Brand Logo
-                  </label>
-                  {logoImageUrl && (
-                    <div className="ste-asset-preview" style={{ position: "relative" }}>
-                      <img src={logoImageUrl} alt="Logo" />
-                      <button
-                        type="button"
-                        title="Remove Brand Logo"
-                        onClick={() => {
-                          setLogoImageUrl("");
-                          setLogoImgObj(null);
-                        }}
-                        style={{
-                          position: "absolute",
-                          top: 4,
-                          right: 4,
-                          background: "rgba(0,0,0,0.65)",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 4,
-                          padding: "2px 6px",
-                          fontSize: 11,
-                          cursor: "pointer",
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Multi-Option Background Music & Demo Tunes */}
-              <div className="ste-field-group">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label className="ste-label" style={{ margin: 0 }}>Background Music</label>
-                  <div style={{ display: "inline-flex", background: "rgba(255,255,255,0.06)", borderRadius: "6px", padding: "2px", gap: "2px" }}>
-                    <button
-                      type="button"
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        background: musicMode === "preset" ? "#11B5BB" : "transparent",
-                        color: musicMode === "preset" ? "#0a192f" : "#cbd5e1",
-                      }}
-                      onClick={() => {
-                        setMusicMode("preset");
-                        const current = DEMO_AUDIO_TUNES.find(d => d.id === selectedPresetId) || DEMO_AUDIO_TUNES[0];
-                        setMusicUrl(current.url);
-                      }}
-                    >
-                      Demo Tunes
-                    </button>
-                    <button
-                      type="button"
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        background: musicMode === "upload" ? "#11B5BB" : "transparent",
-                        color: musicMode === "upload" ? "#0a192f" : "#cbd5e1",
-                      }}
-                      onClick={() => setMusicMode("upload")}
-                    >
-                      Custom Upload
-                    </button>
-                    <button
-                      type="button"
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        background: musicMode === "none" ? "#ef4444" : "transparent",
-                        color: musicMode === "none" ? "#ffffff" : "#94a3b8",
-                      }}
-                      onClick={() => {
-                        setMusicMode("none");
-                        setMusicUrl("");
-                        if (audioRef.current) {
-                          audioRef.current.pause();
-                          setIsPlayingAudio(false);
-                        }
-                      }}
-                    >
-                      Mute
-                    </button>
-                  </div>
-                </div>
-
-                {/* 1. Demo Audio Presets List */}
-                {musicMode === "preset" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "8px" }}>
-                    {DEMO_AUDIO_TUNES.map((tune) => {
-                      const isSelected = selectedPresetId === tune.id;
-                      const isPlayingThis = isPlayingAudio && previewingTuneId === tune.id;
-                      return (
-                        <div
-                          key={tune.id}
-                          onClick={() => {
-                            setSelectedPresetId(tune.id);
-                            setMusicUrl(tune.url);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                            border: isSelected ? "1px solid #11B5BB" : "1px solid rgba(255,255,255,0.08)",
-                            background: isSelected ? "rgba(17,181,187,0.12)" : "rgba(255,255,255,0.03)",
-                            transition: "all 0.15s ease",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
-                            <span style={{ fontSize: "1.05rem" }}>{tune.icon}</span>
-                            <div style={{ overflow: "hidden" }}>
-                              <div style={{ fontSize: "0.78rem", fontWeight: 600, color: isSelected ? "#11B5BB" : "#f1f5f9" }}>
-                                {tune.name}
-                              </div>
-                              <div style={{ fontSize: "0.68rem", color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {tune.desc}
-                              </div>
+                        {bgType === "color" && (
+                          <div className="space-y-2 mt-3">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={bgColor}
+                                onChange={(e) => setBgColor(e.target.value)}
+                                className="w-10 h-9 rounded cursor-pointer border border-slate-200"
+                              />
+                              <input
+                                type="text"
+                                value={bgColor}
+                                onChange={(e) => setBgColor(e.target.value)}
+                                className="ste-input-light flex-1 uppercase font-mono text-xs"
+                              />
+                            </div>
+                            <div className="grid grid-cols-4 gap-1.5 pt-1">
+                              {PRESET_SOLID_COLORS.map((c) => (
+                                <button
+                                  key={c.name}
+                                  type="button"
+                                  style={{ background: c.color }}
+                                  className={`h-7 rounded border transition-all ${
+                                    bgColor === c.color ? "border-slate-900 ring-2 ring-slate-400" : "border-slate-300"
+                                  }`}
+                                  onClick={() => setBgColor(c.color)}
+                                  title={c.name}
+                                />
+                              ))}
                             </div>
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                        )}
+
+                        {bgType === "image" && (
+                          <div className="space-y-2 mt-3">
+                            <label className="ste-upload-dropzone">
+                              <FaImage className="text-slate-400" size={18} />
+                              <span className="text-xs font-semibold text-slate-700">Choose Image File</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleUploadFile(e, "background")}
+                                className="hidden"
+                              />
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Or enter image URL..."
+                              value={aspectBackgrounds[activeRatio] || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setAspectBackgrounds((prev) => ({ ...prev, [activeRatio]: val }));
+                                setBgImageUrl(val);
+                              }}
+                              className="ste-input-light text-xs"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentBg = aspectBackgrounds[activeRatio] || bgImageUrl || "";
+                                  setAspectBackgrounds({ "9:16": currentBg, "16:9": currentBg, "1:1": currentBg, "4:5": currentBg });
+                                  showToast("Applied background image to all ratios!");
+                                }}
+                                className="ste-btn-secondary-light text-xs flex-1"
+                              >
+                                Apply to All 4
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAspectBackgrounds((prev) => ({ ...prev, [activeRatio]: "" }));
+                                  setBgImageUrl("");
+                                  setBgImgObj(null);
+                                }}
+                                className="ste-btn-secondary-light text-xs text-rose-600"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                          <input
+                            type="checkbox"
+                            id="canvas-trans-bg-toggle"
+                            checked={aiTransparentBg}
+                            onChange={(e) => setAiTransparentBg(e.target.checked)}
+                            className="w-4 h-4 accent-slate-900 rounded"
+                          />
+                          <label htmlFor="canvas-trans-bg-toggle" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                            Render with transparent background
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Product Image Asset */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Product Image</label>
+                        <label className="ste-upload-dropzone">
+                          <FaImage className="text-slate-400" size={18} />
+                          <span className="text-xs font-semibold text-slate-700">Upload Product Image</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleUploadFile(e, "product")}
+                            className="hidden"
+                          />
+                        </label>
+                        {productImageUrl && (
+                          <div className="flex items-center gap-3 mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                            <img src={productImageUrl} alt="Product" className="w-12 h-12 object-contain bg-white rounded border" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">Product Photo</p>
+                              <p className="text-[11px] text-slate-400">Positioned on artboard</p>
+                            </div>
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedPresetId(tune.id);
-                                setMusicUrl(tune.url);
-                                if (!previewAudioRef.current) return;
-                                if (previewingTuneId === tune.id && !previewAudioRef.current.paused) {
-                                  previewAudioRef.current.pause();
-                                  setPreviewingTuneId(null);
-                                } else {
-                                  if (audioRef.current) audioRef.current.pause();
-                                  previewAudioRef.current.src = tune.url;
-                                  previewAudioRef.current.volume = musicVolume / 100;
-                                  previewAudioRef.current.currentTime = 0;
-                                  previewAudioRef.current.play().then(() => {
-                                    setPreviewingTuneId(tune.id);
-                                  }).catch((err) => {
-                                    console.warn('Playback error:', err);
-                                  });
-                                }
+                              onClick={() => {
+                                setProductImageUrl("");
+                                setProductImgObj(null);
+                                showToast("Removed product photo");
                               }}
-                              style={{
-                                padding: "4px 8px",
-                                fontSize: "0.7rem",
-                                borderRadius: "4px",
-                                border: "none",
-                                background: isPlayingThis ? "#ef4444" : "rgba(255,255,255,0.12)",
-                                color: "#fff",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
+                              className="text-xs text-rose-600 hover:text-rose-800 font-bold"
                             >
-                              {isPlayingThis ? <FaVolumeXmark size={11} /> : <FaVolumeHigh size={11} />}
-                              <span>{isPlayingThis ? "Pause" : "Play"}</span>
+                              Remove
                             </button>
-                            <span
-                              style={{
-                                display: "inline-block",
-                                width: "12px",
-                                height: "12px",
-                                borderRadius: "50%",
-                                border: isSelected ? "3px solid #11B5BB" : "2px solid rgba(255,255,255,0.3)",
-                                background: isSelected ? "#0a192f" : "transparent",
-                              }}
-                            />
                           </div>
+                        )}
+                      </div>
+
+                      {/* Brand Logo */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Brand Logo</label>
+                        <label className="ste-upload-dropzone">
+                          <FaUpload className="text-slate-400" size={16} />
+                          <span className="text-xs font-semibold text-slate-700">Upload Store Logo</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleUploadFile(e, "logo")}
+                            className="hidden"
+                          />
+                        </label>
+                        {logoImageUrl && (
+                          <div className="flex items-center justify-between mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                            <img src={logoImageUrl} alt="Logo" className="w-10 h-10 object-contain bg-white rounded border" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLogoImageUrl("");
+                                setLogoImgObj(null);
+                              }}
+                              className="text-xs text-rose-600 font-bold"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quality Resolution */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Video Quality / Output</label>
+                        <select
+                          value={resolution}
+                          onChange={(e) => setResolution(Number(e.target.value))}
+                          className="ste-select-light"
+                        >
+                          <option value={720}>720p HD (Fast Render)</option>
+                          <option value={1080}>1080p FHD (Crisp Master)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ───────────────── SECTION 2: CONTENT & COPY ───────────────── */}
+                  {activeSection === "content" && (
+                    <div className="space-y-4">
+                      {/* Offer Type */}
+                      <div className="ste-card-field">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="ste-field-label mb-0">Offer Type Category</label>
+                          <button
+                            type="button"
+                            onClick={() => setShowNewOfferTypeForm(!showNewOfferTypeForm)}
+                            className="text-xs font-bold text-slate-700 hover:text-slate-950"
+                          >
+                            {showNewOfferTypeForm ? "Cancel" : "+ New"}
+                          </button>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        <select
+                          value={selectedOfferTypeId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "__NEW__") {
+                              setShowNewOfferTypeForm(true);
+                              return;
+                            }
+                            setSelectedOfferTypeId(val);
+                            const found = offerTypesList.find((o) => o.offertypeId === val);
+                            const name = found ? found.offertypename : val;
+                            setSelectedOfferTypeName(name);
+                            setOfferType(name);
+                          }}
+                          className="ste-select-light"
+                        >
+                          {offerTypesList.map((ot) => (
+                            <option key={ot.offertypeId} value={ot.offertypeId}>
+                              {ot.offertypename}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                {/* 2. Custom Upload Box */}
-                {musicMode === "upload" && (
-                  <div className="ste-upload-box">
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      onChange={(e) => {
-                        handleUploadFile(e, "music");
-                        setSelectedPresetId("");
-                      }}
-                      id="ste-music-upload"
-                    />
-                    <label htmlFor="ste-music-upload" className="ste-upload-label">
-                      <FaMusic /> Upload Audio Track (MP3/WAV)
-                    </label>
-                  </div>
-                )}
+                      {/* Headline Text */}
+                      <div className="ste-card-field">
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="ste-field-label mb-0">Headline Message</label>
+                          <span className="text-[10px] text-slate-400">Primary Title</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={currentLayers.headline?.text || ""}
+                          onFocus={() => setSelectedLayer("headline")}
+                          onChange={(e) => updateCurrentLayer("headline", { text: e.target.value })}
+                          className="ste-input-light text-sm font-semibold"
+                          placeholder="Grab the crunch before it's gone!!"
+                        />
+                      </div>
 
-                {/* 3. Mute Notice */}
-                {musicMode === "none" && (
-                  <div style={{ padding: "8px 12px", background: "rgba(239,68,68,0.1)", borderRadius: "6px", border: "1px solid rgba(239,68,68,0.25)", fontSize: "0.72rem", color: "#fca5a5" }}>
-                    🔇 No background music will be attached. Video will render silent.
-                  </div>
-                )}
+                      {/* Description */}
+                      <div className="ste-card-field">
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="ste-field-label mb-0">Description / Subhead</label>
+                          <span className="text-[10px] text-slate-400">Product Details</span>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={currentLayers.description?.text || ""}
+                          onFocus={() => setSelectedLayer("description")}
+                          onChange={(e) => updateCurrentLayer("description", { text: e.target.value })}
+                          className="ste-input-light text-xs"
+                          placeholder="Ritz Crackers 300g available at an exclusive discount!!"
+                        />
+                      </div>
 
-                {/* Track Status & Listen Button */}
-                {musicUrl && musicMode !== "none" && (
-                  <div style={{ marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {/* Offer Discount Text */}
+                      <div className="ste-card-field">
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="ste-field-label mb-0">Offer / Discount Badge Text</label>
+                          <span className="text-[10px] text-slate-600 font-bold">Featured Deal</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={currentLayers.discount?.text || ""}
+                          onFocus={() => setSelectedLayer("discount")}
+                          onChange={(e) => updateCurrentLayer("discount", { text: e.target.value })}
+                          className="ste-input-light font-bold text-slate-900"
+                          placeholder="75% OFF"
+                        />
+                      </div>
+
+                      {/* Price & Old Price */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="ste-card-field">
+                          <label className="ste-field-label">Special Deal Price</label>
+                          <input
+                            type="text"
+                            value={currentLayers.price?.text || ""}
+                            onFocus={() => setSelectedLayer("price")}
+                            onChange={(e) => updateCurrentLayer("price", { text: e.target.value })}
+                            className="ste-input-light font-bold text-emerald-700"
+                            placeholder="$4.99"
+                          />
+                        </div>
+                        <div className="ste-card-field">
+                          <label className="ste-field-label">Original / Strikethrough</label>
+                          <input
+                            type="text"
+                            value={currentLayers.oldPrice?.text || ""}
+                            onFocus={() => setSelectedLayer("oldPrice")}
+                            onChange={(e) => updateCurrentLayer("oldPrice", { text: e.target.value })}
+                            className="ste-input-light line-through text-slate-400"
+                            placeholder="$9.99"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Validity Period */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Offer Validity Dates</label>
+                        <input
+                          type="text"
+                          value={currentLayers.validity?.text || ""}
+                          onFocus={() => setSelectedLayer("validity")}
+                          onChange={(e) => updateCurrentLayer("validity", { text: e.target.value })}
+                          className="ste-input-light text-xs"
+                          placeholder="Offer Validity: 1st Aug - 31st Dec 2026"
+                        />
+                      </div>
+
+                      {/* CTA Button Text */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Call to Action (CTA Button)</label>
+                        <input
+                          type="text"
+                          value={currentLayers.cta?.text || ""}
+                          onFocus={() => setSelectedLayer("cta")}
+                          onChange={(e) => updateCurrentLayer("cta", { text: e.target.value })}
+                          className="ste-input-light font-bold"
+                          placeholder="VISIT STORE ➔"
+                        />
+                      </div>
+
+                      {/* Store Name & Legal Footer */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Store / Brand Name</label>
+                        <input
+                          type="text"
+                          value={currentLayers.storeName?.text || ""}
+                          onFocus={() => setSelectedLayer("storeName")}
+                          onChange={(e) => updateCurrentLayer("storeName", { text: e.target.value })}
+                          className="ste-input-light text-xs"
+                          placeholder="URBAN RAIN"
+                        />
+                      </div>
+
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Terms &amp; Disclaimer Notice</label>
+                        <input
+                          type="text"
+                          value={currentLayers.footer?.text || ""}
+                          onFocus={() => setSelectedLayer("footer")}
+                          onChange={(e) => updateCurrentLayer("footer", { text: e.target.value })}
+                          className="ste-input-light text-xs"
+                          placeholder="*T&C apply. Images for representation only."
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ───────────────── SECTION 3: BADGES & STICKERS ───────────────── */}
+                  {activeSection === "badges" && (
+                    <div className="space-y-4">
+                      {/* 3-Way Display Style */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Offer Badge Display Format</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            className={`ste-style-card ${
+                              currentLayers.discount?.shape === "none" && !currentLayers.discount?.badgeImageUrl
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() => {
+                              updateCurrentLayer("discount", {
+                                shape: "none",
+                                bgMode: "transparent",
+                                badgeImageUrl: undefined,
+                              });
+                              showToast("Offer set to Plain Text");
+                            }}
+                          >
+                            <FaFont size={13} className="text-slate-600" />
+                            <span className="text-xs font-semibold">Plain Text</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`ste-style-card ${
+                              currentLayers.discount?.shape === "origami" && !currentLayers.discount?.badgeImageUrl
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() => {
+                              updateCurrentLayer("discount", {
+                                shape: "origami",
+                                bgMode: "color",
+                                bgColor: "#ffc700",
+                                borderColor: "#047857",
+                                badgeImageUrl: undefined,
+                              });
+                              showToast("Offer set to 3D Retail Origami");
+                            }}
+                          >
+                            <FaShapes size={13} className="text-slate-600" />
+                            <span className="text-xs font-semibold">3D Origami</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`ste-style-card ${currentLayers.discount?.badgeImageUrl ? "active" : ""}`}
+                            onClick={() => {
+                              updateCurrentLayer("discount", {
+                                shape: "sticker",
+                                badgeImageUrl: currentLayers.discount?.badgeImageUrl || OFFER_BADGE_PRESETS[0].dataUrl,
+                              });
+                              showToast("Offer set to Sticker Badge");
+                            }}
+                          >
+                            <FaPalette size={13} className="text-slate-600" />
+                            <span className="text-xs font-semibold">Sticker</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Visual Badge Presets Gallery */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Official Retail Badge Presets</label>
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          {OFFER_BADGE_PRESETS.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                updateCurrentLayer("discount", {
+                                  shape: "sticker",
+                                  badgeImageUrl: p.dataUrl,
+                                  badgeStyle: p.id,
+                                });
+                                showToast(`Applied ${p.name}!`);
+                              }}
+                              className="p-2 border border-slate-200 rounded-lg hover:border-slate-800 hover:shadow-xs transition-all flex flex-col items-center gap-1 bg-white"
+                            >
+                              <img src={p.dataUrl} alt={p.name} className="h-10 object-contain" />
+                              <span className="text-[11px] font-semibold text-slate-600 truncate w-full text-center">
+                                {p.name}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Custom Sticker Upload */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Custom Sticker / Badges</label>
+                        <label className="ste-upload-dropzone">
+                          <FaUpload className="text-slate-400" size={16} />
+                          <span className="text-xs font-semibold text-slate-700">Upload Custom PNG/SVG Sticker</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const dataUrl = reader.result as string;
+                                updateCurrentLayer("discount", {
+                                  badgeImageUrl: dataUrl,
+                                  shape: "sticker",
+                                });
+                                showToast("Custom sticker applied to offer!");
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Snapping Action */}
                       <button
                         type="button"
-                        className="ste-btn ste-btn--secondary ste-btn--sm"
                         onClick={() => {
-                          if (!previewAudioRef.current || !musicUrl) return;
-                          if (!previewAudioRef.current.paused) {
-                            previewAudioRef.current.pause();
-                            setPreviewingTuneId(null);
-                          } else {
-                            if (audioRef.current) audioRef.current.pause();
-                            previewAudioRef.current.src = musicUrl;
-                            previewAudioRef.current.volume = musicVolume / 100;
-                            previewAudioRef.current.play().then(() => {
-                              setPreviewingTuneId(selectedPresetId || 'active');
-                            }).catch((err) => console.warn(err));
-                          }
+                          updateCurrentLayer("discount", { x: 0.50, y: 0.50 });
+                          showToast("Offer centered at 50%, 50%!");
                         }}
+                        className="ste-btn-secondary-light w-full justify-center text-xs py-2"
                       >
-                        {previewingTuneId ? <FaVolumeXmark /> : <FaVolumeHigh />}
-                        <span>{previewingTuneId ? "Stop Audio" : "Listen Active"}</span>
+                        <FaCrosshairs /> Snap Offer to Exact Center (50%, 50%)
                       </button>
-                      <span style={{ fontSize: "0.72rem", color: "#11B5BB" }}>
-                        {musicMode === "preset" ? `Track: ${DEMO_AUDIO_TUNES.find(d => d.id === selectedPresetId)?.name || 'Demo Preset'}` : "Custom Track Uploaded"}
-                      </span>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Volume Slider */}
-                {musicMode !== "none" && (
-                  <div className="ste-range-slider" style={{ marginTop: "8px" }}>
-                    <span className="ste-sublabel">Volume: {musicVolume}%</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={musicVolume}
-                      onChange={(e) => {
-                        const vol = Number(e.target.value);
-                        setMusicVolume(vol);
-                        if (audioRef.current) audioRef.current.volume = vol / 100;
-                        if (previewAudioRef.current) previewAudioRef.current.volume = vol / 100;
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+                  {/* ───────────────── SECTION 4: ANIMATION & DURATION ───────────────── */}
+                  {activeSection === "animation" && (
+                    <div className="space-y-4">
+                      {/* Highly Modifiable Video Duration */}
+                      <div className="ste-card-field">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="ste-field-label mb-0">Total Video Duration</label>
+                          <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                            {duration} Seconds ({duration * fps} frames)
+                          </span>
+                        </div>
 
-              {/* Video Specs */}
-              <div className="ste-field-group">
-                <label className="ste-label">Timing &amp; Quality</label>
-                <div className="ste-specs-grid">
-                  <div>
-                    <span className="ste-sublabel">Duration</span>
-                    <select
-                      value={duration}
-                      onChange={(e) => setDuration(Number(e.target.value))}
-                      className="ste-select"
-                    >
-                      <option value={5}>5 Seconds</option>
-                      <option value={8}>8 Seconds</option>
-                      <option value={10}>10 Seconds</option>
-                      <option value={15}>15 Seconds</option>
-                      <option value={30}>30 Seconds</option>
-                    </select>
-                  </div>
-                  <div>
-                    <span className="ste-sublabel">Resolution</span>
-                    <select
-                      value={resolution}
-                      onChange={(e) => setResolution(Number(e.target.value))}
-                      className="ste-select"
-                    >
-                      <option value={720}>720p HD</option>
-                      <option value={1080}>1080p FHD</option>
-                    </select>
-                  </div>
+                        {/* Quick Presets */}
+                        <div className="grid grid-cols-6 gap-1 mb-2">
+                          {[5, 8, 10, 15, 30, 60].map((sec) => (
+                            <button
+                              key={sec}
+                              type="button"
+                              onClick={() => setDuration(sec)}
+                              className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                                duration === sec
+                                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                              }`}
+                            >
+                              {sec}s
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Smooth Duration Slider */}
+                        <div className="flex items-center gap-3 pt-1">
+                          <input
+                            type="range"
+                            min="3"
+                            max="60"
+                            step="0.5"
+                            value={duration}
+                            onChange={(e) => setDuration(Number(e.target.value))}
+                            className="flex-1 accent-slate-900 cursor-pointer"
+                          />
+                          <input
+                            type="number"
+                            min="3"
+                            max="60"
+                            value={duration}
+                            onChange={(e) => setDuration(Math.max(1, Number(e.target.value)))}
+                            className="w-16 ste-input-light text-xs font-bold text-center"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Motion Presets */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Quick Motion Presets</label>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => applyMotionPreset("cascade")}
+                            className="ste-preset-btn"
+                          >
+                            <span>Cascade Sequence</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyMotionPreset("simultaneous")}
+                            className="ste-preset-btn"
+                          >
+                            <span>Simultaneous Pop</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyMotionPreset("snappy")}
+                            className="ste-preset-btn"
+                          >
+                            <span>Snappy &amp; Fast</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyMotionPreset("cinematic")}
+                            className="ste-preset-btn"
+                          >
+                            <span>Cinematic Slow</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Visual Layer Timing Breakdown */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Visual Duration Timeline</label>
+                        <p className="text-[11px] text-slate-500 mb-2">Adjust when each element appears and how long it stays active</p>
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                          {Object.entries(currentLayers).map(([k, val]) => {
+                            if (!val || val.hidden || (!val.text && k !== "product" && k !== "logo")) return null;
+                            const start = val.animStart ?? 0.5;
+                            const end = val.animEnd ?? 1.5;
+                            const dur = Number((end - start).toFixed(1));
+                            return (
+                              <div
+                                key={k}
+                                onClick={() => setSelectedLayer(k as LayerKey)}
+                                className={`p-2 rounded-lg border cursor-pointer transition-all ${
+                                  selectedLayer === k ? "border-slate-900 bg-slate-50" : "border-slate-200 bg-white"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-1">
+                                  <span className="capitalize">{k}</span>
+                                  <span className="text-[11px] font-mono text-slate-700">{start}s → {end}s ({dur}s)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-slate-400 w-8">Start</span>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max={duration}
+                                    step="0.1"
+                                    value={start}
+                                    onChange={(e) => {
+                                      const newStart = Number(e.target.value);
+                                      updateCurrentLayer(k as LayerKey, { animStart: newStart, animEnd: Math.max(newStart + 0.2, end) });
+                                    }}
+                                    className="flex-1 accent-slate-900 h-1"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[10px] text-slate-400 w-8">End</span>
+                                  <input
+                                    type="range"
+                                    min="0.1"
+                                    max={duration}
+                                    step="0.1"
+                                    value={end}
+                                    onChange={(e) => {
+                                      const newEnd = Number(e.target.value);
+                                      updateCurrentLayer(k as LayerKey, { animEnd: newEnd, animStart: Math.min(newEnd - 0.2, start) });
+                                    }}
+                                    className="flex-1 accent-slate-900 h-1"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ───────────────── SECTION 5: AUDIO & MUSIC ───────────────── */}
+                  {activeSection === "music" && (
+                    <div className="space-y-4">
+                      {/* Audio Mode */}
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Background Audio Source</label>
+                        <div className="ste-segmented-3">
+                          <button
+                            type="button"
+                            className={musicMode === "preset" ? "active" : ""}
+                            onClick={() => {
+                              setMusicMode("preset");
+                              const m = DEMO_AUDIO_TUNES.find((d) => d.id === selectedPresetId) || DEMO_AUDIO_TUNES[0];
+                              setMusicUrl(m.url);
+                            }}
+                          >
+                            Demo Tunes
+                          </button>
+                          <button
+                            type="button"
+                            className={musicMode === "upload" ? "active" : ""}
+                            onClick={() => setMusicMode("upload")}
+                          >
+                            Custom MP3
+                          </button>
+                          <button
+                            type="button"
+                            className={musicMode === "none" ? "active" : ""}
+                            onClick={() => {
+                              setMusicMode("none");
+                              setMusicUrl("");
+                              if (audioRef.current) audioRef.current.pause();
+                            }}
+                          >
+                            Mute
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Demo Tunes List */}
+                      {musicMode === "preset" && (
+                        <div className="space-y-2">
+                          {DEMO_AUDIO_TUNES.map((tune) => {
+                            const isSelected = selectedPresetId === tune.id;
+                            const isPlayingThis = previewingTuneId === tune.id;
+                            return (
+                              <div
+                                key={tune.id}
+                                onClick={() => {
+                                  setSelectedPresetId(tune.id);
+                                  setMusicUrl(tune.url);
+                                }}
+                                className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${
+                                  isSelected ? "border-slate-900 bg-slate-50 shadow-xs" : "border-slate-200 bg-white"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <FaMusic className="text-slate-400" size={13} />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-800 truncate">{tune.name}</p>
+                                    <p className="text-[11px] text-slate-500 truncate">{tune.desc}</p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedPresetId(tune.id);
+                                    setMusicUrl(tune.url);
+                                    if (previewAudioRef.current) {
+                                      if (isPlayingThis) {
+                                        previewAudioRef.current.pause();
+                                        setPreviewingTuneId(null);
+                                      } else {
+                                        previewAudioRef.current.src = tune.url;
+                                        previewAudioRef.current.volume = musicVolume / 100;
+                                        previewAudioRef.current.play();
+                                        setPreviewingTuneId(tune.id);
+                                      }
+                                    }
+                                  }}
+                                  className={`p-1.5 rounded-md text-xs font-bold ${
+                                    isPlayingThis ? "bg-rose-500 text-white" : "bg-slate-100 text-slate-700"
+                                  }`}
+                                >
+                                  {isPlayingThis ? <FaVolumeXmark size={12} /> : <FaVolumeHigh size={12} />}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Custom Upload */}
+                      {musicMode === "upload" && (
+                        <div className="ste-card-field">
+                          <label className="ste-upload-dropzone">
+                            <FaMusic className="text-slate-400" size={18} />
+                            <span className="text-xs font-semibold text-slate-700">Choose MP3 / WAV File</span>
+                            <input
+                              type="file"
+                              accept="audio/*"
+                              onChange={(e) => handleUploadFile(e, "music")}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Volume */}
+                      {musicMode !== "none" && (
+                        <div className="ste-card-field">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="ste-field-label mb-0">Audio Volume</label>
+                            <span className="text-xs font-bold text-slate-800 font-mono">{musicVolume}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={musicVolume}
+                            onChange={(e) => setMusicVolume(Number(e.target.value))}
+                            className="w-full accent-slate-900 cursor-pointer"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          </aside>
+            )}
+          </div>
 
-          {/* ── Center Stage: Interactive Canvas ── */}
-          <main className={`ste-stage ${isFullscreenStage ? "ste-stage--fullscreen" : ""}`}>
+          {/* ── Center Stage: Artboard & Unified Player ── */}
+          <main className={`ste-stage-light ${isFullscreenStage ? "fullscreen" : ""}`}>
             {/* Stage Toolbar */}
-            <div className="ste-stage-toolbar">
-              <div className="ste-stage-toolbar__left">
-                {!leftPanelOpen && !isFullscreenStage && (
+            <div className="ste-stage-toolbar-light">
+              <div className="flex items-center gap-2">
+                {!leftPanelOpen && (
                   <button
-                    className="ste-panel-toggle-pill"
+                    type="button"
                     onClick={() => setLeftPanelOpen(true)}
-                    title="Expand Specifications Panel"
+                    className="ste-btn-icon-light"
+                    title="Open Section Panel"
                   >
-                    <FaChevronRight size={10} />
-                    <span>Specs</span>
+                    <FaChevronRight size={11} />
                   </button>
                 )}
 
-                <div className="ste-stage-ratio-pill" title={ASPECT_SPECS[activeRatio].label}>
-                  <span>{activeRatio === "9:16" ? "📱" : activeRatio === "16:9" ? "📺" : activeRatio === "1:1" ? "⏹️" : "📸"}</span>
-                  <span className="ste-stage-ratio-name">{activeRatio}</span>
-                </div>
-
-                <span className="ste-stage-res-badge">
-                  {ASPECT_SPECS[activeRatio].width}×{ASPECT_SPECS[activeRatio].height}
-                </span>
-
-                {/* Ratio quick switcher directly on stage — all 4 saved together */}
-                <div className="ste-stage-ratio-switcher">
-                  {(["9:16", "16:9", "1:1", "4:5"] as AspectRatio[]).map((r) => (
+                {/* Aspect Ratio Switcher Segmented Pills */}
+                <div className="ste-stage-ratios-pills">
+                  {(["16:9", "9:16", "1:1", "4:5"] as AspectRatio[]).map((r) => (
                     <button
                       key={r}
+                      type="button"
                       className={`ste-stage-ratio-btn ${activeRatio === r ? "active" : ""}`}
                       onClick={() => setActiveRatio(r)}
-                      title={`Switch to ${r} — ${ASPECT_SPECS[r].label} (all 4 ratios saved together)`}
+                      title={`Switch to ${r} (${ASPECT_SPECS[r].width}×${ASPECT_SPECS[r].height})`}
                     >
-                      {r}
+                      <span>{r}</span>
+                      {defaultRatio === r && <FaStar size={9} className="text-amber-400" />}
                     </button>
                   ))}
                 </div>
-                {/* Quick sync text button on the stage toolbar */}
-                <button
-                  onClick={syncTextToAllRatios}
-                  className="ste-stage-btn"
-                  title={`Sync text content from ${activeRatio} to all other 3 ratios`}
-                  style={{ fontSize: "0.68rem", gap: "4px", padding: "4px 8px", background: "rgba(17,181,187,0.15)", color: "#11B5BB", border: "1px solid rgba(17,181,187,0.3)" }}
-                >
-                  <FaArrowUpRightFromSquare size={9} />
-                  <span>Sync All</span>
-                </button>
-
-                {/* AI Optimize All Ratios on stage toolbar */}
-                <button
-                  type="button"
-                  onClick={handleAiOptimizeAllRatios}
-                  disabled={isAiOptimizing}
-                  className="ste-stage-btn"
-                  title="AI Auto-Optimize layout for all 4 aspect ratios (9:16, 16:9, 1:1, 4:5). You can freely edit afterwards!"
-                  style={{
-                    fontSize: "0.68rem",
-                    gap: "4px",
-                    padding: "4px 9px",
-                    background: "linear-gradient(135deg, rgba(139, 92, 246, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)",
-                    color: "#c084fc",
-                    border: "1px solid rgba(192, 132, 252, 0.45)",
-                    fontWeight: 700,
-                  }}
-                >
-                  {isAiOptimizing ? <FaSpinner className="ste-spin" size={9} /> : <FaWandMagicSparkles size={9} />}
-                  <span>{isAiOptimizing ? "Optimizing…" : "AI Optimize All"}</span>
-                </button>
               </div>
 
-              <div className="ste-stage-toolbar__center">
-                {selectedLayer && currentLayers[selectedLayer] ? (
-                  <span className="ste-stage-hint ste-stage-hint--active" title={`Selected: ${selectedLayer.toUpperCase()}`}>
-                    <span>🎯</span>
-                    <span>{selectedLayer.toUpperCase()}</span>
-                    <span className="ste-stage-coord-sub">({Math.round(currentLayers[selectedLayer].x * 100)}%, {Math.round(currentLayers[selectedLayer].y * 100)}%)</span>
-                  </span>
-                ) : hoveredLayer ? (
-                  <span className="ste-stage-hint">
-                    <span>👆</span> Move <strong>{hoveredLayer.toUpperCase()}</strong>
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="ste-stage-toolbar__right">
-                {/* Zoom & Alignment Grid Tools */}
-                <div style={{ display: "flex", alignItems: "center", gap: "2px", background: "rgba(0,0,0,0.4)", borderRadius: "6px", padding: "2px 4px", border: "1px solid rgba(255,255,255,0.08)" }}>
+              {/* Right Stage Controls */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setZoomLevel((z) => Math.max(0.5, Number((z - 0.1).toFixed(1))))}
-                    className="ste-stage-btn"
-                    style={{ padding: "3px 6px", fontSize: "11px", minWidth: "22px", height: "24px" }}
-                    title="Zoom Out (-)"
+                    className="px-2 py-1 text-slate-600 hover:bg-slate-100 text-xs font-bold"
                   >
                     -
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoomLevel(1)}
-                    className="ste-stage-btn"
-                    style={{ padding: "3px 6px", fontSize: "10px", minWidth: "40px", height: "24px", color: zoomLevel === 1 ? "#11B5BB" : "#fff", fontWeight: 700 }}
-                    title="Reset Zoom to 100%"
-                  >
-                    {Math.round(zoomLevel * 100)}%
-                  </button>
+                  <span className="px-2 text-xs font-bold text-slate-700">{Math.round(zoomLevel * 100)}%</span>
                   <button
                     type="button"
                     onClick={() => setZoomLevel((z) => Math.min(2.0, Number((z + 0.1).toFixed(1))))}
-                    className="ste-stage-btn"
-                    style={{ padding: "3px 6px", fontSize: "11px", minWidth: "22px", height: "24px" }}
-                    title="Zoom In (+)"
+                    className="px-2 py-1 text-slate-600 hover:bg-slate-100 text-xs font-bold"
                   >
                     +
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowGrid((g) => !g)}
-                    className={`ste-stage-btn ${showGrid ? "ste-stage-btn--active" : ""}`}
-                    style={{ padding: "3px 6px", height: "24px" }}
-                    title={showGrid ? "Hide Alignment Grid" : "Show Alignment Grid"}
-                  >
-                    <FaTableCells size={10} />
-                  </button>
                 </div>
 
-                {isFullscreenStage && (
+                <button
+                  type="button"
+                  onClick={() => setShowGrid(!showGrid)}
+                  className={`ste-btn-icon-light ${showGrid ? "active" : ""}`}
+                  title={showGrid ? "Hide Grid" : "Show Alignment Grid"}
+                >
+                  <FaTableCells size={12} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreenStage(!isFullscreenStage)}
+                  className="ste-btn-icon-light"
+                  title={isFullscreenStage ? "Exit Fullscreen" : "Fullscreen Artboard"}
+                >
+                  {isFullscreenStage ? <FaCompress size={12} /> : <FaExpand size={12} />}
+                </button>
+
+                {!rightPanelOpen && (
                   <button
-                    className={`ste-stage-btn ${showFullscreenInspector ? "ste-stage-btn--active" : ""}`}
-                    onClick={() => setShowFullscreenInspector(!showFullscreenInspector)}
-                    title="Toggle Inspector in Fullscreen"
+                    type="button"
+                    onClick={() => setRightPanelOpen(true)}
+                    className="ste-btn-secondary-light text-xs py-1 px-2.5"
                   >
                     <FaSliders size={11} />
                     <span>Inspector</span>
                   </button>
                 )}
-
-                <button
-                  className={`ste-stage-btn ${isFullscreenStage ? "ste-stage-btn--active" : ""}`}
-                  onClick={() => setIsFullscreenStage(!isFullscreenStage)}
-                  title={isFullscreenStage ? "Exit Fullscreen Stage (Esc)" : "Expand Stage to Fullscreen"}
-                >
-                  {isFullscreenStage ? <FaCompress size={11} /> : <FaExpand size={11} />}
-                  <span>{isFullscreenStage ? "Exit" : "Expand"}</span>
-                </button>
-
-                {!rightPanelOpen && !isFullscreenStage && (
-                  <button
-                    className="ste-panel-toggle-pill"
-                    onClick={() => setRightPanelOpen(true)}
-                    title="Expand Layer Inspector Panel"
-                  >
-                    <span>Inspector</span>
-                    <FaChevronLeft size={10} />
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* Quick Layer Switcher Bar: Visual layer chips for instant selection & clear understandability */}
-            {!isPlaying && (
-              <div
-                className="ste-stage-layer-strip"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "6px 14px",
-                  background: "rgba(5, 20, 25, 0.92)",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                  overflowX: "auto",
-                  scrollbarWidth: "none",
-                  flexShrink: 0,
-                  zIndex: 15,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "5px", paddingRight: "4px", borderRight: "1px solid rgba(255, 255, 255, 0.12)", marginRight: "2px" }}>
-                  <FaLayerGroup size={11} style={{ color: "#11B5BB" }} />
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", whiteSpace: "nowrap" }}>
-                    Layers:
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAddImageModal(true)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    padding: "3px 10px",
-                    borderRadius: "6px",
-                    background: "rgba(17, 181, 187, 0.22)",
-                    border: "1px solid #11B5BB",
-                    color: "#11B5BB",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    marginRight: "6px",
-                  }}
-                  title="Upload custom image or add promotional stickers / graphic badges"
-                >
-                  <FaImage size={11} />
-                  <span>+ Add Image / Sticker</span>
-                </button>
+            {/* ── Quick Layers Selector Strip ── */}
+            <div className="ste-layers-ribbon">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mr-2 flex-shrink-0">
+                <FaLayerGroup size={11} className="text-slate-500" />
+                <span>Layers:</span>
+              </div>
+              <div className="ste-layers-chips-scroll">
                 {([
-                  ["headline", "Headline", "🏷️"],
-                  ["discount", "Offer Badge", "💰"],
-                  ["description", "Description", "📝"],
-                  ["price", "Price", "💵"],
-                  ["oldPrice", "Old Price", "✂️"],
-                  ["product", "Product Image", "🖼️"],
-                  ["cta", "CTA Button", "🔘"],
-                  ["validity", "Validity", "📅"],
-                  ["logo", "Logo", "🏢"],
-                  ["storeName", "Store Name", "🏪"],
-                  ["qrCode", "QR Code", "📱"],
-                  ["footer", "Footer", "📌"],
-                ] as [LayerKey, string, string][]).map(([k, label, icon]) => {
-                  const exists = !!currentLayers[k];
-                  const isSelected = selectedLayer === k;
-                  if (!exists && k !== "headline" && k !== "discount" && k !== "product" && k !== "price" && k !== "description") {
-                    return null;
-                  }
+                  { key: "product", label: "Product Photo" },
+                  { key: "discount", label: "Offer Badge" },
+                  { key: "headline", label: "Headline" },
+                  { key: "description", label: "Description" },
+                  { key: "price", label: "Deal Price" },
+                  { key: "oldPrice", label: "Old Price" },
+                  { key: "cta", label: "CTA Button" },
+                  { key: "validity", label: "Validity" },
+                  { key: "logo", label: "Brand Logo" },
+                  { key: "footer", label: "Legal Footer" },
+                ] as { key: LayerKey; label: string }[]).map((item) => {
+                  const isSel = selectedLayer === item.key;
+                  const isHid = currentLayers[item.key]?.hidden;
                   return (
                     <button
-                      key={k}
+                      key={item.key}
                       type="button"
-                      onClick={() => setSelectedLayer(k)}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "5px",
-                        padding: "3px 8px",
-                        borderRadius: "6px",
-                        fontSize: "11px",
-                        fontWeight: isSelected ? 700 : 500,
-                        whiteSpace: "nowrap",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        background: isSelected ? "rgba(17, 181, 187, 0.25)" : "rgba(255, 255, 255, 0.05)",
-                        border: isSelected ? "1px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.1)",
-                        color: isSelected ? "#38bdf8" : "#cbd5e1",
-                        boxShadow: isSelected ? "0 0 8px rgba(17, 181, 187, 0.35)" : "none",
+                      onClick={() => {
+                        setSelectedLayer(item.key);
+                        if (isHid) {
+                          updateCurrentLayer(item.key, { hidden: false });
+                          showToast(`Restored & selected ${item.label}`);
+                        }
+                        setRightPanelOpen(true);
                       }}
-                      title={`Click to select & edit ${label}`}
+                      className={`ste-layer-pill ${isSel ? "active" : ""} ${isHid ? "is-hidden" : ""}`}
+                      title={isHid ? `${item.label} (Hidden - click to restore to canvas)` : `Select ${item.label}`}
                     >
-                      <span style={{ fontSize: "12px" }}>{icon}</span>
-                      <span>{label}</span>
-                      {isSelected && (
-                        <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#11B5BB" }} />
+                      <span>{item.label}</span>
+                      {isHid ? (
+                        <span className="text-[10px] text-rose-500 font-medium ml-1">Hidden</span>
+                      ) : (
+                        isSel && <span className="w-1.5 h-1.5 rounded-full bg-white ml-1" />
                       )}
                     </button>
                   );
                 })}
               </div>
-            )}
+            </div>
 
-            {/* Docked Selection Bar: Sleek, compact single-row toolbar that never wraps vertically */}
-            {selectedLayer && selectedLayerData && !isPlaying && (
+            {/* Canvas Viewport Artboard Container */}
+            <div className="ste-canvas-container-light" ref={stageContainerRef}>
               <div
-                className="ste-docked-element-bar"
+                className="ste-canvas-card-light"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "0 12px",
-                  height: "42px",
-                  minHeight: "42px",
-                  maxHeight: "42px",
-                  background: "rgba(11, 40, 48, 0.98)",
-                  borderBottom: "1px solid rgba(17, 181, 187, 0.35)",
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.45)",
-                  gap: "8px",
-                  zIndex: 20,
-                  flexShrink: 0,
-                  flexWrap: "nowrap",
-                  overflowX: "auto",
-                  scrollbarWidth: "none",
-                  whiteSpace: "nowrap",
-                  boxSizing: "border-box",
-                  animation: "fadeIn 0.15s ease-out",
-                }}
-              >
-                {/* Active Layer Label */}
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "#11B5BB",
-                    background: "rgba(17, 181, 187, 0.15)",
-                    border: "1px solid rgba(17, 181, 187, 0.35)",
-                    padding: "3px 8px",
-                    borderRadius: "6px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    whiteSpace: "nowrap",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span>🎯</span>
-                  <span>{selectedLayer === "discount" ? "Offer Badge" : selectedLayer === "product" ? "Product Image" : selectedLayer}</span>
-                  <span style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 500, fontFamily: "monospace" }}>
-                    ({Math.round(selectedLayerData.x * 100)}%, {Math.round(selectedLayerData.y * 100)}%)
-                  </span>
-                </span>
-
-                <div style={{ width: "1px", height: "18px", background: "rgba(255, 255, 255, 0.12)", flexShrink: 0 }} />
-
-                {/* Image Controls: Crop & Scale & Center */}
-                {(selectedLayer === "product" || selectedLayer === "logo") && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                    {inPlaceCropLayer === selectedLayer ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInPlaceCropLayer(null);
-                            toast.success("Crop applied!");
-                          }}
-                          style={{
-                            background: "#11B5BB",
-                            border: "none",
-                            color: "#051419",
-                            borderRadius: "6px",
-                            padding: "4px 9px",
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          <FaCheck size={11} /> Done Crop
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => resetCrop(selectedLayer)}
-                          style={{
-                            background: "rgba(255, 255, 255, 0.1)",
-                            border: "1px solid rgba(255, 255, 255, 0.25)",
-                            color: "#cbd5e1",
-                            borderRadius: "6px",
-                            padding: "4px 8px",
-                            fontSize: "11px",
-                            cursor: "pointer",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Reset Crop
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setInPlaceCropLayer(selectedLayer)}
-                        style={{
-                          background: "rgba(2, 132, 199, 0.25)",
-                          border: "1px solid #0284c7",
-                          color: "#38bdf8",
-                          borderRadius: "6px",
-                          padding: "4px 9px",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={`Crop & trim ${selectedLayer === "logo" ? "Logo" : "Product Image"} on canvas`}
-                      >
-                        <FaCrop size={11} /> Crop
-                      </button>
-                    )}
-
-                    {selectedLayerData?.cropInset && (selectedLayerData.cropInset.top > 0 || selectedLayerData.cropInset.right > 0 || selectedLayerData.cropInset.bottom > 0 || selectedLayerData.cropInset.left > 0) && inPlaceCropLayer !== selectedLayer ? (
-                      <button
-                        type="button"
-                        onClick={() => resetCrop(selectedLayer)}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.08)",
-                          border: "1px solid rgba(255, 255, 255, 0.2)",
-                          color: "#94a3b8",
-                          borderRadius: "6px",
-                          padding: "4px 7px",
-                          fontSize: "11px",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                        title="Revert back to uncropped original image"
-                      >
-                        Reset
-                      </button>
-                    ) : null}
-
-                    {/* Quick Image Curvature Presets in Docked Toolbar */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "3px", borderLeft: "1px solid rgba(255,255,255,0.12)", paddingLeft: "6px" }}>
-                      {[
-                        { label: "Sharp", radius: 0, shape: "rect", title: "Sharp rectangular corners (0%)" },
-                        { label: "Curved", radius: 16, shape: "rounded", title: "Curved rounded corners (16%)" },
-                        { label: "Circle", radius: 50, shape: "circle", title: "Circular shape (50%)" },
-                      ].map((preset) => {
-                        const isCurActive = preset.shape === "circle"
-                          ? selectedLayerData.shape === "circle" || selectedLayerData.borderRadius === 50
-                          : preset.radius === 0
-                          ? (!selectedLayerData.borderRadius || selectedLayerData.borderRadius === 0) && selectedLayerData.shape !== "circle"
-                          : selectedLayerData.borderRadius === preset.radius;
-                        return (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => {
-                              updateCurrentLayer(selectedLayer, {
-                                shape: preset.shape as any,
-                                borderRadius: preset.radius,
-                              });
-                            }}
-                            style={{
-                              background: isCurActive ? "rgba(17, 181, 187, 0.3)" : "rgba(255, 255, 255, 0.06)",
-                              border: isCurActive ? "1px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.15)",
-                              color: isCurActive ? "#38bdf8" : "#94a3b8",
-                              borderRadius: "6px",
-                              padding: "3px 6px",
-                              fontSize: "10px",
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              whiteSpace: "nowrap",
-                            }}
-                            title={preset.title}
-                          >
-                            {preset.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Quick Image Size Adjustments & Steppers */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "3px", borderLeft: "1px solid rgba(255,255,255,0.12)", paddingLeft: "6px" }}>
-                      <span style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600, marginRight: "1px" }}>Size:</span>
-                      
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const curSize = selectedLayerData.size || 50;
-                          const newSize = Math.max(10, curSize - 5);
-                          updateCurrentLayer(selectedLayer, { size: newSize });
-                        }}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.08)",
-                          border: "1px solid rgba(255, 255, 255, 0.15)",
-                          color: "#ffffff",
-                          borderRadius: "4px",
-                          width: "22px",
-                          height: "22px",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                        title="Decrease product image size (-5%)"
-                      >
-                        -
-                      </button>
-
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#11B5BB", minWidth: "30px", textAlign: "center" }}>
-                        {selectedLayerData.size}%
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const curSize = selectedLayerData.size || 50;
-                          const newSize = Math.min(95, curSize + 5);
-                          updateCurrentLayer(selectedLayer, { size: newSize });
-                        }}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.08)",
-                          border: "1px solid rgba(255, 255, 255, 0.15)",
-                          color: "#ffffff",
-                          borderRadius: "4px",
-                          width: "22px",
-                          height: "22px",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                        title="Increase product image size (+5%)"
-                      >
-                        +
-                      </button>
-
-                      {[
-                        { label: "Medium", size: 50 },
-                        { label: "Large", size: 65 },
-                        { label: "Hero", size: 75 },
-                      ].map((preset) => {
-                        const isSizeActive = selectedLayerData.size === preset.size;
-                        return (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => {
-                              updateCurrentLayer(selectedLayer, { size: preset.size });
-                            }}
-                            style={{
-                              background: isSizeActive ? "rgba(17, 181, 187, 0.3)" : "rgba(255, 255, 255, 0.06)",
-                              border: isSizeActive ? "1px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.15)",
-                              color: isSizeActive ? "#38bdf8" : "#94a3b8",
-                              borderRadius: "6px",
-                              padding: "3px 6px",
-                              fontSize: "10px",
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              whiteSpace: "nowrap",
-                            }}
-                            title={`Set product size to ${preset.size}%`}
-                          >
-                            {preset.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Snap Image to Center of Canvas */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        updateCurrentLayer(selectedLayer, { x: 0.50 });
-                        toast.success("Centered on Canvas (X: 50%)");
-                      }}
-                      style={{
-                        background: Math.round(selectedLayerData.x * 100) === 50 ? "rgba(17, 181, 187, 0.25)" : "rgba(255, 255, 255, 0.06)",
-                        border: Math.round(selectedLayerData.x * 100) === 50 ? "1px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.15)",
-                        color: Math.round(selectedLayerData.x * 100) === 50 ? "#38bdf8" : "#e2e8f0",
-                        borderRadius: "6px",
-                        padding: "4px 8px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        whiteSpace: "nowrap",
-                      }}
-                      title="Snap image directly to horizontal center of canvas (X: 50%)"
-                    >
-                      <FaCrosshairs size={10} /> Center
-                    </button>
-                  </div>
-                )}
-
-                {/* Text Controls: Input, Alignment, Center, Shape, Size, Width */}
-                {isTextLayer && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                    {/* Quick Text Input */}
-                    <input
-                      type="text"
-                      value={selectedLayerData.text || ""}
-                      onChange={(e) => updateCurrentLayer(selectedLayer, { text: e.target.value })}
-                      placeholder="Edit text..."
-                      style={{
-                        background: "#051419",
-                        border: "1px solid #163B45",
-                        borderRadius: "6px",
-                        color: "#fff",
-                        padding: "3px 8px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        width: "130px",
-                        outline: "none",
-                        height: "26px",
-                        boxSizing: "border-box",
-                      }}
-                    />
-
-                    {/* Text Center & Alignment Option */}
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        background: "#051419",
-                        border: "1px solid #163B45",
-                        borderRadius: "6px",
-                        padding: "2px",
-                        gap: "2px",
-                        height: "26px",
-                        boxSizing: "border-box",
-                      }}
-                      title="Text Alignment: Left, Center, or Right"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "left" })}
-                        style={{
-                          background: selectedLayerData.textAlign === "left" ? "#11B5BB" : "transparent",
-                          color: selectedLayerData.textAlign === "left" ? "#041d24" : "#94a3b8",
-                          border: "none",
-                          borderRadius: "4px",
-                          padding: "2px 5px",
-                          fontSize: "11px",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          fontWeight: 700,
-                          height: "20px",
-                        }}
-                        title="Align text Left"
-                      >
-                        <FaAlignLeft size={10} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "center" })}
-                        style={{
-                          background: (!selectedLayerData.textAlign || selectedLayerData.textAlign === "center") ? "#11B5BB" : "transparent",
-                          color: (!selectedLayerData.textAlign || selectedLayerData.textAlign === "center") ? "#041d24" : "#94a3b8",
-                          border: "none",
-                          borderRadius: "4px",
-                          padding: "2px 6px",
-                          fontSize: "10px",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "3px",
-                          fontWeight: 700,
-                          height: "20px",
-                        }}
-                        title="Align text Center (Text Center Option)"
-                      >
-                        <FaAlignCenter size={10} />
-                        <span>Center</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "right" })}
-                        style={{
-                          background: selectedLayerData.textAlign === "right" ? "#11B5BB" : "transparent",
-                          color: selectedLayerData.textAlign === "right" ? "#041d24" : "#94a3b8",
-                          border: "none",
-                          borderRadius: "4px",
-                          padding: "2px 5px",
-                          fontSize: "11px",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          fontWeight: 700,
-                          height: "20px",
-                        }}
-                        title="Align text Right"
-                      >
-                        <FaAlignRight size={10} />
-                      </button>
-                    </div>
-
-                    {/* Snap Text to Center of Canvas (X = 50%) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        updateCurrentLayer(selectedLayer, { x: 0.50 });
-                        toast.success("Centered on Canvas (X: 50%)");
-                      }}
-                      style={{
-                        background: Math.round(selectedLayerData.x * 100) === 50 ? "rgba(17, 181, 187, 0.25)" : "rgba(255, 255, 255, 0.06)",
-                        border: Math.round(selectedLayerData.x * 100) === 50 ? "1px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.15)",
-                        color: Math.round(selectedLayerData.x * 100) === 50 ? "#38bdf8" : "#e2e8f0",
-                        borderRadius: "6px",
-                        padding: "3px 7px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        whiteSpace: "nowrap",
-                        height: "26px",
-                        boxSizing: "border-box",
-                      }}
-                      title="Snap text directly to horizontal center of canvas (X: 50%)"
-                    >
-                      <FaCrosshairs size={10} />
-                      <span>Center</span>
-                    </button>
-
-                    {/* Shape selector */}
-                    <select
-                      value={selectedLayerData.shape || "none"}
-                      onChange={(e) =>
-                        updateCurrentLayer(selectedLayer, {
-                          shape: e.target.value as any,
-                          bgMode: e.target.value === "none" ? "transparent" : "color",
-                        })
-                      }
-                      style={{
-                        background: "#051419",
-                        border: "1px solid #163B45",
-                        borderRadius: "6px",
-                        color: "#fff",
-                        padding: "2px 6px",
-                        fontSize: "11px",
-                        fontWeight: 500,
-                        outline: "none",
-                        cursor: "pointer",
-                        height: "26px",
-                      }}
-                      title="Card background shape"
-                    >
-                      <option value="none">No BG (Transparent)</option>
-                      <option value="origami">🏷️ 3D Folded Banner (Retail)</option>
-                      <option value="rounded">Rounded Badge</option>
-                      <option value="pill">Pill Shape</option>
-                      <option value="circle">Circle Badge</option>
-                      <option value="rect">Rectangle</option>
-                      <option value="ribbon">Angled Ribbon</option>
-                    </select>
-
-                    {/* Quick Font Size Stepper */}
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        background: "#051419",
-                        border: "1px solid #163B45",
-                        borderRadius: "6px",
-                        overflow: "hidden",
-                        height: "26px",
-                        boxSizing: "border-box",
-                      }}
-                      title="Adjust Font Size"
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateCurrentLayer(selectedLayer, {
-                            size: Math.max(0.5, Number((selectedLayerData.size - 0.2).toFixed(1))),
-                          })
-                        }
-                        style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          border: "none",
-                          color: "#11B5BB",
-                          padding: "0 6px",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          cursor: "pointer",
-                          height: "100%",
-                        }}
-                        title="Decrease font size"
-                      >
-                        A-
-                      </button>
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          color: "#ffffff",
-                          padding: "0 5px",
-                          minWidth: "32px",
-                          textAlign: "center",
-                        }}
-                      >
-                        {selectedLayerData.size}%
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateCurrentLayer(selectedLayer, {
-                            size: Math.min(60, Number((selectedLayerData.size + 0.2).toFixed(1))),
-                          })
-                        }
-                        style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          border: "none",
-                          color: "#11B5BB",
-                          padding: "0 6px",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          cursor: "pointer",
-                          height: "100%",
-                        }}
-                        title="Increase font size"
-                      >
-                        A+
-                      </button>
-                    </div>
-
-                    {/* Quick Box Width Stepper */}
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        background: "#051419",
-                        border: "1px solid #163B45",
-                        borderRadius: "6px",
-                        overflow: "hidden",
-                        height: "26px",
-                        boxSizing: "border-box",
-                      }}
-                      title="Adjust Box Width: text wraps down when width reached"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const curW = selectedLayerData.boxWidth || 45;
-                          updateCurrentLayer(selectedLayer, { boxWidth: Math.max(10, curW - 5) });
-                        }}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          border: "none",
-                          color: "#38bdf8",
-                          padding: "0 6px",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          cursor: "pointer",
-                          height: "100%",
-                        }}
-                        title="Decrease Width"
-                      >
-                        W-
-                      </button>
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          color: "#cbd5e1",
-                          padding: "0 5px",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        W: {selectedLayerData.boxWidth ? `${selectedLayerData.boxWidth}%` : "Auto"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const curW = selectedLayerData.boxWidth || 45;
-                          updateCurrentLayer(selectedLayer, { boxWidth: Math.min(95, curW + 5) });
-                        }}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          border: "none",
-                          color: "#38bdf8",
-                          padding: "0 6px",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          cursor: "pointer",
-                          height: "100%",
-                        }}
-                        title="Increase Width"
-                      >
-                        W+
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Spacer */}
-                <div style={{ flex: 1 }} />
-
-                {/* Actions: Delete, Close, Inspector */}
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteLayer(selectedLayer)}
-                    style={{
-                      background: "rgba(220, 38, 38, 0.25)",
-                      border: "1px solid #ef4444",
-                      color: "#fca5a5",
-                      borderRadius: "6px",
-                      padding: "3px 8px",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      whiteSpace: "nowrap",
-                      height: "26px",
-                    }}
-                    title={`Delete / remove ${selectedLayer} from canvas`}
-                  >
-                    <FaTrash size={10} /> Delete
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedLayer(null);
-                      setInPlaceCropLayer(null);
-                    }}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.08)",
-                      border: "1px solid rgba(255, 255, 255, 0.18)",
-                      color: "#94a3b8",
-                      borderRadius: "6px",
-                      padding: "3px 8px",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      height: "26px",
-                    }}
-                    title="Deselect active layer"
-                  >
-                    ✕ Close
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRightPanelOpen(true)}
-                    style={{
-                      background: "#163B45",
-                      border: "1px solid rgba(17, 181, 187, 0.4)",
-                      color: "#11B5BB",
-                      borderRadius: "6px",
-                      padding: "3px 8px",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      height: "26px",
-                    }}
-                    title="Open full inspector panel on right"
-                  >
-                    Inspector &gt;
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Canvas Container & Mathematically Responsive Viewport */}
-            <div ref={stageContainerRef} className="ste-canvas-container">
-              <div
-                className="ste-canvas-viewport"
-                style={{
-                  width: canvasFitSize.width > 0 ? `${canvasFitSize.width}px` : "auto",
-                  height: canvasFitSize.height > 0 ? `${canvasFitSize.height}px` : "auto",
+                  width: canvasFitSize.width > 0 ? `${canvasFitSize.width * zoomLevel}px` : "auto",
+                  height: canvasFitSize.height > 0 ? `${canvasFitSize.height * zoomLevel}px` : "auto",
                   aspectRatio: `${ASPECT_SPECS[activeRatio].width} / ${ASPECT_SPECS[activeRatio].height}`,
-                  transform: zoomLevel !== 1 ? `scale(${zoomLevel})` : undefined,
-                  transformOrigin: "center center",
-                  transition: "transform 0.18s ease-out, width 0.1s ease-out, height 0.1s ease-out",
                   position: "relative",
-                  maxWidth: "100%",
-                  maxHeight: "100%",
                 }}
+                onPointerMove={handleContainerPointerMove}
+                onPointerUp={handleContainerPointerUp}
               >
                 <canvas
                   ref={canvasRef}
-                  className="ste-interactive-canvas"
                   onPointerDown={handleCanvasPointerDown}
-                  style={{
-                    cursor: isDragging ? "grabbing" : hoveredLayer ? "grab" : "crosshair",
-                  }}
+                  onPointerMove={handleCanvasPointerMove}
+                  onPointerUp={handleCanvasPointerUp}
+                  className="ste-main-canvas-light"
                 />
 
-                {/* Interactive On-Canvas In-Place Crop & Resize Overlay */}
-                {(() => {
-                  if (!selectedLayer || !currentLayers[selectedLayer] || currentLayers[selectedLayer].hidden || isPlaying) return null;
-                  const spec = ASPECT_SPECS[activeRatio];
-                  const bounds = getLayerBounds(selectedLayer, spec.width, spec.height, currentLayers);
-                  if (!bounds) return null;
-
-                  const leftPct = (bounds.left / spec.width) * 100;
-                  const topPct = (bounds.top / spec.height) * 100;
-                  const widthPct = (bounds.width / spec.width) * 100;
-                  const heightPct = (bounds.height / spec.height) * 100;
-                  const isCropping = inPlaceCropLayer === selectedLayer;
-                  const layerData = currentLayers[selectedLayer];
-
-                  return (
-                    <div
-                      className="ste-canvas-element-overlay"
-                      style={{
-                        position: "absolute",
-                        left: `${leftPct}%`,
-                        top: `${topPct}%`,
-                        width: `${widthPct}%`,
-                        height: `${heightPct}%`,
-                        border: isCropping ? "2px solid #38bdf8" : "2px dashed #11B5BB",
-                        borderRadius: !isCropping && (layerData?.shape === "circle" || (typeof layerData?.borderRadius === "number" && layerData.borderRadius >= 50))
-                          ? "9999px"
-                          : !isCropping && typeof layerData?.borderRadius === "number" && layerData.borderRadius > 0
-                          ? `${layerData.borderRadius}px`
-                          : !isCropping && layerData?.shape === "rounded"
-                          ? "16px"
-                          : !isCropping && layerData?.shape === "pill"
-                          ? "9999px"
-                          : "4px",
-                        pointerEvents: "none",
-                        zIndex: 30,
-                        boxShadow: isCropping ? "0 0 0 9999px rgba(0, 0, 0, 0.4), 0 0 20px #0284c7" : "0 0 14px rgba(17, 181, 187, 0.45)",
-                      }}
-                    >
-                      {/* Crop Mode Rule-of-Thirds Grid Lines */}
-                      {isCropping && (
-                        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-                          <div style={{ position: "absolute", left: "33.33%", top: 0, bottom: 0, width: "1px", background: "rgba(56, 189, 248, 0.45)" }} />
-                          <div style={{ position: "absolute", left: "66.66%", top: 0, bottom: 0, width: "1px", background: "rgba(56, 189, 248, 0.45)" }} />
-                          <div style={{ position: "absolute", top: "33.33%", left: 0, right: 0, height: "1px", background: "rgba(56, 189, 248, 0.45)" }} />
-                          <div style={{ position: "absolute", top: "66.66%", left: 0, right: 0, height: "1px", background: "rgba(56, 189, 248, 0.45)" }} />
-                        </div>
-                      )}
-
-                      {/* 8 Interactive Resize / Crop Handles Right on the Element */}
-                      {(["nw", "ne", "se", "sw"] as const).map((pos) => {
-                        const isTop = pos.includes("n");
-                        const isLeft = pos.includes("w");
-                        return (
-                          <div
-                            key={pos}
-                            onPointerDown={(e) => handleStartTransform(e, selectedLayer, isCropping ? "crop" : "resize", pos)}
-                            style={{
-                              position: "absolute",
-                              top: isTop ? "-6px" : undefined,
-                              bottom: !isTop ? "-6px" : undefined,
-                              left: isLeft ? "-6px" : undefined,
-                              right: !isLeft ? "-6px" : undefined,
-                              width: isCropping ? "14px" : "11px",
-                              height: isCropping ? "14px" : "11px",
-                              background: isCropping ? "#38bdf8" : "#ffffff",
-                              border: isCropping ? "2px solid #0369a1" : "2px solid #11B5BB",
-                              borderRadius: isCropping ? "2px" : "3px",
-                              cursor: pos === "nw" || pos === "se" ? "nwse-resize" : "nesw-resize",
-                              pointerEvents: "auto",
-                              zIndex: 35,
-                              boxShadow: "0 2px 6px rgba(0,0,0,0.6)",
-                            }}
-                            title={isCropping ? `Drag to crop ${pos}` : `Drag to resize ${pos}`}
-                          />
-                        );
-                      })}
-
-                      {/* Edge Handles (Top, Bottom, Left, Right) - Resize or Crop */}
-                      {(["n", "s", "w", "e"] as const).map((pos) => {
-                        const isVertical = pos === "n" || pos === "s";
-                        return (
-                          <div
-                            key={pos}
-                            onPointerDown={(e) => handleStartTransform(e, selectedLayer, isCropping ? "crop" : "resize", pos)}
-                            style={{
-                              position: "absolute",
-                              top: pos === "n" ? "-6px" : pos === "s" ? undefined : "50%",
-                              bottom: pos === "s" ? "-6px" : undefined,
-                              left: pos === "w" ? "-6px" : pos === "e" ? undefined : "50%",
-                              right: pos === "e" ? "-6px" : undefined,
-                              transform: isVertical ? "translateX(-50%)" : "translateY(-50%)",
-                              width: isVertical ? "28px" : "10px",
-                              height: isVertical ? "10px" : "28px",
-                              background: isCropping ? "#38bdf8" : "#11B5BB",
-                              border: isCropping ? "2px solid #0369a1" : "2px solid #ffffff",
-                              borderRadius: "4px",
-                              cursor: isVertical ? "ns-resize" : "ew-resize",
-                              pointerEvents: "auto",
-                              zIndex: 34,
-                              boxShadow: "0 1px 5px rgba(0,0,0,0.5)",
-                            }}
-                            title={isCropping ? `Drag to crop ${pos === "n" ? "top" : pos === "s" ? "bottom" : pos === "w" ? "left" : "right"}` : `Drag to resize ${pos === "n" ? "top" : pos === "s" ? "bottom / height" : pos === "w" ? "left" : "right / width"}`}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-
-                {/* Snapped Center Guideline (shows when layer is centered at X: 50%) */}
-                {selectedLayer && currentLayers[selectedLayer] && !isPlaying && Math.abs(currentLayers[selectedLayer].x - 0.50) < 0.015 && (
+                {/* ── Active Layer On-Canvas Bounding Box with Resize Handles and Remove ── */}
+                {selectedLayer && selectedLayerData && !selectedLayerData.hidden && (
                   <div
+                    className="ste-canvas-bbox-overlay"
                     style={{
                       position: "absolute",
-                      left: "50%",
-                      top: 0,
-                      bottom: 0,
-                      width: "1px",
-                      background: "rgba(17, 181, 187, 0.7)",
-                      boxShadow: "0 0 8px rgba(17, 181, 187, 0.8)",
+                      left: `${selectedLayerData.x * 100}%`,
+                      top: `${selectedLayerData.y * 100}%`,
+                      width: `${getLayerBBoxSize(selectedLayer, selectedLayerData, activeRatio).w}%`,
+                      height: `${getLayerBBoxSize(selectedLayer, selectedLayerData, activeRatio).h}%`,
+                      transform: "translate(-50%, -50%)",
                       pointerEvents: "none",
-                      zIndex: 25,
                     }}
                   >
-                    <span
+                    {/* Bounding Box Outline */}
+                    <div className="ste-bbox-border" />
+
+                    {/* Floating Quick Action Pill above selection */}
+                    <div
+                      className="ste-bbox-floating-actions"
+                      onPointerDown={(e) => e.stopPropagation()}
                       style={{
-                        position: "absolute",
-                        top: "10px",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        background: "#11B5BB",
-                        color: "#031d24",
-                        fontSize: "9px",
-                        fontWeight: 800,
-                        padding: "1px 6px",
-                        borderRadius: "4px",
-                        letterSpacing: "0.5px",
-                        whiteSpace: "nowrap",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+                        pointerEvents: "auto",
+                        top: selectedLayerData.y < 0.14 ? "calc(100% + 10px)" : "-44px",
                       }}
                     >
-                      CENTER 50%
-                    </span>
+                      <span className="ste-bbox-pill-name">{selectedLayer.toUpperCase()}</span>
+
+                      {/* Size Stepper (- / +) */}
+                      <div className="ste-bbox-stepper">
+                        <button
+                          type="button"
+                          title="Scale Down"
+                          onClick={() => updateCurrentLayer(selectedLayer, { size: Math.max(1, Number((selectedLayerData.size - 1).toFixed(1))) })}
+                        >
+                          -
+                        </button>
+                        <span title="Layer Scale">{selectedLayerData.size}%</span>
+                        <button
+                          type="button"
+                          title="Scale Up"
+                          onClick={() => updateCurrentLayer(selectedLayer, { size: Math.min(100, Number((selectedLayerData.size + 1).toFixed(1))) })}
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Center Button */}
+                      <button
+                        type="button"
+                        className="ste-bbox-act-btn"
+                        title="Center Horizontally"
+                        onClick={() => {
+                          updateCurrentLayer(selectedLayer, { x: 0.50 });
+                          showToast(`Centered ${selectedLayer}`);
+                        }}
+                      >
+                        <FaAlignCenter size={9} />
+                        <span>Center</span>
+                      </button>
+
+                      {/* Remove / Delete Element */}
+                      <button
+                        type="button"
+                        className="ste-bbox-act-btn danger"
+                        title="Remove / Delete element from canvas"
+                        onClick={() => {
+                          updateCurrentLayer(selectedLayer, { hidden: true });
+                          setSelectedLayer(null);
+                          showToast(`Removed ${selectedLayer} from canvas`);
+                        }}
+                      >
+                        <FaTrash size={9} />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+
+                    {/* 4 Corner Resize Handles */}
+                    <div
+                      className="ste-bbox-handle nw"
+                      onPointerDown={(e) => handleResizeHandlePointerDown(e, "nw")}
+                      title="Drag to resize / scale"
+                    />
+                    <div
+                      className="ste-bbox-handle ne"
+                      onPointerDown={(e) => handleResizeHandlePointerDown(e, "ne")}
+                      title="Drag to resize / scale"
+                    />
+                    <div
+                      className="ste-bbox-handle se"
+                      onPointerDown={(e) => handleResizeHandlePointerDown(e, "se")}
+                      title="Drag to resize / scale"
+                    />
+                    <div
+                      className="ste-bbox-handle sw"
+                      onPointerDown={(e) => handleResizeHandlePointerDown(e, "sw")}
+                      title="Drag to resize / scale"
+                    />
                   </div>
                 )}
-
-                {/* Drag Coordinate Tooltip following element */}
-                {isDragging && selectedLayer && currentLayers[selectedLayer] && (
-                  <div
-                    className="ste-drag-coord-pill"
-                    style={{
-                      left: `${Math.round(currentLayers[selectedLayer].x * 100)}%`,
-                      top: `${Math.round(currentLayers[selectedLayer].y * 100)}%`,
-                    }}
-                  >
-                    {selectedLayer.toUpperCase()} · X: {Math.round(currentLayers[selectedLayer].x * 100)}% Y: {Math.round(currentLayers[selectedLayer].y * 100)}%
-                  </div>
-                )}
-
-                {/* Aspect Ratio Badge in bottom right of canvas */}
-                <div className="ste-viewport-ratio-tag">
-                  {activeRatio} · {ASPECT_SPECS[activeRatio].width}×{ASPECT_SPECS[activeRatio].height}
-                </div>
               </div>
             </div>
 
-            {/* ── Unified Single Studio Video Animation Player Bar ── */}
-            <div className="ste-unified-player-bar">
-              {/* Play / Replay / Reset Layout */}
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+            {/* Bottom Unified Scrubber & Player Bar */}
+            <div className="ste-player-bar-light">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className={`ste-ctrl-btn ste-ctrl-btn--play ${isPlaying ? "ste-ctrl-btn--playing" : ""}`}
-                  onClick={togglePlay}
-                  title={isPlaying ? "Pause Preview (Space)" : "Play Live Animation Preview (Space)"}
-                  style={{
-                    width: "auto",
-                    padding: "0 12px",
-                    height: "32px",
-                    borderRadius: "6px",
-                    fontWeight: 700,
-                    fontSize: "0.78rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    background: isPlaying ? "#ef4444" : "#f05a28",
-                    boxShadow: isPlaying ? "0 0 12px rgba(239,68,68,0.4)" : "0 0 12px rgba(240,90,40,0.3)",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#fff",
-                    whiteSpace: "nowrap",
-                  }}
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className={`ste-player-play-btn ${isPlaying ? "playing" : ""}`}
                 >
-                  {isPlaying ? <FaPause size={10} /> : <FaPlay size={10} />}
+                  {isPlaying ? <FaPause size={12} /> : <FaPlay size={12} />}
                   <span>{isPlaying ? "Pause" : "Play"}</span>
                 </button>
-
                 <button
                   type="button"
-                  className="ste-ctrl-btn"
-                  onClick={handleReplay}
-                  title="Replay from 0.0s"
-                  style={{
-                    height: "32px",
-                    width: "32px",
-                    borderRadius: "6px",
-                    background: "rgba(255,255,255,0.08)",
-                    border: "none",
-                    color: "#fff",
-                    cursor: "pointer",
-                  }}
+                  onClick={() => setPlaybackTime(0)}
+                  className="ste-btn-icon-light"
+                  title="Replay from start"
                 >
-                  <FaRotateRight size={11} />
-                </button>
-
-                <button
-                  type="button"
-                  className="ste-ctrl-btn"
-                  onClick={() => {
-                    setAspectLayers((prev) => ({
-                      ...prev,
-                      [activeRatio]: DEFAULT_LAYERS[activeRatio],
-                    }));
-                    showToast(`🔄 Reset ${activeRatio} layout to defaults`);
-                  }}
-                  title="Reset this ratio layout to default coordinates"
-                  style={{
-                    height: "32px",
-                    width: "32px",
-                    borderRadius: "6px",
-                    background: "rgba(255,255,255,0.08)",
-                    border: "none",
-                    color: "#94a3b8",
-                    cursor: "pointer",
-                  }}
-                >
-                  <FaSliders size={11} />
+                  <FaRotateRight size={12} />
                 </button>
               </div>
 
-              {/* Scrubber Timeline */}
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  minWidth: "140px",
-                  maxWidth: "460px",
-                  margin: "0 4px",
-                }}
-              >
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#11B5BB", fontFamily: "monospace", minWidth: "32px" }}>
+              {/* Progress Slider */}
+              <div className="flex-1 flex items-center gap-3">
+                <span className="text-xs font-mono font-bold text-slate-800 w-10 text-right">
                   {playbackTime.toFixed(1)}s
                 </span>
                 <input
@@ -6840,1751 +3314,451 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                     setIsPlaying(false);
                     setPlaybackTime(Number(e.target.value));
                   }}
-                  className="ste-scrub-input"
-                  style={{ flex: 1, accentColor: "#11B5BB", cursor: "pointer", height: "4px" }}
+                  className="flex-1 accent-slate-900 h-2 bg-slate-200 rounded cursor-pointer"
                 />
-                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#94a3b8", fontFamily: "monospace", minWidth: "28px" }}>
+                <span className="text-xs font-mono font-bold text-slate-500 w-10">
                   {duration}s
                 </span>
               </div>
 
-              {/* Aspect Ratio Switcher & Live Status */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                <span
-                  className="ste-player-status-tag"
-                  style={{
-                    fontSize: "10px",
-                    color: isPlaying ? "#22c55e" : "#94a3b8",
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    background: "rgba(0,0,0,0.35)",
-                    padding: "3px 8px",
-                    borderRadius: "5px",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: "6px",
-                      height: "6px",
-                      borderRadius: "50%",
-                      background: isPlaying ? "#22c55e" : "#64748b",
-                      boxShadow: isPlaying ? "0 0 6px #22c55e" : "none",
-                      display: "inline-block",
+              {/* Quick Duration Presets */}
+              <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+                <span className="text-[11px] font-bold text-slate-400">Duration:</span>
+                {[5, 10, 15].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => {
+                      setDuration(d);
+                      if (playbackTime > d) setPlaybackTime(d);
+                      showToast(`Set duration to ${d}s`);
                     }}
-                  />
-                  {isPlaying ? "Live 60fps" : "Paused"}
-                </span>
-
-                {/* Aspect Switcher */}
-                <div style={{ display: "flex", background: "rgba(0,0,0,0.4)", borderRadius: "6px", padding: "2px", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  {(["16:9", "9:16", "1:1", "4:5"] as AspectRatio[]).map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setActiveRatio(r)}
-                      style={{
-                        background: activeRatio === r ? "#11B5BB" : "transparent",
-                        color: activeRatio === r ? "#07171d" : "#94a3b8",
-                        border: "none",
-                        borderRadius: "4px",
-                        padding: "2px 6px",
-                        fontSize: "10px",
-                        fontWeight: activeRatio === r ? 800 : 500,
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                      title={`Switch to ${r}`}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Quick Save Action in Bottom Player Bar */}
-                <button
-                  type="button"
-                  onClick={() => handleSaveTemplate(false)}
-                  disabled={saving}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-                    color: "#ffffff",
-                    border: "1px solid rgba(16, 185, 129, 0.4)",
-                    boxShadow: "0 0 10px rgba(16, 185, 129, 0.35)",
-                    borderRadius: "6px",
-                    padding: "4px 10px",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    marginLeft: "4px",
-                  }}
-                  title={templateId ? `Update Template #${currentDisplayId}` : "Save Template"}
-                >
-                  {saving ? <FaSpinner className="ste-spin" size={10} /> : <FaFloppyDisk size={10} />}
-                  <span>{saving ? "Saving..." : (templateId ? `Save #${currentDisplayId}` : "Save")}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Floating Inspector Drawer in Fullscreen Mode */}
-            {isFullscreenStage && showFullscreenInspector && selectedLayer && selectedLayerData && (
-              <div className="ste-fs-floating-inspector">
-                <div className="ste-fs-floating-header">
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <FaSliders style={{ color: "#11B5BB" }} />
-                    <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#fff" }}>
-                      {selectedLayer.toUpperCase()} Inspector
-                    </span>
-                  </div>
-                  <button
-                    className="ste-modal__close"
-                    onClick={() => setShowFullscreenInspector(false)}
-                    style={{ width: "26px", height: "26px" }}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
+                      duration === d
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    }`}
                   >
-                    <FaXmark size={12} />
-                  </button>
-                </div>
-                <div className="ste-fs-floating-body">
-                  {isTextLayer && (
-                    <div className="ste-field-group">
-                      <label className="ste-label">Text</label>
-                      <input
-                        type="text"
-                        className="ste-input"
-                        value={selectedLayerData.text || ""}
-                        onChange={(e) => updateCurrentLayer(selectedLayer, { text: e.target.value })}
-                      />
-
-                      {/* Text Alignment */}
-                      <div style={{ marginTop: "8px" }}>
-                        <span className="ste-sublabel">Text Alignment</span>
-                        <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-                          <button
-                            type="button"
-                            onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "left" })}
-                            className={`ste-btn ste-btn--sm ${selectedLayerData.textAlign === "left" ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                            style={{ flex: 1, padding: "5px 4px", fontSize: "11px", fontWeight: 600, justifyContent: "center", gap: "4px" }}
-                          >
-                            <FaAlignLeft size={10} /> Left
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "center" })}
-                            className={`ste-btn ste-btn--sm ${(!selectedLayerData.textAlign || selectedLayerData.textAlign === "center") ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                            style={{ flex: 1.2, padding: "5px 4px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "4px" }}
-                          >
-                            <FaAlignCenter size={10} /> Center
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "right" })}
-                            className={`ste-btn ste-btn--sm ${selectedLayerData.textAlign === "right" ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                            style={{ flex: 1, padding: "5px 4px", fontSize: "11px", fontWeight: 600, justifyContent: "center", gap: "4px" }}
-                          >
-                            <FaAlignRight size={10} /> Right
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="ste-field-group">
-                    <label className="ste-label">Size ({selectedLayerData.size}%)</label>
-                    <input
-                      type="range"
-                      min="2"
-                      max="90"
-                      value={selectedLayerData.size}
-                      onChange={(e) => updateCurrentLayer(selectedLayer, { size: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="ste-field-group">
-                    <label className="ste-label">9-Point Quick Alignment</label>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px" }}>
-                      {[
-                        ["↖ TL", 0.15, 0.15],
-                        ["↑ TC", 0.50, 0.15],
-                        ["↗ TR", 0.85, 0.15],
-                        ["← CL", 0.15, 0.50],
-                        ["✦ C", 0.50, 0.50],
-                        ["→ CR", 0.85, 0.50],
-                        ["↙ BL", 0.15, 0.85],
-                        ["↓ BC", 0.50, 0.85],
-                        ["↘ BR", 0.85, 0.85],
-                      ].map(([lbl, ax, ay]) => (
-                        <button
-                          key={lbl as string}
-                          type="button"
-                          className="ste-btn ste-btn--secondary ste-btn--sm"
-                          style={{ padding: "4px", fontSize: "0.68rem", justifyContent: "center" }}
-                          onClick={() => updateCurrentLayer(selectedLayer, { x: ax as number, y: ay as number })}
-                        >
-                          {lbl}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-          </main>
-
-          {/* ── Right Rail: Layer Inspector ── */}
-          <aside className={`ste-panel ste-panel--inspector ${!rightPanelOpen ? "ste-panel--collapsed" : ""}`}>
-            <div className="ste-panel__header">
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <FaSliders />
-                <h4>Layer Inspector</h4>
-              </div>
-              <button
-                className="ste-panel-collapse-btn"
-                onClick={() => setRightPanelOpen(false)}
-                title="Collapse Inspector Panel"
-              >
-                <FaChevronRight size={11} />
-              </button>
-            </div>
-
-            <div className="ste-panel__body">
-              <div className="ste-element-chips">
-                {(
-                  [
-                    ["product", "Product Image"],
-                    ["discount", "Offer Text / Badge"],
-                    ["headline", "Headline"],
-                    ["description", "Description"],
-                    ["price", "Price"],
-                    ["oldPrice", "Old Price"],
-                    ["validity", "Validity"],
-                    ["cta", "CTA Button"],
-                    ["qrCode", "QR Code"],
-                    ["storeName", "Store Name"],
-                    ["logo", "Logo"],
-                    ["footer", "Footer"],
-                  ] as [LayerKey, string][]
-                ).map(([k, label]) => (
-                  <button
-                    key={k}
-                    className={`ste-elem-chip ${selectedLayer === k ? "ste-elem-chip--active" : ""}`}
-                    onClick={() => setSelectedLayer(k)}
-                  >
-                    {label}
+                    {d}s
                   </button>
                 ))}
               </div>
 
-              {selectedLayer && selectedLayerData ? (
-                <div className="ste-inspector-controls">
-                  {/* Selected Layer Info Bar with Visibility Toggle */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "rgba(0,0,0,0.35)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", gap: "8px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 800, color: "#11B5BB", letterSpacing: "0.03em" }}>
-                      LAYER: {selectedLayer.toUpperCase()}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      {(selectedLayer === "product" || selectedLayer === "logo") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAspectLayers((prev) => ({
+                    ...prev,
+                    [activeRatio]: DEFAULT_LAYERS[activeRatio],
+                  }));
+                  showToast(`Reset ${activeRatio} coordinates`);
+                }}
+                className="ste-btn-secondary-light text-xs py-1 px-2.5"
+                title="Reset layout to defaults"
+              >
+                Reset Layout
+              </button>
+            </div>
+          </main>
+
+          {/* ── Right Rail: Contextual Element Inspector ── */}
+          {rightPanelOpen && (
+            <aside className="ste-right-inspector">
+              <div className="ste-inspector-header">
+                <div className="flex items-center gap-2">
+                  <FaSliders className="text-slate-700" size={13} />
+                  <h4 className="font-bold text-slate-900 text-sm">Layer Inspector</h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRightPanelOpen(false)}
+                  className="ste-btn-icon-light text-slate-400"
+                  title="Close Inspector"
+                >
+                  <FaXmark size={12} />
+                </button>
+              </div>
+
+              <div className="ste-inspector-content">
+                {selectedLayer && selectedLayerData ? (
+                  <div className="space-y-4">
+                    {/* Active Layer Banner & Actions */}
+                    <div className="flex items-center justify-between p-2.5 bg-slate-100 border border-slate-200 rounded-lg">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-bold text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded tracking-wide">
+                          {selectedLayer.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setInPlaceCropLayer(selectedLayer)}
-                          style={{
-                            background: "rgba(2, 132, 199, 0.25)",
-                            border: "1px solid #0284c7",
-                            color: "#38bdf8",
-                            borderRadius: "6px",
-                            padding: "3px 8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
+                          onClick={() => {
+                            updateCurrentLayer(selectedLayer, { x: 0.50 });
+                            showToast(`Centered ${selectedLayer}`);
                           }}
-                          title={`Crop ${selectedLayer}`}
+                          className="text-[11px] font-semibold px-2 py-0.5 rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+                          title="Center horizontally on canvas"
                         >
-                          <FaCrop size={10} /> Crop
+                          Center
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => updateCurrentLayer(selectedLayer, { hidden: !selectedLayerData.hidden })}
-                        className="ste-btn ste-btn--secondary ste-btn--sm"
-                      style={{ padding: "3px 8px", fontSize: "10px", fontWeight: 700, color: selectedLayerData.hidden ? "#ef4444" : "#10b981", gap: "4px" }}
-                      title={selectedLayerData.hidden ? "Show Layer on Canvas" : "Hide Layer from Canvas"}
-                    >
-                      {selectedLayerData.hidden ? "✕ Hidden" : "✓ Visible"}
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => updateCurrentLayer(selectedLayer, { hidden: !selectedLayerData.hidden })}
+                          className={`text-[11px] font-semibold px-2 py-0.5 rounded border transition-colors ${
+                            selectedLayerData.hidden
+                              ? "bg-rose-50 border-rose-300 text-rose-600"
+                              : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
+                          }`}
+                          title={selectedLayerData.hidden ? "Unhide layer" : "Hide layer"}
+                        >
+                          {selectedLayerData.hidden ? "Hidden" : "Visible"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateCurrentLayer(selectedLayer, { hidden: true });
+                            setSelectedLayer(null);
+                            showToast(`Removed ${selectedLayer}`);
+                          }}
+                          className="text-[11px] font-semibold px-2 py-0.5 rounded border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 flex items-center gap-1 transition-colors"
+                          title="Remove Layer from Canvas"
+                        >
+                          <FaTrash size={9} /> Remove
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {isTextLayer && (
-                    <>
-                      <div className="ste-field-group">
-                        <label className="ste-label">Text Content</label>
-                        <textarea
-                          className="ste-input"
-                          rows={2}
-                          value={selectedLayerData.text || ""}
-                          onChange={(e) =>
-                            updateCurrentLayer(selectedLayer, { text: e.target.value })
-                          }
-                          placeholder="Enter text..."
-                        />
-                      </div>
-
-                      {/* OFFER DISPLAY STYLE: Without Offer Badge vs Vector Shape vs Sticker */}
-                      {selectedLayer === "discount" && (
-                        <div
-                          className="ste-field-group"
-                          style={{
-                            background: "linear-gradient(145deg, rgba(17, 181, 187, 0.12) 0%, rgba(5, 20, 25, 0.75) 100%)",
-                            padding: "12px",
-                            borderRadius: "10px",
-                            border: "1px solid rgba(17, 181, 187, 0.4)",
-                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
-                            marginBottom: "12px",
+                    {/* Coordinates & Position */}
+                    <div className="ste-card-field">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="ste-field-label mb-0">Position (X, Y)</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateCurrentLayer(selectedLayer, { x: 0.50 });
+                            showToast(`Centered ${selectedLayer}`);
                           }}
+                          className="text-[11px] text-slate-700 font-bold hover:underline flex items-center gap-1"
                         >
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <span style={{ fontSize: "14px" }}>🎯</span>
-                              <span style={{ fontSize: "12px", fontWeight: 800, color: "#11B5BB", letterSpacing: "0.02em" }}>
-                                OFFER DISPLAY STYLE
-                              </span>
-                            </div>
-                            <span
-                              style={{
-                                fontSize: "10px",
-                                background: selectedLayerData.shape === "none" ? "#0369a1" : selectedLayerData.badgeImageUrl ? "#065f46" : "rgba(255,255,255,0.08)",
-                                color: selectedLayerData.shape === "none" ? "#bae6fd" : selectedLayerData.badgeImageUrl ? "#6ee7b7" : "#94a3b8",
-                                padding: "2px 7px",
-                                borderRadius: "4px",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {selectedLayerData.shape === "none" ? "Plain Text (No Badge)" : selectedLayerData.badgeImageUrl ? "Sticker Badge" : "Vector Shape"}
-                            </span>
-                          </div>
-
-                          {/* 3-Way Mode Selector */}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateCurrentLayer(selectedLayer, {
-                                  shape: "none",
-                                  bgMode: "transparent",
-                                  badgeImageUrl: undefined,
-                                  badgeStyle: undefined,
-                                });
-                                toast.success("Offer set to Plain Text (Without Offer Badge)!");
-                              }}
-                              className={`ste-btn ${selectedLayerData.shape === "none" && !selectedLayerData.badgeImageUrl ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                              style={{ padding: "8px 6px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "5px" }}
-                              title="Display offer percentage as plain text without any badge background"
-                            >
-                              📝 Without Offer Badge
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateCurrentLayer(selectedLayer, {
-                                  shape: "origami",
-                                  bgMode: "color",
-                                  bgColor: selectedLayerData.bgColor || "#ffc700",
-                                  borderColor: selectedLayerData.borderColor || "#047857",
-                                  badgeImageUrl: undefined,
-                                  badgeStyle: undefined,
-                                });
-                                toast.success("Offer set to 3D Retail Origami Badge!");
-                              }}
-                              className={`ste-btn ${selectedLayerData.shape !== "none" && !selectedLayerData.badgeImageUrl ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                              style={{ padding: "8px 6px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "5px" }}
-                              title="Display offer with 3D origami vector badge background"
-                            >
-                              🏷️ Vector Badge Shape
-                            </button>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateCurrentLayer(selectedLayer, {
-                                shape: "sticker",
-                                badgeImageUrl: selectedLayerData.badgeImageUrl || OFFER_BADGE_PRESETS[0].dataUrl,
-                                badgeStyle: selectedLayerData.badgeStyle || OFFER_BADGE_PRESETS[0].id,
-                              });
-                              toast.success("Offer set to Graphic Sticker Badge!");
-                            }}
-                            className={`ste-btn ${selectedLayerData.badgeImageUrl ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                            style={{ width: "100%", padding: "7px 6px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "5px", marginBottom: "8px" }}
-                            title="Display offer with custom sticker graphic"
-                          >
-                            🎨 Sticker Graphic Badge
-                          </button>
-
-                          {/* Quick Center Snapping & Sync Across Ratios */}
-                          <div style={{ paddingTop: "8px", borderTop: "1px dashed rgba(255,255,255,0.12)", display: "flex", flexDirection: "column", gap: "5px" }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateCurrentLayer(selectedLayer, { x: 0.50, y: 0.50 });
-                                toast.success("Offer centered in canvas (X: 50%, Y: 50%)!");
-                              }}
-                              className="ste-btn ste-btn--secondary ste-btn--sm"
-                              style={{
-                                width: "100%",
-                                padding: "6px",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                justifyContent: "center",
-                                gap: "6px",
-                                background: Math.round(selectedLayerData.x * 100) === 50 && Math.round(selectedLayerData.y * 100) === 50 ? "rgba(17, 181, 187, 0.25)" : undefined,
-                                borderColor: Math.round(selectedLayerData.x * 100) === 50 && Math.round(selectedLayerData.y * 100) === 50 ? "#11B5BB" : undefined,
-                                color: Math.round(selectedLayerData.x * 100) === 50 && Math.round(selectedLayerData.y * 100) === 50 ? "#38bdf8" : undefined,
-                              }}
-                              title="Snap offer percentage directly to the exact Center (50%, 50%)"
-                            >
-                              <FaCrosshairs size={11} /> Place Offer in Exact Center (50%, 50%)
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const cur = selectedLayerData;
-                                setAspectLayers((prev) => {
-                                  const updated = { ...prev };
-                                  (["9:16", "16:9", "1:1", "4:5"] as AspectRatio[]).forEach((r) => {
-                                    if (!updated[r]) return;
-                                    updated[r] = {
-                                      ...updated[r],
-                                      [selectedLayer]: {
-                                        ...(updated[r][selectedLayer] || {}),
-                                        x: cur.x,
-                                        y: cur.y,
-                                        size: cur.size,
-                                        shape: cur.shape,
-                                        bgMode: cur.bgMode,
-                                        badgeImageUrl: cur.badgeImageUrl,
-                                        badgeStyle: cur.badgeStyle,
-                                        fontColor: cur.fontColor,
-                                        bgColor: cur.bgColor,
-                                        borderColor: cur.borderColor,
-                                        text: cur.text,
-                                        font: cur.font,
-                                      },
-                                    };
-                                  });
-                                  return updated;
-                                });
-                                toast.success("Applied offer position & style to all 4 aspect ratios!");
-                              }}
-                              className="ste-btn ste-btn--secondary ste-btn--sm"
-                              style={{ width: "100%", padding: "5px", fontSize: "10px", fontWeight: 600, justifyContent: "center", gap: "5px" }}
-                              title="Copy this position and style to 16:9, 9:16, 1:1, and 4:5 so it never moves"
-                            >
-                              🌐 Sync Position &amp; Style to All 4 Ratios
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Offer Badge Sticker & Graphic Design Studio */}
-                      {selectedLayer === "discount" && (
-                        <div
-                          className="ste-field-group"
-                          style={{
-                            background: "linear-gradient(145deg, rgba(17, 181, 187, 0.08) 0%, rgba(5, 20, 25, 0.6) 100%)",
-                            padding: "12px",
-                            borderRadius: "10px",
-                            border: "1px solid rgba(17, 181, 187, 0.3)",
-                            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
-                            marginBottom: "12px",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <span style={{ fontSize: "14px" }}>🏷️</span>
-                              <span style={{ fontSize: "12px", fontWeight: 800, color: "#11B5BB", letterSpacing: "0.02em" }}>
-                                BADGE STICKER &amp; DESIGN
-                              </span>
-                            </div>
-                            {selectedLayerData.badgeImageUrl ? (
-                              <span style={{ fontSize: "10px", background: "#065f46", color: "#6ee7b7", padding: "2px 7px", borderRadius: "4px", fontWeight: 700 }}>
-                                Sticker Active
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.08)", color: "#94a3b8", padding: "2px 7px", borderRadius: "4px", fontWeight: 600 }}>
-                                Vector Shape
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Active Sticker Card with Text Overlay Switch & Reset */}
-                          {selectedLayerData.badgeImageUrl && (
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px",
-                                background: "rgba(0, 0, 0, 0.4)",
-                                padding: "8px 10px",
-                                borderRadius: "8px",
-                                marginBottom: "10px",
-                                border: "1px solid rgba(17, 181, 187, 0.35)",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "48px",
-                                  height: "44px",
-                                  background: "rgba(255, 255, 255, 0.04)",
-                                  borderRadius: "6px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  overflow: "hidden",
-                                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                                  flexShrink: 0,
-                                  padding: "2px",
-                                }}
-                              >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={selectedLayerData.badgeImageUrl}
-                                  alt="Active Badge Sticker"
-                                  style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                                />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: "11px", fontWeight: 700, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {selectedLayerData.badgeStyle
-                                    ? OFFER_BADGE_PRESETS.find((p) => p.id === selectedLayerData.badgeStyle)?.name || "Custom Uploaded Sticker"
-                                    : "Custom Badge Graphic"}
-                                </div>
-                                <label style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "10px", color: "#cbd5e1", marginTop: "4px", cursor: "pointer" }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedLayerData.overlayText !== false}
-                                    onChange={(e) => updateCurrentLayer(selectedLayer, { overlayText: e.target.checked })}
-                                    style={{ accentColor: "#11B5BB", cursor: "pointer" }}
-                                  />
-                                  Overlay discount text on badge
-                                </label>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateCurrentLayer(selectedLayer, {
-                                    badgeImageUrl: undefined,
-                                    badgeStyle: undefined,
-                                    shape: "origami",
-                                  })
-                                }
-                                className="ste-btn ste-btn--secondary ste-btn--sm"
-                                style={{
-                                  padding: "4px 8px",
-                                  fontSize: "10px",
-                                  fontWeight: 700,
-                                  color: "#f87171",
-                                  border: "1px solid rgba(239, 68, 68, 0.4)",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                }}
-                                title="Remove sticker graphic and revert to vector shape"
-                              >
-                                <FaTrash style={{ fontSize: "9px" }} /> Reset
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Upload Custom Sticker Graphic Button & URL Picker */}
-                          <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
-                            <label
-                              className="ste-btn ste-btn--secondary"
-                              style={{
-                                flex: 1,
-                                padding: "6px 10px",
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "6px",
-                                background: "rgba(17, 181, 187, 0.15)",
-                                borderColor: "rgba(17, 181, 187, 0.4)",
-                                color: "#ffffff",
-                                cursor: "pointer",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              <FaUpload style={{ fontSize: "10px", color: "#11B5BB" }} /> Upload Custom Sticker
-                              <input
-                                type="file"
-                                accept="image/png,image/svg+xml,image/jpeg,image/webp"
-                                onChange={handleOfferBadgeImageUpload}
-                                style={{ display: "none" }}
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => setBadgeUrlPromptOpen(!badgeUrlPromptOpen)}
-                              className="ste-btn ste-btn--secondary"
-                              style={{
-                                padding: "6px 10px",
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                borderRadius: "6px",
-                                color: badgeUrlPromptOpen ? "#11B5BB" : "#cbd5e1",
-                                borderColor: badgeUrlPromptOpen ? "#11B5BB" : "rgba(255,255,255,0.12)",
-                              }}
-                              title="Enter image URL"
-                            >
-                              <FaImage style={{ fontSize: "10px" }} /> URL
-                            </button>
-                          </div>
-
-                          {badgeUrlPromptOpen && (
-                            <div style={{ display: "flex", gap: "4px", marginBottom: "10px" }}>
-                              <input
-                                type="text"
-                                placeholder="https://.../sticker.png or data:image/..."
-                                value={badgeUrlInput}
-                                onChange={(e) => setBadgeUrlInput(e.target.value)}
-                                className="ste-input"
-                                style={{ fontSize: "11px", padding: "4px 8px", flex: 1 }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (badgeUrlInput.trim()) {
-                                    updateCurrentLayer(selectedLayer, {
-                                      badgeImageUrl: badgeUrlInput.trim(),
-                                      badgeStyle: "custom_url",
-                                      shape: "sticker",
-                                    });
-                                    setBadgeUrlPromptOpen(false);
-                                    setBadgeUrlInput("");
-                                    toast.success("Badge graphic URL applied!");
-                                  }
-                                }}
-                                className="ste-btn ste-btn--primary ste-btn--sm"
-                                style={{ padding: "4px 10px", fontSize: "11px", whiteSpace: "nowrap" }}
-                              >
-                                Apply
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Preset Badges & Stickers Gallery Header */}
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                            <span className="ste-sublabel" style={{ margin: 0, fontWeight: 700, color: "#cbd5e1" }}>
-                              Choose Badge Sticker Preset ({OFFER_BADGE_PRESETS.length} Designs)
-                            </span>
-                          </div>
-
-                          {/* Preset Stickers Gallery Grid */}
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "repeat(3, 1fr)",
-                              gap: "6px",
-                              maxHeight: "200px",
-                              overflowY: "auto",
-                              paddingRight: "2px",
-                            }}
-                          >
-                            {OFFER_BADGE_PRESETS.map((preset) => {
-                              const isSelected =
-                                selectedLayerData.badgeImageUrl === preset.dataUrl || selectedLayerData.badgeStyle === preset.id;
-                              return (
-                                <button
-                                  key={preset.id}
-                                  type="button"
-                                  onClick={() => {
-                                    updateCurrentLayer(selectedLayer, {
-                                      badgeImageUrl: preset.dataUrl,
-                                      badgeStyle: preset.id,
-                                      shape: "sticker",
-                                    });
-                                  }}
-                                  style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    padding: "6px 4px",
-                                    borderRadius: "6px",
-                                    border: isSelected ? "2px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.12)",
-                                    background: isSelected ? "rgba(17, 181, 187, 0.22)" : "rgba(0, 0, 0, 0.35)",
-                                    cursor: "pointer",
-                                    transition: "all 0.15s ease",
-                                    position: "relative",
-                                    overflow: "hidden",
-                                  }}
-                                  title={preset.name}
-                                >
-                                  {isSelected && (
-                                    <span
-                                      style={{
-                                        position: "absolute",
-                                        top: "2px",
-                                        right: "2px",
-                                        width: "14px",
-                                        height: "14px",
-                                        borderRadius: "50%",
-                                        background: "#11B5BB",
-                                        color: "#051419",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "8px",
-                                        fontWeight: 900,
-                                        zIndex: 2,
-                                      }}
-                                    >
-                                      ✓
-                                    </span>
-                                  )}
-                                  <div
-                                    style={{
-                                      width: "100%",
-                                      height: "38px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      padding: "2px",
-                                    }}
-                                  >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={preset.dataUrl}
-                                      alt={preset.name}
-                                      style={{ maxWidth: "90%", maxHeight: "100%", objectFit: "contain" }}
-                                    />
-                                  </div>
-                                  <span
-                                    style={{
-                                      fontSize: "9px",
-                                      fontWeight: isSelected ? 700 : 500,
-                                      color: isSelected ? "#ffffff" : "#94a3b8",
-                                      marginTop: "3px",
-                                      textAlign: "center",
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      width: "100%",
-                                    }}
-                                  >
-                                    {preset.name}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Typography & Formatting Controls */}
-                      <div className="ste-field-group">
-                        <label className="ste-label">Typography &amp; Style</label>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "6px" }}>
-                          <div>
-                            <span className="ste-sublabel">Font Family</span>
-                            <select
-                              value={selectedLayerData.font || "Arial"}
-                              onChange={(e) => updateCurrentLayer(selectedLayer, { font: e.target.value })}
-                              className="ste-select"
-                              style={{ fontSize: "11px" }}
-                            >
-                              <option value="Arial">Arial (Clean Sans)</option>
-                              <option value="Montserrat">Montserrat (Modern)</option>
-                              <option value="Poppins">Poppins (Friendly)</option>
-                              <option value="Inter">Inter (Sharp UI)</option>
-                              <option value="Oswald">Oswald (Bold Promo)</option>
-                              <option value="Impact">Impact (Sale Poster)</option>
-                              <option value="Georgia">Georgia (Serif)</option>
-                              <option value="Trebuchet MS">Trebuchet MS</option>
-                              <option value="Courier New">Courier (Mono)</option>
-                            </select>
-                          </div>
-                          <div>
-                            <span className="ste-sublabel">Style &amp; Case</span>
-                            <div style={{ display: "flex", gap: "4px" }}>
-                              <button
-                                type="button"
-                                onClick={() => updateCurrentLayer(selectedLayer, { fontWeight: selectedLayerData.fontWeight === "normal" ? "bold" : "normal" })}
-                                className={`ste-btn ste-btn--secondary ste-btn--sm ${selectedLayerData.fontWeight !== "normal" ? "active" : ""}`}
-                                style={{ flex: 1, padding: "5px 2px", fontWeight: 800, justifyContent: "center" }}
-                                title="Bold"
-                              >
-                                B
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateCurrentLayer(selectedLayer, { fontStyle: selectedLayerData.fontStyle === "italic" ? "normal" : "italic" })}
-                                className={`ste-btn ste-btn--secondary ste-btn--sm ${selectedLayerData.fontStyle === "italic" ? "active" : ""}`}
-                                style={{ flex: 1, padding: "5px 2px", fontStyle: "italic", justifyContent: "center" }}
-                                title="Italic"
-                              >
-                                I
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const cur = selectedLayerData.text || "";
-                                  const isUpper = cur === cur.toUpperCase();
-                                  updateCurrentLayer(selectedLayer, { text: isUpper ? cur.toLowerCase() : cur.toUpperCase() });
-                                }}
-                                className="ste-btn ste-btn--secondary ste-btn--sm"
-                                style={{ flex: 1, padding: "5px 2px", fontSize: "10px", fontWeight: 700, justifyContent: "center" }}
-                                title="Toggle UPPERCASE / lowercase"
-                              >
-                                AA
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Dedicated Text Alignment Control in Inspector */}
-                        <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                            <span className="ste-sublabel" style={{ fontWeight: 700, color: "#11B5BB" }}>
-                              Text Alignment
-                            </span>
-                            <span style={{ fontSize: "10px", color: "#38bdf8", fontWeight: 700, textTransform: "capitalize" }}>
-                              {selectedLayerData.textAlign || "center"}
-                            </span>
-                          </div>
-                          <div style={{ display: "flex", gap: "6px" }}>
-                            <button
-                              type="button"
-                              onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "left" })}
-                              className={`ste-btn ste-btn--sm ${selectedLayerData.textAlign === "left" ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                              style={{ flex: 1, padding: "5px 4px", fontSize: "11px", fontWeight: 600, justifyContent: "center", gap: "5px" }}
-                              title="Align Text to Left"
-                            >
-                              <FaAlignLeft size={11} /> Left
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "center" })}
-                              className={`ste-btn ste-btn--sm ${(!selectedLayerData.textAlign || selectedLayerData.textAlign === "center") ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                              style={{ flex: 1.3, padding: "5px 4px", fontSize: "11px", fontWeight: 700, justifyContent: "center", gap: "5px" }}
-                              title="Align Text to Center (Text Center Option)"
-                            >
-                              <FaAlignCenter size={11} /> Center
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => updateCurrentLayer(selectedLayer, { textAlign: "right" })}
-                              className={`ste-btn ste-btn--sm ${selectedLayerData.textAlign === "right" ? "ste-btn--primary" : "ste-btn--secondary"}`}
-                              style={{ flex: 1, padding: "5px 4px", fontSize: "11px", fontWeight: 600, justifyContent: "center", gap: "5px" }}
-                              title="Align Text to Right"
-                            >
-                              <FaAlignRight size={11} /> Right
-                            </button>
-                          </div>
-                        </div>
+                          <FaAlignCenter size={9} /> Center H
+                        </button>
                       </div>
-                    </>
-                  )}
-
-                  {/* Position & Scale with Synchronized Number Inputs */}
-                  <div className="ste-field-group">
-                    <label className="ste-label">Coordinates &amp; Size</label>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
-                          <span className="ste-sublabel">X Position</span>
-                          <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>{Math.round(selectedLayerData.x * 100)}%</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div className="space-y-2">
+                        <div>
+                          <div className="flex justify-between text-xs text-slate-500 mb-1">
+                            <span>Horizontal (X)</span>
+                            <span className="font-mono font-bold text-slate-700">{Math.round(selectedLayerData.x * 100)}%</span>
+                          </div>
                           <input
                             type="range"
                             min="2"
                             max="98"
                             value={Math.round(selectedLayerData.x * 100)}
                             onChange={(e) => updateCurrentLayer(selectedLayer, { x: Number(e.target.value) / 100 })}
-                            style={{ flex: 1 }}
-                          />
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={Math.round(selectedLayerData.x * 100)}
-                            onChange={(e) => updateCurrentLayer(selectedLayer, { x: Math.max(0, Math.min(100, Number(e.target.value))) / 100 })}
-                            className="ste-input"
-                            style={{ width: "48px", padding: "3px 4px", fontSize: "11px", textAlign: "center" }}
+                            className="w-full accent-slate-900"
                           />
                         </div>
-                      </div>
-
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
-                          <span className="ste-sublabel">Y Position</span>
-                          <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>{Math.round(selectedLayerData.y * 100)}%</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <div>
+                          <div className="flex justify-between text-xs text-slate-500 mb-1">
+                            <span>Vertical (Y)</span>
+                            <span className="font-mono font-bold text-slate-700">{Math.round(selectedLayerData.y * 100)}%</span>
+                          </div>
                           <input
                             type="range"
                             min="2"
                             max="98"
                             value={Math.round(selectedLayerData.y * 100)}
                             onChange={(e) => updateCurrentLayer(selectedLayer, { y: Number(e.target.value) / 100 })}
-                            style={{ flex: 1 }}
-                          />
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={Math.round(selectedLayerData.y * 100)}
-                            onChange={(e) => updateCurrentLayer(selectedLayer, { y: Math.max(0, Math.min(100, Number(e.target.value))) / 100 })}
-                            className="ste-input"
-                            style={{ width: "48px", padding: "3px 4px", fontSize: "11px", textAlign: "center" }}
+                            className="w-full accent-slate-900"
                           />
                         </div>
                       </div>
+                    </div>
 
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
-                          <span className="ste-sublabel">Scale / Size</span>
-                          <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>{selectedLayerData.size}%</span>
+                    {/* Size & Box Width */}
+                    <div className="ste-card-field">
+                      <div className="flex justify-between items-center text-xs text-slate-500 mb-1">
+                        <label className="ste-field-label mb-0">Scale / Size</label>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => updateCurrentLayer(selectedLayer, { size: Math.max(1, Number((selectedLayerData.size - 1).toFixed(1))) })}
+                            className="w-5 h-5 flex items-center justify-center bg-slate-100 rounded text-slate-700 font-bold hover:bg-slate-200 text-xs"
+                            title="Scale Down"
+                          >
+                            -
+                          </button>
+                          <span className="font-mono font-bold text-slate-800 text-xs min-w-[36px] text-center">{selectedLayerData.size}%</span>
+                          <button
+                            type="button"
+                            onClick={() => updateCurrentLayer(selectedLayer, { size: Math.min(100, Number((selectedLayerData.size + 1).toFixed(1))) })}
+                            className="w-5 h-5 flex items-center justify-center bg-slate-100 rounded text-slate-700 font-bold hover:bg-slate-200 text-xs"
+                            title="Scale Up"
+                          >
+                            +
+                          </button>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="100"
+                        step="0.5"
+                        value={selectedLayerData.size}
+                        onChange={(e) => updateCurrentLayer(selectedLayer, { size: Number(e.target.value) })}
+                        className="w-full accent-slate-900"
+                      />
+                    </div>
+
+                    {/* Text Layer Properties */}
+                    {selectedLayer !== "product" && selectedLayer !== "logo" && (
+                      <>
+                        <div className="ste-card-field">
+                          <label className="ste-field-label">Text Content</label>
+                          <textarea
+                            rows={2}
+                            value={selectedLayerData.text || ""}
+                            onChange={(e) => updateCurrentLayer(selectedLayer, { text: e.target.value })}
+                            className="ste-input-light text-xs font-medium"
+                          />
+                        </div>
+
+                        <div className="ste-card-field">
+                          <label className="ste-field-label">Typography &amp; Color</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={selectedLayerData.fontColor || "#ffffff"}
+                              onChange={(e) => updateCurrentLayer(selectedLayer, { fontColor: e.target.value })}
+                              className="w-9 h-8 rounded border border-slate-200 cursor-pointer"
+                            />
+                            <select
+                              value={selectedLayerData.font || "Inter"}
+                              onChange={(e) => updateCurrentLayer(selectedLayer, { font: e.target.value })}
+                              className="ste-select-light flex-1 text-xs"
+                            >
+                              <option value="Inter">Inter Clean</option>
+                              <option value="Arial">Arial Bold</option>
+                              <option value="Montserrat">Montserrat</option>
+                              <option value="Impact">Impact Punch</option>
+                              <option value="Georgia">Georgia Classic</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Shape Background */}
+                        <div className="ste-card-field">
+                          <label className="ste-field-label">Card / Badge Shape</label>
+                          <select
+                            value={selectedLayerData.shape || "none"}
+                            onChange={(e) => updateCurrentLayer(selectedLayer, { shape: e.target.value as any })}
+                            className="ste-select-light text-xs"
+                          >
+                            <option value="none">None (Plain Text)</option>
+                            <option value="origami">3D Folded Origami</option>
+                            <option value="rounded">Rounded Box</option>
+                            <option value="pill">Pill Shape</option>
+                            <option value="circle">Circle Badge</option>
+                            <option value="rect">Rectangle</option>
+                          </select>
+
+                          {selectedLayerData.shape && selectedLayerData.shape !== "none" && (
+                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Badge Fill:</span>
+                              <input
+                                type="color"
+                                value={selectedLayerData.bgColor || "#ffc700"}
+                                onChange={(e) => updateCurrentLayer(selectedLayer, { bgColor: e.target.value })}
+                                className="w-8 h-7 rounded border border-slate-200 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={selectedLayerData.bgColor || "#ffc700"}
+                                onChange={(e) => updateCurrentLayer(selectedLayer, { bgColor: e.target.value })}
+                                className="ste-input-light text-[11px] uppercase font-mono py-1 px-1.5 flex-1"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Media Upload for Product or Logo */}
+                    {selectedLayer === "product" && (
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Replace Product Photo</label>
+                        <label className="ste-upload-dropzone">
+                          <FaUpload className="text-slate-400" size={16} />
+                          <span className="text-xs font-semibold text-slate-700">Upload New Photo</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleUploadFile(e, "product")}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    {selectedLayer === "logo" && (
+                      <div className="ste-card-field">
+                        <label className="ste-field-label">Replace Brand Logo</label>
+                        <label className="ste-upload-dropzone">
+                          <FaUpload className="text-slate-400" size={16} />
+                          <span className="text-xs font-semibold text-slate-700">Upload New Logo</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleUploadFile(e, "logo")}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Motion & Entrance Timing */}
+                    <div className="ste-card-field">
+                      <label className="ste-field-label">Motion Animation</label>
+                      <select
+                        value={selectedLayerData.animation || "fade_in"}
+                        onChange={(e) => updateCurrentLayer(selectedLayer, { animation: e.target.value })}
+                        className="ste-select-light text-xs mb-2"
+                      >
+                        <option value="fade_in">Fade In</option>
+                        <option value="slide_up">Slide Up</option>
+                        <option value="slide_down">Slide Down</option>
+                        <option value="slide_left">Slide Left</option>
+                        <option value="slide_right">Slide Right</option>
+                        <option value="zoom_in">Zoom In</option>
+                        <option value="zoom_bounce">Zoom Bounce</option>
+                        <option value="pulse">Pulse Glow</option>
+                        <option value="elastic">Elastic Snap</option>
+                        <option value="none">Static (No Motion)</option>
+                      </select>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-slate-500 text-[11px]">Start: {selectedLayerData.animStart ?? 0.5}s</span>
                           <input
                             type="range"
-                            min="2"
-                            max="90"
-                            value={selectedLayerData.size}
-                            onChange={(e) => updateCurrentLayer(selectedLayer, { size: Number(e.target.value) })}
-                            style={{ flex: 1 }}
-                          />
-                          <input
-                            type="number"
-                            min="1"
-                            max="99"
-                            value={selectedLayerData.size}
-                            onChange={(e) => updateCurrentLayer(selectedLayer, { size: Math.max(1, Math.min(99, Number(e.target.value))) })}
-                            className="ste-input"
-                            style={{ width: "48px", padding: "3px 4px", fontSize: "11px", textAlign: "center" }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* One-Click Center Snapping Buttons */}
-                      <div style={{ display: "flex", gap: "6px", marginTop: "2px" }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            updateCurrentLayer(selectedLayer, { x: 0.50 });
-                            toast.success("Centered horizontally (X: 50%)");
-                          }}
-                          className="ste-btn ste-btn--secondary ste-btn--sm"
-                          style={{
-                            flex: 1,
-                            padding: "5px 6px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            justifyContent: "center",
-                            gap: "5px",
-                            background: Math.round(selectedLayerData.x * 100) === 50 ? "rgba(17, 181, 187, 0.2)" : undefined,
-                            borderColor: Math.round(selectedLayerData.x * 100) === 50 ? "#11B5BB" : undefined,
-                            color: Math.round(selectedLayerData.x * 100) === 50 ? "#38bdf8" : undefined,
-                          }}
-                          title="Snap directly to horizontal center of canvas (X: 50%)"
-                        >
-                          <FaCrosshairs size={10} /> Center X (50%)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            updateCurrentLayer(selectedLayer, { y: 0.50 });
-                            toast.success("Centered vertically (Y: 50%)");
-                          }}
-                          className="ste-btn ste-btn--secondary ste-btn--sm"
-                          style={{
-                            flex: 1,
-                            padding: "5px 6px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            justifyContent: "center",
-                            gap: "5px",
-                            background: Math.round(selectedLayerData.y * 100) === 50 ? "rgba(17, 181, 187, 0.2)" : undefined,
-                            borderColor: Math.round(selectedLayerData.y * 100) === 50 ? "#11B5BB" : undefined,
-                            color: Math.round(selectedLayerData.y * 100) === 50 ? "#38bdf8" : undefined,
-                          }}
-                          title="Snap directly to vertical center of canvas (Y: 50%)"
-                        >
-                          <FaCrosshairs size={10} /> Center Y (50%)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Storesparc 9-Point Quick Alignment Grid + Center Buttons */}
-                    <div style={{ marginTop: "10px", background: "rgba(0,0,0,0.35)", padding: "10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                        <span className="ste-sublabel" style={{ fontWeight: 700, color: "#11B5BB" }}>
-                          Quick Alignment
-                        </span>
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px" }}>
-                        {[
-                          ["↖ TL", 0.15, 0.15],
-                          ["↑ TC", 0.50, 0.15],
-                          ["↗ TR", 0.85, 0.15],
-                          ["← CL", 0.15, 0.50],
-                          ["✦ C", 0.50, 0.50],
-                          ["→ CR", 0.85, 0.50],
-                          ["↙ BL", 0.15, 0.85],
-                          ["↓ BC", 0.50, 0.85],
-                          ["↘ BR", 0.85, 0.85],
-                        ].map(([lbl, ax, ay]) => (
-                          <button
-                            key={lbl as string}
-                            type="button"
-                            className="ste-btn ste-btn--secondary ste-btn--sm"
-                            style={{ padding: "4px", fontSize: "0.7rem", justifyContent: "center" }}
-                            onClick={() => updateCurrentLayer(selectedLayer, { x: ax as number, y: ay as number })}
-                          >
-                            {lbl}
-                          </button>
-                        ))}
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px", marginTop: "6px" }}>
-                        <button
-                          type="button"
-                          className="ste-btn ste-btn--secondary ste-btn--sm"
-                          style={{ fontSize: "10px", justifyContent: "center", padding: "4px" }}
-                          onClick={() => updateCurrentLayer(selectedLayer, { x: 0.5 })}
-                          title="Center Horizontally"
-                        >
-                          Center X
-                        </button>
-                        <button
-                          type="button"
-                          className="ste-btn ste-btn--secondary ste-btn--sm"
-                          style={{ fontSize: "10px", justifyContent: "center", padding: "4px" }}
-                          onClick={() => updateCurrentLayer(selectedLayer, { y: 0.5 })}
-                          title="Center Vertically"
-                        >
-                          Center Y
-                        </button>
-                        <button
-                          type="button"
-                          className="ste-btn ste-btn--secondary ste-btn--sm"
-                          style={{ fontSize: "10px", justifyContent: "center", padding: "4px", color: "#f59e0b" }}
-                          onClick={() => {
-                            const def = DEFAULT_LAYERS[activeRatio][selectedLayer];
-                            if (def) updateCurrentLayer(selectedLayer, { x: def.x, y: def.y, size: def.size });
-                          }}
-                          title="Reset to default coordinates"
-                        >
-                          Reset
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Badges, Shapes & Colors */}
-                  {isTextLayer && (
-                    <>
-                      <div className="ste-field-group">
-                        <label className="ste-label">Badge Shape / Background</label>
-                        <select
-                          value={selectedLayerData.badgeImageUrl ? "sticker" : selectedLayerData.shape || "none"}
-                          onChange={(e) => {
-                            if (e.target.value === "sticker") {
-                              if (!selectedLayerData.badgeImageUrl) {
-                                updateCurrentLayer(selectedLayer, {
-                                  shape: "sticker",
-                                  badgeImageUrl: OFFER_BADGE_PRESETS[0].dataUrl,
-                                  badgeStyle: OFFER_BADGE_PRESETS[0].id,
-                                });
-                              }
-                            } else {
-                              updateCurrentLayer(selectedLayer, {
-                                shape: e.target.value as any,
-                                bgMode: e.target.value === "none" ? "transparent" : "color",
-                                badgeImageUrl: undefined,
-                                badgeStyle: undefined,
-                              });
-                            }
-                          }}
-                          className="ste-select"
-                        >
-                          <option value="sticker">🎨 Custom Sticker / Graphic Badge</option>
-                          <option value="origami">🏷️ 3D Folded Banner (Retail Origami)</option>
-                          <option value="rounded">Rounded Badge (Modern Curved)</option>
-                          <option value="none">No Background Shape (Transparent Text)</option>
-                          <option value="pill">Pill / Capsule</option>
-                          <option value="circle">Circle Badge</option>
-                          <option value="rect">Rectangle</option>
-                          <option value="ribbon">Angled Ribbon / Parallelogram</option>
-                        </select>
-                        <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateCurrentLayer(selectedLayer, {
-                                shape: "none",
-                                bgMode: "transparent",
-                              })
-                            }
-                            className="ste-btn-secondary"
-                            style={{
-                              flex: 1,
-                              padding: "6px 8px",
-                              fontSize: "11px",
-                              fontWeight: 600,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "5px",
-                              background: selectedLayerData.shape === "none" ? "#dc2626" : "#1e293b",
-                              color: "#fff",
-                              borderRadius: "6px",
-                              border: "1px solid #475569",
-                              cursor: "pointer",
-                            }}
-                            title="Remove background from this badge (make it transparent text only)"
-                          >
-                            <FaTrash style={{ fontSize: "10px" }} /> Remove Badge BG
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateCurrentLayer(selectedLayer, {
-                                shape: "rounded",
-                                bgMode: "color",
-                                bgColor: selectedLayerData.bgColor || "#ffc700",
-                              })
-                            }
-                            className="ste-btn-secondary"
-                            style={{
-                              flex: 1,
-                              padding: "6px 8px",
-                              fontSize: "11px",
-                              fontWeight: 600,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "5px",
-                              background: selectedLayerData.shape === "rounded" ? "#0284c7" : "#1e293b",
-                              color: "#fff",
-                              borderRadius: "6px",
-                              border: "1px solid #475569",
-                              cursor: "pointer",
-                            }}
-                            title="Make badge rounded"
-                          >
-                            <FaCheck style={{ fontSize: "10px" }} /> Make Rounded
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Quick Vibrant Retail Swatches Palette */}
-                      <div style={{ marginBottom: "6px" }}>
-                        <span className="ste-sublabel" style={{ display: "block", marginBottom: "4px" }}>Quick Color Swatches</span>
-                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                          {["#ffffff", "#000000", "#ffc700", "#ef4444", "#10b981", "#3b82f6", "#8b5cf6", "#f97316", "#ec4899", "#11b5bb"].map((col) => (
-                            <button
-                              key={col}
-                              type="button"
-                              onClick={() => updateCurrentLayer(selectedLayer, { fontColor: col })}
-                              style={{
-                                width: "19px",
-                                height: "19px",
-                                borderRadius: "4px",
-                                background: col,
-                                border: selectedLayerData.fontColor?.toLowerCase() === col.toLowerCase() ? "2px solid #11b5bb" : "1px solid rgba(255,255,255,0.2)",
-                                cursor: "pointer",
-                              }}
-                              title={`Apply ${col} to Text Color`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="ste-colors-grid">
-                        <div>
-                          <span className="ste-sublabel">Text Color</span>
-                          <input
-                            type="color"
-                            value={selectedLayerData.fontColor || "#ffffff"}
-                            onChange={(e) =>
-                              updateCurrentLayer(selectedLayer, { fontColor: e.target.value })
-                            }
-                            className="ste-color-picker"
+                            min="0"
+                            max={duration}
+                            step="0.1"
+                            value={selectedLayerData.animStart ?? 0.5}
+                            onChange={(e) => updateCurrentLayer(selectedLayer, { animStart: Number(e.target.value) })}
+                            className="w-full accent-slate-900 mt-1"
                           />
                         </div>
                         <div>
-                          <span className="ste-sublabel">Badge BG Color</span>
+                          <span className="text-slate-500 text-[11px]">End: {selectedLayerData.animEnd ?? 1.5}s</span>
                           <input
-                            type="color"
-                            value={selectedLayerData.bgColor || "#ffc700"}
-                            onChange={(e) =>
-                              updateCurrentLayer(selectedLayer, { bgColor: e.target.value })
-                            }
-                            className="ste-color-picker"
+                            type="range"
+                            min="0.1"
+                            max={duration}
+                            step="0.1"
+                            value={selectedLayerData.animEnd ?? 1.5}
+                            onChange={(e) => updateCurrentLayer(selectedLayer, { animEnd: Number(e.target.value) })}
+                            className="w-full accent-slate-900 mt-1"
                           />
                         </div>
-                      </div>
-
-                      <div className="ste-field-group">
-                        <label className="ste-label">Border</label>
-                        <div className="ste-border-row">
-                          <select
-                            value={selectedLayerData.border || "0"}
-                            onChange={(e) =>
-                              updateCurrentLayer(selectedLayer, { border: e.target.value as any })
-                            }
-                            className="ste-select"
-                            style={{ flex: 1 }}
-                          >
-                            <option value="0">No Border</option>
-                            <option value="1">With Border</option>
-                          </select>
-                          <input
-                            type="color"
-                            value={selectedLayerData.borderColor || "#ffffff"}
-                            onChange={(e) =>
-                              updateCurrentLayer(selectedLayer, { borderColor: e.target.value })
-                            }
-                            className="ste-color-picker"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Image Shape, Border Radius & Stroke Controls for Product Image & Logo */}
-                  {(selectedLayer === "product" || selectedLayer === "logo") && (
-                    <div className="ste-field-group" style={{ background: "rgba(17, 181, 187, 0.05)", padding: "12px", borderRadius: "8px", border: "1px solid rgba(17, 181, 187, 0.25)" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                        <label className="ste-label" style={{ margin: 0, color: "#11B5BB", fontWeight: 700 }}>
-                          Image Shape & Curvature
-                        </label>
-                        <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: 700 }}>
-                          {selectedLayerData.shape === "circle" || selectedLayerData.borderRadius === 50 ? "Circle (50%)" : `${selectedLayerData.borderRadius ?? (selectedLayerData.shape === "rounded" ? 16 : 0)}%`}
-                        </span>
-                      </div>
-
-                      {/* Quick Shape Presets */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginBottom: "10px" }}>
-                        {[
-                          { id: "rect", label: "Sharp", icon: "🟩", radius: 0, shape: "rect" },
-                          { id: "subtle", label: "Curved", icon: "🔲", radius: 12, shape: "rounded" },
-                          { id: "card", label: "Rounded", icon: "🔘", radius: 24, shape: "rounded" },
-                          { id: "circle", label: "Circle", icon: "⚪", radius: 50, shape: "circle" },
-                        ].map((preset) => {
-                          const isActive = preset.shape === "circle"
-                            ? selectedLayerData.shape === "circle" || selectedLayerData.borderRadius === 50
-                            : preset.radius === 0
-                            ? (!selectedLayerData.borderRadius || selectedLayerData.borderRadius === 0) && selectedLayerData.shape !== "circle"
-                            : selectedLayerData.borderRadius === preset.radius;
-                          return (
-                            <button
-                              key={preset.id}
-                              type="button"
-                              onClick={() => {
-                                updateCurrentLayer(selectedLayer, {
-                                  shape: preset.shape as any,
-                                  borderRadius: preset.radius,
-                                });
-                              }}
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: "2px",
-                                padding: "6px 4px",
-                                borderRadius: "6px",
-                                border: isActive ? "1.5px solid #11B5BB" : "1px solid rgba(255, 255, 255, 0.12)",
-                                background: isActive ? "rgba(17, 181, 187, 0.2)" : "rgba(255, 255, 255, 0.04)",
-                                color: isActive ? "#ffffff" : "#94a3b8",
-                                fontSize: "10px",
-                                fontWeight: isActive ? 700 : 500,
-                                cursor: "pointer",
-                                transition: "all 0.15s ease",
-                              }}
-                            >
-                              <span style={{ fontSize: "13px" }}>{preset.icon}</span>
-                              <span>{preset.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Corner Radius Slider */}
-                      <div style={{ marginBottom: "10px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                          <span className="ste-sublabel">Corner Radius</span>
-                          <span style={{ fontSize: "10px", color: "#94a3b8" }}>{selectedLayerData.borderRadius ?? (selectedLayerData.shape === "rounded" ? 16 : 0)}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="50"
-                          step="1"
-                          value={selectedLayerData.borderRadius ?? (selectedLayerData.shape === "circle" ? 50 : selectedLayerData.shape === "rounded" ? 16 : 0)}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            updateCurrentLayer(selectedLayer, {
-                              borderRadius: val,
-                              shape: val === 50 ? "circle" : val > 0 ? "rounded" : "rect",
-                            });
-                          }}
-                          className="ste-slider"
-                          style={{ width: "100%" }}
-                        />
-                      </div>
-
-                      {/* Border Stroke & Color */}
-                      <div style={{ marginBottom: "10px" }}>
-                        <span className="ste-sublabel">Border Stroke</span>
-                        <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-                          <select
-                            value={selectedLayerData.borderWidth ?? (selectedLayerData.border === "1" ? 2 : 0)}
-                            onChange={(e) => {
-                              const w = Number(e.target.value);
-                              updateCurrentLayer(selectedLayer, {
-                                borderWidth: w,
-                                border: w > 0 ? "1" : "0",
-                              });
-                            }}
-                            className="ste-select"
-                            style={{ flex: 1 }}
-                          >
-                            <option value="0">None (0px)</option>
-                            <option value="1">Thin (1px)</option>
-                            <option value="2">Medium (2px)</option>
-                            <option value="3">Solid (3px)</option>
-                            <option value="4">Bold (4px)</option>
-                            <option value="6">Thick (6px)</option>
-                          </select>
-                          <input
-                            type="color"
-                            value={selectedLayerData.borderColor || "#ffffff"}
-                            onChange={(e) =>
-                              updateCurrentLayer(selectedLayer, {
-                                borderColor: e.target.value,
-                                border: "1",
-                                borderWidth: selectedLayerData.borderWidth || 2,
-                              })
-                            }
-                            className="ste-color-picker"
-                            title="Border Stroke Color"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Drop Shadow Toggle */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <span className="ste-sublabel" style={{ margin: 0 }}>Drop Shadow</span>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(selectedLayerData.shadow)}
-                          onChange={(e) => updateCurrentLayer(selectedLayer, { shadow: e.target.checked })}
-                          style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "#11B5BB" }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Animation & Speed */}
-                  <div className="ste-field-group">
-                    <label className="ste-label">Entry Motion</label>
-                    <select
-                      value={selectedLayerData.animation || "fade_in"}
-                      onChange={(e) =>
-                        updateCurrentLayer(selectedLayer, { animation: e.target.value })
-                      }
-                      className="ste-select"
-                    >
-                      <option value="fade_in">Fade In</option>
-                      <option value="fade_out">Fade Out</option>
-                      <option value="slide_up">Slide Up</option>
-                      <option value="slide_down">Slide Down</option>
-                      <option value="slide_left">Slide Left</option>
-                      <option value="slide_right">Slide Right</option>
-                      <option value="zoom_in">Zoom In</option>
-                      <option value="zoom_bounce">Zoom Bounce</option>
-                      <option value="pulse">Pulse Glow</option>
-                      <option value="float">Gentle Float</option>
-                      <option value="shake">Shake Alert</option>
-                      <option value="rotate">Rotation Entry</option>
-                      <option value="elastic">Elastic Snap</option>
-                      <option value="fade_up">Fade Up</option>
-                      <option value="none">Static (No Animation)</option>
-                    </select>
-
-                    <div className="ste-timing-row">
-                      <div>
-                        <span className="ste-sublabel">Start (s)</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max="20"
-                          step="0.1"
-                          value={selectedLayerData.animStart ?? 0.5}
-                          onChange={(e) =>
-                            updateCurrentLayer(selectedLayer, {
-                              animStart: Number(e.target.value),
-                            })
-                          }
-                          className="ste-input"
-                        />
-                      </div>
-                      <div>
-                        <span className="ste-sublabel">End (s)</span>
-                        <input
-                          type="number"
-                          min="0.1"
-                          max="20"
-                          step="0.1"
-                          value={selectedLayerData.animEnd ?? 1.5}
-                          onChange={(e) =>
-                            updateCurrentLayer(selectedLayer, {
-                              animEnd: Number(e.target.value),
-                            })
-                          }
-                          className="ste-input"
-                        />
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : selectedDecorId && decorations.find((d) => d.id === selectedDecorId) ? (
-                (() => {
-                  const decor = decorations.find((d) => d.id === selectedDecorId)!;
-                  return (
-                    <div className="ste-inspector-controls">
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "rgba(0,0,0,0.35)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)", gap: "8px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 800, color: "#11B5BB", letterSpacing: "0.03em" }}>
-                          STICKER / IMAGE
-                        </span>
+                ) : (
+                  <div className="py-6 px-2 text-center">
+                    <FaLayerGroup size={22} className="mx-auto mb-2 text-slate-400" />
+                    <p className="text-xs font-bold text-slate-800">Select an Element to Edit</p>
+                    <p className="text-[11px] text-slate-400 mb-3">Choose any layer below or click directly on the canvas:</p>
+                    <div className="grid grid-cols-2 gap-1.5 text-left">
+                      {([
+                        { key: "product", label: "Product Photo" },
+                        { key: "discount", label: "Offer Badge" },
+                        { key: "headline", label: "Headline" },
+                        { key: "description", label: "Description" },
+                        { key: "price", label: "Deal Price" },
+                        { key: "oldPrice", label: "Old Price" },
+                        { key: "cta", label: "CTA Button" },
+                        { key: "validity", label: "Validity" },
+                        { key: "logo", label: "Brand Logo" },
+                        { key: "footer", label: "Legal Footer" },
+                      ] as { key: LayerKey; label: string }[]).map((item) => (
                         <button
+                          key={item.key}
                           type="button"
-                          onClick={() => {
-                            setDecorations((prev) => prev.filter((d) => d.id !== selectedDecorId));
-                            setSelectedDecorId(null);
-                            showToast("🗑️ Sticker deleted");
-                          }}
-                          style={{
-                            background: "rgba(239, 68, 68, 0.2)",
-                            border: "1px solid #ef4444",
-                            color: "#ef4444",
-                            borderRadius: "6px",
-                            padding: "3px 8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
+                          onClick={() => setSelectedLayer(item.key)}
+                          className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 hover:text-slate-900 transition-colors"
                         >
-                          <FaTrash size={10} /> Delete
+                          <span className="truncate">{item.label}</span>
                         </button>
-                      </div>
-
-                      {/* Preview Image */}
-                      <div style={{ display: "flex", justifyContent: "center", padding: "12px", background: "#051419", borderRadius: "8px", border: "1px solid #163B45" }}>
-                        <img src={decor.url} alt="Sticker" style={{ maxHeight: "70px", maxWidth: "100%", objectFit: "contain" }} />
-                      </div>
-
-                      {/* Position X */}
-                      <div className="ste-field-group">
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <label className="ste-label">Horizontal Position (X)</label>
-                          <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>{Math.round(decor.x * 100)}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={Math.round(decor.x * 100)}
-                          onChange={(e) => {
-                            const val = Number(e.target.value) / 100;
-                            setDecorations((prev) => prev.map((d) => d.id === decor.id ? { ...d, x: val } : d));
-                          }}
-                          className="ste-range"
-                        />
-                      </div>
-
-                      {/* Position Y */}
-                      <div className="ste-field-group">
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <label className="ste-label">Vertical Position (Y)</label>
-                          <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>{Math.round(decor.y * 100)}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={Math.round(decor.y * 100)}
-                          onChange={(e) => {
-                            const val = Number(e.target.value) / 100;
-                            setDecorations((prev) => prev.map((d) => d.id === decor.id ? { ...d, y: val } : d));
-                          }}
-                          className="ste-range"
-                        />
-                      </div>
-
-                      {/* Size / Scale */}
-                      <div className="ste-field-group">
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <label className="ste-label">Size / Scale</label>
-                          <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>{decor.size}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="5"
-                          max="60"
-                          value={decor.size}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setDecorations((prev) => prev.map((d) => d.id === decor.id ? { ...d, size: val } : d));
-                          }}
-                          className="ste-range"
-                        />
-                      </div>
-
-                      {/* Sticker Corner Radius Slider */}
-                      <div className="ste-field-group">
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <label className="ste-label">Corner Radius / Curve</label>
-                          <span style={{ fontSize: "11px", color: "#11B5BB", fontWeight: 700 }}>{decor.borderRadius || 0}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="50"
-                          value={decor.borderRadius || 0}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setDecorations((prev) => prev.map((d) => d.id === decor.id ? { ...d, borderRadius: val, shape: val === 50 ? "circle" : val > 0 ? "rounded" : "rect" } : d));
-                          }}
-                          className="ste-range"
-                        />
-                      </div>
-
-                      {/* Center button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDecorations((prev) => prev.map((d) => d.id === decor.id ? { ...d, x: 0.5, y: 0.5 } : d));
-                          showToast("🎯 Centered on canvas");
-                        }}
-                        className="ste-btn ste-btn--secondary"
-                        style={{ width: "100%", justifyContent: "center" }}
-                      >
-                        <FaCrosshairs /> Center Sticker (50%, 50%)
-                      </button>
+                      ))}
                     </div>
-                  );
-                })()
-              ) : (
-                <div className="ste-empty-inspector">
-                  <FaEye />
-                  <p>Click any layer or sticker on the canvas to inspect and edit its properties.</p>
-                </div>
-              )}
-            </div>
-          </aside>
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
         </div>
       )}
 
-      {/* ══════════════ MODAL: CREATE NEW VIDEO TEMPLATE ══════════════ */}
+      {/* ══════════════ MODAL: CREATE TEMPLATE ══════════════ */}
       {showCreateModal && (
         <div className="ste-modal-overlay">
           <div className="ste-modal">
             <div className="ste-modal__header">
               <div className="ste-modal__title-wrap">
-                <FaPlus className="ste-accent-icon" />
-                <h3>Create New Video Template</h3>
+                <FaPlus className="text-slate-700" />
+                <h3 className="font-bold text-slate-900 text-lg">Create New Video Template</h3>
               </div>
-              <button
-                className="ste-modal__close"
-                onClick={() => setShowCreateModal(false)}
-                type="button"
-              >
+              <button className="ste-modal__close" onClick={() => setShowCreateModal(false)} type="button">
                 <FaXmark />
               </button>
             </div>
-
             <form onSubmit={handleConfirmCreateTemplate}>
-              <div className="ste-modal__body" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {/* Template ID info */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(17,181,187,0.1)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(17,181,187,0.25)" }}>
-                  <span style={{ fontSize: "0.82rem", color: "#cbd5e1" }}>Assigned Sequential ID:</span>
-                  <span style={{ fontWeight: 800, color: "#11B5BB", fontSize: "0.95rem", fontFamily: "monospace" }}>
-                    Template #{getNextTemplateId()}
-                  </span>
-                </div>
-
-                {/* Template Name */}
-                <div className="ste-field-group">
-                  <label className="ste-label">Template Name *</label>
+              <div className="ste-modal__body space-y-4">
+                <div className="ste-card-field">
+                  <label className="ste-field-label">Template Name *</label>
                   <input
                     type="text"
-                    className="ste-input"
-                    placeholder="Enter template name (e.g. Weekend Flash Offer)"
+                    className="ste-input-light"
+                    placeholder="Weekend Flash Sale Promo"
                     value={newTplName}
                     onChange={(e) => setNewTplName(e.target.value)}
                     autoFocus
                     required
                   />
-                  <span className="ste-sublabel">Give your template a recognizable name for future editing and scheduling.</span>
                 </div>
-
-                {/* Duration */}
-                <div className="ste-field-group">
-                  <label className="ste-label">Video Duration (Seconds) *</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
-                    {[5, 8, 10, 15, 30].map((sec) => (
+                <div className="ste-card-field">
+                  <label className="ste-field-label">Duration</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {[5, 8, 10, 15, 30].map((s) => (
                       <button
-                        key={sec}
+                        key={s}
                         type="button"
-                        className={`ste-ratio-chip ${newTplDuration === sec ? "ste-ratio-chip--active" : ""}`}
-                        style={{ padding: "8px 0", textAlign: "center", fontSize: "0.8rem", justifyContent: "center" }}
-                        onClick={() => setNewTplDuration(sec)}
+                        onClick={() => setNewTplDuration(s)}
+                        className={`py-1.5 text-xs font-bold rounded-lg border ${
+                          newTplDuration === s ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200"
+                        }`}
                       >
-                        {sec}s
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "6px" }}>
-                    <span className="ste-sublabel">Or Custom Duration:</span>
-                    <input
-                      type="number"
-                      min="3"
-                      max="60"
-                      className="ste-input"
-                      style={{ width: "100px" }}
-                      value={newTplDuration}
-                      onChange={(e) => setNewTplDuration(Math.max(1, Number(e.target.value)))}
-                    />
-                    <span className="ste-sublabel">sec</span>
-                  </div>
-                </div>
-
-                {/* Aspect Ratio */}
-                <div className="ste-field-group">
-                  <label className="ste-label">Initial Aspect Ratio</label>
-                  <div className="ste-ratio-chips" style={{ width: "100%", justifyContent: "space-between" }}>
-                    {(["9:16", "16:9", "1:1", "4:5"] as AspectRatio[]).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        className={`ste-ratio-chip ${newTplRatio === r ? "ste-ratio-chip--active" : ""}`}
-                        onClick={() => setNewTplRatio(r)}
-                      >
-                        {r} {r === "9:16" ? "📱" : r === "16:9" ? "📺" : r === "1:1" ? "⏹️" : "📸"}
+                        {s}s
                       </button>
                     ))}
                   </div>
                 </div>
-
-                {/* Offer Type */}
-                <div className="ste-field-group">
-                  <label className="ste-label">Offer Type</label>
-                  <select
-                    className="ste-select"
-                    value={selectedOfferTypeId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === "__NEW__") {
-                        const newName = window.prompt("Enter new Offer Type Name (e.g. Flash Sale):");
-                        if (newName && newName.trim()) {
-                          const newId = newName.trim().toUpperCase().replace(/[^A-Z0-9]/g, "_");
-                          handleCreateOfferTypeInline(newName.trim(), newId);
-                        }
-                        return;
-                      }
-                      setSelectedOfferTypeId(val);
-                      const found = offerTypesList.find(o => o.offertypeId === val);
-                      const name = found ? found.offertypename : val;
-                      setSelectedOfferTypeName(name);
-                      setNewTplOfferType(name);
-                    }}
-                  >
-                    {/* Fallback option if current selectedOfferTypeId is not yet in offerTypesList */}
-                    {selectedOfferTypeId && !offerTypesList.some(o => o.offertypeId === selectedOfferTypeId) && (
-                      <option value={selectedOfferTypeId}>
-                        {selectedOfferTypeName || selectedOfferTypeId} ({selectedOfferTypeId})
-                      </option>
-                    )}
-                    {offerTypesList.length > 0 ? (
-                      offerTypesList.map((ot) => (
-                        <option key={ot.offertypeId} value={ot.offertypeId}>
-                          {ot.offertypename} ({ot.offertypeId})
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>No offer types created yet</option>
-                    )}
-                    <option value="__NEW__">+ Create New Offer Type...</option>
-                  </select>
-                </div>
-
-                {/* Live Animated Preview in Creation Modal */}
-                <div className="ste-field-group">
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                    <label className="ste-label" style={{ marginBottom: 0 }}>
-                      Live Animation &amp; Layout Preview ({newTplRatio})
-                    </label>
-                    <span style={{ fontSize: "0.75rem", color: "#11B5BB", fontWeight: 700 }}>
-                      {newTplDuration}s · {ASPECT_SPECS[newTplRatio].label}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "180px",
-                      background: "#030c0f",
-                      borderRadius: "8px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                      border: "1px solid rgba(17, 181, 187, 0.3)",
-                      position: "relative",
-                    }}
-                  >
-                    <CreateModalPreviewCanvas
-                      ratio={newTplRatio}
-                      duration={newTplDuration}
-                      offerType={newTplOfferType}
-                      templateName={newTplName || "New Video Template"}
-                    />
-                  </div>
+                <div className="h-44 bg-slate-950 rounded-xl overflow-hidden border border-slate-200">
+                  <CreateModalPreviewCanvas
+                    ratio={newTplRatio}
+                    duration={newTplDuration}
+                    offerType={newTplOfferType}
+                    templateName={newTplName || "New Template"}
+                  />
                 </div>
               </div>
-
               <div className="ste-modal__actions">
-                <button
-                  type="button"
-                  className="ste-btn ste-btn--secondary"
-                  onClick={() => setShowCreateModal(false)}
-                >
+                <button type="button" className="ste-btn ste-btn--secondary" onClick={() => setShowCreateModal(false)}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="ste-btn ste-btn--accent"
-                >
-                  <FaPlus /> Create Template (ID #{getNextTemplateId()})
+                <button type="submit" className="ste-btn ste-btn--primary">
+                  Create Template
                 </button>
               </div>
             </form>
@@ -8592,7 +3766,7 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         </div>
       )}
 
-      {/* ══════════════ MODAL: LIVE ANIMATED VIDEO TEMPLATE PREVIEW ══════════════ */}
+      {/* ══════════════ MODAL: VIEW PREVIEW ══════════════ */}
       {viewingTemplate && (
         <TemplateViewPreviewModal
           template={viewingTemplate}
@@ -8604,277 +3778,70 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         />
       )}
 
-      {/* ══════════════ MODAL: ADD IMAGE / STICKER BADGE ══════════════ */}
-      {showAddImageModal && (
-        <div className="ste-modal-overlay" onClick={() => setShowAddImageModal(false)}>
-          <div
-            className="ste-modal ste-modal--wide"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "680px" }}
-          >
-            <div className="ste-modal__header">
-              <div className="ste-modal__title-wrap">
-                <FaImage className="ste-accent-icon" />
-                <h3>Add Image / Promotional Sticker Badge</h3>
-              </div>
-              <button
-                className="ste-modal__close"
-                onClick={() => setShowAddImageModal(false)}
-                type="button"
-              >
-                <FaXmark />
-              </button>
-            </div>
-
-            <div className="ste-modal__body" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              {/* Option 1: Upload Custom Image */}
-              <div style={{ background: "rgba(17, 181, 187, 0.08)", border: "1px dashed #11B5BB", padding: "18px", borderRadius: "10px", textAlign: "center" }}>
-                <FaUpload size={24} style={{ color: "#11B5BB", marginBottom: "8px" }} />
-                <h4 style={{ margin: "0 0 6px 0", color: "#ffffff", fontSize: "0.95rem" }}>Upload Custom Image from Computer</h4>
-                <p style={{ margin: "0 0 12px 0", fontSize: "0.80rem", color: "#94a3b8" }}>
-                  Supports transparent PNG logos, stickers, product cutouts, badges, or graphics (PNG, JPG, WebP, SVG).
-                </p>
-                <label className="ste-btn ste-btn--primary" style={{ display: "inline-flex", cursor: "pointer", alignItems: "center", gap: "6px" }}>
-                  <FaUpload size={12} />
-                  <span>Choose Image File</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      showToast("Uploading image...");
-                      try {
-                        const fd = new FormData();
-                        fd.append("file", file);
-                        const res = await fetch("/api/upload", { method: "POST", body: fd });
-                        const data = await res.json();
-                        const finalUrl = data.success && data.url ? data.url : URL.createObjectURL(file);
-                        const newDec: DecorItem = {
-                          id: `decor_${Date.now()}`,
-                          url: finalUrl,
-                          x: 0.5,
-                          y: 0.5,
-                          size: 18,
-                        };
-                        setDecorations((prev) => [...prev, newDec]);
-                        setSelectedDecorId(newDec.id);
-                        setSelectedLayer(null);
-                        setShowAddImageModal(false);
-                        showToast("✨ Custom image added to template! Drag to reposition.");
-                      } catch {
-                        const localUrl = URL.createObjectURL(file);
-                        const newDec: DecorItem = {
-                          id: `decor_${Date.now()}`,
-                          url: localUrl,
-                          x: 0.5,
-                          y: 0.5,
-                          size: 18,
-                        };
-                        setDecorations((prev) => [...prev, newDec]);
-                        setSelectedDecorId(newDec.id);
-                        setSelectedLayer(null);
-                        setShowAddImageModal(false);
-                        showToast("✨ Image added! Drag to reposition.");
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-
-              {/* Option 2: Popular Retail Promo Stickers */}
-              <div>
-                <h4 style={{ margin: "0 0 10px 0", color: "#ffffff", fontSize: "0.90rem", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>🏷️ Ready-to-Use Retail Promotional Stickers &amp; Badges</span>
-                </h4>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
-                  {STICKER_PRESETS.map((sticker, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        const newDec: DecorItem = {
-                          id: `decor_${Date.now()}_${idx}`,
-                          url: sticker.url,
-                          x: 0.5,
-                          y: 0.5,
-                          size: sticker.defaultSize || 18,
-                        };
-                        setDecorations((prev) => [...prev, newDec]);
-                        setSelectedDecorId(newDec.id);
-                        setSelectedLayer(null);
-                        setShowAddImageModal(false);
-                        showToast(`✨ "${sticker.name}" added to template! Drag to reposition.`);
-                      }}
-                      style={{
-                        background: "#081d24",
-                        border: "1px solid rgba(255, 255, 255, 0.12)",
-                        borderRadius: "8px",
-                        padding: "12px 8px",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "8px",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                      className="ste-sticker-card"
-                    >
-                      <img
-                        src={sticker.url}
-                        alt={sticker.name}
-                        style={{ height: "54px", objectFit: "contain" }}
-                      />
-                      <span style={{ fontSize: "0.78rem", color: "#cbd5e1", fontWeight: 600 }}>
-                        {sticker.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="ste-modal__actions">
-              <button
-                type="button"
-                className="ste-btn ste-btn--secondary"
-                onClick={() => setShowAddImageModal(false)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════ MODAL: CONFIRM DELETE TEMPLATE ══════════════ */}
+      {/* ══════════════ MODAL: DELETE CONFIRMATION ══════════════ */}
       {deletingTemplate && (
         <div className="ste-modal-overlay">
           <div className="ste-modal">
             <div className="ste-modal__header">
               <div className="ste-modal__title-wrap">
-                <FaTrash style={{ color: "#ef4444" }} />
-                <h3>Delete Video Template</h3>
+                <FaTrash className="text-rose-600" />
+                <h3 className="font-bold text-slate-900 text-lg">Delete Video Template</h3>
               </div>
-              <button
-                className="ste-modal__close"
-                onClick={() => setDeletingTemplate(null)}
-              >
+              <button className="ste-modal__close" onClick={() => setDeletingTemplate(null)}>
                 <FaXmark />
               </button>
             </div>
             <div className="ste-modal__body">
-              <p style={{ color: "#cbd5e1", margin: 0 }}>
-                Are you sure you want to permanently delete template{" "}
-                <strong style={{ color: "#fff" }}>
-                  "#{deletingTemplate.templateId || 10001} - {deletingTemplate.templateName}"
-                </strong>
-                ? This action cannot be undone.
+              <p className="text-sm text-slate-600">
+                Are you sure you want to permanently delete template <strong className="text-slate-900">"{deletingTemplate.templateName}"</strong>? This action cannot be reversed.
               </p>
             </div>
             <div className="ste-modal__actions">
-              <button
-                className="ste-btn ste-btn--secondary"
-                onClick={() => setDeletingTemplate(null)}
-              >
+              <button className="ste-btn ste-btn--secondary" onClick={() => setDeletingTemplate(null)}>
                 Cancel
               </button>
               <button
-                className="ste-btn"
-                style={{ background: "#dc2626", color: "#fff" }}
-                onClick={() => handleDeleteTemplate(deletingTemplate)}
+                className="ste-btn bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                onClick={async () => {
+                  try {
+                    const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+                    const res = await fetch(`/api/video-template/${deletingTemplate._id}`, {
+                      method: "DELETE",
+                      headers: { Authorization: `Bearer ${token}` },
+                    });
+                    const d = await res.json();
+                    if (d.success) {
+                      showToast("Template deleted!");
+                      setDeletingTemplate(null);
+                      fetchTemplates();
+                    }
+                  } catch {
+                    showToast("Error deleting template");
+                  }
+                }}
               >
-                <FaTrash /> Delete Permanently
+                Delete Permanently
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══════════════ MODAL: RENAME TEMPLATE ══════════════ */}
-      {renamingTemplate && (
-        <div className="ste-modal-overlay">
-          <div className="ste-modal">
-            <div className="ste-modal__header">
-              <div className="ste-modal__title-wrap">
-                <FaPen className="ste-accent-icon" />
-                <h3>Rename Template</h3>
-              </div>
-              <button
-                className="ste-modal__close"
-                onClick={() => setRenamingTemplate(null)}
-              >
-                <FaXmark />
-              </button>
-            </div>
-            <form onSubmit={handleQuickRename}>
-              <div className="ste-modal__body">
-                <div style={{ background: "rgba(17,181,187,0.12)", border: "1px solid rgba(17,181,187,0.3)", borderRadius: "8px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>Template ID:</span>
-                  <span style={{ fontFamily: "monospace", fontWeight: 800, color: "#11B5BB", fontSize: "1rem" }}>
-                    #{renamingTemplate.templateId || 10001}
-                  </span>
-                </div>
-                <div className="ste-field-group">
-                  <label className="ste-label">New Template Name *</label>
-                  <input
-                    type="text"
-                    className="ste-input"
-                    placeholder="Enter template name..."
-                    value={renameInput}
-                    onChange={(e) => setRenameInput(e.target.value)}
-                    autoFocus
-                    required
-                  />
-                  <span className="ste-sublabel">Enter a new recognizable title for this video template.</span>
-                </div>
-              </div>
-              <div className="ste-modal__actions">
-                <button
-                  type="button"
-                  className="ste-btn ste-btn--secondary"
-                  onClick={() => setRenamingTemplate(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="ste-btn ste-btn--accent"
-                  disabled={!renameInput.trim()}
-                >
-                  <FaFloppyDisk /> Save New Name
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════ MODAL: RENDERED VIDEO PREVIEW ══════════════ */}
+      {/* ══════════════ MODAL: VIDEO RENDERED ══════════════ */}
       {renderedVideoUrl && (
         <div className="ste-modal-overlay">
           <div className="ste-modal ste-modal--wide">
             <div className="ste-modal__header">
               <div className="ste-modal__title-wrap">
-                <FaVideo className="ste-accent-icon" />
-                <h3>Video Render Complete!</h3>
+                <FaVideo className="text-emerald-600" />
+                <h3 className="font-bold text-slate-900 text-lg">MP4 Video Render Complete!</h3>
               </div>
-              <button
-                className="ste-modal__close"
-                onClick={() => setRenderedVideoUrl(null)}
-              >
+              <button className="ste-modal__close" onClick={() => setRenderedVideoUrl(null)}>
                 <FaXmark />
               </button>
             </div>
-            <div className="ste-modal__video-wrap">
-              <video
-                src={renderedVideoUrl}
-                controls
-                autoPlay
-                loop
-                className="ste-modal__video"
-              />
+            <div className="ste-modal__video-wrap bg-slate-950 rounded-xl overflow-hidden p-2">
+              <video src={renderedVideoUrl} controls autoPlay loop className="w-full h-80 object-contain rounded-lg" />
             </div>
             <div className="ste-modal__actions">
               <a
@@ -8882,15 +3849,11 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
                 download="storesparc_video.mp4"
                 target="_blank"
                 rel="noreferrer"
-                className="ste-btn ste-btn--accent"
-                style={{ textDecoration: "none" }}
+                className="ste-btn ste-btn--primary"
               >
                 <FaDownload /> Download MP4
               </a>
-              <button
-                className="ste-btn ste-btn--secondary"
-                onClick={() => setRenderedVideoUrl(null)}
-              >
+              <button className="ste-btn ste-btn--secondary" onClick={() => setRenderedVideoUrl(null)}>
                 Close
               </button>
             </div>
@@ -8898,1466 +3861,1096 @@ export default function TemplateEditorView({ onNavigate, initialTemplateId, init
         </div>
       )}
 
-      {/* ── Studio Stylesheet ── */}
+      {/* ── Studio Light Stylesheet ── */}
       <style jsx>{`
-        .ste-root {
+        .ste-root-light {
           display: flex;
           flex-direction: column;
           height: 100%;
           max-height: 100%;
           width: 100%;
-          background: #07171d;
-          color: #f8fafc;
-          font-family: "Inter", system-ui, -apple-system, sans-serif;
+          background: #f8fafc;
+          color: #0f172a;
+          font-family: var(--font-inter, system-ui, -apple-system, sans-serif);
           overflow: hidden;
           box-sizing: border-box;
         }
 
-        /* Topbar */
-        .ste-topbar {
+        /* Top Header */
+        .ste-header-light {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 6px 16px;
-          background: #0b2830;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          gap: 10px;
+          padding: 8px 16px;
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+          gap: 12px;
           flex-shrink: 0;
-          min-height: 52px;
-          height: auto;
-          box-sizing: border-box;
-          flex-wrap: wrap;
+          min-height: 56px;
           z-index: 50;
         }
-        .ste-topbar__left {
+        .ste-header-left {
           display: flex;
           align-items: center;
-          gap: 10px;
-          flex: 1 1 auto;
+          gap: 12px;
           min-width: 0;
-          flex-wrap: wrap;
         }
-        .ste-back-btn {
-          background: rgba(255, 255, 255, 0.08);
-          border: none;
-          color: #94a3b8;
-          width: 36px;
-          height: 36px;
+        .ste-btn-icon-light {
+          width: 32px;
+          height: 32px;
           border-radius: 8px;
-          cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.2s;
-        }
-        .ste-back-btn:hover {
-          background: rgba(255, 255, 255, 0.16);
-          color: #fff;
-        }
-        .ste-title-group {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-shrink: 1;
-          min-width: 0;
-        }
-        .ste-badge {
-          background: #11b5bb;
-          color: #05191e;
-          font-size: 0.65rem;
-          font-weight: 800;
-          letter-spacing: 0.05em;
-          padding: 3px 8px;
-          border-radius: 4px;
-        }
-        .ste-template-name-input {
-          background: rgba(0, 0, 0, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.22);
-          color: #fff;
-          font-size: 0.95rem;
-          font-weight: 700;
-          padding: 6px 30px 6px 12px;
-          border-radius: 8px;
-          outline: none;
-          min-width: 130px; max-width: 220px;
-          transition: all 0.2s;
-        }
-        .ste-template-name-input:hover {
-          border-color: rgba(17, 181, 187, 0.6);
-          background: rgba(0, 0, 0, 0.65);
-        }
-        .ste-template-name-input:focus {
-          background: #051419;
-          border-color: #11b5bb;
-          box-shadow: 0 0 0 2px rgba(17, 181, 187, 0.25);
-        }
-
-        /* Mode Tabs */
-        .ste-mode-tabs {
-          display: flex;
-          background: rgba(0, 0, 0, 0.35);
-          padding: 4px;
-          border-radius: 10px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          gap: 4px;
-        }
-        .ste-mode-tab {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          white-space: nowrap;
-          background: transparent;
-          border: none;
-          color: #94a3b8;
-          font-size: 0.8rem;
-          font-weight: 700;
-          padding: 6px 14px;
-          border-radius: 6px;
+          background: #f1f5f9;
+          border: 1px solid #e2e8f0;
+          color: #475569;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.15s;
         }
-        .ste-mode-tab:hover {
-          color: #fff;
+        .ste-btn-icon-light:hover {
+          background: #e2e8f0;
+          color: #0f172a;
         }
-        .ste-mode-tab.active {
-          background: #11b5bb;
-          color: #07171d;
+        .ste-btn-icon-light.active {
+          background: #0f172a;
+          color: #ffffff;
+          border-color: #0f172a;
         }
-
-        /* Topbar buttons */
-        .ste-topbar__right {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+        .ste-brand-badge {
+          display: none;
         }
-        .ste-btn {
+        .ste-tpl-badge {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          font-size: 0.82rem;
-          font-weight: 700;
-          border-radius: 8px;
-          border: none;
-          cursor: pointer;
-          transition: all 0.2s;
+          gap: 4px;
+          padding: 3px 8px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          flex-shrink: 0;
+          font-variant-numeric: tabular-nums;
         }
-        .ste-btn--sm {
-          padding: 6px 12px;
-          font-size: 0.75rem;
+        .ste-name-input-wrap {
+          display: flex;
+          align-items: center;
+          border-radius: 6px;
+          padding: 3px 8px;
+          transition: all 0.15s;
+          border: 1px solid transparent;
         }
-        .ste-btn--secondary {
-          background: rgba(255, 255, 255, 0.1);
-          color: #fff;
+        .ste-name-input-wrap:hover {
+          background: #f8fafc;
+          border-color: #e2e8f0;
         }
-        .ste-btn--secondary:hover {
-          background: rgba(255, 255, 255, 0.18);
+        .ste-name-input-wrap:focus-within {
+          background: #ffffff;
+          border-color: #cbd5e1;
+          box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.05);
         }
-        .ste-btn--accent {
-          background: linear-gradient(135deg, #f05a28, #dc4b1d);
-          color: #fff;
-          box-shadow: 0 4px 14px rgba(240, 90, 40, 0.3);
-        }
-        .ste-btn--accent:hover {
-          filter: brightness(1.1);
-        }
-        .ste-btn--primary {
-          background: #11b5bb;
-          color: #07171d;
-        }
-        .ste-btn--primary:hover {
-          background: #0ea2a7;
-        }
-        .ste-btn--ghost {
+        .ste-name-input {
           background: transparent;
-          color: #94a3b8;
-        }
-        .ste-btn--ghost:hover {
-          color: #fff;
+          border: none;
+          outline: none;
+          font-weight: 600;
+          color: #0f172a;
+          font-size: 13px;
+          width: 200px;
         }
 
-        /* Workspace Grid */
-        .ste-workspace {
+        /* Segmented Mode Tabs */
+        .ste-tabs-segmented {
+          display: flex;
+          align-items: center;
+          background: #f1f5f9;
+          padding: 3px;
+          border-radius: 8px;
+          gap: 2px;
+          border: 1px solid #e2e8f0;
+        }
+        .ste-tab-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 14px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #64748b;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          transition: all 0.15s;
+          white-space: nowrap;
+        }
+        .ste-tab-pill:hover {
+          color: #0f172a;
+        }
+        .ste-tab-pill.active {
+          background: #ffffff;
+          color: #0f172a;
+          font-weight: 600;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .ste-tab-badge {
+          font-size: 10px;
+          font-weight: 600;
+          padding: 1px 6px;
+          border-radius: 9999px;
+          background: #e2e8f0;
+          color: #475569;
+          line-height: 1.2;
+        }
+        .ste-tab-pill.active .ste-tab-badge {
+          background: #f1f5f9;
+          color: #0f172a;
+        }
+
+        /* Right Actions */
+        .ste-header-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        /* Right Header Action Controls */
+        .ste-hdr-btn-ai {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #ffffff;
+          color: #0f172a;
+          border: 1px solid #cbd5e1;
+          font-weight: 600;
+          font-size: 12px;
+          padding: 6px 13px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .ste-hdr-btn-ai:hover {
+          background: #f8fafc;
+          border-color: #94a3b8;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .ste-hdr-btn-ghost {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #ffffff;
+          color: #334155;
+          border: 1px solid #e2e8f0;
+          font-weight: 600;
+          font-size: 12px;
+          padding: 6px 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .ste-hdr-btn-ghost:hover {
+          background: #f8fafc;
+          color: #0f172a;
+          border-color: #cbd5e1;
+        }
+        .ste-hdr-btn-ghost.playing {
+          background: #0f172a;
+          color: #ffffff;
+          border-color: #0f172a;
+        }
+        .ste-hdr-btn-primary {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #0f172a;
+          color: #ffffff;
+          border: 1px solid #0f172a;
+          font-weight: 600;
+          font-size: 12px;
+          padding: 6px 16px;
+          border-radius: 8px;
+          cursor: pointer;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+          transition: all 0.15s;
+        }
+        .ste-hdr-btn-primary:hover {
+          background: #1e293b;
+          border-color: #1e293b;
+        }
+
+        /* Studio Workspace Layout */
+        .ste-studio-body {
           display: flex;
           flex: 1;
-          height: calc(100% - 52px);
           min-height: 0;
           overflow: hidden;
-          position: relative;
         }
-        .ste-panel {
-          width: 260px;
-          min-width: 260px;
-          max-width: 260px;
-          background: #092027;
-          border-right: 1px solid rgba(255, 255, 255, 0.06);
+
+        /* Left Rail: Section Nav + Section Panel */
+        .ste-left-rail {
+          display: flex;
+          background: #ffffff;
+          border-right: 1px solid #e2e8f0;
+          flex-shrink: 0;
+          transition: all 0.2s ease;
+        }
+        .ste-left-rail.collapsed {
+          width: 60px;
+        }
+        .ste-section-nav {
+          width: 64px;
+          background: #f8fafc;
+          border-right: 1px solid #e2e8f0;
           display: flex;
           flex-direction: column;
-          flex-shrink: 0;
-          height: 100%;
-          min-height: 0;
-          transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-                      min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-                      max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-                      opacity 0.18s ease;
+          align-items: center;
+          padding: 10px 0;
+          gap: 8px;
+        }
+        .ste-section-nav-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          width: 52px;
+          height: 52px;
+          border-radius: 10px;
+          border: none;
+          background: transparent;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.15s;
+          gap: 4px;
+        }
+        .ste-section-nav-item span {
+          font-size: 10px;
+          font-weight: 700;
+        }
+        .ste-section-nav-item:hover {
+          background: #e2e8f0;
+          color: #0f172a;
+        }
+        .ste-section-nav-item.active {
+          background: #0f172a;
+          color: #ffffff;
+          font-weight: 700;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .ste-section-panel {
+          width: 320px;
+          display: flex;
+          flex-direction: column;
+          background: #ffffff;
+          border-right: 1px solid #e2e8f0;
           overflow: hidden;
-          z-index: 5;
         }
-        .ste-panel--collapsed {
-          width: 0 !important;
-          min-width: 0 !important;
-          max-width: 0 !important;
-          border-right: none !important;
-          border-left: none !important;
-          opacity: 0;
-          pointer-events: none;
-        }
-        .ste-panel--inspector {
-          border-right: none;
-          border-left: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .ste-panel__header {
+        .ste-section-panel-header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 10px 14px;
-          height: 46px;
-          box-sizing: border-box;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-          color: #11b5bb;
-          font-size: 0.85rem;
-          font-weight: 700;
-          flex-shrink: 0;
-          white-space: nowrap;
+          padding: 12px 16px;
+          border-bottom: 1px solid #f1f5f9;
         }
-        .ste-panel__header h4 {
-          margin: 0;
-          color: #fff;
-          font-size: 0.82rem;
-          font-weight: 700;
-          letter-spacing: 0.01em;
-        }
-        .ste-panel-collapse-btn {
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #94a3b8;
-          width: 26px;
-          height: 26px;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.15s;
-          flex-shrink: 0;
-        }
-        .ste-panel-collapse-btn:hover {
-          background: rgba(17, 181, 187, 0.15);
-          border-color: #11b5bb;
-          color: #11b5bb;
-        }
-        .ste-panel-toggle-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: rgba(17, 181, 187, 0.12);
-          border: 1px solid rgba(17, 181, 187, 0.3);
-          color: #11b5bb;
-          padding: 4px 10px;
-          border-radius: 16px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.15s;
-          white-space: nowrap;
-        }
-        .ste-panel-toggle-pill:hover {
-          background: #11b5bb;
-          color: #07171d;
-          box-shadow: 0 2px 8px rgba(17, 181, 187, 0.35);
-        }
-        .ste-panel__body {
-          padding: 14px 16px 80px 16px;
-          overflow-y: auto;
+        .ste-section-panel-content {
           flex: 1;
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
+          overflow-y: auto;
+          padding: 14px 16px;
         }
 
-        /* Form Controls */
-        .ste-field-group {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
+        /* Field Cards */
+        .ste-card-field {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 11px 13px;
+          transition: border-color 0.15s;
         }
-        .ste-label {
-          font-size: 0.74rem;
-          font-weight: 700;
-          color: #cbd5e1;
+        .ste-card-field:hover {
+          border-color: #cbd5e1;
+        }
+        .ste-field-label {
+          display: block;
+          font-size: 11px;
+          font-weight: 600;
+          color: #475569;
+          margin-bottom: 6px;
           text-transform: uppercase;
           letter-spacing: 0.04em;
         }
-        .ste-sublabel {
-          font-size: 0.72rem;
-          color: #94a3b8;
-        }
-        .ste-input,
-        .ste-select {
-          background: #051419;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          color: #fff;
-          border-radius: 8px;
-          padding: 8px 12px;
-          font-size: 0.84rem;
-          outline: none;
+        .ste-input-light {
           width: 100%;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 7px 10px;
+          color: #0f172a;
+          outline: none;
           box-sizing: border-box;
+          font-size: 12px;
+          transition: border-color 0.15s, box-shadow 0.15s;
         }
-        .ste-input:focus,
-        .ste-select:focus {
-          border-color: #11b5bb;
+        .ste-input-light:focus {
+          border-color: #0f172a;
+          box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.06);
         }
-
-        .ste-ratio-chips {
-          display: flex;
-          background: rgba(0, 0, 0, 0.35);
-          padding: 4px;
-          border-radius: 8px;
-          border: 1px solid rgba(255, 255, 255, 0.06);
+        .ste-select-light {
+          width: 100%;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 6px 10px;
+          color: #0f172a;
+          font-size: 12px;
+          font-weight: 500;
+          outline: none;
+          cursor: pointer;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .ste-select-light:focus {
+          border-color: #0f172a;
+          box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.06);
+        }
+        .ste-ratios-segmented-light {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
           gap: 4px;
         }
-        .ste-ratio-chip {
-          background: transparent;
-          border: none;
-          color: #94a3b8;
-          font-size: 0.75rem;
-          font-weight: 700;
-          padding: 5px 10px;
-          border-radius: 5px;
-          cursor: pointer;
-        }
-        .ste-ratio-chip--active {
-          background: #11b5bb;
-          color: #07171d;
-        }
-
-        .ste-accordion {
-          background: #051419;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          overflow: hidden;
-        }
-        .ste-accordion__summary {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 14px;
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: #fff;
-          cursor: pointer;
-          background: rgba(255, 255, 255, 0.03);
-        }
-        .ste-accordion__content {
-          padding: 12px 14px;
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .ste-btn-toggle {
-          display: flex;
-          background: #051419;
-          border-radius: 6px;
-          padding: 2px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .ste-btn-toggle__btn {
-          flex: 1;
-          padding: 6px;
-          background: transparent;
-          border: none;
-          color: #94a3b8;
-          font-size: 0.74rem;
-          font-weight: 700;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-        .ste-btn-toggle__btn.active {
-          background: #11b5bb;
-          color: #07171d;
-        }
-
-        .ste-gradient-presets {
-          display: flex;
-          gap: 8px;
-          margin-top: 6px;
-        }
-        .ste-grad-thumb {
-          width: 32px;
-          height: 32px;
-          border-radius: 6px;
-          cursor: pointer;
-          border: 2px solid transparent;
-          transition: transform 0.15s;
-        }
-        .ste-grad-thumb:hover {
-          transform: scale(1.1);
-        }
-        .ste-grad-thumb.active {
-          border-color: #fff;
-        }
-
-        .ste-upload-box {
-          position: relative;
-        }
-        .ste-upload-box input[type="file"] {
-          display: none;
-        }
-        .ste-upload-label {
+        .ste-ratio-pill-select {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          background: #051419;
-          border: 1.5px dashed rgba(255, 255, 255, 0.18);
-          color: #cbd5e1;
-          padding: 9px;
-          border-radius: 8px;
-          font-size: 0.78rem;
+          gap: 4px;
+          padding: 7px 4px;
+          font-size: 11px;
+          font-weight: 700;
+          border-radius: 7px;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          color: #475569;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.15s;
         }
-        .ste-upload-label:hover {
-          border-color: #11b5bb;
-          color: #11b5bb;
+        .ste-ratio-pill-select.active {
+          background: #0f172a;
+          color: #ffffff;
+          border-color: #0f172a;
         }
-        .ste-asset-preview {
-          margin-top: 6px;
-          height: 55px;
+        .ste-segmented-2 {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 4px;
+          background: #f1f5f9;
+          padding: 3px;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+        }
+        .ste-segmented-2 button {
+          border: none;
+          background: transparent;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 6px 0;
           border-radius: 6px;
-          overflow: hidden;
-          background: #051419;
+          cursor: pointer;
+          color: #64748b;
+          transition: all 0.15s;
+        }
+        .ste-segmented-2 button.active {
+          background: #ffffff;
+          color: #0f172a;
+          font-weight: 700;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+        .ste-segmented-3 {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 4px;
+          background: #f1f5f9;
+          padding: 3px;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+        }
+        .ste-segmented-3 button {
+          border: none;
+          background: transparent;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 5px 0;
+          border-radius: 6px;
+          cursor: pointer;
+          color: #64748b;
+          transition: all 0.15s;
+        }
+        .ste-segmented-3 button.active {
+          background: #ffffff;
+          color: #0f172a;
+          font-weight: 700;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+        .ste-upload-dropzone {
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
-        }
-        .ste-asset-preview img {
-          max-height: 100%;
-          max-width: 100%;
-          object-fit: contain;
-        }
-        .ste-file-badge {
-          font-size: 0.7rem;
-          color: #11b5bb;
-          margin-top: 4px;
-          display: block;
-        }
-
-        .ste-specs-grid,
-        .ste-timing-row,
-        .ste-border-row,
-        .ste-colors-grid {
-          display: flex;
-          gap: 8px;
-        }
-        .ste-coords-grid {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .ste-color-picker {
-          width: 44px;
-          height: 36px;
-          background: transparent;
-          border: none;
+          gap: 6px;
+          padding: 16px;
+          border: 2px dashed #cbd5e1;
+          border-radius: 8px;
+          background: #ffffff;
           cursor: pointer;
+          transition: all 0.15s;
         }
-
-        /* Stage (Center) */
-        .ste-stage {
-          flex: 1;
+        .ste-upload-dropzone:hover {
+          border-color: #0f172a;
+          background: #f8fafc;
+        }
+        .ste-style-card {
           display: flex;
           flex-direction: column;
-          background: radial-gradient(circle at 50% 45%, #082129 0%, #030c10 100%);
-          position: relative;
-          overflow: hidden;
+          align-items: center;
+          justify-content: center;
+          padding: 8px 4px;
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          cursor: pointer;
+          gap: 4px;
+          transition: all 0.15s;
+        }
+        .ste-style-card.active {
+          border-color: #0f172a;
+          background: #f8fafc;
+          color: #0f172a;
+        }
+        .ste-preset-btn {
+          padding: 8px 10px;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #334155;
+          cursor: pointer;
+          text-align: left;
+          transition: all 0.15s;
+        }
+        .ste-preset-btn:hover {
+          border-color: #0f172a;
+          background: #f8fafc;
+          color: #0f172a;
+        }
+
+        /* Center Stage */
+        .ste-stage-light {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
           min-width: 0;
-          min-height: 0;
-          height: 100%;
-          transition: all 0.25s ease;
+          background: #f1f5f9;
+          position: relative;
         }
-        .ste-stage--fullscreen {
+        .ste-stage-light.fullscreen {
           position: fixed;
-          inset: 0;
-          z-index: 99999;
-          width: 100vw;
-          height: 100vh;
-          background: radial-gradient(circle at 50% 45%, #0a2731 0%, #02090c 100%);
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 100;
         }
-
-        /* Stage Toolbar */
-        .ste-stage-toolbar {
+        .ste-stage-toolbar-light {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 14px;
-          height: 46px;
-          background: rgba(7, 23, 29, 0.95);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          gap: 10px;
-          z-index: 10;
-          flex-shrink: 0;
-          box-sizing: border-box;
-        }
-        .ste-stage-toolbar__left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
+          padding: 6px 14px;
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
+          min-height: 44px;
+          gap: 12px;
           flex-shrink: 0;
         }
-        .ste-stage-ratio-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          background: rgba(17, 181, 187, 0.14);
-          border: 1px solid rgba(17, 181, 187, 0.35);
-          padding: 3px 8px;
-          border-radius: 16px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          color: #11b5bb;
-          white-space: nowrap;
-        }
-        .ste-stage-res-badge {
-          font-size: 0.7rem;
-          color: #94a3b8;
-          background: rgba(255, 255, 255, 0.06);
-          padding: 2px 7px;
-          border-radius: 5px;
-          font-family: monospace;
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          white-space: nowrap;
-        }
-        .ste-stage-ratio-switcher {
+        .ste-stage-ratios-pills {
           display: flex;
-          background: rgba(0, 0, 0, 0.4);
+          align-items: center;
+          gap: 2px;
+          background: #f1f5f9;
           padding: 2px;
           border-radius: 7px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          gap: 2px;
+          border: 1px solid #e2e8f0;
         }
         .ste-stage-ratio-btn {
-          background: transparent;
-          border: none;
-          color: #94a3b8;
-          font-size: 0.7rem;
-          font-weight: 700;
-          padding: 3px 7px;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 8px;
+          font-size: 11px;
+          font-weight: 600;
           border-radius: 5px;
+          border: none;
+          background: transparent;
+          color: #64748b;
           cursor: pointer;
-          transition: all 0.15s;
-          white-space: nowrap;
-        }
-        .ste-stage-ratio-btn:hover {
-          color: #fff;
-          background: rgba(255, 255, 255, 0.06);
         }
         .ste-stage-ratio-btn.active {
-          background: #11b5bb;
-          color: #06181d;
+          background: #ffffff;
+          color: #0f172a;
+          font-weight: 800;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
         }
 
-        .ste-stage-toolbar__center {
+        /* Quick Layers Ribbon Strip */
+        .ste-layers-ribbon {
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 8px;
-          color: #cbd5e1;
-          font-size: 0.74rem;
-          flex: 1;
-          min-width: 0;
-          overflow: hidden;
-        }
-        .ste-stage-hint {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          background: rgba(255, 255, 255, 0.04);
-          padding: 3px 10px;
-          border-radius: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          color: #94a3b8;
-          font-size: 0.72rem;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .ste-stage-coord-sub {
-          font-family: monospace;
-          opacity: 0.85;
-          font-size: 0.68rem;
-        }
-        .ste-stage-hint--active {
-          background: rgba(240, 90, 40, 0.15);
-          border-color: rgba(240, 90, 40, 0.4);
-          color: #f05a28;
-          font-weight: 700;
-        }
-
-        .ste-stage-toolbar__right {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-shrink: 0;
-        }
-        .ste-stage-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          color: #fff;
-          padding: 4px 10px;
-          border-radius: 7px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s;
-          white-space: nowrap;
-        }
-        .ste-stage-btn:hover {
-          background: rgba(255, 255, 255, 0.16);
-          border-color: #11b5bb;
-          color: #11b5bb;
-        }
-        .ste-stage-btn--active {
-          background: #f05a28;
-          border-color: #f05a28;
-          color: #fff;
-        }
-        .ste-stage-btn--active:hover {
-          background: #dc4b1d;
-          color: #fff;
-        }
-
-        /* Canvas Container & Mathematically Responsive Viewport */
-        .ste-stage-toolbar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0 12px;
-          height: 40px;
-          min-height: 40px;
-          max-height: 40px;
-          background: rgba(7, 23, 29, 0.95);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          gap: 8px;
-          z-index: 10;
-          flex-shrink: 0;
-          box-sizing: border-box;
-          overflow-x: auto;
-          scrollbar-width: none;
-          white-space: nowrap;
-        }
-        .ste-stage-toolbar::-webkit-scrollbar {
-          display: none;
-        }
-        .ste-stage-layer-strip {
-          height: 36px;
-          min-height: 36px;
-          max-height: 36px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          white-space: nowrap;
-          box-sizing: border-box;
-        }
-        .ste-stage-layer-strip::-webkit-scrollbar {
-          display: none;
-        }
-        .ste-docked-element-bar {
-          height: 42px;
-          min-height: 42px;
-          max-height: 42px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          white-space: nowrap;
-          box-sizing: border-box;
-        }
-        .ste-docked-element-bar::-webkit-scrollbar {
-          display: none;
-        }
-        .ste-unified-player-bar {
-          height: 44px;
-          min-height: 44px;
-          max-height: 44px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          white-space: nowrap;
-          box-sizing: border-box;
-        }
-        .ste-unified-player-bar::-webkit-scrollbar {
-          display: none;
-        }
-        .ste-canvas-container {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 10px;
-          position: relative;
-          overflow: hidden;
-          min-height: 0;
-          min-width: 0;
-          box-sizing: border-box;
-          width: 100%;
-          height: 100%;
-        }
-        .ste-canvas-viewport {
-          position: relative;
-          max-width: 100%;
-          max-height: 100%;
-          width: auto;
-          height: auto;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-          overflow: hidden;
-          background: #000;
-          touch-action: none;
-          user-select: none;
-        }
-        .ste-interactive-canvas {
-          width: 100%;
-          height: 100%;
-          max-width: 100%;
-          max-height: 100%;
-          display: block;
-          object-fit: contain;
-          touch-action: none;
-          user-select: none;
-        }
-        .ste-drag-coord-pill {
-          position: absolute;
-          transform: translate(-50%, -135%);
-          background: rgba(7, 23, 29, 0.94);
-          border: 1.5px solid #11b5bb;
-          color: #fff;
-          padding: 3px 10px;
-          border-radius: 20px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          pointer-events: none;
-          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65);
-          white-space: nowrap;
-          z-index: 50;
-        }
-        .ste-viewport-ratio-tag {
-          position: absolute;
-          bottom: 10px;
-          right: 12px;
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(4px);
-          color: #94a3b8;
-          font-size: 0.68rem;
-          font-family: monospace;
-          padding: 3px 8px;
-          border-radius: 4px;
-          pointer-events: none;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          z-index: 5;
-        }
-
-        /* Floating Fullscreen Inspector */
-        .ste-fs-floating-inspector {
-          position: absolute;
-          top: 60px;
-          right: 20px;
-          width: 320px;
-          max-height: calc(100vh - 140px);
-          background: rgba(9, 32, 39, 0.94);
-          backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: 12px;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
-          z-index: 60;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-        .ste-fs-floating-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 16px;
-          background: rgba(5, 20, 25, 0.85);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .ste-fs-floating-body {
-          padding: 16px;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        /* Unified Responsive Player Bar */
-        .ste-unified-player-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
           padding: 6px 14px;
-          height: 44px;
-          min-height: 44px;
-          background: #081d24;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
           gap: 8px;
           flex-shrink: 0;
-          box-sizing: border-box;
-          z-index: 10;
-          width: 100%;
+          overflow-x: auto;
+          scrollbar-width: thin;
         }
-
-        .ste-topbar-btn {
-          padding: 6px 12px !important;
-          font-size: 0.78rem !important;
-          white-space: nowrap !important;
-          flex-shrink: 0 !important;
-          height: 32px !important;
-        }
-
-        /* Playback Bar (legacy fallback) */
-        .ste-playback-bar {
+        .ste-layers-chips-scroll {
           display: flex;
           align-items: center;
-          padding: 0 14px;
-          height: 44px;
-          background: #081d24;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-          gap: 12px;
-          flex-shrink: 0;
-          box-sizing: border-box;
-          z-index: 10;
+          gap: 6px;
+          overflow-x: auto;
+          white-space: nowrap;
+          padding: 2px 0;
         }
-        .ste-playback-controls {
-          display: flex;
+        .ste-layer-pill {
+          display: inline-flex;
           align-items: center;
-          gap: 8px;
-          flex-shrink: 0;
-        }
-        .ste-ctrl-btn {
-          width: 32px;
-          height: 32px;
+          gap: 4px;
+          padding: 4px 10px;
           border-radius: 6px;
-          background: rgba(255, 255, 255, 0.08);
-          border: none;
-          color: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          font-size: 11px;
+          font-weight: 500;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #475569;
           cursor: pointer;
           transition: all 0.15s;
-          font-size: 0.85rem;
+          white-space: nowrap;
         }
-        .ste-ctrl-btn:hover {
-          background: #11b5bb;
-          color: #07171d;
+        .ste-layer-pill:hover {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+          color: #0f172a;
         }
-        .ste-ctrl-btn--play {
-          background: #f05a28;
+        .ste-layer-pill.active {
+          background: #0f172a;
+          color: #ffffff;
+          border-color: #0f172a;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+          font-weight: 600;
         }
-        .ste-ctrl-btn--play:hover {
-          background: #dc4b1d;
-        }
-        .ste-scrub-wrap {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          min-width: 0;
-        }
-        .ste-time-label {
-          font-size: 0.72rem;
+        .ste-layer-pill.is-hidden {
+          opacity: 0.6;
+          background: #f8fafc;
+          border-color: #e2e8f0;
           color: #94a3b8;
-          font-family: monospace;
-          min-width: 32px;
-          text-align: center;
+          text-decoration: line-through;
         }
-        .ste-scrub-input {
-          flex: 1;
-          accent-color: #11b5bb;
-          cursor: pointer;
-          height: 4px;
-        }
-
-        /* Element Chips */
-        .ste-element-chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-        }
-        .ste-elem-chip {
-          background: #051419;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #94a3b8;
-          font-size: 0.72rem;
-          padding: 5px 9px;
-          border-radius: 6px;
-          cursor: pointer;
-        }
-        .ste-elem-chip--active {
-          background: rgba(17, 181, 187, 0.15);
-          border-color: #11b5bb;
-          color: #11b5bb;
-          font-weight: 700;
-        }
-
-        .ste-empty-inspector {
-          text-align: center;
-          padding: 40px 10px;
+        .ste-layer-pill.is-hidden:hover {
+          opacity: 0.9;
+          background: #f1f5f9;
+          border-color: #cbd5e1;
           color: #64748b;
-          font-size: 0.82rem;
-        }
-        .ste-empty-inspector svg {
-          font-size: 1.8rem;
-          margin-bottom: 10px;
         }
 
-        /* ── All 4 Ratios Grid View ── */
-        .ste-grid-view {
+        /* Canvas Card */
+        .ste-canvas-container-light {
           flex: 1;
           display: flex;
-          flex-direction: column;
-          background: #040e13;
-          overflow-y: auto;
-          padding: 20px 24px;
-        }
-        .ste-grid-toolbar {
-          display: flex;
           align-items: center;
-          justify-content: space-between;
-          margin-bottom: 18px;
-        }
-        .ste-grid-toolbar h3 {
-          margin: 0;
-          color: #fff;
-          font-size: 1.2rem;
-        }
-        .ste-grid-toolbar p {
-          margin: 4px 0 0;
-          color: #94a3b8;
-          font-size: 0.85rem;
-        }
-        .ste-aspect-tiles-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 20px;
-        }
-        .ste-aspect-tile-card {
-          background: #092027;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 12px;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        .ste-aspect-tile-head {
-          padding: 12px 16px;
-          background: #0b2830;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .ste-aspect-tile-label {
-          font-size: 0.82rem;
-          font-weight: 700;
-          color: #11b5bb;
-        }
-        .ste-tile-canvas-wrap {
+          justify-content: center;
           padding: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #000;
-          min-height: 240px;
-          box-sizing: border-box;
-        }
-        .ste-tile-canvas-viewport {
+          overflow: auto;
           position: relative;
-          max-width: 100%;
-          max-height: 220px;
+        }
+        .ste-canvas-card-light {
+          box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+          border-radius: 12px;
+          background: #000000;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
-          border-radius: 8px;
-          overflow: hidden;
-          background: #000;
+          position: relative;
         }
-        .ste-tile-canvas {
+        .ste-main-canvas-light {
           width: 100%;
           height: 100%;
           display: block;
-          object-fit: contain;
-          border-radius: 8px;
+          cursor: crosshair;
+          border-radius: 12px;
         }
 
-        /* ── Saved Templates Library View ── */
-        .ste-library-view {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          background: #040e13;
-          overflow-y: auto;
-          padding: 28px 36px;
+        /* On-Canvas Bounding Box & Interactive Controls */
+        .ste-canvas-bbox-overlay {
+          pointer-events: none;
+          box-sizing: border-box;
+          z-index: 35;
         }
-        .ste-library-header {
+        .ste-bbox-border {
+          position: absolute;
+          inset: 0;
+          border: 1.5px solid #0f172a;
+          border-radius: 4px;
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.95);
+          pointer-events: none;
+        }
+        .ste-bbox-floating-actions {
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(15, 23, 42, 0.94);
+          backdrop-filter: blur(8px);
+          padding: 5px 10px;
+          border-radius: 9999px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.2);
+          z-index: 50;
+          white-space: nowrap;
+          pointer-events: auto;
+        }
+        .ste-bbox-pill-name {
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.5px;
+          color: #e2e8f0;
+          margin-right: 2px;
+        }
+        .ste-bbox-stepper {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background: rgba(255, 255, 255, 0.12);
+          border-radius: 6px;
+          padding: 2px 6px;
+          font-size: 11px;
+          font-family: monospace;
+          font-weight: 700;
+          color: #ffffff;
+        }
+        .ste-bbox-stepper button {
+          background: transparent;
+          border: none;
+          color: #ffffff;
+          cursor: pointer;
+          padding: 0 3px;
+          font-weight: 900;
+          font-size: 12px;
+          line-height: 1;
+        }
+        .ste-bbox-stepper button:hover {
+          color: #cbd5e1;
+        }
+        .ste-bbox-act-btn {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background: rgba(255, 255, 255, 0.15);
+          border: none;
+          border-radius: 6px;
+          color: #ffffff;
+          padding: 3px 8px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .ste-bbox-act-btn:hover {
+          background: rgba(255, 255, 255, 0.28);
+        }
+        .ste-bbox-act-btn.danger {
+          background: #ef4444;
+          color: #ffffff;
+        }
+        .ste-bbox-act-btn.danger:hover {
+          background: #dc2626;
+        }
+        .ste-bbox-handle {
+          position: absolute;
+          width: 10px;
+          height: 10px;
+          background: #ffffff;
+          border: 1.5px solid #0f172a;
+          border-radius: 2px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+          pointer-events: auto;
+          z-index: 40;
+          transition: transform 0.1s;
+        }
+        .ste-bbox-handle:hover {
+          transform: scale(1.3);
+          background: #0f172a;
+        }
+        .ste-bbox-handle.nw {
+          top: -6px;
+          left: -6px;
+          cursor: nwse-resize;
+        }
+        .ste-bbox-handle.ne {
+          top: -6px;
+          right: -6px;
+          cursor: nesw-resize;
+        }
+        .ste-bbox-handle.se {
+          bottom: -6px;
+          right: -6px;
+          cursor: nwse-resize;
+        }
+        .ste-bbox-handle.sw {
+          bottom: -6px;
+          left: -6px;
+          cursor: nesw-resize;
+        }
+
+        /* Bottom Player Bar */
+        .ste-player-bar-light {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 24px;
+          padding: 8px 16px;
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
+          min-height: 48px;
+          gap: 16px;
+          flex-shrink: 0;
         }
-        .ste-library-header h2 {
-          margin: 0;
-          font-size: 1.5rem;
-          color: #fff;
-        }
-        .ste-library-header p {
-          margin: 4px 0 0;
-          color: #94a3b8;
-          font-size: 0.85rem;
-        }
-
-        .ste-table-wrap {
-          background: #092027;
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          overflow: hidden;
-        }
-        .ste-table {
-          width: 100%;
-          border-collapse: collapse;
-          text-align: left;
-        }
-        .ste-table th {
-          background: #0b2830;
-          padding: 14px 18px;
-          font-size: 0.75rem;
-          color: #94a3b8;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .ste-table td {
-          padding: 14px 18px;
-          font-size: 0.85rem;
-          color: #cbd5e1;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-          vertical-align: middle;
-        }
-        .ste-table tr:hover {
-          background: rgba(255, 255, 255, 0.02);
-        }
-        .ste-table tr.is-active-row {
-          background: rgba(17, 181, 187, 0.06);
-        }
-
-        .ste-badge-chip {
-          background: #051419;
-          color: #11b5bb;
-          border: 1px solid rgba(17, 181, 187, 0.3);
-          padding: 3px 8px;
-          border-radius: 6px;
-          font-size: 0.72rem;
-          font-weight: 700;
-        }
-        .ste-badge-soft {
-          background: rgba(22, 163, 74, 0.15);
-          color: #22c55e;
-          padding: 3px 8px;
-          border-radius: 6px;
-          font-size: 0.72rem;
-          font-weight: 700;
-        }
-
-        .ste-actions-cell {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 6px;
-        }
-        .ste-action-btn {
+        .ste-player-play-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 6px 12px;
-          font-size: 0.75rem;
+          background: #0f172a;
+          color: #ffffff;
           font-weight: 700;
-          border-radius: 6px;
+          font-size: 12px;
+          padding: 7px 14px;
+          border-radius: 8px;
+          border: none;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .ste-player-play-btn:hover {
+          background: #1e293b;
+        }
+        .ste-player-play-btn.playing {
+          background: #334155;
+        }
+
+        /* Right Inspector */
+        .ste-right-inspector {
+          width: 300px;
+          background: #ffffff;
+          border-left: 1px solid #e2e8f0;
+          display: flex;
+          flex-direction: column;
+          flex-shrink: 0;
+        }
+        .ste-inspector-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .ste-inspector-content {
+          flex: 1;
+          overflow-y: auto;
+          padding: 14px 16px;
+        }
+
+        /* Buttons & Badges */
+        .ste-btn-primary-light {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #0f172a;
+          color: #ffffff;
+          font-weight: 600;
+          font-size: 12px;
+          padding: 6px 14px;
+          border-radius: 8px;
           border: none;
           cursor: pointer;
           transition: all 0.15s;
         }
-        .ste-action-btn--view {
-          background: rgba(17, 181, 187, 0.15);
-          color: #11b5bb;
+        .ste-btn-primary-light:hover {
+          background: #1e293b;
         }
-        .ste-action-btn--view:hover {
-          background: #11b5bb;
-          color: #05191e;
+        .ste-btn-secondary-light {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #ffffff;
+          color: #475569;
+          font-weight: 600;
+          font-size: 12px;
+          padding: 6px 12px;
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+          cursor: pointer;
+          transition: all 0.15s;
         }
-        .ste-action-btn--edit {
-          background: rgba(240, 90, 40, 0.15);
-          color: #f05a28;
-        }
-        .ste-action-btn--edit:hover {
-          background: #f05a28;
-          color: #fff;
-        }
-        .ste-action-btn--delete {
-          background: rgba(220, 38, 38, 0.15);
-          color: #ef4444;
-        }
-        .ste-action-btn--delete:hover {
-          background: #dc2626;
-          color: #fff;
-        }
-
-        .ste-loading-wrap,
-        .ste-empty-box {
-          text-align: center;
-          padding: 80px 20px;
-          color: #94a3b8;
-          background: #092027;
-          border-radius: 12px;
-          border: 1px dashed rgba(255, 255, 255, 0.1);
-        }
-        .ste-empty-box h3 {
-          color: #fff;
-          margin: 12px 0 6px;
+        .ste-btn-secondary-light:hover {
+          background: #f8fafc;
+          color: #0f172a;
         }
 
         /* Toast */
-        .ste-toast {
+        .ste-toast-light {
           position: fixed;
           bottom: 24px;
-          right: 24px;
-          z-index: 9999;
-          background: #11b5bb;
-          color: #05191e;
-          padding: 12px 20px;
-          border-radius: 8px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #0f172a;
+          color: #ffffff;
+          padding: 10px 20px;
+          border-radius: 30px;
+          font-size: 12px;
           font-weight: 700;
-          font-size: 0.88rem;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+          z-index: 200;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        /* Library & Grid Views */
+        .ste-library-container-light {
+          flex: 1;
+          overflow-y: auto;
+          padding: 24px 32px;
+          background: #f8fafc;
+        }
+        .ste-library-top-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+        .ste-library-table-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        .ste-table-light {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+        }
+        .ste-table-light th {
+          background: #f8fafc;
+          text-align: left;
+          padding: 12px 16px;
+          color: #64748b;
+          font-weight: 700;
+          border-bottom: 1px solid #e2e8f0;
+          text-transform: uppercase;
+          font-size: 11px;
+          letter-spacing: 0.3px;
+        }
+        .ste-table-light td {
+          padding: 14px 16px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .ste-id-badge {
+          font-family: monospace;
+          font-weight: 700;
+          color: #334155;
+          background: #f1f5f9;
+          border: 1px solid #cbd5e1;
+          padding: 3px 8px;
+          border-radius: 6px;
+          font-size: 12px;
+        }
+        .ste-ratio-pill-table {
+          font-weight: 700;
+          font-size: 11px;
+          background: #f1f5f9;
+          padding: 2px 8px;
+          border-radius: 4px;
+          color: #475569;
+        }
+        .ste-status-badge {
+          font-weight: 700;
+          font-size: 11px;
+          color: #10b981;
+          background: #ecfdf5;
+          padding: 2px 8px;
+          border-radius: 4px;
+        }
+        .ste-table-action-btn {
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .ste-table-action-btn:hover {
+          background: #f1f5f9;
+          color: #0f172a;
+        }
+        .ste-table-action-btn.primary {
+          background: #0f172a;
+          color: #ffffff;
+          border-color: #0f172a;
+        }
+        .ste-table-action-btn.danger:hover {
+          background: #fee2e2;
+          color: #ef4444;
+          border-color: #fca5a5;
+        }
+
+        /* Grid View */
+        .ste-grid-container-light {
+          flex: 1;
+          overflow-y: auto;
+          padding: 24px 32px;
+          background: #f8fafc;
+        }
+        .ste-grid-header-light {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+        .ste-aspect-cards-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 20px;
+        }
+        .ste-aspect-card-light {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          display: flex;
+          flex-direction: column;
+        }
+        .ste-aspect-card-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .ste-aspect-card-canvas-wrap {
+          height: 320px;
+          background: #0f172a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 12px;
+        }
+        .ste-grid-canvas {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
         }
 
         /* Modals */
         .ste-modal-overlay {
           position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.8);
-          backdrop-filter: blur(8px);
-          z-index: 10000;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(15, 23, 42, 0.6);
+          backdrop-filter: blur(4px);
           display: flex;
           align-items: center;
           justify-content: center;
+          z-index: 200;
           padding: 20px;
         }
         .ste-modal {
-          background: #0b2830;
+          background: #ffffff;
           border-radius: 16px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
           width: 100%;
-          max-width: 540px;
+          max-width: 520px;
           overflow: hidden;
-          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          display: flex;
+          flex-direction: column;
         }
         .ste-modal--wide {
-          max-width: 680px;
+          max-width: 760px;
         }
         .ste-modal__header {
-          padding: 16px 20px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
           display: flex;
           align-items: center;
           justify-content: space-between;
+          padding: 16px 20px;
+          border-bottom: 1px solid #f1f5f9;
         }
         .ste-modal__title-wrap {
           display: flex;
           align-items: center;
           gap: 10px;
         }
-        .ste-modal__title-wrap h3 {
-          margin: 0;
-          font-size: 1rem;
-          color: #fff;
-        }
-        .ste-accent-icon {
-          color: #f05a28;
-        }
         .ste-modal__close {
           background: transparent;
           border: none;
           color: #94a3b8;
-          font-size: 1rem;
+          font-size: 16px;
           cursor: pointer;
+        }
+        .ste-modal__close:hover {
+          color: #0f172a;
         }
         .ste-modal__body {
           padding: 20px;
+          overflow-y: auto;
           max-height: 70vh;
-          overflow-y: auto;
-        }
-        .ste-detail-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          font-size: 0.85rem;
-          background: #051419;
-          padding: 14px;
-          border-radius: 8px;
-        }
-        .ste-json-box {
-          background: #000;
-          color: #11b5bb;
-          padding: 12px;
-          border-radius: 8px;
-          font-size: 0.75rem;
-          max-height: 180px;
-          overflow-y: auto;
-        }
-        .ste-modal__video-wrap {
-          padding: 16px;
-          background: #000;
-          display: flex;
-          justify-content: center;
-        }
-        .ste-modal__video {
-          max-height: 60vh;
-          width: 100%;
-          border-radius: 8px;
         }
         .ste-modal__actions {
-          padding: 16px 20px;
           display: flex;
-          gap: 12px;
+          align-items: center;
           justify-content: flex-end;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          gap: 10px;
+          padding: 14px 20px;
+          border-top: 1px solid #f1f5f9;
+          background: #f8fafc;
         }
-
-        .ste-spin {
-          animation: spin 1s linear infinite;
+        .ste-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          border: none;
+          text-decoration: none;
         }
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
+        .ste-btn--primary {
+          background: #0f172a;
+          color: #ffffff;
         }
-
-        /* ══════════════════════════════════════════════════════════
-           RESPONSIVE DESIGN & USER-FRIENDLY ADAPTIVE SYSTEM
-           ══════════════════════════════════════════════════════════ */
-        @media (max-width: 1500px) {
-          .ste-panel {
-            width: 250px;
-            min-width: 250px;
-            max-width: 250px;
-          }
-          .ste-template-name-input {
-            max-width: 160px;
-            min-width: 110px;
-            font-size: 0.85rem;
-          }
-          .ste-topbar {
-            padding: 6px 12px;
-            gap: 6px;
-          }
-          .ste-topbar-btn {
-            padding: 5px 9px !important;
-            font-size: 0.74rem !important;
-          }
+        .ste-btn--primary:hover {
+          background: #1e293b;
         }
-
-        @media (max-width: 1280px) {
-          .ste-topbar {
-            height: auto;
-            min-height: 46px;
-            padding: 4px 10px;
-          }
-          .ste-panel {
-            width: 240px;
-            min-width: 240px;
-            max-width: 240px;
-          }
-          .ste-template-name-input {
-            max-width: 130px;
-          }
-          .ste-btn-label {
-            display: inline;
-          }
-          .ste-player-status-tag {
-            display: none !important;
-          }
+        .ste-btn--secondary {
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          color: #475569;
         }
-
-        @media (max-width: 1600px) {
-          .ste-topbar {
-            padding: 6px 12px;
-            gap: 8px;
-          }
-          .ste-topbar-btn {
-            padding: 5px 9px !important;
-            font-size: 0.74rem !important;
-          }
-          .ste-template-name-input {
-            max-width: 140px;
-          }
-        }
-
-        @media (max-width: 1400px) {
-          .ste-panel {
-            width: 235px;
-            min-width: 235px;
-            max-width: 235px;
-          }
-          .ste-topbar {
-            padding: 6px 10px;
-            gap: 6px;
-          }
-          .ste-topbar__left {
-            flex-wrap: wrap;
-            gap: 6px;
-          }
-          .ste-topbar__right {
-            flex-wrap: wrap;
-            gap: 5px;
-          }
-          .ste-template-name-input {
-            max-width: 130px;
-          }
-        }
-
-        @media (max-width: 1200px) {
-          .ste-panel {
-            width: 215px;
-            min-width: 215px;
-            max-width: 215px;
-          }
-          .ste-topbar {
-            height: auto;
-            min-height: 48px;
-            padding: 6px 10px;
-            flex-wrap: wrap;
-            gap: 6px;
-          }
-          .ste-topbar__left {
-            flex-wrap: wrap;
-            gap: 6px;
-          }
-          .ste-topbar__right {
-            flex-wrap: wrap;
-            gap: 5px;
-          }
-          .ste-workspace {
-            position: relative;
-            height: calc(100% - 64px);
-          }
-          /* Overlay Drawer Mode for Sidebars on Medium Screens */
-          .ste-panel--assets {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            z-index: 100;
-            background: rgba(9, 32, 39, 0.98);
-            backdrop-filter: blur(16px);
-            box-shadow: 6px 0 28px rgba(0, 0, 0, 0.7);
-          }
-          .ste-panel--inspector {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            right: 0;
-            z-index: 100;
-            background: rgba(9, 32, 39, 0.98);
-            backdrop-filter: blur(16px);
-            box-shadow: -6px 0 28px rgba(0, 0, 0, 0.7);
-          }
-          .ste-stage {
-            width: 100% !important;
-            flex: 1;
-          }
-        }
-
-        @media (max-width: 1024px) {
-          .ste-panel {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            z-index: 60;
-            width: 260px !important;
-            min-width: 260px !important;
-            max-width: 260px !important;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85);
-          }
-          .ste-panel--specs {
-            left: 0;
-          }
-          .ste-panel--inspector {
-            right: 0;
-          }
-        }
-
-        @media (max-width: 992px) {
-          .ste-playback-bar {
-            padding: 0 10px;
-            gap: 8px;
-          }
-          .ste-mode-tabs {
-            padding: 2px;
-          }
-          .ste-mode-tab {
-            padding: 4px 8px !important;
-            font-size: 0.72rem !important;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .ste-topbar {
-            padding: 6px 8px;
-            flex-direction: column;
-            align-items: stretch;
-            height: auto;
-          }
-          .ste-topbar__left {
-            justify-content: space-between;
-            width: 100%;
-          }
-          .ste-topbar__right {
-            justify-content: flex-end;
-            width: 100%;
-          }
-          .ste-template-name-input {
-            width: 130px;
-            min-width: 110px;
-            font-size: 0.80rem;
-          }
-          .ste-panel {
-            width: 280px;
-            max-width: 85vw;
-          }
-          .ste-mode-tabs {
-            order: 4;
-            width: 100%;
-            justify-content: center;
-          }
+        .ste-btn--secondary:hover {
+          background: #f1f5f9;
         }
       `}</style>
     </div>

@@ -148,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      <aside className={`store-sidebar ${mobileOpen ? "store-sidebar--open" : ""}`}>
+      <aside className={`store-sidebar ${mobileOpen ? "store-sidebar--open" : ""} ${activeView === "templateEditor" ? "store-sidebar--collapsed !hidden" : ""}`}>
         {/* Logo */}
         <div className="store-sidebar__logo">
           <div className="store-logo-icon">
@@ -1003,7 +1003,7 @@ export default function StoreUserPage() {
         />
         <div className="store-layout-right">
           <Header userName={userName} onMobileMenuOpen={() => setMobileOpen(true)} />
-          <main className={`store-content ${activeView === "templateEditor" ? "store-content--editor" : ""}`}>
+          <main className={`store-content ${activeView === "templateEditor" ? "store-content--editor !p-0 !m-0 !max-w-none !h-full bg-white" : ""}`}>
             {renderContent()}
           </main>
         </div>

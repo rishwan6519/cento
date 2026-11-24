@@ -26,3 +26,4 @@ const MfaChallengeSchema: Schema = new Schema(
 
 export default mongoose.models.MfaChallenge ||
   mongoose.model<IMfaChallenge>('MfaChallenge', MfaChallengeSchema);
+
