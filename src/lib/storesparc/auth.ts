@@ -13,10 +13,10 @@ export async function getCallerIdentity(req: NextRequest): Promise<CallerIdentit
     token = authHeader.substring(7);
   }
 
-  // Allow x-user-id / x-store-id for testing or trusted internal services if JWT secret is not configured
-  const testUserId = req.headers.get('x-user-id');
+  // Allow x-user-id / x-store-id for testing or trusted internal web portal services
+  const testUserId = req.headers.get('x-user-id') || req.nextUrl.searchParams.get('userId');
   const testRole = req.headers.get('x-user-role') as Role | null;
-  const testStoreId = req.headers.get('x-store-id');
+  const testStoreId = req.headers.get('x-store-id') || req.nextUrl.searchParams.get('storeId');
 
   if (testUserId && testStoreId) {
     return {
@@ -27,6 +27,30 @@ export async function getCallerIdentity(req: NextRequest): Promise<CallerIdentit
       storeName: 'Sparc Flagship Store',
       locality: 'Downtown',
     };
+  }
+
+  if (testUserId) {
+    await connectToDatabase();
+    const dbUser = await User.findById(testUserId).catch(() => null);
+    if (dbUser) {
+      let role: Role = 'Store Manager';
+      if (testRole) {
+        role = testRole;
+      } else if (dbUser.role === UserRole.Admin || dbUser.role === UserRole.AccountAdmin || dbUser.role === UserRole.Reseller) {
+        role = 'Central admin';
+      } else if (dbUser.role === UserRole.Store || dbUser.operatorName === 'Manager') {
+        role = 'Store Manager';
+      }
+      const storeId = (dbUser.assignedStoreId || dbUser._id).toString();
+      return {
+        userId: dbUser._id.toString(),
+        displayName: dbUser.operatorName || dbUser.username,
+        role,
+        storeId,
+        storeName: dbUser.storeName || 'Sparc Store',
+        locality: dbUser.storeLocation || dbUser.location || 'Local',
+      };
+    }
   }
 
   if (!token) {
