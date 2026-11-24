@@ -1375,27 +1375,162 @@ The server constructs a single unified push envelope. The `data` block maintains
 ---
 
 ### 5. Task Management for Managers (GAP-SM-009)
-* **Create Task:** `POST /tasks`
+
+* **1. Get Task Form Options:** `GET /tasks/options` (or `GET /store/tasks/options`)
+* **Headers:** `Authorization: Bearer <token>` (Store Manager or Central admin)
+* **Purpose:** Populates the manager's task creation & editing modal with authoritative categories, roles, and eligible staff.
+* **Response Format (200 OK):**
+```json
+{
+  "store_id": "string",
+  "categories": [
+    {
+      "key": "group",
+      "label": "Group Task",
+      "description": "General task open to anyone on shift at the store",
+      "needs_role": false,
+      "eligible": "All Store Staff"
+    },
+    {
+      "key": "priority",
+      "label": "Priority Task",
+      "description": "Urgent task broadcast to all staff with priority notifications",
+      "needs_role": false,
+      "eligible": "All Store Staff"
+    },
+    {
+      "key": "role_specific",
+      "label": "Role-Specific Task",
+      "description": "Task restricted to staff members with a designated operational role",
+      "needs_role": true,
+      "eligible": "Staff matching designated role"
+    },
+    {
+      "key": "manager_only",
+      "label": "Manager Only",
+      "description": "Confidential managerial task hidden from regular staff",
+      "needs_role": false,
+      "eligible": "Store Managers and Central Admin"
+    }
+  ],
+  "roles": [
+    {
+      "key": "Cashier",
+      "label": "Cashier / Registers",
+      "eligible_staff": [ { "id": "string", "name": "string", "role": "string" } ]
+    },
+    {
+      "key": "Stockroom",
+      "label": "Stockroom / Inventory",
+      "eligible_staff": [ { "id": "string", "name": "string", "role": "string" } ]
+    },
+    {
+      "key": "Visual Merchandiser",
+      "label": "Visual Merchandiser",
+      "eligible_staff": [ { "id": "string", "name": "string", "role": "string" } ]
+    },
+    {
+      "key": "Keyholder",
+      "label": "Keyholder / Closing Supervisor",
+      "eligible_staff": [ { "id": "string", "name": "string", "role": "string" } ]
+    }
+  ],
+  "eligible_staff": [
+    {
+      "id": "string",
+      "name": "string",
+      "role": "string"
+    }
+  ]
+}
+```
+
+* **2. Create Task:** `POST /tasks`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
 * **Request Body (Create):**
 ```json
 {
   "title": "string",
   "note": "string",
   "category": "group" | "priority" | "role_specific" | "manager_only",
-  "role": "string",            // if role_specific
-  "assignee_id": "string",     // optional (open to team if omitted)
+  "role": "string",             // Required if category is role_specific
+  "assignee_id": "string",      // Optional (omit to leave open in pool for team to claim)
   "assignee_name": "string",
-  "due_date": "string (ISO 8601)"
+  "due_date": "string (ISO 8601 UTC)",
+  "client_timestamp": "string (ISO 8601 UTC)"
 }
 ```
-* **Reassign Task:** `POST /tasks/{id}/assign`
+* **Response Format (200 OK):**
+```json
+{
+  "id": "string",
+  "title": "string",
+  "category": "string",
+  "note": "string" | null,
+  "role_label": "string" | null,
+  "due": {
+    "date": "string (YYYY-MM-DD)",
+    "time": "string (HH:MM)" | null
+  } | null,
+  "assignee_name": "string" | null,
+  "assigned_to_me": boolean,
+  "completed_by": null,
+  "completed_at": null,
+  "can_claim": boolean,
+  "can_complete": boolean,
+  "can_release": boolean,
+  "created_by": "string",
+  "status": "open" | "claimed"
+}
+```
+
+* **3. Edit Task:** `PATCH /tasks/{id}`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
+* **Request Body (Edit):**
+```json
+{
+  "title": "string",
+  "note": "string",
+  "category": "group" | "priority" | "role_specific" | "manager_only",
+  "role": "string",
+  "due": {
+    "date": "string (YYYY-MM-DD)",
+    "time": "string (HH:MM)" | null
+  },
+  "client_timestamp": "string (ISO 8601 UTC)"
+}
+```
+* **Response Format (200 OK):** Returns the full updated task matching Staff Area 7.
+
+* **4. Assign or Reassign Task:** `POST /tasks/{id}/assign`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`
 * **Request Body (Reassign):**
 ```json
 {
-  "assignee_id": "string",
-  "assignee_name": "string"
+  "assignee_id": "string | null",   // Pass null or omit to leave open to team
+  "assignee_name": "string | null",
+  "client_timestamp": "string (ISO 8601 UTC)"
 }
 ```
+* **Response Format (200 OK):**
+```json
+{
+  "id": "string",
+  "status": "open" | "claimed",
+  "assignee_name": "string",
+  "message": "Task assignment updated"
+}
+```
+
+#### 💡 Open Questions & Server Rules Resolved (GAP-SM-009):
+1. **Server-Authoritative Role & Category Eligibility:**
+   * **`group` Tasks:** Eligible for any staff member rostered at the store. Stored in team pool (`status: "open"`, `can_claim: true`).
+   * **`priority` Tasks:** Eligible for any staff member, but immediately generates a high-priority push notification and in-app alert (`category: "priority_task"`) to all store staff.
+   * **`role_specific` Tasks:** Visible and claimable only by staff members holding that specific operational role label (e.g., `Cashier`, `Stockroom`).
+   * **`manager_only` Tasks:** Completely filtered out and hidden from regular staff queries (`GET /tasks`). Visible strictly when the caller has role `Store Manager` or `Central admin`.
+2. **Task Pool & Reassignment Lifecycle:**
+   * Managers can assign a task directly to an individual (`status: "claimed"`, raises `task_assigned` alert) or leave `assignee_id: null` to place the task in the pool for staff to claim.
+   * If an assignee is unable to complete a claimed task, either the staff member (`POST /tasks/{id}/release`) or the Store Manager (`POST /tasks/{id}/assign` with `assignee_id: null`) can release it back to the team pool.
 
 ---
 
