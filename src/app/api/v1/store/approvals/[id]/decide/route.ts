@@ -46,6 +46,23 @@ export async function POST(
 
       await approval.save();
 
+      // Raise swap_decided alert to the requesting staff member (Area 8 & 11)
+      if (approval.kind === 'shift_swap') {
+        const StoreAlert = (await import('@/models/StoreAlert')).default;
+        await StoreAlert.create({
+          userId: approval.requesterId,
+          storeId: approval.storeId,
+          category: 'swap_decided',
+          title: `Shift Swap ${approve ? 'Approved' : 'Declined'}`,
+          body: approve
+            ? `Your shift swap request for ${approval.detail?.date || 'shift'} was approved by ${caller!.displayName}.`
+            : `Your shift swap request was declined. Reason: ${reason || 'Manager declined'}.`,
+          read: false,
+          targetScreen: 'swaps',
+          targetArgument: approval._id.toString(),
+        });
+      }
+
       // If it's a manual check-in request, settle the attendance record
       if (approval.kind === 'manual_checkin') {
         let attendance = await AttendanceRecord.findOne({ approvalRequestId: approval._id.toString() });

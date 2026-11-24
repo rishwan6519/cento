@@ -377,20 +377,30 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 ### 8. Shift Swaps (GAP-API-003)
 * **List My Swaps:** `GET /swaps`
 * **Request a Swap:** `POST /swaps`
-* **Request Body (POST):**
+* **Withdraw a Swap:** `POST /swaps/{id}/withdraw`
+* **Request Body (POST /swaps):**
 ```json
 {
   "shift_id": "string",
-  "client_timestamp": "string (ISO 8601)"
+  "client_timestamp": "string (ISO 8601)",
+  "reason": "string (optional)"
 }
 ```
-* **Response Format (200 OK):**
+* **Response Format (POST /swaps 200 OK):**
 ```json
 {
   "id": "string",
   "shift_id": "string",
   "status": "pending" | "approved" | "declined" | "withdrawn",
   "submitted_at": "string (ISO 8601)",
+  "message": "string"
+}
+```
+* **Response Format (POST /swaps/{id}/withdraw 200 OK):**
+```json
+{
+  "id": "string",
+  "status": "withdrawn",
   "message": "string"
 }
 ```

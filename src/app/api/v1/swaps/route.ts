@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     try {
       await connectToDatabase();
       const body = await req.json();
-      const { shift_id, client_timestamp } = body;
+      const { shift_id, client_timestamp, reason } = body;
 
       if (!shift_id) {
         return apiError('VALIDATION_ERROR', 'Field shift_id is required', 400);
@@ -75,12 +75,15 @@ export async function POST(req: NextRequest) {
         kind: 'shift_swap',
         requesterId: caller!.userId,
         requesterName: caller!.displayName,
-        summary: `${caller!.displayName} requested swap for shift on ${shift.date}`,
+        summary: reason
+          ? `${caller!.displayName}: ${reason}`
+          : `${caller!.displayName} requested swap for shift on ${shift.date}`,
         detail: {
           shift_id: shift._id.toString(),
           date: shift.date,
           shift_start: shift.startMinutes,
           shift_end: shift.endMinutes,
+          reason: reason || undefined,
         },
         status: 'pending',
         declineReasons: [
