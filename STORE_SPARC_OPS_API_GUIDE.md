@@ -638,18 +638,96 @@ All error responses return HTTP status `4xx` or `5xx` with the standard machine-
 
 ---
 
-### 12. Push Token Registration (GAP-API-009)
-* **Register Device:** `POST /push/register`
-* **Unregister Device:** `POST /push/unregister`
-* **Request Body (POST /push/register):**
+### 12. Push Token Registration & Messaging Architecture (GAP-API-009)
+* **Register Device Push Token:** `POST /push/register`
+* **Unregister Device Push Token:** `POST /push/unregister` *(also sent automatically during sign-out via `/auth/sign-out`)*
+
+#### Request Format (`POST /push/register`):
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: <UUID>`, `Content-Type: application/json`
 ```json
 {
   "token": "string",
   "platform": "Android" | "iOS",
-  "app_id": "string",
-  "environment": "string"
+  "app_id": "com.storesparc.ops",
+  "environment": "production" | "staging" | "sandbox"
 }
 ```
+
+#### Response Format (`POST /push/register` 200 OK):
+```json
+{
+  "registered": true,
+  "token": "string",
+  "platform": "Android" | "iOS",
+  "app_id": "string",
+  "environment": "production" | "staging" | "sandbox",
+  "message": "string"
+}
+```
+
+#### Request Format (`POST /push/unregister`):
+* **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+```json
+{
+  "token": "string"
+}
+```
+
+#### Response Format (`POST /push/unregister` 200 OK):
+```json
+{
+  "unregistered": true,
+  "token": "string",
+  "message": "string"
+}
+```
+
+#### 📲 Unified Push Notification Payload Schema (FCM & APNs)
+The server constructs a single unified push envelope. The `data` block maintains **100% attribute parity** with the `GET /alerts` feed:
+```json
+{
+  "notification": {
+    "title": "Shift Swap Approved",
+    "body": "Your shift swap request for 2026-11-25 was approved by John Smith."
+  },
+  "data": {
+    "alert_id": "string (MongoDB ObjectId)",
+    "category": "swap_decided" | "task_assigned" | "priority_task" | "availability_due" | "hours_to_confirm" | "check_in_outcome" | "store_announcement" | "roster_published",
+    "target_screen": "swaps" | "tasks" | "hours" | "availability" | "attendance" | "roster" | "announcements",
+    "target_argument": "string" | null,
+    "created_at": "string (ISO 8601)",
+    "click_action": "FLUTTER_NOTIFICATION_CLICK"
+  },
+  "android": {
+    "priority": "high",
+    "notification": {
+      "sound": "default",
+      "channelId": "storesparc_alerts"
+    }
+  },
+  "apns": {
+    "payload": {
+      "aps": {
+        "badge": 1,
+        "sound": "default",
+        "category": "swap_decided",
+        "contentAvailable": true
+      }
+    }
+  }
+}
+```
+
+#### 💡 Open Questions Resolved (GAP-API-009):
+1. **FCM for both platforms, or APNs directly for iOS? Who owns the Firebase project?**
+   * **Answer:**
+     * **FCM for both platforms (Cross-Platform Unified Messaging):** We use Firebase Cloud Messaging (FCM) as the unified transport for both Android and iOS. The mobile client utilizes the cross-platform Firebase Messaging Flutter / React Native library. For iOS, Firebase forwards payloads to Apple Push Notification service (APNs) using the Apple APNs Authentication Key (`.p8`) registered in the Firebase Console. This eliminates duplicate backend notification pipelines while preserving native iOS background wakes and badge counts.
+     * **Direct APNs Readiness:** For zero-third-party requirements or VoIP background pushes, the `PushDevice` collection records the `platform` (`'iOS'`) and `environment` (`'sandbox'` vs `'production'`), enabling direct HTTP/2 APNs dispatching if desired.
+     * **Firebase Project Ownership:** The Firebase project and Google Cloud Console account are owned and maintained centrally by the **Central Store Sparc Engineering / Corporate IT team**. Stores and store managers never manage cloud credentials. Central IT provisions the `google-services.json` (Android), `GoogleService-Info.plist` (iOS), and provides the server Google Service Account credential (`FIREBASE_SERVICE_ACCOUNT_KEY`).
+2. **What does a push payload carry, and does it match the alerts feed?**
+   * **Answer:**
+     * **Push Payload Content:** The push payload carries lightweight presentation metadata (`notification.title`, `notification.body`), deep-link routing data (`data.target_screen`, `data.target_argument`), entity identification (`data.alert_id`, `data.category`), and badge counting (`apns.payload.aps.badge`).
+     * **100% Parity with Alerts Feed:** The keys in the `data` block (`alert_id`, `category`, `target_screen`, `target_argument`, `created_at`) correspond 1:1 with the items returned by `GET /alerts`. When a user taps a background push notification, the mobile router navigates to the exact same screen that would open if they tapped that alert inside the in-app notification center.
 
 ---
 

@@ -962,12 +962,34 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"\",\n  \"platform\": \"Android\",\n  \"app_id\": \"com.storesparc.ops\",\n  \"environment\": \"test\"\n}"
+              "raw": "{\n  \"token\": \"\",\n  \"platform\": \"Android\",\n  \"app_id\": \"com.storesparc.ops\",\n  \"environment\": \"production\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/push/register",
               "host": ["{{baseUrl}}"],
               "path": ["push", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unregister Mobile FCM Push Token (GAP-API-009)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-user-id", "value": "{{staffUserId}}" },
+              { "key": "x-user-role", "value": "Staff" },
+              { "key": "x-store-id", "value": "{{storeId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/push/unregister",
+              "host": ["{{baseUrl}}"],
+              "path": ["push", "unregister"]
             }
           },
           "response": []

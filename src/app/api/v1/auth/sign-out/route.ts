@@ -10,8 +10,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     await connectToDatabase();
 
-    // If caller provided a push registration device_token, remove it from their profile
+    // If caller provided a push registration device_token, remove it from devices and profile
     if (caller && body.device_token) {
+      const PushDevice = (await import('@/models/PushDevice')).default;
+      await PushDevice.deleteOne({ token: body.device_token });
       await User.findByIdAndUpdate(caller.userId, {
         $pull: { fcmTokens: body.device_token },
       });
