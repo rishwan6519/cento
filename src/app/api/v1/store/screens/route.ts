@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
           kind_of_content: kindOfContent,
           content_type: kindOfContent,
           offline_since: offlineSince,
+          reported: !!report,
           reported_at: report ? report.reportedAt.toISOString() : null,
           reported_by: report ? report.reportedBy : null,
         };

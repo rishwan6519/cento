@@ -1653,17 +1653,62 @@ The server constructs a single unified push envelope. The `data` block maintains
 ### 7. Report Offline Screen (GAP-SM-011)
 * **Method:** `POST`
 * **Endpoint:** `/store/screens/{id}/report-offline`
-* **Headers:** `Idempotency-Key: string (UUID)`
+* **Headers:** `Authorization: Bearer <token>`, `Idempotency-Key: string (UUID)`
+* **Request Body:** `{ "client_timestamp": "string (ISO 8601 UTC)" }`
 * **Response Format (200 OK):**
 ```json
 {
   "id": "string (Screen ID)",
   "store_id": "string",
   "name": "string",
+  "zone": "entrance" | "window" | "registers" | "aisles",
   "online": false,
-  "reported_at": "string (ISO 8601)",
+  "reported": true,
+  "reported_at": "string (ISO 8601 UTC)",
   "reported_by": "string",
   "message": "Offline screen successfully reported to Central"
 }
 ```
+
+#### 💡 Open Questions Resolved (GAP-SM-011):
+1. **Does a report open a ticket in the Store Promotion Platform, or only notify Central?**
+   * **Answer:**
+     * **Phase 1 Behavior:** The report registers an **incident telemetry event in the Store Promotion Platform (SPP)** and immediately notifies Central Store Operations Console and Store Managers via real-time alerts.
+     * **Automated Diagnostics:** An automated hardware health probe is queued in SPP to ping the media player IP / HDMI status.
+     * **ITSM Ticket Dispatch:** In Phase 1, formal field technician dispatch (e.g., ServiceNow / Jira Service Desk ticket) is managed at the Central Operations tier; the mobile API acknowledges the report and flags the screen as `reported: true`.
+2. **Duplicate Report Handling:**
+   * **Answer:** The server accepts **one report per offline screen incident**. If a screen has already been reported as offline, subsequent calls return the existing incident timestamp and reporter (`reported: true`, `reported_at`, `reported_by`) without duplicate notifications or error rejections.
+
+---
+
+# 📋 PART 3: WHAT THE STORE MANAGER ADDS TO THE STAFF AREAS
+
+The Store Manager capabilities seamlessly integrate with and complete the Staff areas established in Part 1:
+
+| Staff Area | Store Manager Extension & Backend Integration |
+| :--- | :--- |
+| **Area 1: Sign-In** | Phase 1 strictly defines **three roles**: `Staff`, `Store Manager`, and `Central admin`. There is **no Assistant Manager role**. |
+| **Area 2: Roster** | The published shifts staff read (`GET /roster/published`) are the exact shifts the manager publishes in Area 4 (`POST /store/roster/publish`). |
+| **Area 4: Attendance** | The manager's approval or decline decision (`POST /store/approvals/{id}/decide`) authoritatively settles a staff member's manual check-in request, updating attendance to `checked_in`. |
+| **Area 5: Hours** | Weekly attendance corrections submitted by staff are routed to the manager's approvals queue. There is **no separate manager sign-off** of confirmed weeks; payroll processing is out of scope. |
+| **Area 7: Tasks** | When called by a Store Manager, `GET /tasks` returns all tasks including `manager_only` tasks (which are hidden from Staff). Tasks created by the manager in Area 5 appear in Staff task lists. |
+| **Area 8: Alerts** | The Store Manager alert categories include: `approvals_waiting` (with flagged count), `manual_checkin_to_confirm`, `availability_missing` (opens **Team availability** target screen), `priority_task`, and `screen_offline` (with `reported` status). |
+| **Area 11: Store Screens** | Every screen in `GET /store/screens` carries `reported: boolean`, `reported_at`, and `reported_by`. |
+
+---
+
+# ⚖️ PART 4: SUMMARY MATRIX — DECISIONS THE API MUST RESPECT
+
+These decisions were settled in the Store Manager design review and govern every API endpoint:
+
+| Agreed Decision | What It Means for the API |
+| :--- | :--- |
+| **No leave or discount approvals in Phase 1** | The approvals queue holds `shift_swap`, `attendance_correction`, and `manual_checkin` requests only. |
+| **Manager approves or declines swaps; cover from API** | The swap decision carries approve or decline with a reason, never a manager-chosen replacement. |
+| **No separate sign-off of confirmed weeks** | Correction decisions are the manager's only hours action; payroll is out of scope. |
+| **Only submitted availability is shown** | Team availability explicitly marks who has not submitted (`"Not submitted"`); nothing is assumed for them. |
+| **Coverage is a warning, never a block** | Publishing succeeds even with coverage gaps; the plan returns `coverage_warnings`. |
+| **Lateness only from the API** | The dashboard displays lateness badges only when attendance data flags it based on the 5-minute grace window. |
+| **Three roles only; one manager role** | The tasks API filters by role; there is no Assistant Manager role. |
+| **Store and Central WhatsApp groups only** | Announcements go to the store's group; there are no regional groups. |
 
